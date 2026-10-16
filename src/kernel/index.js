@@ -29,6 +29,7 @@ import {
 } from './rules/act.js';
 import { fireHook } from './rules/powers.js';
 import { offerBoons, applyBoon } from './rules/kindling.js';
+import { offerTempers, temperEffects, temperHpCost } from './rules/tempers.js';
 import './rules/effects/index.js'; // registers the exotic handlers exactly once
 import { observe as observeState, observeActions, snapshot as snapshotState } from './observe.js';
 import {
@@ -263,6 +264,11 @@ export function newRun(opts = {}) {
     state.kindling = { offers: offer.ids, taken: null };
     state.relicOff = false;
   }
+  // B2 Tempers (opt-in): the same rule — absent unless asked for.
+  if (opts.tempers === true) {
+    state.tempers = {};
+    state.temperOffers = null;
+  }
 
   return freezeDeep(state);
 }
@@ -312,8 +318,16 @@ export function step(state, id) {
     case 'rest_heal': {
       const healed = Math.min(REST_HEAL, bumped.player.maxHp - bumped.player.hp);
       result = {
-        state: { ...bumped, player: { ...bumped.player, hp: bumped.player.hp + healed }, phase: 'map' },
+        state: { ...bumped, player: { ...bumped.player, hp: bumped.player.hp + healed }, phase: 'map', ...(bumped.tempers ? { temperOffers: null } : {}) },
         events: [{ t: 'heal', who: 'player', amount: healed, source: 'rest' }],
+      };
+      break;
+    }
+    case 'temper': {
+      const o = match.offer;
+      result = {
+        state: { ...bumped, tempers: { ...bumped.tempers, [o.uid]: o.temper }, temperOffers: null, phase: 'map' },
+        events: [{ t: 'card_tempered', uid: o.uid, cardId: o.cardId, temper: o.temper }],
       };
       break;
     }
@@ -321,7 +335,7 @@ export function step(state, id) {
       result = applyBoon(bumped, match.boon);
       break;
     case 'rest_leave':
-      result = { state: { ...bumped, phase: 'map' }, events: [{ t: 'rest_left' }] };
+      result = { state: { ...bumped, phase: 'map', ...(bumped.tempers ? { temperOffers: null } : {}) }, events: [{ t: 'rest_left' }] };
       break;
     default:
       return { state, events: [], error: { code: 1, error: 'internal', id: String(id) } };
@@ -372,9 +386,18 @@ function playCard(state, action, content) {
   };
 
   const events = [];
-  const exhausted = def.effects.some((e) => e.verb === 'exhaust');
+  // B2: a tempered instance resolves its modified effect list (looked up by uid).
+  const temper = state.tempers ? state.tempers[card.uid] : undefined;
+  const effects = temper ? temperEffects(def.effects, temper) : def.effects;
+  const exhausted = effects.some((e) => e.verb === 'exhaust');
+  const hpCost = temperHpCost(temper);
+  if (hpCost > 0) {
+    const paid = Math.min(hpCost, next.player.hp - 1);
+    next = { ...next, player: { ...next.player, hp: next.player.hp - paid } };
+    events.push({ t: 'hp_cost', amount: paid, source: 'temper' });
+  }
 
-  for (const effect of def.effects) {
+  for (const effect of effects) {
     // Re-resolved per effect, not hoisted: if an earlier effect killed the aimed enemy,
     // the remaining effects of the SAME card must land somewhere legal rather than
     // write to a corpse (rule 5). Re-resolution is what makes that a property instead of
@@ -436,6 +459,13 @@ function travel(state, action, content) {
     return startCombat(at, node, content.cards);
   }
   if (node.type === 'rest') {
+    if (at.tempers) {
+      const offer = offerTempers(at, content.cards);
+      return {
+        state: { ...at, phase: 'rest', rngDraws: at.rngDraws + offer.draws, temperOffers: offer.offers },
+        events: [{ t: 'rest_ready', node: node.id }],
+      };
+    }
     return { state: { ...at, phase: 'rest' }, events: [{ t: 'rest_ready', node: node.id }] };
   }
   throw new Error(`unhandled node type "${node.type}"`);

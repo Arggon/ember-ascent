@@ -5,6 +5,7 @@
 // is frozen by the requirements:
 //   p<n> play hand slot n · e1 end turn · c continue · s<n> reward pick · n<n> map node
 //   k<n> kindling boon (opt-in runs only; additive, no existing id changes)
+//   t<n> temper a card at a rest site (opt-in runs only; additive)
 //
 // TARGETED PLAYS (PM Document revision 5). A card whose content declares
 // `target: "enemy"` must be aimed by the player when the choice is real, i.e. when
@@ -106,6 +107,7 @@ export function actions(state) {
     case 'rest': {
       out.push({ id: 'c', kind: 'rest_heal' });
       out.push({ id: 'e1', kind: 'rest_leave' });
+      (state.temperOffers ?? []).forEach((offer, i) => out.push({ id: `t${i + 1}`, kind: 'temper', offer }));
       break;
     }
     case 'kindling': {

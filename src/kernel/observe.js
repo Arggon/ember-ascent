@@ -16,6 +16,7 @@ import { defaultContent } from './content.js';
 import { actions as legalActions } from './actions.js';
 import { intentLabel, intentDamage, REST_HEAL } from './rules/act.js';
 import { BOONS } from './rules/kindling.js';
+import { TEMPERS } from './rules/tempers.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -213,7 +214,12 @@ function rewardBody(state) {
 }
 
 function restBody(state) {
-  return ['REST — heal or move on', ` HP ${state.player.hp}/${state.player.maxHp}`];
+  const lines = ['REST — heal or move on', ` HP ${state.player.hp}/${state.player.maxHp}`];
+  if (state.temperOffers && state.temperOffers.length > 0) {
+    lines.push('TEMPER (instead of healing)');
+    state.temperOffers.forEach((o, i) => lines.push(` t${i + 1} ${o.cardId} ${TEMPERS[o.temper].label}`));
+  }
+  return lines;
 }
 
 function kindlingBody(state) {
@@ -284,6 +290,9 @@ export function observeActions(state) {
         break;
       case 'boon':
         lines.push(`${a.id} ${a.boon}`);
+        break;
+      case 'temper':
+        lines.push(`${a.id} temper ${a.offer.cardId} ${a.offer.temper}`);
         break;
       default:
         lines.push(`${a.id} ?`);
@@ -365,6 +374,9 @@ export function snapshot(state) {
       cost: card.cost,
       type: def.type,
       rarity: def.rarity,
+      // B2: the instance's temper (null when untempered or the run has none).
+      temper: state.tempers?.[card.uid] ?? null,
+      temperText: state.tempers?.[card.uid] ? TEMPERS[state.tempers[card.uid]].text : '',
       // Same card, second rendering. `summary` stays the CLI's compact form (frozen by
       // tests/budget.test.js); `description` is the sentence a human reads instead.
       typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
@@ -492,7 +504,15 @@ export function snapshot(state) {
     enemies,
     map,
     reward,
-    rest: state.phase === 'rest' ? { healId: legal.find((a) => a.kind === 'rest_heal')?.id ?? null, leaveId: legal.find((a) => a.kind === 'rest_leave')?.id ?? null, heal: REST_HEAL } : null,
+    rest: state.phase === 'rest' ? {
+      healId: legal.find((a) => a.kind === 'rest_heal')?.id ?? null,
+      leaveId: legal.find((a) => a.kind === 'rest_leave')?.id ?? null,
+      heal: REST_HEAL,
+      tempers: (state.temperOffers ?? []).map((o, i) => ({
+        actionId: `t${i + 1}`, cardId: o.cardId, cardName: cardDef(o.cardId)?.name ?? o.cardId,
+        temper: o.temper, temperName: TEMPERS[o.temper].name, text: TEMPERS[o.temper].text,
+      })),
+    } : null,
     kindling: state.phase === 'kindling'
       ? { boons: state.kindling.offers.map((id, i) => ({ id, name: BOONS[id].name, text: BOONS[id].text, label: BOONS[id].label, actionId: `k${i + 1}` })) }
       : null,

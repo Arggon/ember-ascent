@@ -157,7 +157,7 @@ function seedFromUrl() {
   return Number.isInteger(n) && n >= 0 ? n : Math.floor(Math.random() * 1000000);
 }
 
-let ctl = createController({ run: { seed: seedFromUrl(), kindling: true } });
+let ctl = createController({ run: { seed: seedFromUrl(), kindling: true, tempers: true } });
 let snap = ctl.snapshot();
 /** Kernel events of the current run, accumulated for the run-history record (reset in newGame). */
 let runEvents = [];
@@ -844,7 +844,7 @@ function newGame(seed = null) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
   // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
-  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), kindling: true } });
+  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), kindling: true, tempers: true } });
   snap = ctl.snapshot();
   // The event stream is per-RUN, so it dies with the run. It is the only source of the kill
   // / elite / boss counts the score needs, which is why it is accumulated rather than
@@ -1857,6 +1857,11 @@ function cardTile(card, opts = {}) {
     tile.classList.add('has-illus');
   }
   tile.append(head);
+  // B2: a tempered instance wears a trim and names its temper (the kernel's own sentence).
+  if (card.temper) {
+    tile.classList.add('tempered', `temper-${card.temper}`);
+    tile.append(el('span', { cls: 'ctemper', text: card.temperText.split(':')[0], attrs: { title: card.temperText } }));
+  }
   tile.append(el('span', { cls: 'cname', text: card.name }));
   if (card.flavor) tile.append(el('span', { cls: 'cflavor', text: card.flavor }));
   tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));
@@ -2114,6 +2119,22 @@ function restView() {
     el('button', { cls: 'btn', text: `Rest (+${snap.rest.heal} HP)`, attrs: { type: 'button' }, on: { click: () => act(snap.rest.healId) } }),
     el('button', { cls: 'btn secondary', text: 'Move on', attrs: { type: 'button' }, on: { click: () => act(snap.rest.leaveId) } }),
   ));
+  // B2: or temper one card instead of healing. Offers and sentences come from the kernel.
+  const tempers = snap.rest.tempers || [];
+  if (tempers.length > 0) {
+    wrap.append(el('p', { cls: 'temper-head', text: 'Or temper a card at the forge (instead of resting):' }));
+    const list = el('div', { cls: 'boon-list temper-list' });
+    for (const t of tempers) {
+      list.append(el('button', {
+        cls: `boon temper-offer temper-${t.temper}`,
+        attrs: { type: 'button', 'data-action': t.actionId, 'aria-label': `Temper ${t.cardName}. ${t.text}` },
+        on: { click: () => act(t.actionId) },
+      },
+      el('span', { cls: 'boon-name', text: `${t.cardName} · ${t.temperName}` }),
+      keywordText(el('span', { cls: 'boon-text' }), t.text.split(': ').slice(1).join(': '))));
+    }
+    wrap.append(list);
+  }
   return page('rest', 'IV — The Ember', 'flame', 'panel', [wrap]);
 }
 
