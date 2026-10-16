@@ -41,10 +41,10 @@ export function backdropMarkup() {
     <path class="brick" d="M0 140 H800 M0 190 H800 M0 240 H800 M60 90 V140 M180 90 V140 M300 90 V140 M420 90 V140 M540 90 V140 M660 90 V140 M120 140 V190 M240 140 V190 M360 140 V190 M480 140 V190 M600 140 V190 M720 140 V190 M60 190 V240 M300 190 V240 M540 190 V240 M780 190 V240"/>
     <path class="chain" d="M120 0 V90 M124 0 V90 M400 0 V70 M404 0 V70 M640 0 V100"/>
     <path class="hook" d="M122 90 C116 96 118 104 126 104 M402 70 C396 76 398 84 406 84"/>
-    <path class="furnace" d="M30 150 C30 120 190 120 190 150 V306 H30 Z"/>
-    <path class="glow" d="M56 170 C56 152 164 152 164 170 V290 H56 Z"/>
-    <path class="glow-core" d="M80 214 C96 196 124 196 140 214 V290 H80 Z"/>
-    <path class="bars" d="M78 166 V290 M110 160 V290 M142 166 V290"/>
+    <ellipse class="fire-spill" cx="110" cy="300" rx="150" ry="40"/>
+    <ellipse class="fire-halo" cx="110" cy="236" rx="110" ry="96"/>
+    <image class="furnace-img" href="assets/sprites/furnace.webp" x="20" y="150" width="180" height="156" preserveAspectRatio="xMidYMax meet"/>
+    <ellipse class="fire-mouth" cx="110" cy="262" rx="44" ry="34"/>
     <path class="spire" d="M690 300 L706 110 L742 110 L758 300 Z"/>
     <path class="spire-cut" d="M714 130 V290 M732 130 V290"/>
     <path class="floor" d="M0 318 C160 300 280 336 400 312 C540 286 660 330 800 304 V400 H0 Z"/>
