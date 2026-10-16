@@ -83,6 +83,8 @@ You have **3 energy per turn**, and cards cost 1–2, so you'll typically play 2
 
 **The Kindling.** In the browser, every run opens at the forge: it offers three boons and you must take one. Each has an upside *and* a price (for example *Bellows Breath*: +1 Energy every turn, −12 max HP). Choose for your plan, not for the bigger number.
 
+**Tempers.** At a campfire you may, instead of resting, temper one of three offered cards for the rest of the run: *Quenched* (also gain 3 Block), *Red-hot* (+50% damage, lose 2 HP when played) or *Balanced* (also draw 1 card, exhausts). A tempered card wears a coloured trim and a badge.
+
 Killing a low-HP enemy outright is usually better than blocking, because a dead enemy deals no damage next turn.
 
 You are going to lose. A lot. That's the genre — the run ends with `GAME OVER — DEFEAT` and tells you how far you got.
@@ -120,7 +122,7 @@ node bin/dlb actions --run run.json     # 5-token action ids
 node bin/dlb play p1 --run run.json
 ```
 
-Add `--kindling` to `new` to open on the act-start boon choice the browser uses: the state shows `KINDLING` and the actions are `k1`–`k3` (no skip). Without the flag a run is byte-identical to earlier builds, so old seeds, logs and golden hashes still match. A Kindling run's log header records `"kindling":true`, so `replay` reproduces it.
+Add `--kindling` to `new` to open on the act-start boon choice the browser uses: the state shows `KINDLING` and the actions are `k1`–`k3` (no skip). Without the flag a run is byte-identical to earlier builds, so old seeds, logs and golden hashes still match. `--tempers` adds the rest-site temper offers (`t1`–`t3`, next to `c` heal and `e1` leave); the browser uses both flags. A Kindling run's log header records `"kindling":true`, so `replay` reproduces it.
 
 **Batch balance testing costs zero API tokens:**
 

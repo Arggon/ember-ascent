@@ -3545,7 +3545,7 @@ html, body {
 /* ---------- Tempers (B2): frame trim per temper + rest-site offers ---------- */
 .card.tempered { position: relative; }
 .card .ctemper {
-  position: absolute; top: 34%; right: -2px; z-index: 3; padding: 1px 6px; border-radius: 6px 0 0 6px;
+  position: absolute; bottom: 30px; right: 6px; z-index: 3; padding: 1px 6px; border-radius: 6px;
   font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #1a0f0a;
 }
 .card.temper-quenched { box-shadow: 0 0 0 2px #7cc4e8, 0 0 14px rgba(124, 196, 232, 0.45); }
@@ -3566,3 +3566,4 @@ html, body {
   .temper-list .boon-text { display: none; }
   .temper-list .boon-name { font-size: 0.74rem; }
 }
+@media (max-height: 480px) { .card .ctemper { bottom: auto; top: 2px; right: 6px; font-size: 0.55rem; padding: 0 4px; } }
