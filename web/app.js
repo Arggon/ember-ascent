@@ -17,6 +17,7 @@
 // End Turn button is always present. Keyboard shortcuts exist but are never required.
 
 import { createController } from '../src/surface/gui/controller.js';
+import { cardArtMarkup } from './card-art.js';
 // The ONE public kernel entry point (package.json `exports` is exactly this file, and it
 // is browser-safe by construction: no `node:*`, no clock, no unseeded randomness, all
 // enforced by tools/check-architecture.mjs). Every number the history screens show is
@@ -1560,21 +1561,25 @@ function cardTile(card, opts = {}) {
   );
   tile.append(gem);
 
-  // Art band: a per-type silhouette in the former dead space. Decorative only — it changes
-  // no legality, no outcome and no data, so it stays in the renderer. The pool member is
-  // dealt by the hand slot, which needs no RNG and keeps two copies of the same card from
-  // looking identical.
-  const ART_POOL = { attack: ['cleave', 'sweep', 'blade'], skill: ['shield', 'ward', 'rune'], power: ['star', 'spikes', 'flame'] };
-  const pool = ART_POOL[card.type] || ['rune'];
-  const slotSeed = Number((card.slot || '').replace(/[^0-9]/g, '')) || 1;
-  const art = glyphBox(pool[slotSeed % pool.length], 'c-art p' + (1 + (slotSeed % 3)));
-  art.setAttribute('aria-hidden', 'true');
-  tile.append(art);
-
-  tile.append(el('span', { cls: 'ctype' },
+  // The head plate is the illustration window: one woodcut drawing per card id
+  // (web/card-art.js), decorative and aria-hidden. The type mark + word stay on top, so
+  // type is still carried by hue, mark and word. Unknown ids fall back to the type mark.
+  const head = el('span', { cls: 'ctype' },
     glyphBox(TYPE_GLYPH[card.type] || 'rune', 'c-type-mark'),
     el('span', { text: card.typeLabel || card.type }),
-  ));
+  );
+  const drawn = cardArtMarkup(card.cardId);
+  if (drawn) {
+    const ill = el('span', { cls: 'c-illus', attrs: { 'aria-hidden': 'true' } });
+    ill.innerHTML = drawn;
+    head.prepend(ill);
+    // A large, faint echo of the same drawing fills the effect panel behind the words.
+    const echo = el('span', { cls: 'c-art c-echo', attrs: { 'aria-hidden': 'true' } });
+    echo.innerHTML = drawn;
+    tile.append(echo);
+    tile.classList.add('has-illus');
+  }
+  tile.append(head);
   tile.append(el('span', { cls: 'cname', text: card.name }));
   tile.append(el('span', { cls: 'cdesc', text: desc }));
   // The compact code is NOT repeated on a reward tile: the player is choosing a card to
@@ -1631,9 +1636,63 @@ function mapView(travel = null) {
     if (showTravel) rowEl.append(travelMarker(travel));
     map.append(rowEl);
   });
+  // The world behind the path (decorative, constant markup): lava at the foot where the
+  // climb starts, two ridge lines, and the Guardian's spire at the summit.
+  const world = el('div', { cls: 'map-world', attrs: { 'aria-hidden': 'true' } });
+  world.innerHTML = MAP_WORLD;
+  map.prepend(world);
   wrap.append(map);
+  requestAnimationFrame(() => drawRoutes(map));
   wrap.append(el('p', { cls: 'hint', text: 'Click a glowing node to travel. Fight something weak, risk an elite, or rest.' }));
   return page('map', 'I — The Path', 'route', 'panel', [wrap]);
+}
+
+const MAP_WORLD = '<svg viewBox="0 0 400 600" preserveAspectRatio="none">'
+  + '<path class="w-sky" d="M0 0 H400 V600 H0 Z"/>'
+  + '<path class="w-far" d="M0 150 L40 120 L70 135 L110 80 L150 110 L200 30 L250 100 L290 75 L330 115 L370 90 L400 110 V600 H0 Z"/>'
+  + '<path class="w-spire" d="M188 70 L196 18 L200 4 L204 18 L212 70 Z"/>'
+  + '<path class="w-mid" d="M0 330 L50 290 L90 310 L140 250 L190 290 L240 240 L290 280 L340 245 L400 285 V600 H0 Z"/>'
+  + '<path class="w-crack" d="M140 250 L150 300 L138 340 M290 280 L282 330"/>'
+  + '<path class="w-near" d="M0 500 L60 470 L120 490 L180 455 L250 485 L320 460 L400 490 V600 H0 Z"/>'
+  + '<path class="w-lava" d="M0 575 C70 555 130 590 200 570 C270 550 330 588 400 566"/>'
+  + '</svg>';
+
+/**
+ * Draw the routes between floors. The kernel connects every node on a floor to every node
+ * on the next one (rules/map.js availableNodes), so every pair is drawn; the legs the player
+ * can take right now are lit. Geometry is read from the laid-out nodes, so it follows any
+ * breakpoint. Decorative: aria-hidden, pointer-inert, and it carries no fact the node
+ * buttons do not already state.
+ * @param {HTMLElement} map
+ */
+function drawRoutes(map) {
+  if (!map.isConnected) return;
+  const box = map.getBoundingClientRect();
+  if (box.width === 0) return;
+  const rows = [...map.querySelectorAll('.map-row')].map((r) => [...r.querySelectorAll('.node')]);
+  // offset* geometry, not getBoundingClientRect: it ignores the rows' entrance transform,
+  // so the routes are drawn where the nodes come to rest.
+  const c = (n) => { const r = n.parentElement; return [r.offsetLeft + n.offsetLeft + n.offsetWidth / 2, r.offsetTop + n.offsetTop + n.offsetHeight / 2]; };
+  let lit = '';
+  let dim = '';
+  for (let r = 0; r + 1 < rows.length; r += 1) {
+    for (const a of rows[r]) {
+      for (const b of rows[r + 1]) {
+        const [x1, y1] = c(a); const [x2, y2] = c(b);
+        const my = (y1 + y2) / 2;
+        const d = `M${x1.toFixed(1)} ${y1.toFixed(1)} C${x1.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)} `;
+        if (a.classList.contains('current') && b.classList.contains('available')) lit += d; else dim += d;
+      }
+    }
+  }
+  // innerHTML on a constant template keeps this file free of any namespace URL string;
+  // the only interpolated values are numbers this function computed.
+  const holder = el('div');
+  holder.innerHTML = `<svg class="map-routes" aria-hidden="true" width="${Math.round(box.width)}" height="${Math.round(box.height)}">`
+    + (dim ? `<path class="route-dim" d="${dim}"/>` : '') + (lit ? `<path class="route-lit" d="${lit}"/>` : '') + '</svg>';
+  const svg = holder.firstChild;
+  map.querySelector('.map-routes')?.remove();
+  map.insertBefore(svg, map.querySelector('.map-row'));
 }
 
 /**

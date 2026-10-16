@@ -2730,7 +2730,7 @@ html, body {
   .card .c-art .m { stroke-width: 1.3; }
   .card .c-art .mf { opacity: 0.3; }
   .card .cdesc { color: #f3e3d3; }
-  .cost-gem { filter: drop-shadow(0 0 6px rgba(255, 120, 40, 0.55)); }
+  .cost-gem { filter: drop-shadow(0 0 6px rgba(255, 120, 40, 0.55)); z-index: 4; }
 
   /* --- Enemies: woodcut iron figures, rim-lit by the furnace, ember eyes. --- */
   .e-silhouette { width: 96px; height: 96px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)); }
@@ -2798,5 +2798,117 @@ html, body {
 
   @media (prefers-reduced-motion: reduce) {
     .enemy .e-silhouette svg { animation: none; }
+  }
+}
+
+/* ==========================================================================================
+   ART PHASE 2 — card illustrations, the drawn world map, motion polish, fixes.
+   Same rules as above: paint/type only inside the combat layout; the map page is outside
+   LAYOUT-ACCEPTANCE's combat scope and is restyled here.
+   ========================================================================================== */
+@media screen {
+  /* --- Card head = illustration window. The drawing sits right, type mark + word left. --- */
+  .card.has-illus .ctype { position: relative; overflow: hidden; justify-content: flex-start; padding-left: 12px; }
+  /* The mark keeps its per-breakpoint HEIGHT (it sets the head plate's height, which the
+     layout contract measured) but gives up its width to the drawing. Type stays readable
+     by hue, the type word and the head shape. */
+  .card.has-illus .c-type-mark { width: 0; margin-right: -6px; visibility: hidden; }
+  .card.has-illus .ctype { align-items: flex-end; }
+  .card.has-illus .ctype > span:last-child { text-shadow: 0 1px 2px #000, 0 0 8px #000; }
+  .c-illus {
+    position: absolute; top: 2px; bottom: 2px; right: 4px; width: 70%;
+    z-index: 0; pointer-events: none; color: color-mix(in srgb, var(--card-hue) 85%, #fff);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%);
+            mask-image: linear-gradient(90deg, transparent 0%, #000 22%);
+  }
+  .c-illus svg { display: block; width: 100%; height: 100%; }
+  .c-illus .b { fill: #0b0705; }
+  .c-illus .r { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+  .c-illus .g { fill: #ffcf6b; filter: drop-shadow(0 0 2px #ff7a2f); }
+  .c-illus .gc { fill: none; stroke: #ff8a3a; stroke-width: 1.4; stroke-linecap: round; filter: drop-shadow(0 0 2px #ff5a1f); }
+  .card.has-illus .ctype > .c-type-mark, .card.has-illus .ctype > span:last-child { position: relative; z-index: 1; }
+  .card.has-illus .c-art.c-echo {
+    display: grid; opacity: 0.13; transform: none; color: var(--card-hue);
+    background: none; box-shadow: none; filter: blur(0.3px);
+  }
+  .c-echo .b { fill: none; } .c-echo .r, .c-echo .gc { fill: none; stroke: currentColor; stroke-width: 1; }
+  .c-echo .g { fill: currentColor; }
+  @media (max-height: 480px), (max-width: 620px) { .card.has-illus .c-art.c-echo { display: none; } }
+  .card.disabled .c-illus { opacity: 0.45; filter: grayscale(0.6); }
+  .card:hover:not(.disabled) .c-illus .g, .card:focus-visible .c-illus .g { animation: ea-flicker 0.9s ease-in-out infinite alternate; }
+  @keyframes ea-flicker { from { opacity: 1; } to { opacity: 0.55; } }
+
+  /* --- HUD step counter: Barlow numerals, not the leftover monospace. --- */
+  #hud .hud-step, #hud .stat { font-family: var(--num); font-weight: 600; letter-spacing: 0.03em; }
+
+  /* --- The world map: climb from the lava (floor 1, bottom) to the Guardian (top). --- */
+  .page-map.panel { background: #0c0806; }
+  .page-map.panel::before, .page-map.panel::after { display: none; }
+  .page-map .map {
+    position: relative; display: flex; flex-direction: column-reverse; gap: 14px;
+    max-width: 640px; padding: 14px 10px; border-radius: 12px; overflow: hidden;
+    background: transparent; border: 1px solid #3b261a;
+  }
+  .map-world { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .map-world svg { width: 100%; height: 100%; display: block; }
+  .map-world .w-sky { fill: #120b08; }
+  .map-world .w-far { fill: #1c120c; }
+  .map-world .w-spire { fill: #2a1610; stroke: #ff6a2a; stroke-opacity: 0.5; stroke-width: 1.5; }
+  .map-world .w-mid { fill: #170e09; }
+  .map-world .w-crack { fill: none; stroke: #ff6a26; stroke-opacity: 0.35; stroke-width: 2; }
+  .map-world .w-near { fill: #0f0806; }
+  .map-world .w-lava { fill: none; stroke: #ff7a2f; stroke-width: 5; stroke-opacity: 0.7; filter: drop-shadow(0 0 6px #ff5a1f); }
+  .map-routes { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none; overflow: visible; }
+  .route-dim { fill: none; stroke: rgba(201, 173, 152, 0.18); stroke-width: 1.5; stroke-dasharray: 2 5; stroke-linecap: round; }
+  .route-lit { fill: none; stroke: var(--gold); stroke-width: 2.5; stroke-dasharray: 6 6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 120, 40, 0.7)); animation: ea-march 1.2s linear infinite; }
+  @keyframes ea-march { to { stroke-dashoffset: -24; } }
+  .page-map .map-row {
+    position: relative; z-index: 2; display: flex; flex-wrap: nowrap; justify-content: center;
+    gap: 36px; max-width: none; margin: 0; grid-template-columns: none;
+  }
+  .page-map .map-row::after { display: none; }
+  .page-map .map-floor-label { left: 4px; transform: translateY(-50%); font-family: var(--num); color: var(--faint); }
+  .page-map .node {
+    flex: 0 0 auto; min-width: 0; width: auto; min-height: 40px; padding: 4px 12px 4px 4px;
+    grid-template-columns: 30px auto 12px; column-gap: 8px; border-radius: 22px;
+    background: rgba(14, 9, 6, 0.92); opacity: 1;
+  }
+  .page-map .node:not(.available):not(.current) { opacity: 0.62; }
+  .page-map .node .ntype-mark { width: 30px; height: 30px; }
+  .page-map .node .ntype { white-space: nowrap; font-size: 0.82rem; }
+  .page-map .node .nsub { white-space: nowrap; }
+  .page-map .node.current { border-color: var(--ember-hot); box-shadow: 0 0 0 3px rgba(255, 207, 107, 0.18); }
+  .page-map .node-you { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+
+  /* Short screens (915x412): 8 floors must fit, so the outcome line goes and nodes shrink.
+     The outcome is still in each node's aria-label/title. */
+  @media (max-height: 480px) {
+    .page-map .map { gap: 4px; padding: 4px 8px; }
+    .page-map .node { min-height: 30px; padding: 2px 10px 2px 2px; grid-template-columns: 24px auto 10px; }
+    .page-map .node .ntype-mark { width: 24px; height: 24px; }
+    .page-map .node .ntype-mark svg { width: 14px; height: 14px; }
+    .page-map .node .nsub { display: none; }
+    .page-map .node .ntype { grid-row: 1 / span 2; font-size: 0.76rem; }
+    .page-map .map-row { gap: 20px; }
+    .page-map .section-title, .page-map .hint, .page-map .page-num { display: none; }
+  }
+  @media (max-width: 620px) {
+    .page-map .map-row { gap: 8px; }
+    .page-map .node .nsub { display: none; }
+    .page-map .node .ntype { grid-row: 1 / span 2; }
+  }
+
+  /* --- Motion polish: one beat per action, eased; heat rises. --- */
+  .page.enter .map-row { animation: ea-rise 0.42s cubic-bezier(.2,.7,.2,1) both; }
+  .page.enter .map-row:nth-child(n+4) { animation-delay: 0.04s; }
+  .page.enter .map-row:nth-child(n+6) { animation-delay: 0.08s; }
+  .page.enter .map-row:nth-child(n+8) { animation-delay: 0.12s; }
+  @keyframes ea-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .page-reward .card { transition: transform 0.18s ease-out, filter 0.18s ease-out; }
+  .page-reward .card:hover, .page-reward .card:focus-visible { transform: translateY(-4px); filter: drop-shadow(0 10px 18px rgba(255, 110, 30, 0.25)); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .route-lit, .page.enter .map-row, .card .c-illus .g { animation: none !important; }
+    .page-reward .card:hover, .page-reward .card:focus-visible { transform: none; }
   }
 }
