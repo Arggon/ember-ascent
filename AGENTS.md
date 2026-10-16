@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This workspace is driven by a full-software-development agent team. Prefer delegating software work to the right specialist rather than doing everything inline. Full playbook: `TEAM.md`.
+This workspace is driven by a full-software-development agent team. Prefer delegating software work to the right specialist rather than doing everything inline. Full playbook: `docs/team/TEAM.md`.
 
 ## Routing
 
@@ -23,5 +23,5 @@ This workspace is driven by a full-software-development agent team. Prefer deleg
 - Multi-role task → start with **Tech Lead**; it decomposes and routes.
 - Every handoff carries: goal, context, inputs, expected output, done-check.
 - Reviewers report findings; the owning engineer fixes them.
-- Only **Tech Lead** declares work done, against the Definition of Done in `TEAM.md`.
+- Only **Tech Lead** declares work done, against the Definition of Done in `docs/team/TEAM.md`.
 - Evidence over assertion: no agent claims a test passed, a build succeeded, or a command ran without showing the actual output.

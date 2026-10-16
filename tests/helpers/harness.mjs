@@ -24,7 +24,7 @@ export const loadSession = () => load('src/surface/session.js');
 export const loadGhost = () => load('src/surface/gui/controller.js');
 export const loadCli = () => load('src/surface/cli.js');
 export const loadSim = () => load('src/surface/sim.js');
-export const loadTokens = () => load('tools/measure-tokens.mjs');
+export const loadTokens = () => load('scripts/measure-tokens.mjs');
 
 let _content = null;
 /** Shipped content, loaded once (read-only, so sharing is safe). */

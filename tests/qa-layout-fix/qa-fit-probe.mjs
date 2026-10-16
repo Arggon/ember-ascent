@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// tests/qa-layout-fix/qa-fit-probe.mjs — QA-owned independent probe for the LAYOUT-ACCEPTANCE.md
-// criteria that tools/dev/viewport-check.mjs and tools/dev/space-check.mjs COLLECT but do NOT
+// tests/qa-layout-fix/qa-fit-probe.mjs — QA-owned independent probe for the docs/specs/LAYOUT-ACCEPTANCE.md
+// criteria that scripts/dev/viewport-check.mjs and scripts/dev/space-check.mjs COLLECT but do NOT
 // ASSERT:
 //   S1 criterion 3 : `.hint` bottom <= innerHeight
 //   S2/S3 clip     : #stage scrollHeight === clientHeight (nothing clipped by overflow:hidden)

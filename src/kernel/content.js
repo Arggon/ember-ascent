@@ -9,7 +9,7 @@
 // node:fs does not exist. `cards.bundle.js` is a thin generated ES module that
 // exports the parsed JSON object, so the kernel depends on NO node:* builtin.
 // `cards.json` remains the single source of truth: it is generated from it by
-// tools/gen-content.mjs, and tests/content/bundle-drift.test.js re-reads the JSON
+// scripts/gen-content.mjs, and tests/content/bundle-drift.test.js re-reads the JSON
 // in Node and deep-compares, so the two can never silently drift.
 import { VERBS } from './rules/vocabulary.js';
 import { registeredEffects } from './rules/vocabulary.js';
