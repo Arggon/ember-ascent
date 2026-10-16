@@ -227,3 +227,15 @@ Each with the default I would ship without an answer.
    visual, and the page also scrolls 100px, which is unambiguous.*
 5. **What is the exact seed set for S6?** *Default: the seeds already used ad hoc in this project
    (1–12), pinned, recorded in the status doc.*
+
+---
+
+## Revision log
+
+- **2026-10-16 — v2/1 scene illustrations (owner-approved layout change).** Reward and rest
+  screens gain a header illustration (`.scene-illus`). The combat contract above is unchanged
+  and `tools/dev/viewport-check.mjs` still reports ALL PASS (9 rows). New, non-gated expectation
+  for those two screens: at 1440×900 and 915×412 with a pinned seed, the whole reward and rest
+  panel fits the window with no page scroll. At `max-height: 480px` the illustration is a
+  64px banner, the rest screen's ember ring and section title are dropped, and its spacing is
+  compacted (this also fixes a pre-existing 51px overflow of the rest screen at 915×412).

@@ -2032,12 +2032,20 @@ function mapNode(n) {
 
 /* ------------------------------------------------------------------- REWARD */
 
+/** Header illustration for the reward and rest scenes: a local WebP, decorative only. */
+function sceneIllus(key) {
+  const box = el('div', { cls: `scene-illus scene-${key}`, attrs: { 'aria-hidden': 'true' } });
+  box.append(el('img', { attrs: { src: `assets/sprites/${key}.webp`, alt: '', draggable: 'false', decoding: 'async' } }));
+  return box;
+}
+
 function rewardView() {
   const wrap = el('div');
   // The reward arrives after a victory, so the spoils head and the three tiles come in as a
   // sequence rather than all at once. `.reveal` is on the ONCE-per-arrival class string
   // built in `render()`; an incidental repaint inside the phase reproduces the same string
   // and the browser restarts nothing.
+  wrap.append(sceneIllus('reward'));
   wrap.append(el('div', { cls: 'reward-head' + (arriving.reward ? ' reveal' : ''), text: 'Victory — choose a card' }));
   const row = el('div', { cls: 'hand' + (arriving.reward ? ' reveal-cards' : '') });
   for (const c of snap.reward.cards) {
@@ -2075,6 +2083,7 @@ function restView() {
   wrap.append(el('div', { cls: 'rest-embers', attrs: { 'aria-hidden': 'true' } },
     el('span', { cls: 'ember e1' }), el('span', { cls: 'ember e2' }), el('span', { cls: 'ember e3' }),
   ));
+  wrap.append(sceneIllus('event'));
   wrap.append(el('div', { cls: 'big-title rest-head', text: 'A quiet moment' }));
   // The one thing this screen must SAY without motion: resting is safe, and leaving is safe.
   wrap.append(el('p', { cls: 'rest-note', text: `HP ${snap.player.hp}/${snap.player.maxHp} — you may heal ${snap.rest.heal} or move on.` }));

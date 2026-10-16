@@ -3488,3 +3488,30 @@ html, body {
   content: ''; position: absolute; left: 7px; top: 14px; width: 2px; height: 6px; background: #1a0f0a;
 }
 .node.pinned { outline: 1px dashed rgba(245, 197, 66, 0.7); outline-offset: 3px; }
+
+/* ---------- Scene illustrations (reward, rest): a woodcut plate above the choice ---------- */
+.scene-illus { display: flex; justify-content: center; margin: 0 auto 6px; pointer-events: none; }
+.scene-illus img {
+  height: clamp(110px, 24vh, 230px); width: auto; max-width: 90%; object-fit: contain;
+  filter: brightness(0.85) drop-shadow(0 0 18px rgba(255, 120, 40, 0.28));
+  -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent);
+          mask-image: linear-gradient(180deg, #000 78%, transparent);
+}
+.scene-reward img { filter: brightness(0.9) drop-shadow(0 0 22px rgba(255, 140, 50, 0.4)); }
+.rest .scene-illus { position: relative; z-index: 1; }
+/* Short landscape (915×412): a slim banner, so the choices stay above the fold. */
+@media (max-height: 480px) {
+  .scene-illus { margin-bottom: 2px; }
+  .scene-illus img { height: 64px; }
+}
+/* The rest illustration takes over the breathing ember ring's job: the brazier glow breathes. */
+.rest .rest-embers { display: none; }
+@keyframes illus-breathe { 0%, 100% { filter: brightness(0.82) drop-shadow(0 0 14px rgba(255, 120, 40, 0.22)); } 50% { filter: brightness(0.95) drop-shadow(0 0 26px rgba(255, 140, 50, 0.42)); } }
+.scene-event img { animation: illus-breathe 4.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .scene-event img { animation: none; } }
+@media (max-height: 480px) {
+  .rest { gap: 2px; padding-top: 4px; padding-bottom: 4px; }
+  .rest > * { margin-top: 0; margin-bottom: 2px; }
+  .rest .rest-calm { font-size: 0.8rem; }
+  .rest .section-title { display: none; }
+}
