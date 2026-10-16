@@ -3360,3 +3360,110 @@ html, body {
   .stage-combat .hero.is-low .fig { transform: translateY(2px); filter: saturate(0.55) brightness(0.78); }
   .hitstop .fig, .hitstop .card, .hitstop .efloat { animation-play-state: running !important; }
 }
+
+/* ===================================================== combat art v2 (woodcut figures)
+   Figures are carved, not outlined: a near-black iron mass, gouged mid-tone planes on the
+   furnace-lit side, hatch cuts on the shadow side, a partial rim, and ember accents. Box
+   sizes of .fig are unchanged (layout frozen); only paint and part motion live here. */
+.stage-combat .fig { position: relative; filter: drop-shadow(0 0 10px rgba(255, 120, 40, 0.16)); }
+.stage-combat .fig .sh { fill: #000; opacity: 0.62; filter: blur(2.5px); }
+.stage-combat .fig .b { fill: #17100b; }
+.stage-combat .fig .m { fill: #6b3c22; }
+.stage-combat .fig .h { fill: none; stroke: #070504; stroke-width: 1.5; stroke-linecap: round; }
+.stage-combat .fig .r { stroke-width: 1.5; opacity: 0.9; }
+.stage-combat .fig .g { fill: #ff7a24; stroke: #ffb35a; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+.stage-combat .fig path.g:not([d*="Z"]) { fill: none; }
+.stage-combat .fig .k { fill: #fff0c8; }
+.stage-combat .fig .e { fill: #ffd27a; }
+.stage-combat .enemy .fig { color: #e9b98e; }
+.stage-combat .enemy .fig .e { fill: #ff5a2a; }
+.stage-combat .enemy.is-boss .fig, .stage-combat .enemy.boss .fig { filter: drop-shadow(0 0 16px rgba(255, 90, 30, 0.32)); }
+
+/* Parts pivot on their own box so poses read as joints, not as a sliding sticker. */
+.stage-combat .fig svg g { transform-box: fill-box; }
+.stage-combat .fig .part-body, .stage-combat .fig .part-head, .stage-combat .fig .part-cape { transform-origin: 50% 100%; }
+.stage-combat .fig .part-arm, .stage-combat .fig .part-weapon { transform-origin: 0% 100%; }
+.stage-combat .enemy .fig .part-weapon { transform-origin: 50% 100%; }
+.stage-combat .fig .part-legs, .stage-combat .fig .sh { transform-origin: 50% 100%; }
+
+@keyframes part-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.015, 1.035); } }
+@keyframes part-nod { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.6px); } }
+@keyframes ember-pulse { 0%, 100% { opacity: 0.78; } 50% { opacity: 1; } }
+.stage-combat .fig.pose-idle .part-body,
+.stage-combat .fig.pose-low .part-body { animation: part-breathe 3.1s ease-in-out infinite; }
+.stage-combat .fig.pose-idle .part-head,
+.stage-combat .fig.pose-idle .part-arm,
+.stage-combat .fig.pose-idle .part-weapon { animation: part-nod 3.1s ease-in-out infinite; }
+.stage-combat .fig .g, .stage-combat .fig .e { animation: ember-pulse 2.2s ease-in-out infinite; }
+/* Idle bob moves the figure; the shadow stays on the floor and breathes the other way. */
+.stage-combat .fig.pose-idle { animation-name: fig-idle-v2; }
+@keyframes fig-idle-v2 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+
+/* Attack: the hammer comes over and down; foes lunge with their weapon/head. */
+.stage-combat .hero .fig.pose-strike .part-weapon,
+.stage-combat .hero .fig.pose-strike .part-arm { animation: hero-swing 0.32s ease-out; transform-origin: 0% 100%; }
+@keyframes hero-swing { 0% { transform: rotate(-18deg); } 45% { transform: rotate(38deg) translateY(10px); } 100% { transform: none; } }
+.stage-combat .enemy .fig.pose-strike .part-head,
+.stage-combat .enemy .fig.pose-strike .part-weapon { animation: foe-bite 0.32s ease-out; }
+@keyframes foe-bite { 0% { transform: none; } 45% { transform: translateX(-10px) rotate(-8deg); } 100% { transform: none; } }
+.stage-combat .fig.pose-windup .part-weapon,
+.stage-combat .fig.pose-windup .part-head { animation: foe-wind 0.85s ease-in-out infinite; }
+@keyframes foe-wind { 0%, 100% { transform: none; } 50% { transform: translateX(4px) rotate(5deg); } }
+/* Hurt: recoil plus a white-hot flash on the carved planes. */
+.stage-combat .fig.pose-hurt .m { fill: #ffd9a8; transition: fill 0.2s; }
+.stage-combat .fig.pose-hurt .part-head { transform: rotate(-6deg); }
+.stage-combat .hero .fig.pose-hurt .part-head { transform: rotate(6deg); }
+.stage-combat .fig.pose-brace .part-weapon { transform: rotate(-30deg) translate(-6px, 8px); }
+.stage-combat .fig.pose-low .part-head { transform: translateY(3px) rotate(4deg); }
+.stage-combat .fig.pose-low .g { animation-duration: 0.9s; }
+
+/* Stage: brick courses, a deeper furnace, carved floor, and a pool of light the cast stands in. */
+.page-combat .backdrop .wall { fill: #1d140e; }
+.page-combat .backdrop .beam { fill: #120b07; }
+.page-combat .backdrop .brick { fill: none; stroke: #120c08; stroke-width: 2; }
+.page-combat .backdrop .hook { fill: none; stroke: #6a5140; stroke-width: 2.4; }
+.page-combat .backdrop .furnace { fill: #26140c; stroke: #3c2216; stroke-width: 6; }
+.page-combat .backdrop .glow { fill: #b8501c; opacity: 0.55; }
+.page-combat .backdrop .glow-core { fill: #ffb050; opacity: 0.65; }
+.page-combat .backdrop .bars { fill: none; stroke: #1a0e08; stroke-width: 7; }
+.page-combat .backdrop .spire { fill: #22160f; }
+.page-combat .backdrop .spire-cut { fill: none; stroke: #120b07; stroke-width: 2; }
+.page-combat .backdrop .floor { fill: #0e0907; }
+.page-combat .backdrop .floor-cut { fill: none; stroke: #2a1a10; stroke-width: 2; stroke-linecap: round; }
+.page-combat .backdrop .lava { stroke-width: 3; opacity: 0.85; }
+.page-combat .fight::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    radial-gradient(60% 34% at 50% 92%, rgba(255, 130, 50, 0.16), transparent 70%),
+    radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55));
+}
+.page-combat .ground { height: 2px; opacity: 0.7; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-combat .fig *, .stage-combat .fig .g, .stage-combat .fig .e { animation: none !important; }
+}
+.stage-combat .fig .ap { fill: #2a1810; }
+.stage-combat .fig .r.apron { opacity: 0.45; }
+.stage-combat .hero .fig .r { opacity: 0.7; }
+/* Intent: a carved iron token instead of a bare glyph floating in the air. */
+.stage-combat .intent-badge {
+  border-radius: 12px 12px 14px 14px;
+  background: radial-gradient(circle at 50% 35%, #2e1b11, #120a06 70%);
+  border: 1px solid #5a3420;
+  box-shadow: inset 0 1px 0 rgba(255, 190, 120, 0.18), 0 3px 8px rgba(0, 0, 0, 0.6);
+  padding: 3px 0 2px;
+}
+.stage-combat .intent-badge svg { height: 58%; }
+.stage-combat .intent-num { font-size: 0.95rem; color: #ffe6c8; text-shadow: 0 1px 0 #000, 0 0 6px rgba(255, 120, 40, 0.6); }
+/* HP plates: framed iron troughs with molten fill. */
+.stage-combat .hpbar { background: #0a0605; border: 1px solid #4e2e1c; box-shadow: inset 0 1px 2px #000; border-radius: 3px; }
+.stage-combat .hpbar i { background: linear-gradient(180deg, #ff8a4a, #c0301c 60%, #8a1c12); box-shadow: 0 0 6px rgba(255, 90, 40, 0.45); }
+.stage-combat .enemy .ename, .page-combat .hero-name { text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.9); }
+.stage-combat .fig .m { fill: #7d4626; }
+/* Short landscape: figures are ~64px tall, so cut the rim deeper and lift the planes. */
+@media (max-height: 480px) {
+  .stage-combat .fig .r { stroke-width: 2.6; opacity: 1; }
+  .stage-combat .fig .m { fill: #a25c30; }
+  .stage-combat .fig .h { stroke-width: 2; }
+  .stage-combat .fig { filter: drop-shadow(0 0 6px rgba(255, 130, 50, 0.35)); }
+}
