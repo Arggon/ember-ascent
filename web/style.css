@@ -3467,3 +3467,39 @@ html, body {
   .stage-combat .fig .h { stroke-width: 2; }
   .stage-combat .fig { filter: drop-shadow(0 0 6px rgba(255, 130, 50, 0.35)); }
 }
+
+/* ===================================================== combat art v3 (illustrated sprites)
+   The .fig box sizes above are unchanged (layout frozen); the sprite fits inside it, feet
+   on the box floor. A warm rim separates the dark ink from the dark stage. */
+.stage-combat .fig { position: relative; filter: none; }
+.stage-combat .fig .spr {
+  position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 100%;
+  object-fit: contain; object-position: 50% 100%;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.55)) drop-shadow(0 0 7px rgba(255, 110, 40, 0.32));
+  user-select: none; pointer-events: none;
+}
+.stage-combat .fig .sh {
+  position: absolute; left: 12%; right: 12%; bottom: -5px; height: 12px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.78), transparent);
+}
+.stage-combat .enemy .fig .spr-the_guardian { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
+@keyframes spr-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.03); } }
+.stage-combat .fig.pose-idle .spr, .stage-combat .fig.pose-low .spr { animation: spr-breathe 3.1s ease-in-out infinite; }
+.stage-combat .fig.pose-idle { animation: none; }
+/* Hit flash: the ink goes white-hot for a beat. */
+.stage-combat .fig.pose-hurt .spr { filter: brightness(2.3) sepia(0.4) drop-shadow(0 0 10px rgba(255, 220, 170, 0.9)); }
+.stage-combat .fig.pose-strike .spr { filter: brightness(1.15) drop-shadow(0 0 1px rgba(255, 196, 140, 0.7)) drop-shadow(0 0 12px rgba(255, 130, 40, 0.6)); }
+.stage-combat .fig.pose-brace .spr { transform: scale(0.98, 0.96); }
+.stage-combat .fig.pose-windup .spr { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 12px rgba(255, 70, 30, 0.6)); }
+@media (max-height: 480px) {
+  .stage-combat .fig .spr { filter: brightness(1.25) drop-shadow(0 0 1px rgba(255, 200, 150, 0.8)) drop-shadow(0 0 5px rgba(255, 120, 40, 0.5)); }
+  .stage-combat .fig .sh { bottom: -3px; height: 7px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-combat .fig .spr { animation: none !important; transform: none; }
+}
+@media (max-height: 480px) {
+  /* The svg used to give the 64px-tall box its width; an absolutely placed sprite cannot. */
+  .stage-combat .hero .fig, .stage-combat .fig { width: 84px; max-width: 100%; }
+}
