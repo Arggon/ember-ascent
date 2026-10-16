@@ -217,6 +217,7 @@ export function logHeader(session) {
     // Additive (B1): only present for an opted-in Kindling run, so old headers are unchanged.
     ...(session.state.kindling ? { kindling: true } : {}),
     ...(session.state.tempers ? { tempers: true } : {}),
+    ...(session.state.quests ? { quests: true } : {}),
   };
 }
 
@@ -237,6 +238,7 @@ export function replay(header, entries) {
     difficulty: header.difficulty ?? 0,
     kindling: header.kindling === true,
     tempers: header.tempers === true,
+    quests: header.quests === true,
   });
   const steps = [];
   for (const [i, entry] of entries.entries()) {

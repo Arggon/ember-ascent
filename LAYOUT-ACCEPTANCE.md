@@ -239,3 +239,12 @@ Each with the default I would ship without an answer.
   panel fits the window with no page scroll. At `max-height: 480px` the illustration is a
   64px banner, the rest screen's ember ring and section title are dropped, and its spacing is
   compacted (this also fixes a pre-existing 51px overflow of the rest screen at 915×412).
+
+- **2026-10-16 — v2/4 ember quests (owner-approved layout change).** A quests run's map page
+  gains a strip of three quest chips above the map (name, progress or "done", and the reward;
+  a thin progress bar). At `max-height: 480px` the chips are a single 17px line, and the map
+  gives up the height: the node gap drops from 4px to 3px, nodes shrink from 30px to 26px and
+  the node icon from 24px to 21px. All 8 floors still fit 915×412 with no page scroll
+  (scrollHeight = 412). Runs without quests keep the old map sizes, because the rules are
+  scoped with `.page-map:has(.quests)`. At 1440×900 the strip adds 42px to the map page, which
+  already scrolled before this change (1351px → 1393px).

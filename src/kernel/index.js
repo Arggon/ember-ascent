@@ -29,6 +29,7 @@ import {
 } from './rules/act.js';
 import { fireHook } from './rules/powers.js';
 import { offerBoons, applyBoon } from './rules/kindling.js';
+import { rollQuests, advanceQuests } from './rules/quests.js';
 import { offerTempers, temperEffects, temperHpCost } from './rules/tempers.js';
 import './rules/effects/index.js'; // registers the exotic handlers exactly once
 import { observe as observeState, observeActions, snapshot as snapshotState } from './observe.js';
@@ -269,6 +270,12 @@ export function newRun(opts = {}) {
     state.tempers = {};
     state.temperOffers = null;
   }
+  // B3 Ember quests (opt-in): three seeded side goals, rolled after any Kindling draws.
+  if (opts.quests === true) {
+    const roll = rollQuests(seed, state.rngDraws);
+    state.rngDraws += roll.draws;
+    state.quests = roll.quests;
+  }
 
   return freezeDeep(state);
 }
@@ -341,6 +348,10 @@ export function step(state, id) {
       return { state, events: [], error: { code: 1, error: 'internal', id: String(id) } };
   }
 
+  if (bumped.quests && result.state.phase !== 'ended') {
+    const q = advanceQuests(result.state, { events: result.events, played: match.kind === 'play', nodeType: bumped.combat?.nodeType ?? null });
+    result = { state: q.state, events: [...result.events, ...q.events] };
+  }
   return { state: freezeDeep(result.state), events: result.events, error: null };
 }
 

@@ -157,7 +157,7 @@ function seedFromUrl() {
   return Number.isInteger(n) && n >= 0 ? n : Math.floor(Math.random() * 1000000);
 }
 
-let ctl = createController({ run: { seed: seedFromUrl(), kindling: true, tempers: true } });
+let ctl = createController({ run: { seed: seedFromUrl(), kindling: true, tempers: true, quests: true } });
 let snap = ctl.snapshot();
 /** Kernel events of the current run, accumulated for the run-history record (reset in newGame). */
 let runEvents = [];
@@ -844,7 +844,7 @@ function newGame(seed = null) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
   // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
-  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), kindling: true, tempers: true } });
+  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), kindling: true, tempers: true, quests: true } });
   snap = ctl.snapshot();
   // The event stream is per-RUN, so it dies with the run. It is the only source of the kill
   // / elite / boss counts the score needs, which is why it is accumulated rather than
@@ -1903,6 +1903,7 @@ function mapView(travel = null) {
   // The wrapper carries `.panel`; this inner div is content only.
   const wrap = el('div');
   wrap.append(el('p', { cls: 'section-title', text: `Map — floor ${snap.map.floor + 1}/${snap.map.floorCount}` }));
+  if (snap.quests) wrap.append(questStrip(snap.quests));
   const travelFromId = travel ? (prevMapCurrent ?? null) : null;
   const travelFromRow = travel ? (prevMapFloor ?? null) : null;
   const map = el('div', { cls: 'map' });
@@ -1929,6 +1930,25 @@ function mapView(travel = null) {
   requestAnimationFrame(() => drawRoutes(map));
   wrap.append(el('p', { cls: 'hint', text: 'Click a glowing node to travel. Fight something weak, risk an elite, or rest.' }));
   return page('map', 'I — The Path', 'route', 'panel', [wrap]);
+}
+
+/** B3 Ember quests: one compact chip per quest, progress as text and as a bar. */
+function questStrip(quests) {
+  const strip = el('div', { cls: 'quests', attrs: { 'aria-label': 'Ember quests' } });
+  for (const q of quests) {
+    const pct = Math.round((100 * q.progress) / q.goal);
+    const chip = el('div', {
+      cls: `quest${q.done ? ' done' : ''}`,
+      attrs: { title: `${q.text} Reward: ${q.rewardText}.` },
+    },
+    el('span', { cls: 'q-name', text: q.name }),
+    el('span', { cls: 'q-prog', text: q.done ? `done · ${q.rewardText}` : `${q.progress}/${q.goal} · ${q.rewardText}` }));
+    const bar = el('span', { cls: 'q-bar' });
+    bar.style.setProperty('--q', `${pct}%`);
+    chip.append(bar);
+    strip.append(chip);
+  }
+  return strip;
 }
 
 const MAP_WORLD = '<svg viewBox="0 0 400 600" preserveAspectRatio="none">'

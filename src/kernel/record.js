@@ -182,6 +182,7 @@ export function buildRunRecord(opts) {
     difficulty: state.difficulty,
     ...(state.kindling ? { kindling: true } : {}),
     ...(state.tempers ? { tempers: true } : {}),
+    ...(state.quests ? { quests: true } : {}),
     profile: opts.profile ?? 'full',
     policy: opts.policy ?? 'human',
     provenance: opts.provenance ?? 'human',
