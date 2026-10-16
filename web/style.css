@@ -3623,8 +3623,12 @@ html, body {
 
 /* B5 The Cinder Mines: painted backdrop (pre-darkened), a cooler floor line, biome picker. */
 .page-combat .backdrop .mines-bg {
-  position: absolute; inset: 0; background: #0b0908 url("assets/mines.webp") center 40% / cover no-repeat;
+  position: absolute; inset: 0; background: #0b0908;
   filter: brightness(0.8) saturate(0.95);
+}
+/* An <img> in the markup, not a stylesheet fetch (check-surface-art forbids those). */
+.page-combat .backdrop .mines-img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 40%;
 }
 .page-combat .backdrop .mines-bg::after {
   content: ''; position: absolute; inset: 0;

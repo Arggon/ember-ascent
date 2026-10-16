@@ -87,6 +87,8 @@ You have **3 energy per turn**, and cards cost 1–2, so you'll typically play 2
 
 **Ember quests.** A run may carry three seeded side goals, shown above the map: *Elite Hunter* (win an elite fight, +8 max HP), *Smith's Rhythm* (play 30 cards, heal 12), *Bladework* (deal 120 damage, +6 max HP), *Ironwall* (gain 60 Block, +6 max HP) and *Pilgrim* (reach 2 campfires, heal 15). Progress counts by itself, and a finished quest pays out at once. The CLI map shows a `QUESTS` line; turn them on with `--quests`.
 
+**The Cinder Mines.** On the opening screen, *Path* switches the climb from The Foundry to The Cinder Mines: a lantern-lit tunnel with its own foes (Slag Crawler, Ash Wraith, the elite Ash Matriarch) and the Cinder Foreman as the boss. Cards, rewards and the map rules are the same. CLI: `new --biome mines`; the log header records `"biome":"mines"` so `replay` reproduces it. A run without the flag is byte-identical to earlier builds.
+
 **Tempers.** At a campfire you may, instead of resting, temper one of three offered cards for the rest of the run: *Quenched* (also gain 3 Block), *Red-hot* (+50% damage, lose 2 HP when played) or *Balanced* (also draw 1 card, exhausts). A tempered card wears a coloured trim and a badge.
 
 Killing a low-HP enemy outright is usually better than blocking, because a dead enemy deals no damage next turn.

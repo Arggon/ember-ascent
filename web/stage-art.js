@@ -45,7 +45,7 @@ export function enemyVariant(id) {
 /** Act backdrop. Only act 1 exists; the foundry is the whole climb. */
 export function backdropMarkup(biome = 'foundry') {
   // B5 The Cinder Mines: a painted, pre-darkened tunnel (local WebP) instead of the foundry.
-  if (biome === 'mines') return '<div class="mines-bg"></div><div class="mines-floor"></div>';
+  if (biome === 'mines') return '<div class="mines-bg"><img class="mines-img" src="assets/mines.webp" alt="" draggable="false" decoding="async"></div><div class="mines-floor"></div>';
   return svg(`
     <path class="sky" d="M0 0 H800 V400 H0 Z"/>
     <path class="wall" d="M0 80 L80 40 H160 L200 70 H320 L360 30 H520 L560 64 H700 L800 28 V400 H0 Z"/>
