@@ -2471,3 +2471,444 @@ html, body {
   font-weight: 800;
   margin-bottom: 2px;
 }
+
+/* ==========================================================================================
+   EMBER THEME — art pass 2 (2026-10-16).
+   Presentation only: colours, surfaces, borders, glows and CSS-painted fire. No sizing,
+   spacing or layout values change here, so the frozen viewport contract
+   (LAYOUT-ACCEPTANCE.md) is untouched. No images, fonts or network requests.
+   Wrapped in `@media screen` on purpose: it is a single late layer that wins the cascade
+   without re-declaring any top-level selector (tools/check-surface-art.mjs rule 2).
+   Idea: you climb out of a furnace. Heat rises from the bottom of the screen, embers drift
+   up, and the one warm accent is now ember orange instead of gold. Block / skill stay cool
+   blue: fire vs. ice keeps "damage vs. defence" readable at a glance.
+   ========================================================================================== */
+@media screen {
+  :root {
+    --ground: #0c0806;
+    --raised: #1b120d;
+    --edge: #3b261a;
+    --ink: #f8eee5;
+    --dim: #c9ad98;
+    --faint: #94786a;
+    --gold: #ff9d3a;          /* ember: energy, primary actions, reachable nodes */
+    --gold-ink: #2b1200;
+    --hp: #ff5a3c;
+    --danger: #ff5a3c;
+    --win: #ffc552;
+    --loss: #ff5a3c;
+    --attack: #ff6e40;
+    --skill: #6fb6e4;
+    --power: #d9a2ff;
+    --ember-hot: #ffcf6b;
+    --ember-mid: #ff7a2f;
+    --ember-deep: #a3200f;
+    --char: #140d09;
+    --glow-ember: 0 0 0 1px rgba(255, 140, 50, 0.35), 0 0 22px rgba(255, 110, 30, 0.28);
+  }
+
+  /* Furnace light from below, cold soot above. One painted surface (html), so no seam. */
+  html {
+    background:
+      radial-gradient(120% 60% at 50% 112%, rgba(255, 96, 24, 0.30) 0%, rgba(163, 32, 15, 0.14) 38%, rgba(12, 8, 6, 0) 70%),
+      radial-gradient(80% 50% at 50% -10%, rgba(60, 40, 30, 0.35) 0%, rgba(12, 8, 6, 0) 70%),
+      var(--ground);
+    background-attachment: fixed;
+  }
+  body { background: transparent; }
+
+  /* Drifting embers: three dot fields at different speeds behind everything. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.55;
+    background-image:
+      radial-gradient(1.6px 1.6px at 12% 80%, var(--ember-hot), transparent 70%),
+      radial-gradient(1.2px 1.2px at 28% 64%, var(--ember-mid), transparent 70%),
+      radial-gradient(2px 2px at 47% 90%, var(--ember-hot), transparent 70%),
+      radial-gradient(1.3px 1.3px at 63% 72%, var(--ember-mid), transparent 70%),
+      radial-gradient(1.8px 1.8px at 81% 86%, var(--ember-hot), transparent 70%),
+      radial-gradient(1.1px 1.1px at 92% 58%, var(--ember-mid), transparent 70%);
+    background-size: 100% 100%;
+    animation: ember-rise 14s linear infinite;
+  }
+  #app { position: relative; z-index: 1; }
+  @keyframes ember-rise {
+    0%   { transform: translateY(0);     opacity: 0; }
+    15%  { opacity: 0.55; }
+    85%  { opacity: 0.4; }
+    100% { transform: translateY(-60vh); opacity: 0; }
+  }
+
+  /* ---------- HUD: soot glass with a heated top edge ---------- */
+  #hud {
+    background: linear-gradient(180deg, rgba(38, 24, 17, 0.92) 0%, rgba(20, 13, 9, 0.92) 100%);
+    border-color: var(--edge);
+    box-shadow: inset 0 1px 0 rgba(255, 160, 80, 0.22), 0 8px 24px rgba(0, 0, 0, 0.55);
+  }
+  .hud-char { color: var(--ember-hot); text-shadow: 0 0 12px rgba(255, 140, 40, 0.35); }
+  .stat { background: rgba(0, 0, 0, 0.28); }
+  .stat.hp { border-color: rgba(255, 90, 60, 0.45); }
+  .stat.energy { color: var(--ember-hot); border-color: rgba(255, 157, 58, 0.55); box-shadow: 0 0 10px rgba(255, 130, 40, 0.18); }
+
+  /* ---------- Buttons: the primary action is a coal ---------- */
+  .btn {
+    background: linear-gradient(180deg, #ffb357 0%, #ff7a2f 55%, #e2521f 100%);
+    color: var(--gold-ink);
+    border-color: #ffb357;
+    box-shadow: 0 0 0 1px rgba(255, 120, 40, 0.35), 0 6px 18px rgba(255, 90, 20, 0.25);
+  }
+  .btn.secondary, .btn.ghost {
+    background: rgba(30, 19, 13, 0.85);
+    color: var(--ink);
+    border-color: var(--edge);
+    box-shadow: none;
+  }
+  .btn.ghost:hover, .btn.secondary:hover { border-color: var(--ember-mid); color: var(--ember-hot); }
+
+  /* ---------- Panels / pages ---------- */
+  .page .page-num { color: var(--faint); }
+  .section-title { color: var(--dim); }
+  .stage-combat.sc-targeting > .section-title { color: var(--ember-hot); }
+  .page-glyph { color: var(--ember-mid); }
+
+  /* ---------- Enemies: silhouettes standing in front of a fire ---------- */
+  .enemy {
+    background: linear-gradient(180deg, #22150f 0%, #150d09 100%);
+    border-color: #4a2c1c;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 150, 70, 0.12);
+  }
+  .e-art {
+    background:
+      radial-gradient(70% 90% at 50% 100%, rgba(255, 110, 30, 0.42) 0%, rgba(163, 32, 15, 0.18) 45%, rgba(0, 0, 0, 0) 75%),
+      linear-gradient(180deg, #1a0f0a 0%, #2a150c 100%);
+    border-bottom-color: #4a2c1c;
+  }
+  .e-silhouette .sl { fill: #0a0604; }
+  .enemy.eh-0 .e-silhouette { color: #ffb070; }
+  .enemy.eh-1 .e-silhouette { color: #ff7f5c; }
+  .enemy.eh-2 .e-silhouette { color: #e3a6ff; }
+  .enemy.eh-3 .e-silhouette { color: #b6d29a; }
+  .enemy.eh-4 .e-silhouette { color: #ffd36b; }
+  .enemy.e-elite { border-color: #6a3f86; }
+  .enemy.e-boss { border-color: #a3200f; box-shadow: 0 0 0 1px rgba(255, 60, 30, 0.35), 0 0 30px rgba(255, 60, 20, 0.28), 0 10px 26px rgba(0, 0, 0, 0.6); }
+  .enemy.e-boss .e-art {
+    background:
+      radial-gradient(80% 100% at 50% 100%, rgba(255, 70, 20, 0.6) 0%, rgba(163, 32, 15, 0.3) 45%, rgba(0, 0, 0, 0) 80%),
+      linear-gradient(180deg, #1c0806 0%, #3a0f08 100%);
+  }
+  .enemy .ehp { color: #ff8a6a; }
+
+  /* Intents: an attack is a flare, block stays ice. */
+  .e-intent.kind-attack {
+    background: linear-gradient(90deg, rgba(255, 90, 40, 0.24) 0%, rgba(120, 25, 10, 0.18) 100%);
+    border-color: rgba(255, 110, 60, 0.6);
+  }
+  .e-intent.kind-attack .ilabel { color: #ffc2a8; }
+  .e-intent.kind-buff .ilabel { color: #ffd890; }
+
+  /* ---------- Cards: forged plates; the hue is the metal's glow ---------- */
+  .card {
+    background:
+      radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--card-hue, #ff7a2f) 18%, transparent) 0%, transparent 60%),
+      linear-gradient(180deg, #24170f 0%, #150d09 100%);
+    border-color: color-mix(in srgb, var(--card-hue, #ff7a2f) 45%, #3b261a);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 190, 120, 0.12);
+  }
+  .card:hover:not(.disabled) {
+    border-color: var(--card-hue, #ff7a2f);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-hue, #ff7a2f) 50%, transparent), 0 0 24px color-mix(in srgb, var(--card-hue, #ff7a2f) 30%, transparent), 0 12px 26px rgba(0, 0, 0, 0.55);
+  }
+  /* Legibility fix: the big background mark sat at 30-40% under the rules text. */
+  .card .c-art.p1, .card .c-art.p2, .card .c-art.p3 { opacity: 0.12; }
+  .card .cname { color: var(--ink); }
+  .card .cdesc { color: #f2e4d8; }
+  .card .cost-gem {
+    background: radial-gradient(circle at 35% 30%, #ffe2a0 0%, #ff9d3a 45%, #c2410c 100%);
+    color: var(--gold-ink);
+    box-shadow: 0 0 0 2px #1b120d, 0 0 12px rgba(255, 140, 40, 0.55);
+  }
+  .card.disabled { filter: saturate(0.4) brightness(0.75); }
+
+  /* ---------- Map: a climb up the chimney ---------- */
+  .map {
+    background:
+      radial-gradient(90% 40% at 50% 100%, rgba(255, 90, 20, 0.18) 0%, transparent 70%),
+      linear-gradient(180deg, rgba(27, 18, 13, 0.92) 0%, rgba(16, 10, 7, 0.95) 100%);
+    border-color: var(--edge);
+  }
+  .node { background: rgba(20, 13, 9, 0.9); border-color: #3b261a; color: var(--dim); }
+  .node.available {
+    background: linear-gradient(180deg, rgba(255, 140, 50, 0.22) 0%, rgba(120, 40, 10, 0.25) 100%);
+    border-color: var(--ember-mid);
+    color: var(--ink);
+    box-shadow: var(--glow-ember);
+  }
+  .node.current { border-color: var(--ember-hot); color: var(--ember-hot); }
+  .node.t-boss { border-color: #6a1d10; color: #ff9a80; }
+  .node.t-boss.available { border-color: var(--hp); box-shadow: 0 0 0 3px rgba(255, 60, 30, 0.25), 0 0 26px rgba(255, 60, 20, 0.35); }
+  .node.t-rest { border-color: #3d4a2c; color: #c8d9a5; }
+  .node.t-rest .ntype-mark { color: #ffb35c; }    /* the campfire */
+
+  /* ---------- Reward / end ---------- */
+  .reward-head { color: var(--ember-hot); text-shadow: 0 0 18px rgba(255, 130, 40, 0.4); }
+
+  /* Round 2: the remaining cold surfaces. */
+  .fx-turn-wipe { background: linear-gradient(180deg, rgba(255, 140, 50, 0) 0%, rgba(255, 140, 50, 0.05) 60%, rgba(255, 140, 50, 0) 100%); }
+  .panel, .modal { background: linear-gradient(180deg, var(--raised) 0%, var(--char) 100%); }
+  .panel::after { border-color: rgba(255, 157, 58, 0.16); }
+  .hand-index { background: var(--char); }
+  .enemy.aimed { border-color: var(--ember-hot); box-shadow: 0 0 0 3px var(--ember-hot) inset, 0 0 28px rgba(255, 150, 50, 0.35), var(--shadow-lg); }
+  .enemy.aimed .e-art {
+    background:
+      radial-gradient(70% 100% at 50% 100%, rgba(255, 190, 90, 0.55) 0%, rgba(255, 90, 20, 0.25) 45%, rgba(0, 0, 0, 0) 80%),
+      linear-gradient(180deg, #1f120a 0%, #3a1a0b 100%);
+  }
+  .card .c-art.p1, .card .c-art.p2, .card .c-art.p3 { opacity: 0.08; }
+  .fx-card { background: linear-gradient(180deg, #24170f 0%, #150d09 100%); border-color: var(--edge); }
+
+  @media (prefers-reduced-motion: reduce) {
+    body::before { animation: none; opacity: 0.35; }
+  }
+}
+
+/* ==========================================================================================
+   ART DIRECTION PROTOTYPE — "Forge-lit woodcut" (branch art-direction, phase 1 mockups)
+   One late layer, like the ember theme above. Paint, type and decoration only: no box in
+   the combat layout changes width/height (LAYOUT-ACCEPTANCE.md). Fonts come from
+   web/fonts/fonts.css (local, OFL). The single accent stays ember orange.
+   ========================================================================================== */
+@media screen {
+  :root {
+    --display: "Cinzel", "Iowan Old Style", Georgia, serif;
+    --text: "Alegreya Sans", system-ui, sans-serif;
+    --rules: "Alegreya", Georgia, serif;
+    --num: "Barlow Condensed", "Alegreya Sans", sans-serif;
+    --deco: "Cinzel Decorative", "Cinzel", serif;
+    --iron: #1a120d;
+    --iron-hi: #3a271b;
+    --brass: #b98a52;
+  }
+  body, button { font-family: var(--text); }
+  #hud .stat, .ehp, .gem-core, .csum, .hand-index, .efloat { font-family: var(--num); font-weight: 600; font-variant-numeric: tabular-nums lining-nums; letter-spacing: 0.02em; }
+  .card .cdesc, .ilabel { font-family: var(--rules); }
+  .enemy.e-boss .ename { font-family: var(--deco); }
+
+  /* --- Type: Cinzel for names and chapter marks only; never body copy. --- */
+  .section-title, .page-num, .card .cname, .ename, .node .ntype, #hud .who, .reward h2, .end h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .card .cname { font-size: 0.98rem; letter-spacing: 0.02em; text-transform: none; }
+  .ename { font-size: 0.95rem; color: #ffe2c4; }
+  .section-title { letter-spacing: 0.22em; color: var(--brass); }
+
+  /* --- Card frame: forged plaque. Iron rim, brass keyline, a sunken illustration window. --- */
+  .card {
+    background:
+      radial-gradient(120% 60% at 50% 30%, color-mix(in srgb, var(--card-hue) 16%, transparent) 0%, transparent 60%),
+      linear-gradient(180deg, #24170f 0%, #170f0a 55%, #0f0906 100%);
+    border: 1px solid #4a2f1e;
+    box-shadow: inset 0 0 0 3px #120b07, inset 0 0 0 4px rgba(185, 138, 82, 0.35), inset 0 0 26px rgba(0, 0, 0, 0.5);
+  }
+  .card::after { border-color: rgba(185, 138, 82, 0.22); background: linear-gradient(180deg, rgba(255, 200, 140, 0.06) 0%, transparent 30%); }
+  .card .ctype {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--card-hue) 30%, #120b07) 0%, #140c08 100%);
+    border-bottom: 1px solid rgba(185, 138, 82, 0.4);
+    color: color-mix(in srgb, var(--card-hue) 80%, #fff);
+  }
+  .card .c-art {
+    border-radius: 6px;
+    background: radial-gradient(70% 70% at 50% 60%, color-mix(in srgb, var(--card-hue) 22%, transparent) 0%, transparent 75%);
+    box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.16);
+    opacity: 0.55;
+  }
+  .card .c-art .m { stroke-width: 1.3; }
+  .card .c-art .mf { opacity: 0.3; }
+  .card .cdesc { color: #f3e3d3; }
+  .cost-gem { filter: drop-shadow(0 0 6px rgba(255, 120, 40, 0.55)); z-index: 4; }
+
+  /* --- Enemies: woodcut iron figures, rim-lit by the furnace, ember eyes. --- */
+  .e-silhouette { width: 96px; height: 96px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)); }
+  .e-silhouette .b { fill: #0b0705; }
+  .e-silhouette .r { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .e-silhouette .g { fill: #ffcf6b; stroke: none; filter: drop-shadow(0 0 3px #ff7a2f); }
+  .e-silhouette .gc { fill: none; stroke: #ff7a2f; stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 2px #ff5a1f); }
+  .e-silhouette .gr { fill: none; stroke: rgba(255, 140, 60, 0.35); stroke-width: 1.5; }
+  .enemy.eh-0 .e-silhouette, .enemy.eh-1 .e-silhouette, .enemy.eh-2 .e-silhouette,
+  .enemy.eh-3 .e-silhouette, .enemy.eh-4 .e-silhouette { color: #d98a5c; }
+  .enemy.e-elite .e-silhouette { color: #e0a070; }
+  .enemy.e-boss .e-silhouette { color: #ff8a4a; width: 104px; height: 104px; }
+  .enemy:not(.is-dying) .e-silhouette svg { animation: ea-breathe 4.2s ease-in-out infinite; transform-origin: 50% 100%; }
+  @keyframes ea-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025, 1.035); } }
+
+  /* --- Map as a world: a ridge line and a lava river under the path, fog at the edges. --- */
+  .page-map.panel {
+    background:
+      linear-gradient(180deg, rgba(14, 9, 7, 0.0) 0%, rgba(14, 9, 7, 0.0) 55%, rgba(255, 90, 30, 0.10) 100%),
+      radial-gradient(90% 60% at 50% 0%, rgba(60, 38, 26, 0.6) 0%, transparent 70%),
+      #0f0a07;
+    border-color: #3b261a;
+  }
+  /* Two ridge silhouettes and a lava seam, cut with clip-path: no image, no URL. */
+  .page-map.panel::before {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 62%; z-index: 0; pointer-events: none;
+    background: linear-gradient(180deg, #1a0f0a 0%, #120a07 70%, #2a0f06 100%);
+    clip-path: polygon(0 100%, 0 40%, 10% 22%, 18% 32%, 28% 6%, 38% 24%, 48% 0, 58% 20%, 65% 10%, 75% 30%, 85% 4%, 100% 30%, 100% 100%);
+  }
+  .page-map.panel::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 18%; z-index: 0; pointer-events: none;
+    background: radial-gradient(60% 40% at 50% 100%, rgba(255, 110, 40, 0.45), transparent 75%), #0d0705;
+    clip-path: polygon(0 100%, 0 40%, 14% 20%, 30% 46%, 46% 18%, 60% 40%, 76% 14%, 90% 38%, 100% 22%, 100% 100%);
+  }
+  .page-map.panel > * { position: relative; z-index: 1; }
+  .map-row::after { background: none; border-bottom: 1px dashed rgba(255, 157, 58, 0.22); }
+  .node { background: rgba(20, 13, 9, 0.82); border-color: #3b261a; backdrop-filter: blur(1px); }
+  .node .ntype-mark {
+    display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #2a1a10, #0c0705); box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.4);
+  }
+  .node .ntype-mark svg { width: 18px; height: 18px; }
+  .page-map .map { background: transparent; border-color: transparent; }
+  .node .ntype-mark { grid-row: 1 / span 2; }
+  .node .ntype { grid-column: 2; grid-row: 1; display: block !important; color: var(--ink); line-height: 1.1; }
+  .node .nsub { grid-column: 2; grid-row: 2; display: block; font-size: 0.72rem; color: var(--faint); line-height: 1.1; }
+  .node.available::after { grid-row: 1 / span 2; }
+  .node .ntype { text-transform: none; font-size: 0.86rem; letter-spacing: 0.03em; }
+  .node .nsub { text-transform: none; letter-spacing: 0.02em; font-weight: 500; font-family: var(--text); }
+  .node.available { border-color: var(--gold); background: rgba(40, 20, 10, 0.9); }
+  .node.t-boss { border-color: #7a2414; }
+
+  /* --- Phone landscape (max-height 480): the portrait plate was display:none, so the
+         enemy read as a text box. Bring a 34px portrait back INSIDE the head plate's own
+         padding: absolute, so the card's height does not change. --- */
+  @media (max-height: 480px) {
+    .enemy .e-art {
+      display: block; position: absolute; top: 4px; left: 6px; width: 34px; height: 34px;
+      margin: 0; border: 1px solid #4a2c1c; border-radius: 6px; z-index: 3;
+    }
+    .enemy .e-art .e-silhouette { width: 32px; height: 32px; animation: none; }
+    .enemy .e-art .target-index, .enemy .e-art .target-mark { display: none; }
+    .enemy .e-head { padding-left: 36px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .enemy .e-silhouette svg { animation: none; }
+  }
+}
+
+/* ==========================================================================================
+   ART PHASE 2 — card illustrations, the drawn world map, motion polish, fixes.
+   Same rules as above: paint/type only inside the combat layout; the map page is outside
+   LAYOUT-ACCEPTANCE's combat scope and is restyled here.
+   ========================================================================================== */
+@media screen {
+  /* --- Card head = illustration window. The drawing sits right, type mark + word left. --- */
+  .card.has-illus .ctype { position: relative; overflow: hidden; justify-content: flex-start; padding-left: 12px; }
+  /* The mark keeps its per-breakpoint HEIGHT (it sets the head plate's height, which the
+     layout contract measured) but gives up its width to the drawing. Type stays readable
+     by hue, the type word and the head shape. */
+  .card.has-illus .c-type-mark { width: 0; margin-right: -6px; visibility: hidden; }
+  .card.has-illus .ctype { align-items: flex-end; }
+  .card.has-illus .ctype > span:last-child { text-shadow: 0 1px 2px #000, 0 0 8px #000; }
+  .c-illus {
+    position: absolute; top: 2px; bottom: 2px; right: 4px; width: 70%;
+    z-index: 0; pointer-events: none; color: color-mix(in srgb, var(--card-hue) 85%, #fff);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%);
+            mask-image: linear-gradient(90deg, transparent 0%, #000 22%);
+  }
+  .c-illus svg { display: block; width: 100%; height: 100%; }
+  .c-illus .b { fill: #0b0705; }
+  .c-illus .r { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+  .c-illus .g { fill: #ffcf6b; filter: drop-shadow(0 0 2px #ff7a2f); }
+  .c-illus .gc { fill: none; stroke: #ff8a3a; stroke-width: 1.4; stroke-linecap: round; filter: drop-shadow(0 0 2px #ff5a1f); }
+  .card.has-illus .ctype > .c-type-mark, .card.has-illus .ctype > span:last-child { position: relative; z-index: 1; }
+  .card.has-illus .c-art.c-echo {
+    display: grid; opacity: 0.13; transform: none; color: var(--card-hue);
+    background: none; box-shadow: none; filter: blur(0.3px);
+  }
+  .c-echo .b { fill: none; } .c-echo .r, .c-echo .gc { fill: none; stroke: currentColor; stroke-width: 1; }
+  .c-echo .g { fill: currentColor; }
+  @media (max-height: 480px), (max-width: 620px) { .card.has-illus .c-art.c-echo { display: none; } }
+  .card.disabled .c-illus { opacity: 0.45; filter: grayscale(0.6); }
+  .card:hover:not(.disabled) .c-illus .g, .card:focus-visible .c-illus .g { animation: ea-flicker 0.9s ease-in-out infinite alternate; }
+  @keyframes ea-flicker { from { opacity: 1; } to { opacity: 0.55; } }
+
+  /* --- HUD step counter: Barlow numerals, not the leftover monospace. --- */
+  #hud .hud-step, #hud .stat { font-family: var(--num); font-weight: 600; letter-spacing: 0.03em; }
+
+  /* --- The world map: climb from the lava (floor 1, bottom) to the Guardian (top). --- */
+  .page-map.panel { background: #0c0806; }
+  .page-map.panel::before, .page-map.panel::after { display: none; }
+  .page-map .map {
+    position: relative; display: flex; flex-direction: column-reverse; gap: 14px;
+    max-width: 640px; padding: 14px 10px; border-radius: 12px; overflow: hidden;
+    background: transparent; border: 1px solid #3b261a;
+  }
+  .map-world { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .map-world svg { width: 100%; height: 100%; display: block; }
+  .map-world .w-sky { fill: #120b08; }
+  .map-world .w-far { fill: #1c120c; }
+  .map-world .w-spire { fill: #2a1610; stroke: #ff6a2a; stroke-opacity: 0.5; stroke-width: 1.5; }
+  .map-world .w-mid { fill: #170e09; }
+  .map-world .w-crack { fill: none; stroke: #ff6a26; stroke-opacity: 0.35; stroke-width: 2; }
+  .map-world .w-near { fill: #0f0806; }
+  .map-world .w-lava { fill: none; stroke: #ff7a2f; stroke-width: 5; stroke-opacity: 0.7; filter: drop-shadow(0 0 6px #ff5a1f); }
+  .map-routes { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none; overflow: visible; }
+  .route-dim { fill: none; stroke: rgba(201, 173, 152, 0.18); stroke-width: 1.5; stroke-dasharray: 2 5; stroke-linecap: round; }
+  .route-lit { fill: none; stroke: var(--gold); stroke-width: 2.5; stroke-dasharray: 6 6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 120, 40, 0.7)); animation: ea-march 1.2s linear infinite; }
+  @keyframes ea-march { to { stroke-dashoffset: -24; } }
+  .page-map .map-row {
+    position: relative; z-index: 2; display: flex; flex-wrap: nowrap; justify-content: center;
+    gap: 36px; max-width: none; margin: 0; grid-template-columns: none;
+  }
+  .page-map .map-row::after { display: none; }
+  .page-map .map-floor-label { left: 4px; transform: translateY(-50%); font-family: var(--num); color: var(--faint); }
+  .page-map .node {
+    flex: 0 0 auto; min-width: 0; width: auto; min-height: 40px; padding: 4px 12px 4px 4px;
+    grid-template-columns: 30px auto 12px; column-gap: 8px; border-radius: 22px;
+    background: rgba(14, 9, 6, 0.92); opacity: 1;
+  }
+  .page-map .node:not(.available):not(.current) { opacity: 0.62; }
+  .page-map .node .ntype-mark { width: 30px; height: 30px; }
+  .page-map .node .ntype { white-space: nowrap; font-size: 0.82rem; }
+  .page-map .node .nsub { white-space: nowrap; }
+  .page-map .node.current { border-color: var(--ember-hot); box-shadow: 0 0 0 3px rgba(255, 207, 107, 0.18); }
+  .page-map .node-you { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+
+  /* Short screens (915x412): 8 floors must fit, so the outcome line goes and nodes shrink.
+     The outcome is still in each node's aria-label/title. */
+  @media (max-height: 480px) {
+    .page-map .map { gap: 4px; padding: 4px 8px; }
+    .page-map .node { min-height: 30px; padding: 2px 10px 2px 2px; grid-template-columns: 24px auto 10px; }
+    .page-map .node .ntype-mark { width: 24px; height: 24px; }
+    .page-map .node .ntype-mark svg { width: 14px; height: 14px; }
+    .page-map .node .nsub { display: none; }
+    .page-map .node .ntype { grid-row: 1 / span 2; font-size: 0.76rem; }
+    .page-map .map-row { gap: 20px; }
+    .page-map .section-title, .page-map .hint, .page-map .page-num { display: none; }
+  }
+  @media (max-width: 620px) {
+    .page-map .map-row { gap: 8px; }
+    .page-map .node .nsub { display: none; }
+    .page-map .node .ntype { grid-row: 1 / span 2; }
+  }
+
+  /* --- Motion polish: one beat per action, eased; heat rises. --- */
+  .page.enter .map-row { animation: ea-rise 0.42s cubic-bezier(.2,.7,.2,1) both; }
+  .page.enter .map-row:nth-child(n+4) { animation-delay: 0.04s; }
+  .page.enter .map-row:nth-child(n+6) { animation-delay: 0.08s; }
+  .page.enter .map-row:nth-child(n+8) { animation-delay: 0.12s; }
+  @keyframes ea-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .page-reward .card { transition: transform 0.18s ease-out, filter 0.18s ease-out; }
+  .page-reward .card:hover, .page-reward .card:focus-visible { transform: translateY(-4px); filter: drop-shadow(0 10px 18px rgba(255, 110, 30, 0.25)); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .route-lit, .page.enter .map-row, .card .c-illus .g { animation: none !important; }
+    .page-reward .card:hover, .page-reward .card:focus-visible { transform: none; }
+  }
+}
