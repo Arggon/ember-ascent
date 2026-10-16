@@ -451,6 +451,34 @@ function el(tag, opts = {}, ...kids) {
   return node;
 }
 
+/**
+ * Fill `node` with `text`, wrapping kernel glossary words (Block, Vulnerable, Exhaust…)
+ * in gold keyword spans with the kernel's own meaning as the tooltip, and "Lose N HP"
+ * costs in ember red. Text nodes only: nothing is parsed as HTML. Presentation only.
+ * @param {HTMLElement} node
+ * @param {string} text
+ * @returns {HTMLElement}
+ */
+function keywordText(node, text) {
+  const terms = new Map();
+  for (const row of snap.glossary || []) {
+    if ((row.group === 'A' || row.group === 'B') && /^[A-Z][a-z]+$/.test(row.label || '')) terms.set(row.label.toLowerCase(), row.meaning);
+  }
+  const str = String(text ?? '');
+  if (terms.size === 0) { node.textContent = str; return node; }
+  const words = [...terms.keys()].sort((a, b) => b.length - a.length).join('|');
+  const re = new RegExp(`(Lose \\d+ HP)|\\b(${words})\\b`, 'gi');
+  let at = 0;
+  for (const m of str.matchAll(re)) {
+    if (m.index > at) node.append(str.slice(at, m.index));
+    if (m[1]) node.append(el('span', { cls: 'kw kw-cost', text: m[1] }));
+    else node.append(el('span', { cls: 'kw', text: m[2], attrs: { title: terms.get(m[2].toLowerCase()) || '' } }));
+    at = m.index + m[0].length;
+  }
+  if (at < str.length) node.append(str.slice(at));
+  return node;
+}
+
 function toast(msg, kind = 'warn') {
   toastEl.textContent = msg;
   toastEl.className = kind === 'info' ? 'show info' : 'show';
@@ -1808,7 +1836,7 @@ function cardTile(card, opts = {}) {
   tile.append(head);
   tile.append(el('span', { cls: 'cname', text: card.name }));
   if (card.flavor) tile.append(el('span', { cls: 'cflavor', text: card.flavor }));
-  tile.append(el('span', { cls: 'cdesc', text: desc }));
+  tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));
   // The compact code is NOT repeated on a reward tile: the player is choosing a card to
   // keep, not playing one, so the shorthand is noise there.
   if (card.showSummary !== false) {

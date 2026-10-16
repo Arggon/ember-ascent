@@ -3442,3 +3442,7 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .page-combat .backdrop .fire-mouth, .page-combat .backdrop .fire-halo, .page-combat .backdrop .fire-spill { animation: none; }
 }
+
+/* Keywords in rules text: gold for game terms (tooltip = kernel glossary), ember red for costs. */
+.card .cdesc .kw { color: #f5c542; font-weight: 700; cursor: help; }
+.card .cdesc .kw-cost { color: #ff7a5a; cursor: default; }
