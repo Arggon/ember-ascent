@@ -125,6 +125,8 @@ function seedFromUrl() {
 
 let ctl = createController({ run: { seed: seedFromUrl() } });
 let snap = ctl.snapshot();
+/** Kernel events of the current run, accumulated for the run-history record (reset in newGame). */
+let runEvents = [];
 /** Last time a value changed, so a click produces visible feedback. */
 let flash = { hp: false, energy: false, block: false, hits: [], n: 0, blockEat: false };
 /**
