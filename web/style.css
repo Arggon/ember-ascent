@@ -3476,3 +3476,15 @@ html, body {
   100% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .fx-scene, .fx-act-card { display: none; } }
+
+/* Map pins: a hot-iron tack in the node's corner. Absolute, so no node changes size. */
+.node .node-pin {
+  position: absolute; top: -7px; right: -7px; width: 16px; height: 16px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffe0a8, #ff8a2a 45%, #8a2a10 100%);
+  box-shadow: 0 0 0 2px #1a0f0a, 0 0 10px rgba(255, 140, 50, 0.8);
+  pointer-events: none;
+}
+.node .node-pin::after {
+  content: ''; position: absolute; left: 7px; top: 14px; width: 2px; height: 6px; background: #1a0f0a;
+}
+.node.pinned { outline: 1px dashed rgba(245, 197, 66, 0.7); outline-offset: 3px; }

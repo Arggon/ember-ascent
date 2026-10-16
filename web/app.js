@@ -1988,15 +1988,42 @@ function travelMarker(travel) {
   return mark;
 }
 
+/* Map pins (M5): up to 3 planning marks per run, kept in localStorage under the run's
+   seed and NEVER in run state, so the kernel, replays and hashes are untouched. */
+const PINS_KEY = 'dlb.mapPins.v1';
+const PIN_MAX = 3;
+function mapPins() {
+  const all = storeGet(PINS_KEY);
+  const list = all && Array.isArray(all[String(snap.seed)]) ? all[String(snap.seed)] : [];
+  return list.filter((x) => typeof x === 'string');
+}
+function toggleMapPin(id) {
+  let list = mapPins();
+  list = list.includes(id) ? list.filter((x) => x !== id) : [...list, id].slice(-PIN_MAX);
+  // Only the current seed is kept, so the store never grows across runs.
+  storePut(PINS_KEY, { [String(snap.seed)]: list });
+  announce(list.includes(id) ? 'Pin placed.' : 'Pin removed.');
+}
+
 function mapNode(n) {
   const short = n.type.replace('combat_', '');
   const cls = `node t-${short}` + (n.available ? ' available' : '') + (n.current ? ' current' : '');
   const node = el(n.available ? 'button' : 'span', {
     cls,
     attrs: n.available ? { type: 'button', title: `Travel to ${n.label}`, 'aria-label': `Travel to ${(NODE_WORDS[short] || [n.label])[0]}` } : {},
-    on: n.available && n.actionId ? { click: () => act(n.actionId) } : {},
+    on: {
+      ...(n.available && n.actionId ? { click: () => act(n.actionId) } : {}),
+      // Right-click (long-press on touch) drops or lifts a planning pin. Browser-only state.
+      contextmenu: (ev) => { ev.preventDefault(); toggleMapPin(n.id); render(); },
+    },
   });
+  if (n.available) node.title = `Travel to ${n.label} · right-click to pin`;
+  else node.setAttribute('title', 'Right-click to pin this node');
   node.append(glyphBox(NODE_GLYPH[short] || 'rune', 'ntype-mark'));
+  if (mapPins().includes(n.id)) {
+    node.classList.add('pinned');
+    node.append(el('span', { cls: 'node-pin', attrs: { 'aria-label': 'pinned' } }));
+  }
   const words = NODE_WORDS[short] || [n.label, ''];
   node.append(el('span', { cls: 'ntype', text: words[0] }));
   if (words[1]) node.append(el('span', { cls: 'nsub', text: words[1] }));
