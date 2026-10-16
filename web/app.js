@@ -756,7 +756,6 @@ function positionClass(index, after, before = null, explicit = null) {
 
 const sumEnemyHp = (s) => s.enemies.reduce((n, e) => n + e.hp, 0);
 
-function newGame() {
 function newGame(seed = null) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
