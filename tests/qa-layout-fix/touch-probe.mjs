@@ -6,7 +6,7 @@
 // the five viewports the gate names: 1366x768, 1280x800, 915x412, 1200x450, 844x390.
 //
 // Read-only against the product: it loads the real page, measures, and prints. It never
-// writes under web/ or tools/. It exits 1 if any target viewport has a .btn min box < 44.
+// writes under src/web/ or scripts/. It exits 1 if any target viewport has a .btn min box < 44.
 //
 // Usage: node tests/qa-layout-fix/touch-probe.mjs [--seeds 1,3,7,11]
 import { spawn } from 'node:child_process';

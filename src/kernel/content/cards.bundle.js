@@ -1,4 +1,4 @@
-// GENERATED FILE — do not edit by hand. Run: node tools/gen-content.mjs
+// GENERATED FILE — do not edit by hand. Run: node scripts/gen-content.mjs
 //
 // Source of truth: src/kernel/content/cards.json (the single source of card data).
 // This module exists so the kernel can carry NO node:* builtin and therefore run

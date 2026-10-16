@@ -5,7 +5,7 @@
 // about two code paths; here it is one function, and R1's golden test can assert it.
 //
 // BROWSER-SAFE BY CONSTRUCTION (DR-2): this module imports NO `node:*` builtin. It is
-// reachable from `web/**` through the kernel entry, and `tools/check-architecture.mjs`
+// reachable from `src/web/**` through the kernel entry, and `scripts/check-architecture.mjs`
 // fails the build if that ever stops being true. Everything here is a pure function of
 // its arguments — no clock, no `Math.random`, no I/O.
 //
