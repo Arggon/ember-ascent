@@ -2994,9 +2994,10 @@ html, body {
 .page-combat .hero .hpbar { width: 72%; }
 .page-combat .speed-dock {
   position: absolute;
+  /* Top-left corner, above the hero's head: centred it sat on the first foe's sprite and
+     name (e.g. Ash Cantor at 915x412). */
   top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 8px;
   z-index: 4;
   display: flex;
   gap: 4px;
@@ -3567,3 +3568,18 @@ html, body {
   .temper-list .boon-name { font-size: 0.74rem; }
 }
 @media (max-height: 480px) { .card .ctemper { bottom: auto; top: 2px; right: 6px; font-size: 0.55rem; padding: 0 4px; } }
+
+/* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
+   than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at
+   768x1024. Cap combat-hand rules at 4 lines; the full sentence stays in the card's
+   aria-label/tooltip and the keyword glossary. */
+.stage-combat .card .cdesc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+@media (max-height: 480px) {
+  .stage-combat .card .cdesc { -webkit-line-clamp: 3; line-height: 1; }
+  .stage-combat .card { gap: 0; }
+}
