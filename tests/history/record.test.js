@@ -381,7 +381,7 @@ test('§11.2: the fresh pool is a documented slice of the shipped cards', () => 
 
   // The pool selection reports its own composition and plan, and they agree with the pool.
   const sel = poolSelection(FULL, null);
-  assert.deepEqual(sel.ids.slice().sort(), FRESH.cardList.map((c) => c.id).slice().sort(), 'poolSelection and contentForProfile agree');
+  assert.deepEqual(sel.ids.slice().sort(), FRESH.cardList.filter((c) => !c.hero).map((c) => c.id).slice().sort(), 'poolSelection and contentForProfile agree (hero-only starters ride along outside the selection)');
   assert.equal(sel.composition.attack + sel.composition.skill + sel.composition.power, sel.ids.length, 'the type split sums to the pool');
   assert.equal(sel.plan.allowRare, false, 'the fresh plan may not allow rares');
 });

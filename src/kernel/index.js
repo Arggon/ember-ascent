@@ -131,7 +131,8 @@ export function contentForProfile(profile = null) {
   return loadContent(
     JSON.stringify({
       contentVersion: full.contentVersion,
-      cards: full.cardList.filter((c) => ids.has(c.id)),
+      // Hero-only starters (B4) are outside the selection but every run may need them.
+      cards: full.cardList.filter((c) => ids.has(c.id) || c.hero),
       characters: Object.fromEntries(full.characters),
       statuses: full.statuses,
     }),
@@ -256,6 +257,9 @@ export function newRun(opts = {}) {
     reward: null,
   };
 
+  // B4 second hero: a character whose relic is not the Kindled Heart records it, so the
+  // default (Ashwright) state keeps no new field and every existing hash is unchanged.
+  if (character.startingRelic && character.startingRelic !== 'burning_blood') state.relic = character.startingRelic;
   // B1 Kindling (opt-in). Only an opted-in run gains the extra fields and draws, so the
   // default state — and every existing golden hash — is byte-identical to before.
   if (opts.kindling === true) {

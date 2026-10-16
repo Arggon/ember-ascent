@@ -21,7 +21,7 @@ export const FRESH_SIZE = 24;
 /** Ratio of the pool by card type, applied to any size: 12:9:3 out of 24 = 0.5 / 0.375 / 0.125. */
 export const TYPE_RATIO = Object.freeze({ attack: 0.5, skill: 0.375, power: 0.125 });
 /** The shipped total (1 act, frozen content). Derived at call time, never used as a literal rule. */
-export const SHIPPED_CARDS = 42;
+export const SHIPPED_CARDS = 44;
 
 /** Rarity order, cheapest first. A fill may only relax *down* this list. */
 const RARITY_RANK = Object.freeze({ starter: 0, common: 1, uncommon: 2, rare: 3 });
@@ -289,7 +289,11 @@ function typeTargets(size, content, base) {
  * @param {any} [profile]
  * @returns {{ids: string[], composition: {attack: number, skill: number, power: number}, size: number, plan: any}}
  */
-export function poolSelection(content, profile = null) {
+export function poolSelection(allContent, profile = null) {
+  // Hero-only starters (B4: `hero` set) belong to their hero's deck, not to the shared
+  // pool, so adding a hero leaves every pool slice — and every Ashwright run — unchanged.
+  // contentForProfile adds them back so that hero's run can still resolve them.
+  const content = withoutHeroCards(allContent);
   const plan = poolPlan(profile);
   const q = queues(content);
   const chosen = new Map(); // id -> card
@@ -342,4 +346,11 @@ function countType(chosen, type) {
 
 function countTypes(chosen) {
   return { attack: countType(chosen, 'attack'), skill: countType(chosen, 'skill'), power: countType(chosen, 'power') };
+}
+
+/** The content minus hero-only starter cards (cards carrying a `hero` field). */
+export function withoutHeroCards(content) {
+  if (!content.cardList.some((c) => c.hero)) return content;
+  const cardList = content.cardList.filter((c) => !c.hero);
+  return { ...content, cardList, cards: new Map(cardList.map((c) => [c.id, c])) };
 }

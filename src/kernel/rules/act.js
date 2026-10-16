@@ -20,6 +20,8 @@ export const BASE_ENERGY = 3;
 export const REST_HEAL = 8;
 /** HP restored by the Kindled Heart relic (id `burning_blood`) after each combat. */
 export const RELIC_HEAL = 6;
+/** Extra first-turn Energy from the Cyan Lantern relic (B4, Bellows Keeper). */
+export const LANTERN_ENERGY = 1;
 /** Reward choice count after a normal fight; elites offer one more. */
 export const REWARD_CHOICES = 3;
 
@@ -120,6 +122,11 @@ export function startCombat(state, node, cardDefs) {
   };
 
   const turn = beginTurn(base, cardDefs);
+  // B4 Cyan Lantern (Bellows Keeper): +1 Energy on the first turn of every fight.
+  if (state.relic === 'cyan_lantern') {
+    turn.state = { ...turn.state, player: { ...turn.state.player, energy: turn.state.player.energy + LANTERN_ENERGY } };
+    turn.events.push({ t: 'energy', who: 'player', amount: LANTERN_ENERGY, source: 'cyan_lantern' });
+  }
   return {
     state: turn.state,
     events: [
@@ -320,7 +327,8 @@ export function resolveVictory(state, cardDefs) {
   // documented rule that they last only the fight. Caught by tests/kernel/status-reset.test.js.
   let next = { ...state, combat: { ...state.combat, active: false, enemies: [] }, player: { ...state.player, statuses: {} } };
 
-  const healed = state.relicOff ? 0 : Math.min(state.player.maxHp - state.player.hp, RELIC_HEAL);
+  // Only the Kindled Heart heals after fights; another hero's relic (B4) does not.
+  const healed = state.relicOff || (state.relic && state.relic !== 'burning_blood') ? 0 : Math.min(state.player.maxHp - state.player.hp, RELIC_HEAL);
   if (healed > 0) {
     next = { ...next, player: { ...next.player, hp: next.player.hp + healed } };
     events.push({ t: 'heal', who: 'player', amount: healed, source: 'burning_blood' });

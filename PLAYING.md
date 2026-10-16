@@ -83,6 +83,8 @@ You have **3 energy per turn**, and cards cost 1–2, so you'll typically play 2
 
 **The Kindling.** In the browser, every run opens at the forge: it offers three boons and you must take one. Each has an upside *and* a price (for example *Bellows Breath*: +1 Energy every turn, −12 max HP). Choose for your plan, not for the bigger number.
 
+**Heroes.** Before the first choice of a run, the Kindling screen offers two heroes. The **Ashwright** (60 HP) starts with 5 Hammerfall, 4 Quench and Anvil Blow, and the Kindled Heart heals 6 after each fight. The **Bellows Keeper** (54 HP) starts with 4 Hammerfall, 4 Quench, *Bellows Gust* (1: deal 4 to ALL enemies) and *Fan the Flames* (0: gain 1 Energy, Exhaust). His **Cyan Lantern** gives +1 Energy on the first turn of every fight but never heals. His two starters are his alone and never appear as rewards. On the CLI, use `--character bellows`. The log header records the hero, so replay rebuilds the same run.
+
 **Ember quests.** A run may carry three seeded side goals, shown above the map: *Elite Hunter* (win an elite fight, +8 max HP), *Smith's Rhythm* (play 30 cards, heal 12), *Bladework* (deal 120 damage, +6 max HP), *Ironwall* (gain 60 Block, +6 max HP) and *Pilgrim* (reach 2 campfires, heal 15). Progress counts by itself, and a finished quest pays out at once. The CLI map shows a `QUESTS` line; turn them on with `--quests`.
 
 **Tempers.** At a campfire you may, instead of resting, temper one of three offered cards for the rest of the run: *Quenched* (also gain 3 Block), *Red-hot* (+50% damage, lose 2 HP when played) or *Balanced* (also draw 1 card, exhausts). A tempered card wears a coloured trim and a badge.
