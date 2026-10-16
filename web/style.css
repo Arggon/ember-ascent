@@ -3446,3 +3446,33 @@ html, body {
 /* Keywords in rules text: gold for game terms (tooltip = kernel glossary), ember red for costs. */
 .card .cdesc .kw { color: #f5c542; font-weight: 700; cursor: help; }
 .card .cdesc .kw-cost { color: #ff7a5a; cursor: default; }
+
+/* ---------- Scene transitions + act title card (fx layer, never intercepts input) ---------- */
+.fx-scene {
+  position: fixed; inset: 0; z-index: 55; pointer-events: none;
+  background:
+    radial-gradient(70% 50% at 50% 110%, rgba(255, 120, 40, 0.55), transparent 70%),
+    linear-gradient(180deg, rgba(10, 6, 4, 0) 0%, rgba(10, 6, 4, 0.85) 45%, rgba(10, 6, 4, 0) 100%);
+  animation: scene-heat 0.7s ease-in-out both;
+}
+@keyframes scene-heat {
+  0% { opacity: 0; transform: translateY(40%); }
+  45% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-40%); }
+}
+.fx-act-card {
+  position: fixed; inset: 0; z-index: 58; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: radial-gradient(70% 45% at 50% 50%, rgba(12, 8, 5, 0.97) 35%, rgba(12, 8, 5, 0.55) 80%, rgba(12, 8, 5, 0.3));
+  animation: act-card 2.3s ease-in-out both;
+}
+.fx-act-num { font-family: var(--display, Cinzel, serif); font-size: 0.95rem; letter-spacing: 0.5em; color: #ff9d3a; text-transform: uppercase; }
+.fx-act-name { font-family: 'Cinzel Decorative', var(--display, Cinzel, serif); font-size: clamp(1.8rem, 5vw, 3.4rem); color: #f3dcc0; text-shadow: 0 0 30px rgba(255, 120, 40, 0.5); }
+.fx-act-rule { width: min(320px, 50vw); height: 2px; background: linear-gradient(90deg, transparent, #ff9d3a, transparent); box-shadow: 0 0 12px rgba(255, 140, 50, 0.7); }
+@keyframes act-card {
+  0% { opacity: 0; letter-spacing: 0.02em; }
+  18% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .fx-scene, .fx-act-card { display: none; } }

@@ -1216,6 +1216,7 @@ function render() {
   // card play would flash the whole screen.
   if (phaseChanged && stageEl.firstElementChild) {
     stageEl.firstElementChild.classList.add('enter');
+    sceneBeat(paintedPhase, snap.phase);
     paintedPhase = snap.phase;
   }
   // The first-run explanation, shown once. A player who has never seen the game should
@@ -1264,6 +1265,27 @@ function render() {
 */
 
 /** Put a node on the persistent screen layer. Null-safe: the test harness has no layer. */
+/**
+ * Scene transitions (presentation only, skipped under reduced motion by fxAdd): the very
+ * first map of a run gets the act title card; every later phase change gets a short
+ * ember-and-heat wipe. Fixed overlay, pointer-events none, so layout and clicks are untouched.
+ * @param {string|null} from the phase painted before
+ * @param {string} to the phase being painted
+ */
+function sceneBeat(from, to) {
+  if (from === null) {
+    if (to === 'map' && !(snap.map && snap.map.floor > 0)) {
+      fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
+        el('span', { cls: 'fx-act-num', text: 'Act I' }),
+        el('span', { cls: 'fx-act-name', text: 'The Foundry' }),
+        el('span', { cls: 'fx-act-rule' })), 2300);
+    }
+    return;
+  }
+  if (to === 'ended') return;
+  fxAdd(el('div', { cls: `fx-scene to-${to}`, attrs: { 'aria-hidden': 'true' } }), 700);
+}
+
 function fxAdd(node, ms) {
   if (!fxEl || reducedMotion) return;
   fxEl.append(node);
