@@ -1,0 +1,4 @@
+== sha256 BEFORE copy ==
+be3db6a601012afae180b9a6d592aeb1d670e51c157e56c9858ecf355ea853c8  web/style.css
+300597437f279fcb88ceab8ee15d8ad303866c2fefa5c2a547dca8f160f5468d  tools/dev/viewport-check.mjs
+f5ee0cd51074d4b824b9acfc73042e3a22cf9b4333c71225453842e9e0df58db  tools/dev/space-check.mjs

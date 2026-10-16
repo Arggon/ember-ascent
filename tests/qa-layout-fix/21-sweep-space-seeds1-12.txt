@@ -1,0 +1,141 @@
+thresholds: wastePx >= 0 (negative = content below the fold) | seed pinned: yes
+base: http://localhost:5173/web/index.html?seed={seed}  seeds: 1,2,3,4,5,6,7,8,9,10,11,12
+
+size         label            seed  reported  viewport      waste   waste%  scrollH  handFill%  result
+412x915      galaxy-s25plus   1     1         [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   2     2         [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   3     3         [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   4     4         [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   5     5         [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   6     6         [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   7     7         [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   8     8         [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   9     9         [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   10    10        [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   11    11        [412,915]     24px    3%      915      100%       pass
+412x915      galaxy-s25plus   12    12        [412,915]     24px    3%      915      100%       pass
+390x844      iphone-14        1     1         [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        2     2         [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        3     3         [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        4     4         [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        5     5         [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        6     6         [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        7     7         [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        8     8         [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        9     9         [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        10    10        [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        11    11        [390,844]     24px    3%      844      100%       pass
+390x844      iphone-14        12    12        [390,844]     24px    3%      844      100%       pass
+360x640      phone-small      1     1         [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      2     2         [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      3     3         [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      4     4         [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      5     5         [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      6     6         [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      7     7         [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      8     8         [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      9     9         [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      10    10        [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      11    11        [360,640]     14px    2%      640      100%       pass
+360x640      phone-small      12    12        [360,640]     14px    2%      640      100%       pass
+414x896      phone-large      1     1         [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      2     2         [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      3     3         [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      4     4         [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      5     5         [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      6     6         [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      7     7         [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      8     8         [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      9     9         [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      10    10        [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      11    11        [414,896]     24px    3%      896      100%       pass
+414x896      phone-large      12    12        [414,896]     24px    3%      896      100%       pass
+768x1024     tablet           1     1         [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           2     2         [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           3     3         [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           4     4         [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           5     5         [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           6     6         [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           7     7         [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           8     8         [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           9     9         [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           10    10        [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           11    11        [768,1024]    34px    3%      1024     100%       pass
+768x1024     tablet           12    12        [768,1024]    34px    3%      1024     100%       pass
+1280x800     desktop          1     1         [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          2     2         [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          3     3         [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          4     4         [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          5     5         [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          6     6         [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          7     7         [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          8     8         [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          9     9         [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          10    10        [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          11    11        [1280,800]    26px    3%      800      71%        pass
+1280x800     desktop          12    12        [1280,800]    26px    3%      800      71%        pass
+1366x768     laptop           1     1         [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           2     2         [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           3     3         [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           4     4         [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           5     5         [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           6     6         [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           7     7         [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           8     8         [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           9     9         [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           10    10        [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           11    11        [1366,768]    26px    3%      768      71%        pass
+1366x768     laptop           12    12        [1366,768]    26px    3%      768      71%        pass
+1280x1000    desktop-tall     1     1         [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     2     2         [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     3     3         [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     4     4         [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     5     5         [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     6     6         [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     7     7         [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     8     8         [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     9     9         [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     10    10        [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     11    11        [1280,1000]   58px    6%      1000     81%        pass
+1280x1000    desktop-tall     12    12        [1280,1000]   58px    6%      1000     81%        pass
+915x412      galaxy-s25plus-landscape1     1         [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape2     2         [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape3     3         [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape4     4         [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape5     5         [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape6     6         [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape7     7         [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape8     8         [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape9     9         [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape10    10        [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape11    11        [915,412]     14px    3%      412      100%       pass
+915x412      galaxy-s25plus-landscape12    12        [915,412]     14px    3%      412      100%       pass
+844x390      iphone-14-landscape1     1         [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape2     2         [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape3     3         [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape4     4         [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape5     5         [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape6     6         [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape7     7         [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape8     8         [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape9     9         [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape10    10        [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape11    11        [844,390]     22px    6%      390      100%       pass
+844x390      iphone-14-landscape12    12        [844,390]     22px    6%      390      100%       pass
+1200x450     short-window     1     1         [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     2     2         [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     3     3         [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     4     4         [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     5     5         [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     6     6         [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     7     7         [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     8     8         [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     9     9         [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     10    10        [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     11    11        [1200,450]    14px    3%      450      75%        pass
+1200x450     short-window     12    12        [1200,450]    14px    3%      450      75%        pass
+
+ALL PASS (132 rows)
+
+screenshots in shots/space/
+exit=0

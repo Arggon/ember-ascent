@@ -1,0 +1,26 @@
+thresholds: EndTurn bottom <= innerHeight - 8 | pageScrollHeight <= innerHeight + 0 | handRows <= 1 | EndTurn topmost at centre: true | seed pinned: yes
+base: http://localhost:5173/tests/qa-layout-fix/sandbox-prefix/index.html?seed={seed}  seeds: 3,11
+
+size         label            seed  reported  eTbot/vh  clear  scrollPx  handRows  onTop  result
+844x390      phone-landscape  3     3         368/390   22     0         1         true   pass
+844x390      phone-landscape  11    11        368/390   22     0         1         true   pass
+915x412      galaxy-s25u-land 3     3         406/412   6      0         1         true   FAIL
+915x412      galaxy-s25u-land 11    11        406/412   6      0         1         true   FAIL
+1366x768     laptop           3     3         774/768   -5     103       1         true   FAIL
+1366x768     laptop           11    11        770/768   -2     100       1         true   FAIL
+1200x450     short-desktop-window3     3         444/450   6      0         1         true   FAIL
+1200x450     short-desktop-window11    11        444/450   6      0         1         true   FAIL
+
+FAIL summary (6 failing row(s)):
+  FAIL 915x412 seed 3: End Turn clearance 6px < 8px: bottom=406 vs threshold bottom<=404
+  FAIL 915x412 seed 11: End Turn clearance 6px < 8px: bottom=406 vs threshold bottom<=404
+  FAIL 1366x768 seed 3: End Turn below fold: bottom=774 > innerHeight=768 (by 6px)
+  FAIL 1366x768 seed 3: page scrolls: scrollHeight=871 > innerHeight=768 (by 103px)
+  FAIL 1366x768 seed 11: End Turn below fold: bottom=770 > innerHeight=768 (by 2px)
+  FAIL 1366x768 seed 11: page scrolls: scrollHeight=868 > innerHeight=768 (by 100px)
+  FAIL 1200x450 seed 3: End Turn clearance 6px < 8px: bottom=444 vs threshold bottom<=442
+  FAIL 1200x450 seed 11: End Turn clearance 6px < 8px: bottom=444 vs threshold bottom<=442
+
+per-kind min tappable box @ 1200x450: {"cardWrap":64,"card":64,"enemy":93,"node":null,"btn":44}
+
+screenshots in shots/viewport/

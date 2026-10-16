@@ -1,0 +1,11 @@
+sim 2000 runs | policy smart | threads 4 | seeds 1..2000
+win 63 (3.1%) loss 1937 (96.9%) unfinished 0
+steps total 122705 mean 61.4 | floors max 7 mean 5.64
+malformed 0/122705 (0.0%)
+boss reached 1239/2000 (62.0%) | kills 63 (5.1% of those that reached)
+boss arrival: HP 34.6/60 (58%) | deck 15.3 (atk 9.5 blk 4.8 pow 1.0) | block points in deck 31.6
+boss at death: mean HP remaining 63.1/110 (57%) over 1176 boss deaths
+elapsed 1413ms | 1415.0 runs/sec
+payload tokens: dump worst 100/250 PASS | action line worst 6/8 PASS (180 lines measured)
+payloadTokens: worst 100 tokens (o200k 100, cl100k 100)
+actionLine: worst 6 tokens (o200k 6, cl100k 6)

@@ -1,0 +1,11 @@
+thresholds: EndTurn bottom <= innerHeight - 8 | pageScrollHeight <= innerHeight + 0 | handRows <= 1 | EndTurn topmost at centre: true | seed pinned: yes
+base: http://localhost:5173/web/index.html?seed={seed}  seeds: 3
+
+size         label            seed  reported  eTbot/vh  clear  scrollPx  handRows  onTop  result
+915x412      galaxy-s25u-land 3     3         398/412   14     0         1         true   pass
+
+ALL PASS (1 rows)
+
+per-kind min tappable box @ 915x412: {"cardWrap":68,"card":68,"enemy":102,"node":null,"btn":40}
+
+screenshots in shots/viewport/

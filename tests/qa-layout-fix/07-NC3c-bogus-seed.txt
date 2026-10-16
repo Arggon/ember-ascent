@@ -1,0 +1,13 @@
+thresholds: EndTurn bottom <= innerHeight - 8 | pageScrollHeight <= innerHeight + 0 | handRows <= 1 | EndTurn topmost at centre: true | seed pinned: yes
+base: http://localhost:5173/web/index.html?seed={seed}  seeds: 999999999999
+
+size         label            seed  reported  eTbot/vh  clear  scrollPx  handRows  onTop  result
+1366x768     laptop           999999999999-         NOT FOUND -      0         0         -      FAIL
+
+FAIL summary (1 failing row(s)):
+  FAIL 1366x768 seed 999999999999: INVALID SEED: page reported no seed (New Run button not found), requested 999999999999
+  FAIL 1366x768 seed 999999999999: End Turn button NOT FOUND (separate from below-fold)
+
+per-kind min tappable box @ 1366x768: {"cardWrap":null,"card":null,"enemy":null,"node":null,"btn":null}
+
+screenshots in shots/viewport/

@@ -1,0 +1,72 @@
+TASK 1 — THE TRUE IMPORT CLOSURE
+=====================================================================
+METHOD (deterministic, not guessed)
+Starting at web/index.html, a Node script followed every ES module specifier:
+  A) static  : /(?:^|[\s;}])(?:import|export)\s+(?:[^"';]*?\sfrom\s*)?["']([^"'\s]+)["']/g
+  B) dynamic : /(?:await\s+)?import\(\s*["']([^"'\s]+)["']\s*\)/g
+Any specifier starting with '.' or '/' was resolved against the importing file
+and recursed. Bare specifiers were reported, not followed (they cannot resolve in
+a browser without an import map). Non-JS entry points were taken from the HTML:
+  <link rel="stylesheet" href="./style.css">   and   <script type="module" src="./app.js">
+
+RAW SCAN OUTPUT (bare specifiers found, all dynamic, all inside try/catch)
+  src/surface/tokens.js -> js-tiktoken/lite
+  src/surface/tokens.js -> js-tiktoken/ranks/o200k_base
+  src/surface/tokens.js -> js-tiktoken/ranks/cl100k_base
+
+CLOSURE — 25 files. [req] = needed; [opt] = reachable only via try/catch
+  [req]  web/style.css
+  [req]  web/app.js
+  [req]  src/surface/gui/controller.js
+  [req]  src/surface/session.js
+  [req]  src/kernel/index.js
+  [req]  src/kernel/state.js
+  [req]  src/kernel/sha256.js
+  [req]  src/kernel/content.js
+  [req]  src/kernel/rules/vocabulary.js
+  [req]  src/kernel/rules/card-instance.js
+  [req]  src/kernel/content/cards.bundle.js
+  [req]  src/kernel/rules/map.js
+  [req]  src/kernel/rng.js
+  [req]  src/kernel/rules/encounters.js
+  [req]  src/kernel/actions.js
+  [req]  src/kernel/rules/act.js
+  [req]  src/kernel/rules/powers.js
+  [req]  src/kernel/rules/effects/index.js
+  [req]  src/kernel/observe.js
+  [req]  src/kernel/describe.js
+  [MISSING] src/surface/gui/renderer.js   <- does not exist in the repo (see below)
+  [req]  web/tokens.js
+  [opt]  src/surface/tokens.js
+  count: 23 files visited, 21 required on disk, 1 absent, 1 optional
+
+THE THREE TRAPS IN THE BRIEF, EACH RESOLVED
+1. DYNAMIC import() — the token badge. web/tokens.js:21 does
+     const mod = await import('../src/surface/tokens.js');
+   inside try/catch. That file IS shipped. It then fails on its OWN bare
+   'js-tiktoken' specifier, the outer catch swallows it, and the badge shows its
+   no-encoder state. Shipping it makes the failure the intended tested path
+   instead of an unexpected 404, and web/app.js names it unconditionally. 3.1 KB.
+2. A SECOND dynamic import the brief did not mention:
+     src/surface/gui/controller.js:33  const mod = await import('./renderer.js');
+   src/surface/gui/renderer.js DOES NOT EXIST anywhere in this repo.
+   `ls src/surface/gui` returns only controller.js. A 404 is therefore the
+   designed "renderer unresolvable" state, and shipping a stub would be WRONG:
+   an unresolvable renderer is a case the golden test exercises. Not shipped.
+3. NON-JS RUNTIME ASSETS — none. Verified:
+     grep -nE "url\(" web/style.css                                  -> no matches
+     grep -rnE "fetch\(|XMLHttpRequest|new Audio|new Worker|<img|src="
+        web/*.js web/index.html src/kernel src/surface --include=*.js -> no matches
+   The whole visual layer is CSS; there is no sprite, font or image.
+4. ABSOLUTE-vs-RELATIVE PATHS — exactly two imports point outside web/:
+     web/app.js:19    import ... from '../src/surface/gui/controller.js'
+     web/tokens.js:21         await import('../src/surface/tokens.js')
+   Both are relative and both are preserved by keeping the src/ subtree intact.
+   No absolute paths, no leading-slash imports anywhere in the closure.
+5. NOT IN THE CLOSURE (dead for the browser, deliberately excluded):
+   src/surface/cli.js (imports ./sim.js, ./stats.js) — the CLI surface, never
+   reached from web/; src/kernel/describe.js IS included (session.js imports it);
+   src/kernel/rules/effects.js is a one-line re-export shim not imported by
+   anything in the closure; src/kernel/content/cards.json is read only by tests —
+   the browser gets the same data pre-parsed via cards.bundle.js.
+   Confirmed by the serve test: all four 404 and nothing requests them.

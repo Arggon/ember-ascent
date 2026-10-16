@@ -1,0 +1,118 @@
+thresholds: EndTurn bottom <= innerHeight - 8 | pageScrollHeight <= innerHeight + 0 | handRows <= 1 | EndTurn topmost at centre: true | seed pinned: yes
+base: http://localhost:5173/web/index.html?seed={seed}  seeds: 1,2,3,4,5,6,7,8,9,10,11,12
+
+size         label            seed  reported  eTbot/vh  clear  scrollPx  handRows  onTop  result
+360x640      phone-small      1     1         626/640   14     0         1         true   pass
+360x640      phone-small      2     2         626/640   14     0         1         true   pass
+360x640      phone-small      3     3         626/640   14     0         1         true   pass
+360x640      phone-small      4     4         626/640   14     0         1         true   pass
+360x640      phone-small      5     5         626/640   14     0         1         true   pass
+360x640      phone-small      6     6         626/640   14     0         1         true   pass
+360x640      phone-small      7     7         626/640   14     0         1         true   pass
+360x640      phone-small      8     8         626/640   14     0         1         true   pass
+360x640      phone-small      9     9         626/640   14     0         1         true   pass
+360x640      phone-small      10    10        626/640   14     0         1         true   pass
+360x640      phone-small      11    11        626/640   14     0         1         true   pass
+360x640      phone-small      12    12        626/640   14     0         1         true   pass
+390x844      iphone-14        1     1         741/844   103    0         1         true   pass
+390x844      iphone-14        2     2         742/844   102    0         1         true   pass
+390x844      iphone-14        3     3         759/844   85     0         1         true   pass
+390x844      iphone-14        4     4         742/844   102    0         1         true   pass
+390x844      iphone-14        5     5         758/844   86     0         1         true   pass
+390x844      iphone-14        6     6         758/844   86     0         1         true   pass
+390x844      iphone-14        7     7         759/844   85     0         1         true   pass
+390x844      iphone-14        8     8         758/844   86     0         1         true   pass
+390x844      iphone-14        9     9         741/844   103    0         1         true   pass
+390x844      iphone-14        10    10        742/844   102    0         1         true   pass
+390x844      iphone-14        11    11        745/844   99     0         1         true   pass
+390x844      iphone-14        12    12        762/844   82     0         1         true   pass
+414x896      phone-large      1     1         783/896   113    0         1         true   pass
+414x896      phone-large      2     2         783/896   113    0         1         true   pass
+414x896      phone-large      3     3         801/896   95     0         1         true   pass
+414x896      phone-large      4     4         783/896   113    0         1         true   pass
+414x896      phone-large      5     5         800/896   96     0         1         true   pass
+414x896      phone-large      6     6         800/896   96     0         1         true   pass
+414x896      phone-large      7     7         801/896   95     0         1         true   pass
+414x896      phone-large      8     8         800/896   96     0         1         true   pass
+414x896      phone-large      9     9         783/896   113    0         1         true   pass
+414x896      phone-large      10    10        783/896   113    0         1         true   pass
+414x896      phone-large      11    11        783/896   113    0         1         true   pass
+414x896      phone-large      12    12        803/896   93     0         1         true   pass
+844x390      phone-landscape  1     1         368/390   22     0         1         true   pass
+844x390      phone-landscape  2     2         368/390   22     0         1         true   pass
+844x390      phone-landscape  3     3         368/390   22     0         1         true   pass
+844x390      phone-landscape  4     4         368/390   22     0         1         true   pass
+844x390      phone-landscape  5     5         368/390   22     0         1         true   pass
+844x390      phone-landscape  6     6         368/390   22     0         1         true   pass
+844x390      phone-landscape  7     7         368/390   22     0         1         true   pass
+844x390      phone-landscape  8     8         368/390   22     0         1         true   pass
+844x390      phone-landscape  9     9         368/390   22     0         1         true   pass
+844x390      phone-landscape  10    10        368/390   22     0         1         true   pass
+844x390      phone-landscape  11    11        368/390   22     0         1         true   pass
+844x390      phone-landscape  12    12        368/390   22     0         1         true   pass
+915x412      galaxy-s25u-land 1     1         398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 2     2         398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 3     3         398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 4     4         398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 5     5         398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 6     6         398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 7     7         398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 8     8         398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 9     9         398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 10    10        398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 11    11        398/412   14     0         1         true   pass
+915x412      galaxy-s25u-land 12    12        398/412   14     0         1         true   pass
+768x1024     tablet           1     1         901/1024  123    0         1         true   pass
+768x1024     tablet           2     2         908/1024  116    0         1         true   pass
+768x1024     tablet           3     3         922/1024  102    0         1         true   pass
+768x1024     tablet           4     4         908/1024  116    0         1         true   pass
+768x1024     tablet           5     5         915/1024  109    0         1         true   pass
+768x1024     tablet           6     6         915/1024  109    0         1         true   pass
+768x1024     tablet           7     7         922/1024  102    0         1         true   pass
+768x1024     tablet           8     8         915/1024  109    0         1         true   pass
+768x1024     tablet           9     9         901/1024  123    0         1         true   pass
+768x1024     tablet           10    10        904/1024  120    0         1         true   pass
+768x1024     tablet           11    11        904/1024  120    0         1         true   pass
+768x1024     tablet           12    12        915/1024  109    0         1         true   pass
+1280x800     desktop          1     1         727/800   73     0         1         true   pass
+1280x800     desktop          2     2         729/800   71     0         1         true   pass
+1280x800     desktop          3     3         732/800   68     0         1         true   pass
+1280x800     desktop          4     4         729/800   71     0         1         true   pass
+1280x800     desktop          5     5         730/800   70     0         1         true   pass
+1280x800     desktop          6     6         730/800   70     0         1         true   pass
+1280x800     desktop          7     7         732/800   68     0         1         true   pass
+1280x800     desktop          8     8         730/800   70     0         1         true   pass
+1280x800     desktop          9     9         727/800   73     0         1         true   pass
+1280x800     desktop          10    10        729/800   71     0         1         true   pass
+1280x800     desktop          11    11        724/800   76     0         1         true   pass
+1280x800     desktop          12    12        730/800   70     0         1         true   pass
+1366x768     laptop           1     1         701/768   67     0         1         true   pass
+1366x768     laptop           2     2         703/768   65     0         1         true   pass
+1366x768     laptop           3     3         707/768   61     0         1         true   pass
+1366x768     laptop           4     4         703/768   65     0         1         true   pass
+1366x768     laptop           5     5         704/768   64     0         1         true   pass
+1366x768     laptop           6     6         704/768   64     0         1         true   pass
+1366x768     laptop           7     7         707/768   61     0         1         true   pass
+1366x768     laptop           8     8         704/768   64     0         1         true   pass
+1366x768     laptop           9     9         701/768   67     0         1         true   pass
+1366x768     laptop           10    10        703/768   65     0         1         true   pass
+1366x768     laptop           11    11        698/768   70     0         1         true   pass
+1366x768     laptop           12    12        704/768   64     0         1         true   pass
+1200x450     short-desktop-window1     1         436/450   14     0         1         true   pass
+1200x450     short-desktop-window2     2         436/450   14     0         1         true   pass
+1200x450     short-desktop-window3     3         436/450   14     0         1         true   pass
+1200x450     short-desktop-window4     4         436/450   14     0         1         true   pass
+1200x450     short-desktop-window5     5         436/450   14     0         1         true   pass
+1200x450     short-desktop-window6     6         436/450   14     0         1         true   pass
+1200x450     short-desktop-window7     7         436/450   14     0         1         true   pass
+1200x450     short-desktop-window8     8         436/450   14     0         1         true   pass
+1200x450     short-desktop-window9     9         436/450   14     0         1         true   pass
+1200x450     short-desktop-window10    10        436/450   14     0         1         true   pass
+1200x450     short-desktop-window11    11        436/450   14     0         1         true   pass
+1200x450     short-desktop-window12    12        436/450   14     0         1         true   pass
+
+ALL PASS (108 rows)
+
+per-kind min tappable box @ 1200x450: {"cardWrap":68,"card":68,"enemy":102,"node":null,"btn":40}
+
+screenshots in shots/viewport/

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Deckbuilder — Phase 5 browser surface</title>
+  <!-- Zero dependencies: one local stylesheet, one local ES module. No CDN, no build. -->
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <!--
+    A VIEW on the SAME kernel the headless CLI drives. This page contains no game
+    rules: every number and label it shows comes from controller.snapshot(), which the
+    kernel computes. See src/surface/gui/controller.js and src/kernel/observe.js.
+  -->
+  <div id="app">
+    <header id="hud" aria-label="Player status"></header>
+    <main id="stage" aria-live="polite"></main>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </div>
+  <noscript>This game needs JavaScript modules enabled.</noscript>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

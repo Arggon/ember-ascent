@@ -1,0 +1,156 @@
+TASK 2 — RELEASE ARTIFACT BUILD, AND TASK 4 — REPRODUCIBILITY
+date: 2026-10-13T14:00:49Z   node: v24.20.0
+command: node tools/build-release.mjs      (and OUT=... for runs 2 and 3)
+
+===== RUN 1 -> ./release =====
+build-release: wrote /home/arggon/.config/AutoClaw-oversea-official/accounts/94e66e684ead817e330e9c30239face9889db0c1f9f662f8f569582a5b6e3380/projects/Default/release
+   69695  app.js
+    1089  HOW-TO-RUN-LOCALLY.txt
+    2208  index.html
+    5742  src/kernel/actions.js
+    4851  src/kernel/content.js
+   14028  src/kernel/content/cards.bundle.js
+   26469  src/kernel/describe.js
+   13581  src/kernel/index.js
+   18091  src/kernel/observe.js
+    3323  src/kernel/rng.js
+   14936  src/kernel/rules/act.js
+    2702  src/kernel/rules/card-instance.js
+    7252  src/kernel/rules/effects/index.js
+    5515  src/kernel/rules/encounters.js
+    3325  src/kernel/rules/map.js
+    4586  src/kernel/rules/powers.js
+   10078  src/kernel/rules/vocabulary.js
+    4769  src/kernel/sha256.js
+    6582  src/kernel/state.js
+    4339  src/surface/gui/controller.js
+   10769  src/surface/session.js
+    3137  src/surface/tokens.js
+   51777  style.css
+    1270  tokens.js
+    5149  tools/serve.mjs
+
+files in artifact: 25
+total size:        295263 bytes (288.3 KiB)
+zip:               /home/arggon/.config/AutoClaw-oversea-official/accounts/94e66e684ead817e330e9c30239face9889db0c1f9f662f8f569582a5b6e3380/projects/Default/release.zip
+zip size:          101861 bytes (99.5 KiB)
+zip entries:       25
+zip sha256:        b86764e45a4c9752b434486cc4d92e89a8be39786e8c7a244ca93264c114add0
+
+===== RUN 2 -> /tmp/rebuild-a =====
+zip:               /tmp/rebuild-a.zip
+zip size:          101861 bytes (99.5 KiB)
+zip entries:       25
+zip sha256:        b86764e45a4c9752b434486cc4d92e89a8be39786e8c7a244ca93264c114add0
+
+===== RUN 3 -> /tmp/rebuild-b =====
+zip:               /tmp/rebuild-b.zip
+zip size:          101861 bytes (99.5 KiB)
+zip entries:       25
+zip sha256:        b86764e45a4c9752b434486cc4d92e89a8be39786e8c7a244ca93264c114add0
+
+===== REPRODUCIBILITY: sha256 of the three zips =====
+b86764e45a4c9752b434486cc4d92e89a8be39786e8c7a244ca93264c114add0  release.zip
+b86764e45a4c9752b434486cc4d92e89a8be39786e8c7a244ca93264c114add0  /tmp/rebuild-a.zip
+b86764e45a4c9752b434486cc4d92e89a8be39786e8c7a244ca93264c114add0  /tmp/rebuild-b.zip
+
+===== REPRODUCIBILITY: sha256 manifest of every file, diffed =====
+run1 == run2 : IDENTICAL (all 25 files)
+run1 == run3 : IDENTICAL (all 25 files)
+25 /tmp/.man2.release
+
+===== ZIP integrity and layout =====
+No errors detected in compressed data of release.zip.
+root-level entries:
+  HOW-TO-RUN-LOCALLY.txt
+  app.js
+  index.html
+  style.css
+  tokens.js
+web/-prefixed entries (must be none):
+0
+total zip entries: 25   (itch.io limit: 1000 extracted files)
+longest entry path: 34 src/kernel/content/cards.bundle.js  (itch.io limit: 240 chars)
+
+===== SIZE BREAKDOWN (KiB) =====
+    142.4 KiB  src/kernel
+     68.1 KiB  app.js
+     50.6 KiB  style.css
+     17.8 KiB  src/surface
+      5.0 KiB  tools/serve.mjs
+      2.2 KiB  index.html
+      1.2 KiB  tokens.js
+      1.1 KiB  HOW-TO-RUN-LOCALLY.txt
+  -------
+    288.3 KiB  TOTAL in 25 files
+  zip on disk: 99.5 KiB
+
+===== PROOF THE ORIGINALS WERE NOT EDITED (web/ and src/ untouched) =====
+index.html  artifact vs repo web/:  65a1af5811d84cbc00f4719e0b5878d1254e6cf27f805e0e3496a4d1bc551f7f  - 65a1af5811d84cbc00f4719e0b5878d1254e6cf27f805e0e3496a4d1bc551f7f  -
+style.css   artifact vs repo web/:  35ba862f58dde494767d88b5d17b3dc088c3c43d5c84f724afee2b8fe306706d  - 35ba862f58dde494767d88b5d17b3dc088c3c43d5c84f724afee2b8fe306706d  -
+tokens.js   artifact vs repo web/:  26d8674c6b9df756f487d7b046ea8f7baba54e9a5ec8ed59f0cc1cf3da866f44  - 26d8674c6b9df756f487d7b046ea8f7baba54e9a5ec8ed59f0cc1cf3da866f44  -
+app.js      artifact (1 line rewritten): e6d8de670e46bc97a713c1e9e955f83a8cf55293e62b314f82822887a22b8ed8  -
+app.js      repo web/app.js (original) : 34f8638ae7b3ecae8140fb627563c453e806ad30803c167189e260bbe4252dc3  -
+--- and the ONLY difference is the one import specifier: ---
+19c19
+< import { createController } from '../src/surface/gui/controller.js';
+---
+> import { createController } from './src/surface/gui/controller.js';
+(above: exactly one changed line)
+--- kernel + session files must be byte-identical: ---
+  IDENTICAL  src/kernel/index.js
+  IDENTICAL  src/kernel/observe.js
+  IDENTICAL  src/surface/session.js
+  IDENTICAL  src/surface/gui/controller.js
+  IDENTICAL  src/kernel/content/cards.bundle.js
+
+===== EXTERNAL-ASSET GREP (Task 2 requirement) =====
+command: grep -rniE 'https?://|cdn|@import|googleapis|.woff' <artifact>
+release/tools/serve.mjs:135:  const base = `http://localhost:${port}`;
+release/HOW-TO-RUN-LOCALLY.txt:5:http:// — opening index.html directly with file:// will NOT work, because browsers
+release/HOW-TO-RUN-LOCALLY.txt:12:Then open the URL it prints, which is http://localhost:5173/ — and add ?seed=N to
+release/HOW-TO-RUN-LOCALLY.txt:13:play a specific run, e.g. http://localhost:5173/?seed=7
+release/HOW-TO-RUN-LOCALLY.txt:21:this same origin. No analytics, no telemetry, no external font, no CDN.
+grep exit: 0
+
+-- restricted to the files the BROWSER loads (.js/.html/.css): --
+grep exit: 1 (1 = EMPTY)
+
+JUSTIFICATION for the 4 non-empty hits (all in generated prose, letter of the law):
+  release/tools/serve.mjs:135  'http://localhost:${port}'  -> the local URL the
+      server PRINTS to stdout as help text. Not fetched, not an asset.
+  release/HOW-TO-RUN-LOCALLY.txt:5,12,13,21 -> the words 'http://' and 'CDN' in
+      sentences telling the player how to run it and asserting there is no CDN.
+No browser-loaded file matches. There is no external request in the artifact.
+
+=====================================================================
+FINAL REBUILD (web/app.js changed under us at 11:02:07 - sibling agent)
+date: 2026-10-13T14:03:22Z
+command: node tools/build-release.mjs
+
+total size:        305409 bytes (298.3 KiB)
+zip:               /home/arggon/.config/AutoClaw-oversea-official/accounts/94e66e684ead817e330e9c30239face9889db0c1f9f662f8f569582a5b6e3380/projects/Default/release.zip
+zip size:          104998 bytes (102.5 KiB)
+zip entries:       25
+zip sha256:        fd2cfde5ba16253835dbc4697c0608a12932fd8d4f3962129f65ecdb59e41420
+
+-- runs 2 and 3 to /tmp --
+zip entries:       25
+zip sha256:        fd2cfde5ba16253835dbc4697c0608a12932fd8d4f3962129f65ecdb59e41420
+zip entries:       25
+zip sha256:        fd2cfde5ba16253835dbc4697c0608a12932fd8d4f3962129f65ecdb59e41420
+
+-- zip sha256, three runs --
+fd2cfde5ba16253835dbc4697c0608a12932fd8d4f3962129f65ecdb59e41420  release.zip
+fd2cfde5ba16253835dbc4697c0608a12932fd8d4f3962129f65ecdb59e41420  /tmp/fin-a.zip
+fd2cfde5ba16253835dbc4697c0608a12932fd8d4f3962129f65ecdb59e41420  /tmp/fin-b.zip
+
+-- per-file manifest diff --
+ALL THREE BUILDS BYTE-IDENTICAL
+
+-- app.js in the FINAL artifact differs from the original by exactly one line --
+19c19
+< import { createController } from '../src/surface/gui/controller.js';
+---
+> import { createController } from './src/surface/gui/controller.js';
+   (one changed line: the import specifier, as designed)

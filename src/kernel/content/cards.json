@@ -1,0 +1,69 @@
+{
+  "contentVersion": "dlb-0.3.0-act1",
+  "characters": {
+    "ironclad": {
+      "name": "Ironclad",
+      "maxHp": 60,
+      "startingDeck": [
+        "strike", "strike", "strike", "strike", "strike",
+        "defend", "defend", "defend", "defend",
+        "bash"
+      ],
+      "startingRelic": "burning_blood"
+    }
+  },
+  "cards": [
+    { "id": "strike",     "name": "Strike",     "cost": 1, "type": "attack", "rarity": "starter", "target": "enemy", "effects": [{ "verb": "damage", "amount": 6 }] },
+    { "id": "defend",     "name": "Defend",     "cost": 1, "type": "skill",  "rarity": "starter", "target": "none",  "effects": [{ "verb": "block", "amount": 5 }] },
+    { "id": "bash",       "name": "Bash",       "cost": 2, "type": "attack", "rarity": "starter", "target": "enemy", "effects": [{ "verb": "damage", "amount": 8 }, { "verb": "status", "status": "vulnerable", "amount": 2, "to": "enemy" }] },
+
+    { "id": "anger",      "name": "Anger",      "cost": 0, "type": "attack", "rarity": "common", "target": "enemy", "effects": [{ "verb": "damage", "amount": 5 }] },
+    { "id": "cleave",     "name": "Cleave",     "cost": 1, "type": "attack", "rarity": "common", "target": "all",   "effects": [{ "verb": "damage", "amount": 4, "target": "all_enemies" }] },
+    { "id": "clothesline","name": "Clothesline","cost": 2, "type": "attack", "rarity": "common", "target": "enemy", "effects": [{ "verb": "damage", "amount": 12 }, { "verb": "status", "status": "weak", "amount": 2, "to": "enemy" }] },
+    { "id": "headbutt",   "name": "Headbutt",   "cost": 1, "type": "attack", "rarity": "common", "target": "enemy", "effects": [{ "verb": "damage", "amount": 9 }] },
+    { "id": "ironwave",   "name": "Iron Wave",  "cost": 1, "type": "attack", "rarity": "common", "target": "enemy", "effects": [{ "verb": "block", "amount": 5 }, { "verb": "damage", "amount": 5 }] },
+    { "id": "pommel",     "name": "Pommel Strike","cost": 1, "type": "attack", "rarity": "common", "target": "enemy", "effects": [{ "verb": "damage", "amount": 9 }, { "verb": "draw", "amount": 1 }] },
+    { "id": "sword_boomerang", "name": "Sword Boomerang", "cost": 1, "type": "attack", "rarity": "common", "target": "random_enemy", "effects": [{ "verb": "damage", "amount": 3, "target": "all_enemies" }] },
+    { "id": "thunderclap","name": "Thunderclap","cost": 1, "type": "attack", "rarity": "common", "target": "all",   "effects": [{ "verb": "damage", "amount": 4, "target": "all_enemies" }, { "verb": "status", "status": "vulnerable", "amount": 1, "to": "enemy" }] },
+    { "id": "twin_strike","name": "Twin Strike","cost": 1, "type": "attack", "rarity": "common", "target": "enemy", "effects": [{ "verb": "damage", "amount": 5 }, { "verb": "damage", "amount": 5 }] },
+    { "id": "wild_strike","name": "Wild Strike","cost": 1, "type": "attack", "rarity": "common", "target": "enemy", "effects": [{ "verb": "damage", "amount": 12 }] },
+    { "id": "flex",       "name": "Flex",       "cost": 0, "type": "skill",  "rarity": "common", "target": "self",  "effects": [{ "verb": "status", "status": "strength", "amount": 2, "to": "self" }] },
+    { "id": "shrug",      "name": "Shrug It Off","cost": 1, "type": "skill", "rarity": "common", "target": "self",  "effects": [{ "verb": "block", "amount": 8 }, { "verb": "draw", "amount": 1 }] },
+    { "id": "true_grit",  "name": "True Grit",  "cost": 1, "type": "skill",  "rarity": "common", "target": "self",  "effects": [{ "verb": "block", "amount": 7 }] },
+    { "id": "warcry",     "name": "Warcry",     "cost": 0, "type": "skill",  "rarity": "common", "target": "self",  "effects": [{ "verb": "draw", "amount": 1 }, { "verb": "discard", "amount": 1 }] },
+    { "id": "armaments",  "name": "Armaments",  "cost": 1, "type": "skill",  "rarity": "common", "target": "self",  "effects": [{ "verb": "block", "amount": 5 }] },
+    { "id": "havoc",      "name": "Havoc",      "cost": 1, "type": "skill",  "rarity": "common", "target": "self",  "effects": [{ "verb": "draw", "amount": 1 }, { "verb": "energy", "amount": 1 }] },
+
+    { "id": "battle_trance","name": "Battle Trance","cost": 0, "type": "skill", "rarity": "uncommon", "target": "self", "effects": [{ "verb": "draw", "amount": 3 }] },
+    { "id": "bloodletting","name": "Bloodletting","cost": 0, "type": "skill", "rarity": "uncommon", "target": "self", "effects": [{ "verb": "custom", "handler": "bloodletting" }] },
+    { "id": "carnage",    "name": "Carnage",    "cost": 2, "type": "attack", "rarity": "uncommon", "target": "enemy", "effects": [{ "verb": "damage", "amount": 20 }] },
+    { "id": "combust",    "name": "Combust",    "cost": 1, "type": "power",  "rarity": "uncommon", "target": "self", "effects": [{ "verb": "custom", "handler": "combust" }] },
+    { "id": "dark_embrace","name": "Dark Embrace","cost": 2, "type": "power", "rarity": "uncommon", "target": "self", "effects": [{ "verb": "custom", "handler": "dark_embrace" }] },
+    { "id": "dropkick",   "name": "Dropkick",   "cost": 1, "type": "attack", "rarity": "uncommon", "target": "enemy", "effects": [{ "verb": "damage", "amount": 5 }, { "verb": "energy", "amount": 1 }] },
+    { "id": "entrench",   "name": "Entrench",   "cost": 2, "type": "skill",  "rarity": "uncommon", "target": "self", "effects": [{ "verb": "custom", "handler": "entrench" }] },
+    { "id": "feel_no_pain","name": "Feel No Pain","cost": 1, "type": "power", "rarity": "uncommon", "target": "self", "effects": [{ "verb": "custom", "handler": "feel_no_pain" }] },
+    { "id": "flame_barrier","name": "Flame Barrier","cost": 2, "type": "skill", "rarity": "uncommon", "target": "self", "effects": [{ "verb": "block", "amount": 12 }] },
+    { "id": "ghostly_armor","name": "Ghostly Armor","cost": 1, "type": "skill", "rarity": "uncommon", "target": "self", "effects": [{ "verb": "block", "amount": 10 }] },
+    { "id": "hemokinesis","name": "Hemokinesis", "cost": 1, "type": "attack", "rarity": "uncommon", "target": "enemy", "effects": [{ "verb": "custom", "handler": "hemokinesis" }] },
+    { "id": "inflame",    "name": "Inflame",    "cost": 1, "type": "power",  "rarity": "uncommon", "target": "self", "effects": [{ "verb": "status", "status": "strength", "amount": 2, "to": "self" }] },
+    { "id": "metallicize", "name": "Metallicize","cost": 1, "type": "power", "rarity": "uncommon", "target": "self", "effects": [{ "verb": "status", "status": "metallicize", "amount": 3, "to": "self" }] },
+    { "id": "pummel",     "name": "Pummel",     "cost": 1, "type": "attack", "rarity": "uncommon", "target": "enemy", "effects": [{ "verb": "damage", "amount": 2 }, { "verb": "damage", "amount": 2 }, { "verb": "damage", "amount": 2 }, { "verb": "damage", "amount": 2 }, { "verb": "exhaust" }] },
+    { "id": "rampage",    "name": "Rampage",    "cost": 1, "type": "attack", "rarity": "uncommon", "target": "enemy", "effects": [{ "verb": "custom", "handler": "rampage" }] },
+    { "id": "rupture",    "name": "Rupture",    "cost": 1, "type": "power",  "rarity": "uncommon", "target": "self", "effects": [{ "verb": "custom", "handler": "rupture" }] },
+    { "id": "shockwave",  "name": "Shockwave",  "cost": 2, "type": "skill",  "rarity": "uncommon", "target": "all",  "effects": [{ "verb": "status", "status": "weak", "amount": 3, "to": "enemy" }, { "verb": "status", "status": "vulnerable", "amount": 3, "to": "enemy" }] },
+    { "id": "uppercut",   "name": "Uppercut",   "cost": 2, "type": "attack", "rarity": "uncommon", "target": "enemy", "effects": [{ "verb": "damage", "amount": 13 }, { "verb": "status", "status": "weak", "amount": 1, "to": "enemy" }, { "verb": "status", "status": "vulnerable", "amount": 1, "to": "enemy" }] },
+
+    { "id": "bludgeon",   "name": "Bludgeon",   "cost": 3, "type": "attack", "rarity": "rare", "target": "enemy", "effects": [{ "verb": "damage", "amount": 32 }] },
+    { "id": "impervious", "name": "Impervious", "cost": 2, "type": "skill",  "rarity": "rare", "target": "self",  "effects": [{ "verb": "block", "amount": 30 }, { "verb": "exhaust" }] },
+    { "id": "limit_break","name": "Limit Break","cost": 1, "type": "skill",  "rarity": "rare", "target": "self",  "effects": [{ "verb": "custom", "handler": "limit_break" }] },
+    { "id": "offering",   "name": "Offering",   "cost": 0, "type": "skill",  "rarity": "rare", "target": "self",  "effects": [{ "verb": "custom", "handler": "offering" }] },
+    { "id": "reaper",     "name": "Reaper",     "cost": 2, "type": "attack", "rarity": "rare", "target": "all",   "effects": [{ "verb": "custom", "handler": "reaper" }] }
+  ],
+  "statuses": {
+    "strength":    { "name": "PWR",  "decays": false, "kind": "buff" },
+    "vulnerable":  { "name": "VULN", "decays": true,  "kind": "debuff" },
+    "weak":        { "name": "WK",   "decays": true,  "kind": "debuff" },
+    "dexterity":   { "name": "DEX",  "decays": false, "kind": "buff" },
+    "metallicize": { "name": "METAL","decays": false, "kind": "buff" }
+  }
+}

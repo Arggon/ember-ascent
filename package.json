@@ -1,0 +1,28 @@
+{
+  "name": "ember-ascent",
+  "version": "0.3.0",
+  "type": "module",
+  "description": "Ember Ascent — agent-playable roguelike deckbuilder (browser, zero deps)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "dlb": "./bin/dlb"
+  },
+  "exports": {
+    "./kernel/index.js": "./src/kernel/index.js"
+  },
+  "main": "./src/kernel/index.js",
+  "scripts": {
+    "test": "node --test 'tests/**/*.test.js'",
+    "gate": "node tools/check-architecture.mjs",
+    "tokens": "node tools/measure-tokens.mjs",
+    "sim": "node bin/dlb sim --runs 200 --seed-start 1 --policy greedy --threads 4",
+    "serve": "node tools/serve.mjs"
+  },
+  "devDependencies": {
+    "js-tiktoken": "^1.0.21",
+    "postcss": "^8.5.30"
+  }
+}

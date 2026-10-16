@@ -1,0 +1,19 @@
+thresholds: wastePx >= 0 (negative = content below the fold) | seed pinned: yes
+base: http://localhost:5173/web/index.html?seed={seed}  seeds: 11
+
+size         label            seed  reported  viewport      waste   waste%  scrollH  handFill%  result
+412x915      galaxy-s25plus   11    11        [412,915]     24px    3%      915      100%       pass
+390x844      iphone-14        11    11        [390,844]     24px    3%      844      100%       pass
+360x640      phone-small      11    11        [360,640]     14px    2%      640      100%       pass
+414x896      phone-large      11    11        [414,896]     24px    3%      896      100%       pass
+768x1024     tablet           11    11        [768,1024]    34px    3%      1024     100%       pass
+1280x800     desktop          11    11        [1280,800]    26px    3%      800      71%        pass
+1366x768     laptop           11    11        [1366,768]    26px    3%      768      71%        pass
+1280x1000    desktop-tall     11    11        [1280,1000]   58px    6%      1000     81%        pass
+915x412      galaxy-s25plus-landscape11    11        [915,412]     14px    3%      412      100%       pass
+844x390      iphone-14-landscape11    11        [844,390]     22px    6%      390      100%       pass
+1200x450     short-window     11    11        [1200,450]    14px    3%      450      75%        pass
+
+ALL PASS (11 rows)
+
+screenshots in shots/space/

@@ -1,0 +1,17 @@
+FUNCTIONAL TEST — the SHIPPED artifact, driven headlessly from the zip extraction
+dir: /tmp/ziptest-362311   date: 2026-10-13T14:00:07Z
+
+seed 12345 run 1 : {"steps":2000,"errs":0,"firstErr":null,"hash":"sha256:3806c929c48dd49ff"}
+seed 12345 run 2 : {"steps":2000,"errs":0,"firstErr":null,"hash":"sha256:3806c929c48dd49ff"}
+seed 00777       : {"steps":2000,"errs":0,"firstErr":null,"hash":"sha256:c8fe924cc221784d4"}
+DETERMINISM  same seed -> same hash : PASS
+DETERMINISM  same seed -> same steps: PASS
+DIFFERENCE   diff seed -> diff hash : PASS
+shipped content  cards : 42
+shipped content  keys  : contentVersion, characters, cards, statuses
+
+PARSE CHECK — every shipped .js parses as an ES module (node --check)
+  parsed OK: 21   failures: 0
+
+EXTERNAL-ASSET GREP (browser-loaded files only: .js .html .css)
+  grep exit: 1  (1 = EMPTY)

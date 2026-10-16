@@ -1,0 +1,10 @@
+  padding: 10px 14px;$
+  background: linear-gradient(180deg, var(--raised) 0%, #10151f 100%);$
+  border: 1px solid var(--edge);$
+  border-radius: var(--radius-lg);$
+  box-shadow: var(--shadow);$
+$
+  column-gap: 8px$
+  flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; min-height: 52px;$
+}$
+$

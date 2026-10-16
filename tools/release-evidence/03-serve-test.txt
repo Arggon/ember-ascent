@@ -1,0 +1,110 @@
+=====================================================================
+TASK 3 - CLEAN-DIRECTORY SERVE TEST  (FINAL, against the delivered release.zip)
+zip sha256: 72d1dc63ef442e7ef990c2c68723d6b4bea696a10ee482bd704722e5fd183f6e
+Artifact unpacked into a clean temp dir OUTSIDE the repo.
+dir:  /tmp/final2-407886
+date: 2026-10-13T14:03:13Z   node v24.20.0
+cmd:  node tools/serve.mjs --port 5601
+files present: 25   index.html at top level: yes
+
+server banner:
+    serving /tmp/final2-407886
+    
+      open http://localhost:5601/
+    
+      (game:      http://localhost:5601/   · seed via ?seed=N)
+      (ctrl-c to stop)
+
+== 1. EVERY runtime file in the closure ==
+/                                              200 text/html; charset=utf-8
+/index.html                                    200 text/html; charset=utf-8
+/app.js                                        200 text/javascript; charset=utf-8
+/style.css                                     200 text/css; charset=utf-8
+/tokens.js                                     200 text/javascript; charset=utf-8
+/src/surface/gui/controller.js                 200 text/javascript; charset=utf-8
+/src/surface/session.js                        200 text/javascript; charset=utf-8
+/src/surface/tokens.js                         200 text/javascript; charset=utf-8
+/src/kernel/index.js                           200 text/javascript; charset=utf-8
+/src/kernel/state.js                           200 text/javascript; charset=utf-8
+/src/kernel/sha256.js                          200 text/javascript; charset=utf-8
+/src/kernel/content.js                         200 text/javascript; charset=utf-8
+/src/kernel/observe.js                         200 text/javascript; charset=utf-8
+/src/kernel/describe.js                        200 text/javascript; charset=utf-8
+/src/kernel/actions.js                         200 text/javascript; charset=utf-8
+/src/kernel/rng.js                             200 text/javascript; charset=utf-8
+/src/kernel/content/cards.bundle.js            200 text/javascript; charset=utf-8
+/src/kernel/rules/act.js                       200 text/javascript; charset=utf-8
+/src/kernel/rules/card-instance.js             200 text/javascript; charset=utf-8
+/src/kernel/rules/encounters.js                200 text/javascript; charset=utf-8
+/src/kernel/rules/map.js                       200 text/javascript; charset=utf-8
+/src/kernel/rules/powers.js                    200 text/javascript; charset=utf-8
+/src/kernel/rules/vocabulary.js                200 text/javascript; charset=utf-8
+/src/kernel/rules/effects/index.js             200 text/javascript; charset=utf-8
+/HOW-TO-RUN-LOCALLY.txt                        200 text/plain; charset=utf-8
+
+== 2. deliberate absences (optional dynamic imports; 404 IS the designed state) ==
+/src/surface/gui/renderer.js                   404 text/plain; charset=utf-8
+/src/surface/cli.js                            404 text/plain; charset=utf-8
+/src/surface/sim.js                            404 text/plain; charset=utf-8
+/src/surface/stats.js                          404 text/plain; charset=utf-8
+/web/app.js                                    404 text/plain; charset=utf-8
+/web/index.html                                404 text/plain; charset=utf-8
+
+== 3. TRAVERSAL GUARD - raw status and body ==
+/../../../../etc/passwd                404  body: not found: /../../../../etc/passwd
+/..%2f..%2f..%2f..%2fetc/passwd        404  body: not found: /..%2F..%2F..%2F..%2Fetc/passwd
+/./../../../../etc/shadow              404  body: not found: /./../../../../etc/shadow
+/%2e%2e%2f%2e%2e%2fetc/passwd          404  body: not found: /%2E%2E%2F%2E%2E%2Fetc/passwd
+/../package.json                       404  body: not found: /../package.json
+/../web/app.js                         404  body: not found: /../web/app.js
+/nonexistent.js                        404  body: not found: /nonexistent.js
+
+== 4. did any attempt leak real outside-root bytes? ==
+  /../../../../etc/passwd                            leaked_lines=0
+  /../package.json                                   leaked_lines=0
+  /../web/app.js                                     leaked_lines=0
+  /../../../../../../home/arggon/.bashrc             leaked_lines=0
+  /../src/kernel/content/cards.json                  leaked_lines=0
+  TOTAL LEAKED LINES ACROSS ALL ATTEMPTS: 0
+
+== 5. ONE NON-REFUSAL, EXPLAINED HONESTLY ==
+  GET /../src/kernel/index.js returns 200. This is NOT a leak.
+  serve.mjs decodes the URL, calls normalize() so ../ collapses, resolves inside
+  ROOT and re-checks the prefix, so the request lands back on the artifact's OWN
+  file. Byte-identical, proven by hash:
+    artifact/src/kernel/index.js : a107890da1ec59c1f9c6017d33d57c034a2f4a45958dfb0be169abc2b9995c22
+    bytes served via /../src/... : a107890da1ec59c1f9c6017d33d57c034a2f4a45958dfb0be169abc2b9995c22
+  A path that would genuinely leave the root, /../package.json, is refused 404.
+  Independent zip-level check (python3 zipfile):
+    symlink entries        : 0 (zip-slip / symlink-escape not applicable)
+    absolute or .. entries : 0
+    entries / CRC testzip  : 25 / None
+
+== 6. FUNCTIONAL TEST: the shipped engine driven from this extraction ==
+  import closure resolved from artifact : OK  surface=gui-controller
+  seed 12345 run 1 : {"steps":3000,"errs":0,"firstErr":null,"hash":"sha256:3806c929c48dd49ff72"}
+  seed 12345 run 2 : {"steps":3000,"errs":0,"firstErr":null,"hash":"sha256:3806c929c48dd49ff72"}
+  seed 00777       : {"steps":3000,"errs":0,"firstErr":null,"hash":"sha256:c8fe924cc221784d40b"}
+  same seed -> same hash                : PASS
+  different seed -> different hash      : PASS
+  card definitions in shipped bundle    : 42
+  wall time                             : 974 ms
+
+== 7. every shipped .js parses as an ES module (node --check) ==
+  parsed OK: 21   failures: 0
+
+== 8. EXTERNAL-ASSET GREP (browser-loaded files: .js/.html/.css) ==
+  grep exit: 1 (1 = EMPTY)
+
+== 9. FULL-ARTIFACT grep (letter of the law) and justification for its hits ==
+/tmp/final2-407886/tools/serve.mjs:135:  const base = `http://localhost:${port}`;
+/tmp/final2-407886/HOW-TO-RUN-LOCALLY.txt:5:http:// — opening index.html directly with file:// will NOT work, because browsers
+/tmp/final2-407886/HOW-TO-RUN-LOCALLY.txt:12:Then open the URL it prints, which is http://localhost:5173/ — and add ?seed=N to
+/tmp/final2-407886/HOW-TO-RUN-LOCALLY.txt:13:play a specific run, e.g. http://localhost:5173/?seed=7
+/tmp/final2-407886/HOW-TO-RUN-LOCALLY.txt:21:this same origin. No analytics, no telemetry, no external font, no CDN.
+  grep exit: 0
+  Justification: every hit is prose in a generated text file - the 'http://' in
+  the run-locally note and in the local server's own printed banner, plus the
+  word CDN inside the sentence 'no analytics, no telemetry, no external font, no
+  CDN'. No browser-loaded file matches at all.
+after stop: HTTP 000 (000 = server down)

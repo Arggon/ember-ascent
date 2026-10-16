@@ -1,0 +1,410 @@
+/* web/style.css — the browser surface's whole visual layer.
+ *
+ * No image files and no external fonts: identity comes from CSS only (color, layout,
+ * borders, gradients). The palette is deliberately small so "player vs enemy",
+ * "playable vs not" and "damage vs block" read at a glance.
+ *
+ * Layout target: comfortable at ~1280px, tolerable down to 800px (the hand and the
+ * map both scroll rather than overflow). */
+
+:root {
+  --bg: #0d1017;
+  --bg-2: #141926;
+  --panel: #1b2233;
+  --panel-2: #232c42;
+  --line: #2c3752;
+  --line-soft: #39456a;
+  --ink: #e8edf7;
+  --ink-dim: #9aa6c2;
+  --ink-faint: #66708c;
+
+  --hp: #e0524f;
+  --hp-bg: #3a1d22;
+  --block: #5aa9e6;
+  --energy: #f2c14e;
+  --attack: #d9705f;
+  --skill: #6fa8dc;
+  --power: #b98fe0;
+  --status: #8fa9a0;
+  --curse: #8a6d8f;
+
+  --gold: #f2c14e;
+  --win: #6fcf8f;
+  --loss: #e0524f;
+  --ok: #6fcf8f;
+
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: radial-gradient(1200px 700px at 50% -10%, #182137 0%, var(--bg) 55%) fixed;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: 100%;
+  padding: 12px 16px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------- HUD (player status bar) ---------- */
+
+#hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--bg-2) 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.hud-char { font-weight: 700; letter-spacing: 0.3px; }
+.hud-char .diff { color: var(--gold); font-weight: 600; margin-left: 6px; font-size: 0.85em; }
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.stat .glyph { font-size: 0.95em; opacity: 0.9; }
+.stat.hp { color: var(--hp); }
+.stat.energy { color: var(--energy); }
+.stat.block { color: var(--block); }
+.stat.dim { color: var(--ink-dim); font-weight: 500; }
+
+/* Small pill used for statuses and powers. */
+.pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  color: var(--ink-dim);
+}
+.pill.strength { color: #ffb0a3; border-color: #5a352f; }
+.pill.vulnerable { color: #ffc2d1; border-color: #5a2f3d; }
+.pill.weak { color: #cdb4ff; border-color: #3f3560; }
+.pill.dexterity { color: #a8e6c8; border-color: #2f5142; }
+.pill.metallicize { color: #c8d4dc; }
+.pill.power { color: var(--gold); border-color: #5a4a1f; }
+
+.spacer { flex: 1 1 auto; }
+
+/* Token badge — unobtrusive, right-aligned, proves the agent-friendliness claim. */
+.token-badge {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  border: 1px dashed var(--line-soft);
+  border-radius: 6px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  cursor: help;
+}
+.token-badge b { color: var(--ink-dim); font-weight: 700; }
+
+/* ---------- Stage (the per-phase screen) ---------- */
+
+#stage {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.section-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 6px;
+}
+
+/* Enemy row */
+.enemies {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 4px 0;
+}
+.enemy {
+  min-width: 180px;
+  background: linear-gradient(180deg, #2a1e26 0%, #201821 100%);
+  border: 1px solid #4a2f38;
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.enemy .ename { font-weight: 800; font-size: 1.05rem; }
+.enemy .ehp {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--hp);
+  margin: 4px 0 2px;
+}
+.hpbar {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--hp-bg);
+  overflow: hidden;
+  margin: 6px 0;
+  border: 1px solid #4a2f38;
+}
+.hpbar > i { display: block; height: 100%; background: linear-gradient(90deg, #f07a6f, var(--hp)); }
+.hpbar.block > i { background: linear-gradient(90deg, #8fd0ff, var(--block)); }
+
+.enemy .eblock { color: var(--block); font-weight: 700; font-size: 0.9rem; }
+
+/* Intent: the whole point of a readable fight. */
+.intent {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #171126;
+  border: 1px solid #3a2d55;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.intent .ilabel { color: #ffb3a6; }
+.intent.kind-buff .ilabel, .intent.kind-block .ilabel { color: #b6e3c4; }
+.intent .iatk { color: var(--hp); }
+.intent .isub { display: block; font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; margin-top: 3px; }
+
+/* ---------- Hand (card tiles) ---------- */
+
+.hand {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.card {
+  position: relative;
+  width: 160px;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.09s ease, box-shadow 0.09s ease, border-color 0.09s ease;
+  text-align: center;
+  font-family: inherit;
+  color: var(--ink);
+}
+.card:hover:not(.disabled) {
+  transform: translateY(-6px);
+  border-color: var(--gold);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.55);
+}
+.card:focus-visible { outline: 2px solid var(--energy); outline-offset: 2px; }
+.card.disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.7) brightness(0.62);
+  border-color: var(--line);
+}
+
+/* Cost badge: top-left, always visible. */
+.cost {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 1rem;
+  color: #1a1305;
+  background: radial-gradient(circle at 35% 30%, #ffe08a, var(--energy));
+  border: 2px solid #0c0f16;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.card.disabled .cost { filter: grayscale(0.5) brightness(0.8); }
+
+.card .cname { font-weight: 800; font-size: 1rem; line-height: 1.2; }
+.card .ctype {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--ink-faint);
+}
+.card .csum {
+  margin-top: auto;
+  font-size: 0.86rem;
+  color: var(--ink);
+  background: #10151f;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 6px;
+  font-variant-numeric: tabular-nums;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+}
+.card.type-attack { border-top: 3px solid var(--attack); }
+.card.type-skill { border-top: 3px solid var(--skill); }
+.card.type-power { border-top: 3px solid var(--power); }
+.card.type-status { border-top: 3px solid var(--status); }
+.card.type-curse { border-top: 3px solid var(--curse); }
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #12161f;
+  background: linear-gradient(180deg, #ffe08a, var(--energy));
+  border: 1px solid #8a6b1e;
+  border-radius: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: filter 0.1s ease, transform 0.06s ease;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.btn.secondary {
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border-color: var(--line-soft);
+}
+.btn.ghost {
+  color: var(--ink-dim);
+  background: transparent;
+  border-color: var(--line-soft);
+}
+
+.controls { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.hint { color: var(--ink-faint); font-size: 0.8rem; }
+
+/* ---------- Map ---------- */
+
+.map { display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 6px 0; }
+.map-row { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.map-floor-label { color: var(--ink-faint); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; width: 54px; text-align: right; }
+
+.node {
+  font-family: inherit;
+  min-width: 92px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 2px solid var(--line-soft);
+  color: var(--ink-dim);
+  font-weight: 700;
+  cursor: default;
+  position: relative;
+}
+.node.available {
+  cursor: pointer;
+  color: var(--ink);
+  border-color: var(--gold);
+  background: linear-gradient(180deg, #2a2438, #1d2030);
+  box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.18), var(--shadow);
+  animation: pulse 2.2s ease-in-out infinite;
+}
+.node.available:hover { filter: brightness(1.12); transform: translateY(-2px); }
+.node.available:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.node.current { border-color: var(--block); box-shadow: 0 0 0 3px rgba(90, 169, 230, 0.22); }
+.node.t-boss { border-color: #6b2f3a; color: #ffb3a6; }
+.node.t-boss.available { border-color: var(--hp); }
+.node.t-elite { border-color: #5a4a1f; color: #ffd88a; }
+.node .ntype { display: block; }
+.node .nsub { display: block; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); font-weight: 800; margin-top: 2px; }
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.16), var(--shadow); }
+  50% { box-shadow: 0 0 0 6px rgba(242, 193, 78, 0.06), var(--shadow); }
+}
+
+/* ---------- Reward / rest / end screens ---------- */
+
+.panel {
+  background: linear-gradient(180deg, var(--panel) 0%, var(--bg-2) 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.big-title { font-size: 2.1rem; font-weight: 900; letter-spacing: 0.02em; margin: 8px 0; }
+.big-title.win { color: var(--win); text-shadow: 0 0 24px rgba(111, 207, 143, 0.35); }
+.big-title.loss { color: var(--loss); text-shadow: 0 0 24px rgba(224, 82, 79, 0.35); }
+
+.restart-row { margin-top: 18px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* ---------- Toast ---------- */
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  background: #241726;
+  border: 1px solid #5a2f3d;
+  color: #ffd0c8;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 50;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+#toast.info { background: #17222b; border-color: #2f4a5a; color: #cfe8f5; }
+
+/* A brief flash on a value that just changed, so a click has visible feedback. */
+@keyframes flash-up { from { background: rgba(242, 193, 78, 0.4); } to { background: transparent; } }
+@keyframes flash-hit { from { background: rgba(224, 82, 79, 0.45); } to { background: transparent; } }
+.flash-energy { animation: flash-up 0.5s ease; }
+.flash-hit { animation: flash-hit 0.5s ease; }
+
+@media (max-width: 900px) {
+  #app { padding: 10px 10px 24px; }
+  .card { width: 138px; min-height: 176px; }
+  .big-title { font-size: 1.7rem; }
+}

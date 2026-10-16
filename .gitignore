@@ -1,0 +1,9 @@
+node_modules/
+.zwork/
+.opencode/
+.sim/
+sim-out*/
+release.zip
+shots/
+*.log
+.DS_Store

@@ -1,0 +1,15 @@
+thresholds: wastePx >= 0 (negative = content below the fold) | seed pinned: yes
+base: http://localhost:5173/tests/qa-layout-fix/sandbox-prefix/index.html?seed={seed}  seeds: 11
+
+size         label            seed  reported  viewport      waste   waste%  scrollH  handFill%  result
+1280x800     desktop          11    11        [1280,800]    -10px   -1%     868      81%        FAIL
+1366x768     laptop           11    11        [1366,768]    -42px   -5%     868      81%        FAIL
+915x412      galaxy-s25plus-landscape11    11        [915,412]     6px     1%      412      94%        pass
+844x390      iphone-14-landscape11    11        [844,390]     22px    6%      390      100%       pass
+1200x450     short-window     11    11        [1200,450]    6px     1%      450      71%        pass
+
+FAIL summary (2 failing row(s)):
+  FAIL 1280x800 seed 11: negative wastePx: wastePx=-10px < 0px (contentBottom=810 vs innerHeight=800, scrollHeight=868)
+  FAIL 1366x768 seed 11: negative wastePx: wastePx=-42px < 0px (contentBottom=810 vs innerHeight=768, scrollHeight=868)
+
+screenshots in shots/space/

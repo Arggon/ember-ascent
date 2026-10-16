@@ -1,0 +1,15 @@
+sim 2000 runs | policy greedy | threads 4 | seeds 1..2000
+win 145 (7.2%) loss 1855 (92.8%) unfinished 0
+steps total 138776 mean 69.4 | floors max 7 mean 5.22
+malformed 0/138776 (0.0%)
+boss reached 1114/2000 (55.7%) | kills 145 (13.0% of those that reached)
+boss arrival: HP 36.5/60 (61%) | deck 15.4 (atk 9.9 blk 4.8 pow 0.7) | block points in deck 20.6
+boss at death: mean HP remaining 59.6/110 (54%) over 969 boss deaths
+elapsed 1915ms | 1044.3 runs/sec
+payload tokens: dump worst 105/250 PASS | action line worst 7/8 PASS (343 lines measured)
+payloadTokens: worst 105 tokens (o200k 104, cl100k 105)
+actionLine: worst 7 tokens (o200k 6, cl100k 7)
+
+real	0m1.984s
+user	0m6.695s
+sys	0m0.377s

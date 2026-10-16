@@ -1,0 +1,49 @@
+#!/usr/bin/env node
+// `dlb` executable — argv handoff, the R7 watchdog, and exit-code plumbing.
+//
+// Deliberately thin: parsing and formatting live in src/surface/cli.js so that file
+// stays unit-testable without spawning a process, and so the surface remains the
+// only thing between an agent and the kernel.
+//
+// R7: stdin is never read. The watchdog is enforced HERE, at the surface, because
+// the kernel holds no clock (R3) and must stay replayable.
+import { run, EXIT } from '../src/surface/cli.js';
+
+const argv = process.argv.slice(2);
+const cmd = argv[0];
+const rest = argv.slice(1);
+
+// --timeout is accepted by every subcommand, so it is read before dispatch. A bad
+// value is a usage error, not a silent default.
+let timeoutMs = 10000;
+{
+  const i = rest.findIndex((a) => a === '--timeout' || a.startsWith('--timeout='));
+  if (i !== -1) {
+    const raw = rest[i].includes('=') ? rest[i].slice(rest[i].indexOf('=') + 1) : rest[i + 1];
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n <= 0) {
+      process.stderr.write('dlb: --timeout must be a positive integer\n');
+      process.exit(EXIT.usage);
+    }
+    timeoutMs = n;
+  }
+}
+
+let settled = false;
+const watchdog = setTimeout(() => {
+  if (settled) return;
+  settled = true;
+  // Flush whatever is already buffered, then declare the timeout explicitly (R7).
+  process.stderr.write(`[timeout after ${timeoutMs}ms]\n`);
+  process.exit(EXIT.timeout);
+}, timeoutMs);
+watchdog.unref?.();
+
+const code = await run(cmd, rest).catch((e) => {
+  process.stderr.write(`dlb: internal error: ${e?.stack ?? e}\n`);
+  return EXIT.internal;
+});
+
+settled = true;
+clearTimeout(watchdog);
+process.exitCode = code;

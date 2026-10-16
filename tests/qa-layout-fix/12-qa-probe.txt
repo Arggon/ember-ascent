@@ -1,0 +1,80 @@
+QA independent probe — thresholds: etBottom <= innerHeight-8 | scrollHeight <= innerHeight | hint.bottom <= innerHeight | handRows == 1 | #stage scrollHeight == clientHeight | et topmost | seed == requested
+base: http://localhost:5173/web/index.html?seed={seed}  seeds: 1,3,7,11  hide-scrollbars: true
+
+size      seed  rep   etBot/vh  clear  scrollH  handRows  etTopmost  hintBot/vh  stageClip(scroll==client)
+360x640   1     1     626/640   14     640      1         true       0/640       ok (564==564)
+360x640   3     3     626/640   14     640      1         true       0/640       ok (564==564)
+360x640   7     7     626/640   14     640      1         true       0/640       ok (564==564)
+360x640   11    11    626/640   14     640      1         true       0/640       ok (564==564)
+390x844   1     1     741/844   103    844      1         true       820/844     ok (768==768)
+390x844   3     3     759/844   85     844      1         true       820/844     ok (768==768)
+390x844   7     7     759/844   85     844      1         true       820/844     ok (768==768)
+390x844   11    11    745/844   99     844      1         true       820/844     ok (768==768)
+414x896   1     1     783/896   113    896      1         true       872/896     ok (820==820)
+414x896   3     3     801/896   95     896      1         true       872/896     ok (820==820)
+414x896   7     7     801/896   95     896      1         true       872/896     ok (820==820)
+414x896   11    11    783/896   113    896      1         true       872/896     ok (820==820)
+844x390   1     1     368/390   22     390      1         true       0/390       ok (313==313)
+844x390   3     3     368/390   22     390      1         true       0/390       ok (313==313)
+844x390   7     7     368/390   22     390      1         true       0/390       ok (313==313)
+844x390   11    11    368/390   22     390      1         true       0/390       ok (313==313)
+915x412   1     1     398/412   14     412      1         true       0/412       ok (334==334)
+915x412   3     3     398/412   14     412      1         true       0/412       ok (334==334)
+915x412   7     7     398/412   14     412      1         true       0/412       ok (334==334)
+915x412   11    11    398/412   14     412      1         true       0/412       ok (334==334)
+768x1024  1     1     901/1024  123    1024     1         true       990/1024    ok (936==936)
+768x1024  3     3     922/1024  102    1024     1         true       990/1024    ok (936==936)
+768x1024  7     7     922/1024  102    1024     1         true       990/1024    ok (936==936)
+768x1024  11    11    904/1024  120    1024     1         true       990/1024    ok (936==936)
+1280x800  1     1     727/800   73     800      1         true       774/800     ok (716==716)
+1280x800  3     3     732/800   68     800      1         true       774/800     ok (716==716)
+1280x800  7     7     732/800   68     800      1         true       774/800     ok (716==716)
+1280x800  11    11    724/800   76     800      1         true       774/800     ok (716==716)
+1366x768  1     1     701/768   67     768      1         true       742/768     ok (684==684)
+1366x768  3     3     707/768   61     768      1         true       742/768     ok (684==684)
+1366x768  7     7     707/768   61     768      1         true       742/768     ok (684==684)
+1366x768  11    11    698/768   70     768      1         true       742/768     ok (684==684)
+1200x450  1     1     436/450   14     450      1         true       0/450       ok (372==372)
+1200x450  3     3     436/450   14     450      1         true       0/450       ok (372==372)
+1200x450  7     7     436/450   14     450      1         true       0/450       ok (372==372)
+1200x450  11    11    436/450   14     450      1         true       0/450       ok (372==372)
+
+ALL PASS (36 rows)
+
+--- stage/combat overflow detail (all rows) ---
+  360x640 s1: stage 564/564 overflow-y=hidden | combat 529/529 | hint 0/0
+  360x640 s3: stage 564/564 overflow-y=hidden | combat 529/529 | hint 0/0
+  360x640 s7: stage 564/564 overflow-y=hidden | combat 529/529 | hint 0/0
+  360x640 s11: stage 564/564 overflow-y=hidden | combat 529/529 | hint 0/0
+  390x844 s1: stage 768/768 overflow-y=hidden | combat 733/733 | hint 13/13
+  390x844 s3: stage 768/768 overflow-y=hidden | combat 733/733 | hint 13/13
+  390x844 s7: stage 768/768 overflow-y=hidden | combat 733/733 | hint 13/13
+  390x844 s11: stage 768/768 overflow-y=hidden | combat 733/733 | hint 13/13
+  414x896 s1: stage 820/820 overflow-y=hidden | combat 785/785 | hint 13/13
+  414x896 s3: stage 820/820 overflow-y=hidden | combat 785/785 | hint 13/13
+  414x896 s7: stage 820/820 overflow-y=hidden | combat 785/785 | hint 13/13
+  414x896 s11: stage 820/820 overflow-y=hidden | combat 785/785 | hint 13/13
+  844x390 s1: stage 313/313 overflow-y=hidden | combat 287/287 | hint 0/0
+  844x390 s3: stage 313/313 overflow-y=hidden | combat 287/287 | hint 0/0
+  844x390 s7: stage 313/313 overflow-y=hidden | combat 287/287 | hint 0/0
+  844x390 s11: stage 313/313 overflow-y=hidden | combat 287/287 | hint 0/0
+  915x412 s1: stage 334/334 overflow-y=hidden | combat 314/314 | hint 0/0
+  915x412 s3: stage 334/334 overflow-y=hidden | combat 314/314 | hint 0/0
+  915x412 s7: stage 334/334 overflow-y=hidden | combat 314/314 | hint 0/0
+  915x412 s11: stage 334/334 overflow-y=hidden | combat 314/314 | hint 0/0
+  768x1024 s1: stage 936/936 overflow-y=hidden | combat 889/889 | hint 16/16
+  768x1024 s3: stage 936/936 overflow-y=hidden | combat 889/889 | hint 16/16
+  768x1024 s7: stage 936/936 overflow-y=hidden | combat 889/889 | hint 16/16
+  768x1024 s11: stage 936/936 overflow-y=hidden | combat 889/889 | hint 16/16
+  1280x800 s1: stage 716/716 overflow-y=hidden | combat 679/679 | hint 16/16
+  1280x800 s3: stage 716/716 overflow-y=hidden | combat 679/679 | hint 16/16
+  1280x800 s7: stage 716/716 overflow-y=hidden | combat 679/679 | hint 16/16
+  1280x800 s11: stage 716/716 overflow-y=hidden | combat 679/679 | hint 16/16
+  1366x768 s1: stage 684/684 overflow-y=hidden | combat 647/647 | hint 16/16
+  1366x768 s3: stage 684/684 overflow-y=hidden | combat 647/647 | hint 16/16
+  1366x768 s7: stage 684/684 overflow-y=hidden | combat 647/647 | hint 16/16
+  1366x768 s11: stage 684/684 overflow-y=hidden | combat 647/647 | hint 16/16
+  1200x450 s1: stage 372/372 overflow-y=hidden | combat 352/352 | hint 0/0
+  1200x450 s3: stage 372/372 overflow-y=hidden | combat 352/352 | hint 0/0
+  1200x450 s7: stage 372/372 overflow-y=hidden | combat 352/352 | hint 0/0
+  1200x450 s11: stage 372/372 overflow-y=hidden | combat 352/352 | hint 0/0

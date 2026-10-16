@@ -1,0 +1,12 @@
+thresholds: EndTurn bottom <= innerHeight - 8 | pageScrollHeight <= innerHeight + 0 | handRows <= 1 | EndTurn topmost at centre: true | seed pinned: yes
+base: http://localhost:5173/web/?seed={seed}  seeds: 11
+
+size         label            seed  reported  eTbot/vh  clear  scrollPx  handRows  onTop  result
+1366x768     laptop           11    119756    707/768   61     0         1         true   FAIL
+
+FAIL summary (1 failing row(s)):
+  FAIL 1366x768 seed 11: INVALID SEED: page reported 119756, requested 11
+
+per-kind min tappable box @ 1366x768: {"cardWrap":148,"card":148,"enemy":259,"node":null,"btn":40}
+
+screenshots in shots/viewport/
