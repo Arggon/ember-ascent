@@ -474,6 +474,7 @@ export function snapshot(state) {
     turn: state.combat?.turn ?? 0,
     energyPerTurn: state.energyPerTurn ?? 3,
     character: state.character,
+    biome: state.biome ?? 'foundry',
     characterName: defaultContent().characters.get(state.character)?.name ?? state.character,
     relicName: defaultContent().characters.get(state.character)?.relicName ?? '',
     difficulty: state.difficulty,

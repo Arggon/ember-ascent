@@ -146,6 +146,13 @@ const ENCOUNTER_BY_TYPE = {
   elite: ['elite_1'],
   boss: ['boss_1'],
 };
+/** B5: the Cinder Mines' encounter pools (opt-in with `biome: 'mines'`). */
+const MINES_BY_TYPE = {
+  combat_weak: ['mines_weak_1', 'mines_weak_2', 'mines_weak_3'],
+  combat_strong: ['mines_strong_1', 'mines_strong_2'],
+  elite: ['mines_elite_1'],
+  boss: ['mines_boss_1'],
+};
 
 /**
  * Start a run.
@@ -157,6 +164,11 @@ export function newRun(opts = {}) {
   const seed = opts.seed ?? 0;
   const characterId = opts.character ?? 'ironclad';
   const difficulty = opts.difficulty ?? 0;
+  const biome = opts.biome ?? 'foundry';
+  if (biome !== 'foundry' && biome !== 'mines') {
+    throw Object.assign(new Error(`unknown biome "${biome}"`), { code: 3 });
+  }
+  const byType = biome === 'mines' ? MINES_BY_TYPE : ENCOUNTER_BY_TYPE;
 
   if (!Number.isInteger(seed) || seed < 0 || seed > 2 ** 32) {
     throw Object.assign(new Error(`seed must be an integer in [0, 2^32], got ${opts.seed}`), { code: 3 });
@@ -180,7 +192,7 @@ export function newRun(opts = {}) {
   const encounterTable = {};
   for (const row of mapGen.rows) {
     for (const node of row) {
-      const pool = ENCOUNTER_BY_TYPE[node.type];
+      const pool = byType[node.type];
       if (!pool) {
         // Non-combat node (rest): no enemies, no draws consumed. Skipping the draw
         // keeps the stream aligned to *content that needs randomness*; rest nodes
@@ -257,6 +269,8 @@ export function newRun(opts = {}) {
     reward: null,
   };
 
+  // B5 alternate biome: recorded only when not the default, so foundry hashes are unchanged.
+  if (biome !== 'foundry') state.biome = biome;
   // B4 second hero: a character whose relic is not the Kindled Heart records it, so the
   // default (Ashwright) state keeps no new field and every existing hash is unchanged.
   if (character.startingRelic && character.startingRelic !== 'burning_blood') state.relic = character.startingRelic;

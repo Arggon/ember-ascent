@@ -218,6 +218,7 @@ export function logHeader(session) {
     ...(session.state.kindling ? { kindling: true } : {}),
     ...(session.state.tempers ? { tempers: true } : {}),
     ...(session.state.quests ? { quests: true } : {}),
+    ...(session.state.biome ? { biome: session.state.biome } : {}),
   };
 }
 
@@ -239,6 +240,7 @@ export function replay(header, entries) {
     kindling: header.kindling === true,
     tempers: header.tempers === true,
     quests: header.quests === true,
+    ...(header.biome ? { biome: header.biome } : {}),
   });
   const steps = [];
   for (const [i, entry] of entries.entries()) {

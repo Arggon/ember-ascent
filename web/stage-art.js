@@ -17,6 +17,7 @@ const SPRITES = {
   hero: 'hero', jaw_worm: 'jaw_worm', cultist: 'cultist', red_louse: 'red_louse',
   acid_slime: 'acid_slime', gremlin_nob: 'gremlin_nob', the_guardian: 'the_guardian',
   bellows_keeper: 'bellows_keeper',
+  slag_crawler: 'slag_crawler', ash_wraith: 'ash_wraith', ash_wraith_elite: 'ash_wraith', cinder_foreman: 'cinder_foreman',
 };
 
 /** Hero sprite per character id (fixed table; unknown ids fall back to the Ashwright). */
@@ -36,8 +37,15 @@ export function enemyMarkup(id) {
   return sprite(SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id] : SPRITES.jaw_worm);
 }
 
+/** Extra class for an enemy whose sprite is shared with a variant (the elite wraith). */
+export function enemyVariant(id) {
+  return id === 'ash_wraith_elite' ? ' is-elite-variant' : '';
+}
+
 /** Act backdrop. Only act 1 exists; the foundry is the whole climb. */
-export function backdropMarkup() {
+export function backdropMarkup(biome = 'foundry') {
+  // B5 The Cinder Mines: a painted, pre-darkened tunnel (local WebP) instead of the foundry.
+  if (biome === 'mines') return '<div class="mines-bg"></div><div class="mines-floor"></div>';
   return svg(`
     <path class="sky" d="M0 0 H800 V400 H0 Z"/>
     <path class="wall" d="M0 80 L80 40 H160 L200 70 H320 L360 30 H520 L560 64 H700 L800 28 V400 H0 Z"/>

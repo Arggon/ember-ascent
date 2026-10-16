@@ -18,7 +18,7 @@
 
 import { createController } from '../src/surface/gui/controller.js';
 import { cardArtMarkup } from './card-art.js';
-import { attackTier, backdropMarkup, enemyMarkup, heroMarkup, intentGlyph } from './stage-art.js';
+import { attackTier, backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, intentGlyph } from './stage-art.js';
 // The ONE public kernel entry point (package.json `exports` is exactly this file, and it
 // is browser-safe by construction: no `node:*`, no clock, no unseeded randomness, all
 // enforced by tools/check-architecture.mjs). Every number the history screens show is
@@ -162,9 +162,15 @@ const HEROES = [
   { id: 'ironclad', name: 'Ashwright', blurb: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.' },
   { id: 'bellows', name: 'Bellows Keeper', blurb: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.' },
 ];
+/** B5: the chosen biome ('foundry' or 'mines'); `?biome=mines` seeds it. */
+const BIOMES = [
+  { id: 'foundry', name: 'The Foundry' },
+  { id: 'mines', name: 'The Cinder Mines' },
+];
+let biomeChoice = new URLSearchParams(location.search).get('biome') === 'mines' ? 'mines' : 'foundry';
 let heroChoice = HEROES.some((h) => h.id === new URLSearchParams(location.search).get('hero')) ? new URLSearchParams(location.search).get('hero') : 'ironclad';
 
-let ctl = createController({ run: { seed: seedFromUrl(), character: heroChoice, kindling: true, tempers: true, quests: true } });
+let ctl = createController({ run: { seed: seedFromUrl(), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } });
 let snap = ctl.snapshot();
 /** Kernel events of the current run, accumulated for the run-history record (reset in newGame). */
 let runEvents = [];
@@ -851,7 +857,7 @@ function newGame(seed = null) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
   // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
-  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), character: heroChoice, kindling: true, tempers: true, quests: true } });
+  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } });
   snap = ctl.snapshot();
   // The event stream is per-RUN, so it dies with the run. It is the only source of the kill
   // / elite / boss counts the score needs, which is why it is accumulated rather than
@@ -1556,7 +1562,8 @@ function intentBadge(e) {
   });
   badge.innerHTML = intentGlyph(which);
   if (kind === 'attack') {
-    const n = e.intent.hits > 1 ? `${e.intent.damage}×${e.intent.hits}` : String(e.intent.damage ?? '');
+    // `damage` is the intent's TOTAL (all hits); the badge reads per-hit × hits, as the label does.
+    const n = e.intent.hits > 1 ? `${Math.round(e.intent.damage / e.intent.hits)}×${e.intent.hits}` : String(e.intent.damage ?? '');
     badge.append(el('b', { cls: 'intent-num', text: n }));
   }
   return badge;
@@ -1679,7 +1686,7 @@ function combatView() {
 
   const fight = el('div', { cls: 'fight' });
   const backdrop = el('div', { cls: 'backdrop', attrs: { 'aria-hidden': 'true' } });
-  backdrop.innerHTML = backdropMarkup();
+  backdrop.innerHTML = backdropMarkup(snap.biome);
   // Empty foundry floor fast-forwards the feel queue. Cards, enemies and buttons sit above it.
   backdrop.addEventListener('pointerdown', () => skipAnim());
   fight.append(backdrop);
@@ -1760,7 +1767,7 @@ function enemyCard(e, position) {
 
   const pose = enemyPose(e);
   card.append(intentBadge(e));
-  const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
+  const fig = el('div', { cls: `fig pose-${pose}${enemyVariant(e.id)}`, attrs: { 'aria-hidden': 'true' } });
   fig.innerHTML = enemyMarkup(e.id);
   card.append(fig);
   // The target mark is a SHAPE, not a colour: a slot number, plus a crosshair on the
@@ -2134,6 +2141,17 @@ function kindlingView() {
       el('span', { cls: 'hp-blurb', text: h.blurb })));
     }
     wrap.append(heroes);
+    const paths = el('div', { cls: 'biome-select', attrs: { role: 'radiogroup', 'aria-label': 'Choose the path' } });
+    paths.append(el('span', { cls: 'bs-label', text: 'Path' }));
+    for (const b of BIOMES) {
+      const on = (snap.biome ?? 'foundry') === b.id;
+      paths.append(el('button', {
+        cls: `biome-pick${on ? ' on' : ''} bp-${b.id}`, text: b.name,
+        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false' },
+        on: { click: () => { if (on) return; biomeChoice = b.id; newGame(snap.seed); } },
+      }));
+    }
+    wrap.append(paths);
   }
   wrap.append(el('div', { cls: 'big-title kindling-head', text: 'The forge offers a kindling' }));
   wrap.append(el('p', { cls: 'kindling-note', text: 'Take one. Each gift has a price.' }));
