@@ -2674,3 +2674,129 @@ html, body {
     body::before { animation: none; opacity: 0.35; }
   }
 }
+
+/* ==========================================================================================
+   ART DIRECTION PROTOTYPE — "Forge-lit woodcut" (branch art-direction, phase 1 mockups)
+   One late layer, like the ember theme above. Paint, type and decoration only: no box in
+   the combat layout changes width/height (LAYOUT-ACCEPTANCE.md). Fonts come from
+   web/fonts/fonts.css (local, OFL). The single accent stays ember orange.
+   ========================================================================================== */
+@media screen {
+  :root {
+    --display: "Cinzel", "Iowan Old Style", Georgia, serif;
+    --text: "Alegreya Sans", system-ui, sans-serif;
+    --rules: "Alegreya", Georgia, serif;
+    --num: "Barlow Condensed", "Alegreya Sans", sans-serif;
+    --deco: "Cinzel Decorative", "Cinzel", serif;
+    --iron: #1a120d;
+    --iron-hi: #3a271b;
+    --brass: #b98a52;
+  }
+  body, button { font-family: var(--text); }
+  #hud .stat, .ehp, .gem-core, .csum, .hand-index, .efloat { font-family: var(--num); font-weight: 600; font-variant-numeric: tabular-nums lining-nums; letter-spacing: 0.02em; }
+  .card .cdesc, .ilabel { font-family: var(--rules); }
+  .enemy.e-boss .ename { font-family: var(--deco); }
+
+  /* --- Type: Cinzel for names and chapter marks only; never body copy. --- */
+  .section-title, .page-num, .card .cname, .ename, .node .ntype, #hud .who, .reward h2, .end h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .card .cname { font-size: 0.98rem; letter-spacing: 0.02em; text-transform: none; }
+  .ename { font-size: 0.95rem; color: #ffe2c4; }
+  .section-title { letter-spacing: 0.22em; color: var(--brass); }
+
+  /* --- Card frame: forged plaque. Iron rim, brass keyline, a sunken illustration window. --- */
+  .card {
+    background:
+      radial-gradient(120% 60% at 50% 30%, color-mix(in srgb, var(--card-hue) 16%, transparent) 0%, transparent 60%),
+      linear-gradient(180deg, #24170f 0%, #170f0a 55%, #0f0906 100%);
+    border: 1px solid #4a2f1e;
+    box-shadow: inset 0 0 0 3px #120b07, inset 0 0 0 4px rgba(185, 138, 82, 0.35), inset 0 0 26px rgba(0, 0, 0, 0.5);
+  }
+  .card::after { border-color: rgba(185, 138, 82, 0.22); background: linear-gradient(180deg, rgba(255, 200, 140, 0.06) 0%, transparent 30%); }
+  .card .ctype {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--card-hue) 30%, #120b07) 0%, #140c08 100%);
+    border-bottom: 1px solid rgba(185, 138, 82, 0.4);
+    color: color-mix(in srgb, var(--card-hue) 80%, #fff);
+  }
+  .card .c-art {
+    border-radius: 6px;
+    background: radial-gradient(70% 70% at 50% 60%, color-mix(in srgb, var(--card-hue) 22%, transparent) 0%, transparent 75%);
+    box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.16);
+    opacity: 0.55;
+  }
+  .card .c-art .m { stroke-width: 1.3; }
+  .card .c-art .mf { opacity: 0.3; }
+  .card .cdesc { color: #f3e3d3; }
+  .cost-gem { filter: drop-shadow(0 0 6px rgba(255, 120, 40, 0.55)); }
+
+  /* --- Enemies: woodcut iron figures, rim-lit by the furnace, ember eyes. --- */
+  .e-silhouette { width: 96px; height: 96px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)); }
+  .e-silhouette .b { fill: #0b0705; }
+  .e-silhouette .r { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .e-silhouette .g { fill: #ffcf6b; stroke: none; filter: drop-shadow(0 0 3px #ff7a2f); }
+  .e-silhouette .gc { fill: none; stroke: #ff7a2f; stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 2px #ff5a1f); }
+  .e-silhouette .gr { fill: none; stroke: rgba(255, 140, 60, 0.35); stroke-width: 1.5; }
+  .enemy.eh-0 .e-silhouette, .enemy.eh-1 .e-silhouette, .enemy.eh-2 .e-silhouette,
+  .enemy.eh-3 .e-silhouette, .enemy.eh-4 .e-silhouette { color: #d98a5c; }
+  .enemy.e-elite .e-silhouette { color: #e0a070; }
+  .enemy.e-boss .e-silhouette { color: #ff8a4a; width: 104px; height: 104px; }
+  .enemy:not(.is-dying) .e-silhouette svg { animation: ea-breathe 4.2s ease-in-out infinite; transform-origin: 50% 100%; }
+  @keyframes ea-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025, 1.035); } }
+
+  /* --- Map as a world: a ridge line and a lava river under the path, fog at the edges. --- */
+  .page-map.panel {
+    background:
+      linear-gradient(180deg, rgba(14, 9, 7, 0.0) 0%, rgba(14, 9, 7, 0.0) 55%, rgba(255, 90, 30, 0.10) 100%),
+      radial-gradient(90% 60% at 50% 0%, rgba(60, 38, 26, 0.6) 0%, transparent 70%),
+      #0f0a07;
+    border-color: #3b261a;
+  }
+  /* Two ridge silhouettes and a lava seam, cut with clip-path: no image, no URL. */
+  .page-map.panel::before {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 62%; z-index: 0; pointer-events: none;
+    background: linear-gradient(180deg, #1a0f0a 0%, #120a07 70%, #2a0f06 100%);
+    clip-path: polygon(0 100%, 0 40%, 10% 22%, 18% 32%, 28% 6%, 38% 24%, 48% 0, 58% 20%, 65% 10%, 75% 30%, 85% 4%, 100% 30%, 100% 100%);
+  }
+  .page-map.panel::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 18%; z-index: 0; pointer-events: none;
+    background: radial-gradient(60% 40% at 50% 100%, rgba(255, 110, 40, 0.45), transparent 75%), #0d0705;
+    clip-path: polygon(0 100%, 0 40%, 14% 20%, 30% 46%, 46% 18%, 60% 40%, 76% 14%, 90% 38%, 100% 22%, 100% 100%);
+  }
+  .page-map.panel > * { position: relative; z-index: 1; }
+  .map-row::after { background: none; border-bottom: 1px dashed rgba(255, 157, 58, 0.22); }
+  .node { background: rgba(20, 13, 9, 0.82); border-color: #3b261a; backdrop-filter: blur(1px); }
+  .node .ntype-mark {
+    display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #2a1a10, #0c0705); box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.4);
+  }
+  .node .ntype-mark svg { width: 18px; height: 18px; }
+  .page-map .map { background: transparent; border-color: transparent; }
+  .node .ntype-mark { grid-row: 1 / span 2; }
+  .node .ntype { grid-column: 2; grid-row: 1; display: block !important; color: var(--ink); line-height: 1.1; }
+  .node .nsub { grid-column: 2; grid-row: 2; display: block; font-size: 0.72rem; color: var(--faint); line-height: 1.1; }
+  .node.available::after { grid-row: 1 / span 2; }
+  .node .ntype { text-transform: none; font-size: 0.86rem; letter-spacing: 0.03em; }
+  .node .nsub { text-transform: none; letter-spacing: 0.02em; font-weight: 500; font-family: var(--text); }
+  .node.available { border-color: var(--gold); background: rgba(40, 20, 10, 0.9); }
+  .node.t-boss { border-color: #7a2414; }
+
+  /* --- Phone landscape (max-height 480): the portrait plate was display:none, so the
+         enemy read as a text box. Bring a 34px portrait back INSIDE the head plate's own
+         padding: absolute, so the card's height does not change. --- */
+  @media (max-height: 480px) {
+    .enemy .e-art {
+      display: block; position: absolute; top: 4px; left: 6px; width: 34px; height: 34px;
+      margin: 0; border: 1px solid #4a2c1c; border-radius: 6px; z-index: 3;
+    }
+    .enemy .e-art .e-silhouette { width: 32px; height: 32px; animation: none; }
+    .enemy .e-art .target-index, .enemy .e-art .target-mark { display: none; }
+    .enemy .e-head { padding-left: 36px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .enemy .e-silhouette svg { animation: none; }
+  }
+}

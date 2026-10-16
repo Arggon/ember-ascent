@@ -465,14 +465,16 @@ const GLYPHS = {
   crown: { box: '0 0 26 26', body: '<path class="m" d="M4 19 L4 8 L9 13 L13 5 L17 13 L22 8 L22 19 Z"/><path class="m" d="M4 22 H22"/>' },
   broken: { box: '0 0 26 26', body: '<path class="m" d="M12 3 L15 11"/><path class="m" d="M14 15 L8 23"/><path class="m" d="M18 5 L21 12"/>' },
 
-  // --- enemy silhouettes (viewBox 100, drawn at ~92px) ---
-  'e-worm': { box: '0 0 100 100', body: '<path class="sl" d="M16 86 C6 62 24 40 46 48 C68 56 62 80 42 78 C26 76 24 56 40 50"/><path class="sl" d="M62 34 C74 30 86 40 84 54"/><circle class="dot" cx="68" cy="44" r="3.4"/>' },
-  'e-slime': { box: '0 0 100 100', body: '<path class="sl" d="M16 84 C16 48 32 28 50 28 C68 28 84 48 84 84 Z"/><circle class="dot" cx="38" cy="56" r="4.2"/><circle class="dot" cx="62" cy="56" r="4.2"/><path class="sl" d="M16 84 H84"/>' },
-  'e-louse': { box: '0 0 100 100', body: '<path class="sl" d="M50 30 C66 30 76 44 76 58 C76 72 66 82 50 82 C34 82 24 72 24 58 C24 44 34 30 50 30 Z"/><path class="sl" d="M30 50 L12 40 M30 62 L12 66 M70 50 L88 40 M70 62 L88 66"/><path class="sl" d="M42 30 L34 12 M58 30 L66 12"/><circle class="dot" cx="42" cy="52" r="3.6"/><circle class="dot" cx="58" cy="52" r="3.6"/>' },
-  'e-cultist': { box: '0 0 100 100', body: '<path class="sl" d="M50 8 L64 40 H36 Z"/><path class="sl" d="M50 34 C64 34 72 48 72 62 V84 H28 V62 C28 48 36 34 50 34 Z"/><path class="sl" d="M38 46 L62 46"/>' },
-  'e-brute': { box: '0 0 100 100', body: '<path class="sl" d="M30 30 C22 22 18 12 20 6 C28 10 34 20 36 26"/><path class="sl" d="M70 30 C78 22 82 12 80 6 C72 10 66 20 64 26"/><path class="sl" d="M50 24 C64 24 74 34 74 48 V84 H26 V48 C26 34 36 24 50 24 Z"/><path class="sl" d="M34 56 H66"/><circle class="dot" cx="40" cy="40" r="3.4"/><circle class="dot" cx="60" cy="40" r="3.4"/>' },
-  'e-sentinel': { box: '0 0 100 100', body: '<path class="sl" d="M50 6 L78 18 V46 C78 66 64 80 50 88 C36 80 22 66 22 46 V18 Z"/><path class="sl" d="M50 24 C58 24 64 30 64 38 V62 H36 V38 C36 30 42 24 50 24 Z"/><circle class="dot" cx="43" cy="40" r="3.4"/><circle class="dot" cx="57" cy="40" r="3.4"/>' },
-  'e-rune': { box: '0 0 100 100', body: '<path class="sl" d="M50 12 L86 50 L50 88 L14 50 Z"/><circle class="sl" cx="50" cy="50" r="14"/>' },
+  // --- enemy illustrations (art-direction rev): forged-iron woodcut. Three layers per
+  //     creature: `.b` body (near-black iron), `.r` rim light (currentColor = the creature's
+  //     tint), `.g` ember glow (eyes, cores, cracks). Constant markup, no interpolation. ---
+  'e-worm': { box: '0 0 100 100', body: '<path class="b" d="M10 92 C8 70 14 52 30 44 C42 38 56 40 64 30 C70 22 80 20 88 26 L84 36 C78 32 72 34 68 40 C60 52 46 54 38 60 C28 68 26 80 30 92 Z"/><path class="r" d="M10 92 C8 70 14 52 30 44 C42 38 56 40 64 30 C70 22 80 20 88 26"/><path class="r" d="M18 72 L28 76 M22 60 L32 66 M34 50 L40 58 M48 44 L50 52"/><path class="b" d="M66 30 L92 18 L84 34 L94 40 L70 42 Z"/><path class="r" d="M66 30 L92 18 L84 34 L94 40 L70 42"/><path class="g" d="M84 24 l3 3 -3 1z M74 36 l3 0 -1 3z"/><circle class="g" cx="76" cy="26" r="2.6"/><path class="gr" d="M4 94 H96"/>' },
+  'e-louse': { box: '0 0 100 100', body: '<path class="r" d="M26 56 L8 46 M26 66 L6 70 M30 76 L14 88 M74 56 L92 46 M74 66 L94 70 M70 76 L86 88"/><ellipse class="b" cx="50" cy="62" rx="28" ry="24"/><path class="r" d="M22 62 C22 48 34 38 50 38 C66 38 78 48 78 62 C78 76 66 86 50 86 C34 86 22 76 22 62 Z"/><path class="r" d="M28 54 C40 48 60 48 72 54 M26 66 C40 60 60 60 74 66 M30 77 C42 72 58 72 70 77"/><path class="b" d="M38 40 C38 30 62 30 62 40 Z"/><path class="r" d="M38 40 C38 30 62 30 62 40 M42 32 L32 14 M58 32 L68 14"/><circle class="g" cx="44" cy="36" r="2.6"/><circle class="g" cx="56" cy="36" r="2.6"/>' },
+  'e-slime': { box: '0 0 100 100', body: '<path class="b" d="M12 88 C12 66 20 50 30 40 C38 32 44 22 50 14 C56 22 62 32 70 40 C80 50 88 66 88 88 Z"/><path class="r" d="M12 88 C12 66 20 50 30 40 C38 32 44 22 50 14 C56 22 62 32 70 40 C80 50 88 66 88 88"/><path class="r" d="M30 88 C30 94 26 96 24 92 M64 88 C64 96 70 97 70 91"/><circle class="r" cx="62" cy="56" r="5"/><circle class="r" cx="34" cy="70" r="3.4"/><circle class="r" cx="56" cy="76" r="2.4"/><path class="g" d="M38 54 l8 4 -8 3z M62 66 l-8 -4 8 -3z" transform="translate(0 -6)"/><path class="gr" d="M6 89 H94"/>' },
+  'e-cultist': { box: '0 0 100 100', body: '<path class="b" d="M50 10 C64 12 70 28 68 42 L80 92 H20 L32 42 C30 28 36 12 50 10 Z"/><path class="r" d="M50 10 C64 12 70 28 68 42 L80 92 H20 L32 42 C30 28 36 12 50 10 Z"/><path class="b" d="M40 30 C40 22 60 22 60 30 L58 44 H42 Z"/><path class="r" d="M50 44 V92 M34 60 C42 56 58 56 66 60"/><circle class="g" cx="45" cy="34" r="2.3"/><circle class="g" cx="55" cy="34" r="2.3"/><path class="r" d="M80 92 L86 20"/><path class="g" d="M86 8 C90 14 90 18 86 20 C82 18 82 14 86 8 Z"/>' },
+  'e-brute': { box: '0 0 100 100', body: '<path class="b" d="M50 22 C70 22 84 34 86 52 L90 92 H10 L14 52 C16 34 30 22 50 22 Z"/><path class="r" d="M50 22 C70 22 84 34 86 52 L90 92 H10 L14 52 C16 34 30 22 50 22 Z"/><path class="r" d="M34 26 C24 18 20 8 22 2 C30 6 36 14 40 22 M66 26 C76 18 80 8 78 2 C70 6 64 14 60 22"/><path class="r" d="M30 50 C40 46 60 46 70 50 M38 62 L50 70 L62 62"/><path class="g" d="M36 40 l8 3 -8 2z M64 40 l-8 3 8 2z"/><path class="gc" d="M22 70 L30 78 L26 88 M78 70 L72 80 L76 88"/>' },
+  'e-sentinel': { box: '0 0 100 100', body: '<path class="b" d="M50 4 L84 16 L90 50 C86 72 70 86 50 96 C30 86 14 72 10 50 L16 16 Z"/><path class="r" d="M50 4 L84 16 L90 50 C86 72 70 86 50 96 C30 86 14 72 10 50 L16 16 Z"/><path class="r" d="M50 14 L74 24 L78 50 C74 66 64 76 50 84 C36 76 26 66 22 50 L26 24 Z"/><path class="r" d="M30 40 H70 M50 14 V30 M50 64 V84"/><path class="gc" d="M36 30 L42 36 L38 40 M64 30 L58 36 L62 40 M22 60 L30 62 M78 60 L70 62"/><circle class="g" cx="50" cy="52" r="8"/><circle class="r" cx="50" cy="52" r="12"/>' },
+  'e-rune': { box: '0 0 100 100', body: '<path class="b" d="M50 12 L86 50 L50 88 L14 50 Z"/><path class="r" d="M50 12 L86 50 L50 88 L14 50 Z"/><circle class="g" cx="50" cy="50" r="7"/><circle class="r" cx="50" cy="50" r="14"/>' },
 };
 
 /**
@@ -508,6 +510,14 @@ const INTENT_GLYPH = { attack: 'strike', block: 'shieldWide', buff: 'chevUp', de
 
 /** Node type (after stripping the `combat_` prefix) -> its silhouette. */
 const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', rest: 'flame', boss: 'horns' };
+
+/** Node type -> the words a player reads on the map. Presentation only: the kernel's
+ *  own label ("fight", "fight+") still drives the title and the travel banner. The second
+ *  line states only what the kernel's NODE_TYPES.reward says (card or heal). */
+const NODE_WORDS = {
+  weak: ['Skirmish', 'card reward'], strong: ['Hard fight', 'card reward'], elite: ['Elite', 'card reward'],
+  rest: ['Campfire', 'heal'], boss: ['The Guardian', 'final fight'],
+};
 
 /**
  * Pick a silhouette, boss/elite framing and a rim tint from the enemy's NAME. The
@@ -1646,12 +1656,13 @@ function mapNode(n) {
   const cls = `node t-${short}` + (n.available ? ' available' : '') + (n.current ? ' current' : '');
   const node = el(n.available ? 'button' : 'span', {
     cls,
-    attrs: n.available ? { type: 'button', title: `Travel to ${n.label}` } : {},
+    attrs: n.available ? { type: 'button', title: `Travel to ${n.label}`, 'aria-label': `Travel to ${(NODE_WORDS[short] || [n.label])[0]}` } : {},
     on: n.available && n.actionId ? { click: () => act(n.actionId) } : {},
   });
   node.append(glyphBox(NODE_GLYPH[short] || 'rune', 'ntype-mark'));
-  node.append(el('span', { cls: 'ntype', text: n.label }));
-  node.append(el('span', { cls: 'nsub', text: n.type.replace('_', ' ') }));
+  const words = NODE_WORDS[short] || [n.label, ''];
+  node.append(el('span', { cls: 'ntype', text: words[0] }));
+  if (words[1]) node.append(el('span', { cls: 'nsub', text: words[1] }));
   return node;
 }
 
