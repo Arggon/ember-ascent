@@ -86,7 +86,7 @@ You are going to lose. A lot. That's the genre — the run ends with `GAME OVER 
 
 ## What kind of game this is
 
-A **roguelike deckbuilder**, structurally in the family of *Slay the Spire* and *Balatro*. One act, one boss, 40 cards, one character.
+A **roguelike deckbuilder**, structurally in the family of *Slay the Spire* and *Balatro*. One act, one boss (the Slag Warden), 40 cards, one character: the Ashwright, whose Kindled Heart restores 6 HP after each fight.
 
 It is a **vertical slice**: the mechanical core, built to prove the loop works and that AI agents can drive it at low token cost. There is **no art and no sound** yet.
 

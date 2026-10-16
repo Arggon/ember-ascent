@@ -49,7 +49,7 @@ Still worth capturing yourself, because the harness walks the map by script and 
 boss on demand:
 
 1. A **combat mid-turn** with an enemy intent visible — the `desktop-1280x800-s*.png` set covers this.
-2. **The Guardian** boss fight (the payoff screen). Scripting a run to the boss is the one shot the
+2. **The Slag Warden** boss fight (the payoff screen). Scripting a run to the boss is the one shot the
    harness does not produce; `?seed=N` plus playing to the end, or the itch.io preview, will get it.
 
 Cover art: **`shots/cover-ember-ascent.png`** (1260×1000, a 2× render of itch.io's 630×500) is

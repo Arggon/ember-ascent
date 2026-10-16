@@ -134,7 +134,7 @@ export function newRun(opts = {}) {
       });
       encounterTable[node.id] = {
         id: enc.id,
-        name: enc.name,
+        name: enc.stateName ?? enc.name,
         tier: enc.tier,
         reward: NODE_TYPES[node.type].reward,
         elite: Boolean(enc.elite),

@@ -11,7 +11,9 @@ import { intAt } from '../rng.js';
 export const ENEMIES = {
   jaw_worm: {
     id: 'jaw_worm',
-    name: 'Jaw Worm',
+    name: 'Cinder Maw',
+    // Copied into run state and therefore into the content hash. Do not edit.
+    stateName: 'Jaw Worm',
     maxHp: [40, 44],
     moves: [
       { id: 'chomp', label: 'A11', kind: 'attack', damage: 11 },
@@ -22,7 +24,8 @@ export const ENEMIES = {
   },
   cultist: {
     id: 'cultist',
-    name: 'Cultist',
+    name: 'Ash Cantor',
+    stateName: 'Cultist',
     maxHp: [48, 54],
     moves: [
       { id: 'incantation', label: 'PWR3', kind: 'buff', strength: 3 },
@@ -33,7 +36,8 @@ export const ENEMIES = {
   },
   red_louse: {
     id: 'red_louse',
-    name: 'Red Louse',
+    name: 'Kiln Mite',
+    stateName: 'Red Louse',
     maxHp: [10, 15],
     moves: [
       { id: 'bite', label: 'A6', kind: 'attack', damage: 6 },
@@ -43,7 +47,8 @@ export const ENEMIES = {
   },
   acid_slime: {
     id: 'acid_slime',
-    name: 'Acid Slime',
+    name: 'Slag Ooze',
+    stateName: 'Acid Slime',
     maxHp: [28, 32],
     moves: [
       { id: 'tackle', label: 'A10', kind: 'attack', damage: 10 },
@@ -52,7 +57,8 @@ export const ENEMIES = {
   },
   gremlin_nob: {
     id: 'gremlin_nob',
-    name: 'Gremlin Nob',
+    name: 'Cinder Brute',
+    stateName: 'Gremlin Nob',
     maxHp: [82, 86],
     elite: true,
     moves: [
@@ -63,7 +69,8 @@ export const ENEMIES = {
   },
   the_guardian: {
     id: 'the_guardian',
-    name: 'The Guardian',
+    name: 'Slag Warden',
+    stateName: 'The Guardian',
     maxHp: [110, 110],
     boss: true,
     moves: [
@@ -82,15 +89,15 @@ export const ENEMIES = {
  * `tier` orders them by difficulty inside an act.
  */
 export const ENCOUNTERS = {
-  weak_1: { id: 'weak_1', name: 'Jaw Worm', tier: 1, enemies: ['jaw_worm'] },
-  weak_2: { id: 'weak_2', name: 'Cultist', tier: 1, enemies: ['cultist'] },
-  weak_3: { id: 'weak_3', name: 'Two Lice', tier: 1, enemies: ['red_louse', 'red_louse'] },
-  weak_4: { id: 'weak_4', name: 'Acid Slime', tier: 1, enemies: ['acid_slime'] },
-  strong_1: { id: 'strong_1', name: 'Louse + Slime', tier: 2, enemies: ['red_louse', 'acid_slime'] },
-  strong_2: { id: 'strong_2', name: 'Jaw Worm + Louse', tier: 2, enemies: ['jaw_worm', 'red_louse'] },
-  strong_3: { id: 'strong_3', name: 'Cultist + Slime', tier: 2, enemies: ['cultist', 'acid_slime'] },
-  elite_1: { id: 'elite_1', name: 'Gremlin Nob', tier: 3, elite: true, enemies: ['gremlin_nob'] },
-  boss_1: { id: 'boss_1', name: 'The Guardian', tier: 4, boss: true, enemies: ['the_guardian'] },
+  weak_1: { id: 'weak_1', name: 'Cinder Maw', stateName: 'Jaw Worm', tier: 1, enemies: ['jaw_worm'] },
+  weak_2: { id: 'weak_2', name: 'Ash Cantor', stateName: 'Cultist', tier: 1, enemies: ['cultist'] },
+  weak_3: { id: 'weak_3', name: 'Twin Mites', stateName: 'Two Lice', tier: 1, enemies: ['red_louse', 'red_louse'] },
+  weak_4: { id: 'weak_4', name: 'Slag Ooze', stateName: 'Acid Slime', tier: 1, enemies: ['acid_slime'] },
+  strong_1: { id: 'strong_1', name: 'Mite and Ooze', stateName: 'Louse + Slime', tier: 2, enemies: ['red_louse', 'acid_slime'] },
+  strong_2: { id: 'strong_2', name: 'Maw and Mite', stateName: 'Jaw Worm + Louse', tier: 2, enemies: ['jaw_worm', 'red_louse'] },
+  strong_3: { id: 'strong_3', name: 'Cantor and Ooze', stateName: 'Cultist + Slime', tier: 2, enemies: ['cultist', 'acid_slime'] },
+  elite_1: { id: 'elite_1', name: 'Cinder Brute', stateName: 'Gremlin Nob', tier: 3, elite: true, enemies: ['gremlin_nob'] },
+  boss_1: { id: 'boss_1', name: 'Slag Warden', stateName: 'The Guardian', tier: 4, boss: true, enemies: ['the_guardian'] },
 };
 
 /**

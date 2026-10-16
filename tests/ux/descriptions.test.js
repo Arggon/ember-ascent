@@ -244,7 +244,7 @@ test('snapshot() carries the plain-English fields next to the compact ones', asy
     assert.ok(typeof e.intent.text === 'string' && e.intent.text.length > 0, 'enemy intent has a sentence');
   }
   // The R4 text dump is the CLI's, and must be byte-identical to what it always was.
-  assert.match(observe(state), /bloodletting|Bloodletting/);
+  assert.match(observe(state), /Vein Tap/);
 });
 
 test('the browser surface reaches the descriptions through the controller alone', async () => {
@@ -255,7 +255,7 @@ test('the browser surface reaches the descriptions through the controller alone'
   assert.ok(Array.isArray(d.help) && d.help.length >= 5, 'controller exposes the first-run help');
   assert.equal(typeof ctl.describe().card, 'function', 'controller exposes the describe functions');
   const tile = ctl.describe().tile(C.cards.get('strike'), { cost: 1 }, 3);
-  assert.equal(tile.name, 'Strike');
+  assert.equal(tile.name, 'Hammerfall');
   assert.equal(tile.cost, 1);
   assert.match(tile.description, /Deal 6 damage/);
   assert.equal(tile.compact, 'A6');

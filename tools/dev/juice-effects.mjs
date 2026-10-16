@@ -200,7 +200,7 @@ console.log('=== A. prefers-reduced-motion: NO (the normal path) ===\n');
   ok('the played card travels as a copy on the persistent layer',
     fly.length >= 1, `#fx-layer children = [${byId['fx-layer'].kids.map((k) => k._cls).join(', ')}]`);
   ok('the flying card carries the played card\'s name and a target lane',
-    !!fly[0] && /Strike|Defend|Bash/.test(fly[0].textContent) && /side-(0|1|mid|none)/.test(fly[0]._cls),
+    !!fly[0] && /Hammerfall|Quench|Anvil Blow/.test(fly[0].textContent) && /side-(0|1|mid|none)/.test(fly[0]._cls),
     `"${fly[0] && fly[0].textContent}" class="${fly[0] && fly[0]._cls}"`);
 
   // 6. No layout shift: prove from the CSS that the hit reaction cannot move the card.

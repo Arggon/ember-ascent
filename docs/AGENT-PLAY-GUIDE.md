@@ -42,7 +42,7 @@ dlb play <id> --run run.json        # act
 $ dlb new --seed 42 --run run.json < /dev/null
 new run: seed 42 character ironclad difficulty 0
 saved to run.json
-hash sha256:778ca6629f468888097783705f4f8afe3749eff4c59dcfd37391140298db0159
+hash sha256:11020de6ed24cc04e3c7bfa9ec85805242dcd73fea65a79c3e17f84d0bb572af
 ```
 
 ```
@@ -62,13 +62,13 @@ n1 fight
 $ dlb play n1 --run run.json     # enter combat
 T1 | HP 60/60 | EN 3/3 | BLK 0 | draw5 disc0
 HAND
- 1 Defend       B5
- 2 Strike       A6
- 3 Strike       A6
- 4 Strike       A6
- 5 Defend       B5
+ 1 Quench       B5
+ 2 Hammerfall   A6
+ 3 Hammerfall   A6
+ 4 Hammerfall   A6
+ 5 Quench       B5
 ENEMY
- Jaw Worm  HP 40/40  A7 B5
+ Cinder Maw  HP 40/40  A7 B5
 ```
 
 ```
@@ -82,15 +82,15 @@ e1 end
 ```
 
 ```
-$ dlb play p1 --run run.json     # play Defend
+$ dlb play p1 --run run.json     # play Quench
 T2 | HP 60/60 | EN 2/3 | BLK 5 | draw5 disc1
 HAND
- 1 Strike       A6
- 2 Strike       A6
- 3 Strike       A6
- 4 Defend       B5
+ 1 Hammerfall   A6
+ 2 Hammerfall   A6
+ 3 Hammerfall   A6
+ 4 Quench       B5
 ENEMY
- Jaw Worm  HP 40/40  A7 B5
+ Cinder Maw  HP 40/40  A7 B5
 ```
 
 ### Reading the dump
@@ -107,7 +107,7 @@ T1 | HP 60/60 | EN 3/3 | BLK 0 | draw5 disc0
 
 - `A6` = attack 6 · `B5` = block 5 · `A8+V2` = attack 8 plus 2 vulnerable · `PWR+2` = gain 2 strength
 - `EN2` = costs 2 energy (shown in the hand; **not** repeated on action lines)
-- Enemy line: `Jaw Worm  HP 40/40  A7 B5` → intent this turn is 7 attack + 5 block
+- Enemy line: `Cinder Maw  HP 40/40  A7 B5` → intent this turn is 7 attack + 5 block. The words are the display name; action ids and enemy ids are unchanged (`strike`, `jaw_worm`).
 - `draw5 disc0` lets the agent see deck cycling without a pile dump. `--verbose` adds pile contents.
 
 ### Action IDs

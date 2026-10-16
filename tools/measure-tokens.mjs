@@ -27,17 +27,17 @@ export function countWorst(text) {
 
 const DUMP_SPIKE = `T3 | HP 42/60 | EN 3/3 | BLK 0 | draw5 disc3 | PWR2 VULN1
 HAND
- 1 Strike      A6
- 2 Strike      A6
- 3 Defend      B5
- 4 Bash        A8+V2 EN2
- 5 Inflame     PWR+2 EN1
+ 1 Hammerfall  A6
+ 2 Hammerfall  A6
+ 3 Quench       B5
+ 4 Anvil Blow   A8+V2 EN2
+ 5 Stoke        PWR+2 EN1
 ENEMY
- Jaw Worm  HP 44/44  A12`;
+ Cinder Maw  HP 44/44  A12`;
 
 const PILE_SPIKE = `PILES
- draw: Strike, Strike, Defend, Bash, Inflame
- disc: Neutralize, Survivor
+ draw: Hammerfall, Hammerfall, Quench, Anvil Blow, Stoke
+ disc: Quench, Bellows
  exhaust: -`;
 
 const CONFIG_SPIKE = `$ node bin/dlb new --seed 7 --character ironclad --difficulty 1

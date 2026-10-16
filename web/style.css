@@ -619,6 +619,20 @@ html, body {
 }
 .c-type-mark .mf { fill: currentColor; stroke: none; }
 
+/* Flavor is content, shown only where the stage has room. Short viewports keep the
+   effect sentence and hide this line so the hand does not grow. */
+.cflavor {
+  display: none;
+  font-family: var(--serif, Georgia, serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--faint);
+  line-height: 1.25;
+}
+@media (min-width: 1100px) and (min-height: 880px) {
+  .card .cflavor { display: block; font-size: var(--fs-1); margin-top: 2px; }
+}
+
 .card .cname {
   font-weight: 800;
   font-size: var(--fs-4);
@@ -1514,7 +1528,7 @@ html, body {
 }
 
 /* A boss that has just gone down says so. The ghost's `.ename`/`.ehp` lines carry the words
-   ("The Guardian" above "BOSS DOWN"); this is the frame colour, so the biggest death in a
+   ("Slag Warden" above "BOSS DOWN"); this is the frame colour, so the biggest death in a
    run is not readable ONLY by colour — the text is the fact, this is the emphasis. */
 .enemy.is-dying.boss-down { border-color: var(--loss, #e2504c); }
 

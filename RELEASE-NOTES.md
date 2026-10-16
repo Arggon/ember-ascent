@@ -17,9 +17,9 @@ climb a single act, fight what is in your way, and face one boss at the end.
 |---|---|
 | **Acts** | 1 (eight rows: entry, fights, elites/rests, and a fixed boss row) |
 | **Cards** | **42** — 20 attack, 16 skill, 6 power |
-| **Character** | 1 — "Ironclad", 60 max HP, plus one starting relic ("Burning Blood") |
+| **Character** | 1 — the Ashwright, 60 max HP, plus one starting relic (Kindled Heart) |
 | **Enemies** | 6, across 9 encounters (4 weak, 3 strong, 1 elite, 1 boss) |
-| **Boss** | 1 — "The Guardian" |
+| **Boss** | 1 — the Slag Warden |
 | **Run length** | roughly **15–40 minutes** per run |
 | **Difficulty** | HARD. Losing is the normal outcome early on. |
 | **Tech** | plain ES modules + CSS. Zero runtime dependencies, no build step, no bundler, no CDN, no network access |

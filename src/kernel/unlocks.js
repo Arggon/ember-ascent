@@ -87,7 +87,7 @@ export const UNLOCK_CATALOG = Object.freeze([
  */
 export const BADGE_CATALOG = Object.freeze([
   Object.freeze({ id: 'first_win', name: 'Victory', condition: 'Win a run' }),
-  Object.freeze({ id: 'boss_down', name: 'Guardian down', condition: 'Defeat The Guardian' }),
+  Object.freeze({ id: 'boss_down', name: 'Warden down', condition: 'Defeat the Slag Warden' }),
   Object.freeze({ id: 'elite_hunter', name: 'Elite hunter', condition: 'Kill an elite' }),
   Object.freeze({ id: 'deep_run', name: 'Deep run', condition: 'Reach the boss floor' }),
   Object.freeze({ id: 'ten_kills', name: 'Ten down', condition: 'Kill ten enemies in one run' }),

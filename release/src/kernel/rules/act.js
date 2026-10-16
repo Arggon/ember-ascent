@@ -18,7 +18,7 @@ export const HAND_SIZE = 5;
 export const BASE_ENERGY = 3;
 /** HP restored at a rest site. */
 export const REST_HEAL = 8;
-/** HP restored by the Burning Blood relic after each combat. */
+/** HP restored by the Kindled Heart relic (id `burning_blood`) after each combat. */
 export const RELIC_HEAL = 6;
 /** Reward choice count after a normal fight; elites offer one more. */
 export const REWARD_CHOICES = 3;
@@ -81,7 +81,7 @@ export function startCombat(state, node, cardDefs) {
     return {
       id: s.id,
       index: i,
-      name: def.name,
+      name: def.stateName ?? def.name,
       hp: s.hp,
       maxHp: s.hp,
       block: 0,

@@ -472,7 +472,7 @@ process.stdout.write('\n== I. renderer-level checks on synthetic snapshots where
     phase: 'combat', outcome: null, stepIndex: 1, floor: 0, turn: 1, energyPerTurn: 3,
     character: 'ironclad', difficulty: 0, seed: 1,
     player: { hp: 50, maxHp: 80, energy: 2, block: 0, statuses: [], powers: [] },
-    hand: [{ slot: 'p1', cardId: 'strike', name: 'Strike', cost: 1, type: 'attack', rarity: 'starter', typeLabel: 'Attack', summary: 'A6', description: 'Deal 6 damage.', playable: true, hint: '' }],
+    hand: [{ slot: 'p1', cardId: 'strike', name: 'Hammerfall', cost: 1, type: 'attack', rarity: 'starter', typeLabel: 'Attack', summary: 'A6', description: 'Deal 6 damage.', playable: true, hint: '' }],
     piles: { draw: 4, discard: 1, exhaust: 0 },
     enemies,
     map: { floor: 0, floorCount: 8, current: null, rows: [], currentRow: [] },
@@ -483,7 +483,7 @@ process.stdout.write('\n== I. renderer-level checks on synthetic snapshots where
   });
 
   // --- I.1  the identity flash: one enemy at position 0 whose index is 2 ---
-  let solo = [enemy(2, 'Jaw Worm', 40, 40)];
+  let solo = [enemy(2, 'Cinder Maw', 40, 40)];
   const fakeSolo = {
     snapshot: () => snapshotWith(solo),
     dispatch: (id) => { if (id === 'p1') solo = [{ ...solo[0], hp: solo[0].hp - 6 }]; return { error: null, events: [], changed: true }; },
@@ -498,7 +498,7 @@ process.stdout.write('\n== I. renderer-level checks on synthetic snapshots where
     I1.dispatched.length === 1 && I1.dispatched[0] === 'p1', `dispatched=[${I1.dispatched.join(', ')}]`);
 
   // --- I.2  a targeted play names and flashes the enemy that was hit ---
-  let duo = [enemy(0, 'Acid Slime', 20, 20), enemy(2, 'Jaw Worm', 40, 40)];
+  let duo = [enemy(0, 'Slag Ooze', 20, 20), enemy(2, 'Cinder Maw', 40, 40)];
   const fakeDuo = {
     snapshot: () => snapshotWith(duo),
     dispatch: (id) => {
@@ -520,7 +520,7 @@ process.stdout.write('\n== I. renderer-level checks on synthetic snapshots where
     d2.length === 1 && d2[0].a['data-target-index'] === '2',
     d2.length ? `flashing data-target-index=${d2[0].a['data-target-index']}` : 'none flashed');
   check('the feedback toast names the enemy that was hit',
-    /Dealt 6 damage to Jaw Worm/.test(byId.get('toast').textContent), `"${byId.get('toast').textContent.trim()}"`);
+    /Dealt 6 damage to Cinder Maw/.test(byId.get('toast').textContent), `"${byId.get('toast').textContent.trim()}"`);
 }
 
 const failed = results.filter((r) => !r.ok);

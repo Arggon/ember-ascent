@@ -517,7 +517,7 @@ const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', rest: 'fl
  *  line states only what the kernel's NODE_TYPES.reward says (card or heal). */
 const NODE_WORDS = {
   weak: ['Skirmish', 'card reward'], strong: ['Hard fight', 'card reward'], elite: ['Elite', 'card reward'],
-  rest: ['Campfire', 'heal'], boss: ['The Guardian', 'final fight'],
+  rest: ['Campfire', 'heal'], boss: ['Slag Warden', 'final fight'],
 };
 
 /**
@@ -526,23 +526,18 @@ const NODE_WORDS = {
  * @param {string} name
  * @returns {{art: string, boss: boolean, elite: boolean, hue: number}}
  */
-function enemyLook(name) {
-  const n = String(name || '');
-  let art = 'e-rune';
-  if (/guardian/i.test(n)) art = 'e-sentinel';
-  else if (/nob/i.test(n)) art = 'e-brute';
-  else if (/worm/i.test(n)) art = 'e-worm';
-  else if (/slime/i.test(n)) art = 'e-slime';
-  else if (/louse|lice/i.test(n)) art = 'e-louse';
-  else if (/cultist/i.test(n)) art = 'e-cultist';
-  let hash = 0;
-  for (let i = 0; i < n.length; i += 1) hash = (hash * 31 + n.charCodeAt(i)) % 5;
-  return {
-    art,
-    boss: /guardian/i.test(n),
-    elite: /nob/i.test(n),
-    hue: hash,
+function enemyLook(id) {
+  const table = {
+    jaw_worm: { art: 'e-worm', hue: 1 },
+    cultist: { art: 'e-cultist', hue: 4 },
+    red_louse: { art: 'e-louse', hue: 1 },
+    acid_slime: { art: 'e-slime', hue: 3 },
+    gremlin_nob: { art: 'e-brute', elite: true, hue: 2 },
+    the_guardian: { art: 'e-sentinel', boss: true, hue: 1 },
   };
+  const hit = table[id];
+  if (hit) return { art: hit.art, boss: Boolean(hit.boss), elite: Boolean(hit.elite), hue: hit.hue };
+  return { art: 'e-rune', boss: false, elite: false, hue: 0 };
 }
 
 /* --------------------------------------------------------- the one dispatch path */
@@ -682,7 +677,7 @@ function act(actionId, targetK = null) {
       // collapse reads, and nothing else. The victory beat is gated on this below, which is
       // how "the boss dies, THEN the panel arrives" is sequenced without asking the kernel
       // for a new field.
-      boss: enemyLook(e.name).boss,
+      boss: enemyLook(e.id).boss,
     }));
   // Each departure becomes a `death` burst, which the next paint draws as an inert ghost
   // card that collapses. The ghost is positioned by ENEMY ROW ORDER (`side-*`), never by a
@@ -813,7 +808,11 @@ function renderHud() {
   const p = snap.player;
 
   hudEl.append(
-    el('span', { cls: 'hud-char', text: capitalize(snap.character) }),
+    el('span', {
+      cls: 'hud-char',
+      text: snap.characterName || capitalize(snap.character),
+      attrs: { title: snap.relicName ? `${snap.characterName} — relic: ${snap.relicName}` : '' },
+    }),
   );
 
   // DESIGN REV 3 (UX spec): the word label is NOT part of the value text. Emitting `HP 60/60`
@@ -1080,7 +1079,7 @@ function render() {
       if (enteredIds.has(e.id)) continue;
       enteredIds.add(e.id);
       enteringIds.add(e.id);
-      if (enemyLook(e.name).boss) bossWelcomed.push(e.name);
+      if (enemyLook(e.id).boss) bossWelcomed.push(e.name);
     }
   }
   // The boss's arrival is NAMED on screen as well as animated, so the fact ("the boss is
@@ -1231,7 +1230,7 @@ function dispatchFx() {
   // The boss arrives as a BEAT, not a bigger fade: a red wash, a heavier and slower
   // title card, plus a ring that expands out of the enemy row.
   if (welcome) {
-    fxBanner('THE GUARDIAN', 'boss', '', 1350);
+    fxBanner('SLAG WARDEN', 'boss', '', 1350);
     fxAdd(el('div', { cls: 'fx-boss-ring' }), 1100);
   }
   // The run's last two moments, each with its own weight: a bright hold for the win, a
@@ -1343,7 +1342,7 @@ function freshStatusKeys(list) {
  */
 function dyingRow(dying, row = el('div', { cls: 'enemies' })) {
   for (const d of dying) {
-    const down = enemyLook(d.name).art;
+    const down = enemyLook(d.id).art;
     // A boss says so: its collapse is the biggest single event in the run, and the word is
     // what makes the difference readable with no motion at all (the row is also the only
     // place the boss's name is still on screen, its card having left the snapshot).
@@ -1413,7 +1412,7 @@ function combatView() {
  */
 function enemyCard(e, position) {
   const kind = e.intent.kind;
-  const look = enemyLook(e.name);
+  const look = enemyLook(e.id);
   const targeting = pendingSlot !== null && snap.enemies.length > 1;
   const isAimed = targeting && aimed === position + 1;
   // The damage flash is keyed on the enemy's stable identity (`index`), never on its
@@ -1581,6 +1580,7 @@ function cardTile(card, opts = {}) {
   }
   tile.append(head);
   tile.append(el('span', { cls: 'cname', text: card.name }));
+  if (card.flavor) tile.append(el('span', { cls: 'cflavor', text: card.flavor }));
   tile.append(el('span', { cls: 'cdesc', text: desc }));
   // The compact code is NOT repeated on a reward tile: the player is choosing a card to
   // keep, not playing one, so the shorthand is noise there.
@@ -1739,7 +1739,7 @@ function rewardView() {
     // The reward tile's own action: taking a card, not playing one. Marked with `data-action`
     // so the hotkey handler can also reach it.
     const tile = cardTile(
-      { slot: c.actionId, cardId: c.cardId, name: c.name, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, playable: true, showSummary: false },
+      { slot: c.actionId, cardId: c.cardId, name: c.name, flavor: c.flavor, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, playable: true, showSummary: false },
       { actionId: c.actionId, onClick: (ev) => { consumeClick(ev); act(c.actionId); } },
     );
     row.append(tile);
@@ -1800,8 +1800,8 @@ function endView() {
     wrap.append(ledgerBlock(math));
     if (math.earned) {
       wrap.append(el('p', { cls: 'def', text: won
-        ? 'You cleared Act 1 and the boss fell.'
-        : 'The Ironclad falls. Try a different route or a better card pick.' }));
+        ? 'You cleared Act 1 and the Slag Warden fell.'
+        : 'The Ashwright falls. Try a different route or a better card pick.' }));
     } else {
       // AC-7.4 (ANTI-HOLLOW). No elite, no boss, no victory: the total does NOT get display
       // size and no celebratory word is attached to it. The factual recognition below keeps
@@ -1814,8 +1814,8 @@ function endView() {
     // that was reloaded onto a finished run). The screen shows what it has and NO ledger:
     // an itemised block would have to invent every line.
     wrap.append(el('p', { cls: 'def', text: won
-      ? 'You cleared Act 1 and the boss fell.'
-      : 'The Ironclad falls. Try a different route or a better card pick.' }));
+      ? 'You cleared Act 1 and the Slag Warden fell.'
+      : 'The Ashwright falls. Try a different route or a better card pick.' }));
   }
 
   if (!savedOk) {
