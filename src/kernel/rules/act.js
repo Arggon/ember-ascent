@@ -116,7 +116,7 @@ export function startCombat(state, node, cardDefs) {
     // 34 at the boss. Enemy statuses were already reset per spawn; the player's were not.
     // NOTE: beginTurn deliberately does NOT do this — a buff must survive the turns within
     // one fight, and only be cleared when a new fight begins.
-    player: { ...state.player, block: 0, energy: BASE_ENERGY, statuses: {} },
+    player: { ...state.player, block: 0, energy: state.energyPerTurn ?? BASE_ENERGY, statuses: {} },
   };
 
   const turn = beginTurn(base, cardDefs);
@@ -159,7 +159,7 @@ export function beginTurn(state, cardDefs) {
   let next = {
     ...state,
     combat: { ...state.combat, turn: state.combat.turn + 1, hand: [] },
-    player: { ...state.player, block: 0, energy: BASE_ENERGY },
+    player: { ...state.player, block: 0, energy: state.energyPerTurn ?? BASE_ENERGY },
   };
 
   const drawn = drawCards(next, HAND_SIZE);
@@ -320,7 +320,7 @@ export function resolveVictory(state, cardDefs) {
   // documented rule that they last only the fight. Caught by tests/kernel/status-reset.test.js.
   let next = { ...state, combat: { ...state.combat, active: false, enemies: [] }, player: { ...state.player, statuses: {} } };
 
-  const healed = Math.min(state.player.maxHp - state.player.hp, RELIC_HEAL);
+  const healed = state.relicOff ? 0 : Math.min(state.player.maxHp - state.player.hp, RELIC_HEAL);
   if (healed > 0) {
     next = { ...next, player: { ...next.player, hp: next.player.hp + healed } };
     events.push({ t: 'heal', who: 'player', amount: healed, source: 'burning_blood' });

@@ -37,7 +37,7 @@ export const COMMON = {
 
 /** Per-subcommand flag specs. Types and defaults are printed by --help. */
 export const SPECS = {
-  new: { ...COMMON, '--seed': { type: 'int', default: 0 }, '--character': { type: 'string', default: 'ironclad' }, '--difficulty': { type: 'int', default: 0 } },
+  new: { ...COMMON, '--seed': { type: 'int', default: 0 }, '--character': { type: 'string', default: 'ironclad' }, '--difficulty': { type: 'int', default: 0 }, '--kindling': { type: 'bool', default: false } },
   state: { ...COMMON, '--brief': { type: 'bool', default: false }, '--verbose': { type: 'bool', default: false }, '--tokens': { type: 'bool', default: false } },
   actions: { ...COMMON },
   play: { ...COMMON },
@@ -63,6 +63,7 @@ usage: dlb <command> [flags]
 
 commands
   new --seed N --character S --difficulty N   start a run, write --run
+      [--kindling]                            opt in to act-start boons (k<n> picks)
   state [--brief|--verbose]                   current observation (R4 dump)
   actions                                     legal actions, one per line (R5)
   play <id>                                   apply one action id
@@ -265,7 +266,7 @@ export async function run(cmd, argv, io = {}) {
 async function dispatch(cmd, flags, positional, out, err) {
   switch (cmd) {
     case 'new': {
-      const session = begin({ seed: flags['--seed'], character: flags['--character'], difficulty: flags['--difficulty'] });
+      const session = begin({ seed: flags['--seed'], character: flags['--character'], difficulty: flags['--difficulty'], kindling: flags['--kindling'] });
       writeSave(flags['--run'], session);
       if (flags['--json']) {
         out(`${JSON.stringify({ ok: true, run: flags['--run'], hash: runHash(session), state: summary(session) })}\n`);

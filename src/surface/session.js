@@ -214,6 +214,8 @@ export function logHeader(session) {
     // without these two, and they change none of the specified fields.
     character: session.state.character,
     difficulty: session.state.difficulty,
+    // Additive (B1): only present for an opted-in Kindling run, so old headers are unchanged.
+    ...(session.state.kindling ? { kindling: true } : {}),
   };
 }
 
@@ -232,6 +234,7 @@ export function replay(header, entries) {
     seed: header.seed,
     character: header.character ?? 'ironclad',
     difficulty: header.difficulty ?? 0,
+    kindling: header.kindling === true,
   });
   const steps = [];
   for (const [i, entry] of entries.entries()) {

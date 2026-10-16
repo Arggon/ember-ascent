@@ -15,6 +15,7 @@ import { availableNodes, NODE_TYPES } from './rules/map.js';
 import { defaultContent } from './content.js';
 import { actions as legalActions } from './actions.js';
 import { intentLabel, intentDamage, REST_HEAL } from './rules/act.js';
+import { BOONS } from './rules/kindling.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -159,6 +160,8 @@ function body(state, opts) {
       return restBody(state);
     case 'map':
       return mapBody(state, opts);
+    case 'kindling':
+      return kindlingBody(state);
     case 'ended':
       return [
         `GAME OVER — ${state.outcome === 'win' ? 'VICTORY' : 'DEFEAT'} | floor ${state.floor + 1} | steps ${state.stepIndex}`,
@@ -211,6 +214,11 @@ function rewardBody(state) {
 
 function restBody(state) {
   return ['REST — heal or move on', ` HP ${state.player.hp}/${state.player.maxHp}`];
+}
+
+function kindlingBody(state) {
+  return ['KINDLING — take one boon (upside and cost)',
+    ...state.kindling.offers.map((id, i) => ` k${i + 1} ${id} ${BOONS[id].label}`)];
 }
 
 function mapBody(state, opts) {
@@ -273,6 +281,9 @@ export function observeActions(state) {
         break;
       case 'rest_leave':
         lines.push(`${a.id} leave`);
+        break;
+      case 'boon':
+        lines.push(`${a.id} ${a.boon}`);
         break;
       default:
         lines.push(`${a.id} ?`);
@@ -482,6 +493,9 @@ export function snapshot(state) {
     map,
     reward,
     rest: state.phase === 'rest' ? { healId: legal.find((a) => a.kind === 'rest_heal')?.id ?? null, leaveId: legal.find((a) => a.kind === 'rest_leave')?.id ?? null, heal: REST_HEAL } : null,
+    kindling: state.phase === 'kindling'
+      ? { boons: state.kindling.offers.map((id, i) => ({ id, name: BOONS[id].name, text: BOONS[id].text, label: BOONS[id].label, actionId: `k${i + 1}` })) }
+      : null,
     ended: state.phase === 'ended' ? { outcome: state.outcome, floor: state.floor + 1, steps: state.stepIndex } : null,
     // The plain-English layer, computed from this same state. A human surface paints
     // `description` / `text` / `glossary`; the compact fields above stay untouched for
