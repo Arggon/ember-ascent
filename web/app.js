@@ -1178,7 +1178,8 @@ function render() {
 function fxAdd(node, ms) {
   if (!fxEl || reducedMotion) return;
   fxEl.append(node);
-  later(() => { if (node.parent) node.parent.removeChild(node); }, ms);
+  // `parentNode`, not `parent`: DOM nodes have no `.parent`, so effect nodes used to pile up forever.
+  later(() => { node.remove(); }, ms);
 }
 
 /**
