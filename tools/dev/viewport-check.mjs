@@ -145,6 +145,10 @@ async function cycle(url) {
   await ev(`(()=>{const b=[...document.querySelectorAll('button')].find(x=>/got it/i.test(x.textContent||''));if(b)b.click();try{localStorage.setItem('dlb.helpSeen.v1','1')}catch{};return 1})()`);
   await S('Page.navigate', { url });
   await sleep(1200);
+  // Kindling (v2/2): runs open on the act-start boon choice. Take the first boon (taking
+  // one is mandatory; every boon keeps the 5-card opening hand) to reach the map.
+  await ev(`(()=>{const b=document.querySelector('.kindling .boon');if(b)b.click();return 1})()`);
+  await sleep(900);
   // Travel into the first fight: the densest screen.
   await ev(`(()=>{const n=document.querySelector('.node.available');if(n)n.click();return 1})()`);
   await sleep(1300);
