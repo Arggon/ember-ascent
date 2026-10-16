@@ -66,13 +66,16 @@ Cards you **cannot afford** are visually disabled — if it won't play, you don'
 
 ### What's on screen
 
-- **Top bar** — hit points, energy, block, turn number, and the draw/discard counts
-- **Hand** — your cards as tiles, each with its cost badge and a plain-English description
-- **Enemies** — HP bars **and their telegraphed intent in words**, so you can see what's coming before you commit
+- **The fight** — the Ashwright stands on the left, enemies on a ground line to the right, with the foundry behind them. Each enemy shows a badge for what it will do (a bigger badge means a harder hit) and the same intent in words.
+- **Top bar** — hit points, energy, block, and the step count
+- **Energy orb** — the energy you have left this turn, large, beside the hand
+- **Draw and discard** — piles in the corners. Click one to read the cards in it
+- **Hand** — your cards fanned along the bottom, each with its cost and a plain-English description
+- **End Turn** — the enemies then act
 - **Map** — the path through the act, with clickable nodes
 - **Rewards** — pick one of three cards after each fight
 - **`Help` button** — how to play plus the full keyword glossary
-- **A small token counter** — the measured cost of the observation the engine produced. It's there deliberately: it's the product feature that makes the game cheap for AI agents to drive, and it's fun to watch it stay tiny.
+- **Speed** — `1×`, `2×`, and `»` above the fight. `»` skips the combat animations. The same skip happens if you click the empty foundry floor.
 
 ### How the game works
 
@@ -88,7 +91,7 @@ You are going to lose. A lot. That's the genre — the run ends with `GAME OVER 
 
 A **roguelike deckbuilder**, structurally in the family of *Slay the Spire* and *Balatro*. One act, one boss (the Slag Warden), 40 cards, one character: the Ashwright, whose Kindled Heart restores 6 HP after each fight.
 
-It is a **vertical slice**: the mechanical core, built to prove the loop works and that AI agents can drive it at low token cost. There is **no art and no sound** yet.
+It is a **vertical slice**: the mechanical core, built to prove the loop works and that AI agents can drive it at low token cost. The combat screen is drawn in the forge-lit woodcut style. There is **no sound** yet.
 
 **What is deliberately not done:** balance is untuned, so expect the difficulty curve to feel rough. There are no meta-progression, no save-and-resume mid-run UI, no settings, no sound.
 

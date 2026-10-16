@@ -197,6 +197,7 @@ function combatBody(state, opts) {
 }
 
 const pileNames = (pile) => (pile.length === 0 ? '-' : pile.map((c) => defOf(c).name).join(', '));
+const pileCardNames = (pile) => (pile ?? []).map((c) => defOf(c).name);
 
 function rewardBody(state) {
   const lines = ['REWARD — pick one'];
@@ -472,6 +473,10 @@ export function snapshot(state) {
       draw: state.combat?.draw?.length ?? 0,
       discard: state.combat?.discard?.length ?? 0,
       exhaust: state.combat?.exhaust?.length ?? 0,
+      // Names only, for the pile viewer. Counts above stay the compact facts.
+      drawCards: pileCardNames(state.combat?.draw),
+      discardCards: pileCardNames(state.combat?.discard),
+      exhaustCards: pileCardNames(state.combat?.exhaust),
     },
     enemies,
     map,

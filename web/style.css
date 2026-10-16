@@ -1463,9 +1463,8 @@ html, body {
   z-index: 5;
 }
 
-/* The readable part is the enemy's HP TOTAL, which always agrees with the HP bar that is
-   updating at the same moment. The MAGNITUDE of the hit is carried by a glyph and by
-   size — never by a second number, so the floater can never contradict the bar. */
+/* The readable number is the HP delta (damage dealt) or the block delta. The bar still
+   shows the remaining total, so the floater and the bar describe the same kernel step. */
 .efloat {
   position: absolute;
   left: 50%;
@@ -1483,9 +1482,9 @@ html, body {
 }
 /* The glyph ladder. Shape and size carry the hit magnitude, so it survives a monochrome
    screen and does not depend on colour. */
-.efloat-g1 { font-size: var(--fs-4); color: #ffb4ae; }
-.efloat-g2 { font-size: var(--fs-5); color: #ff8078; }
-.efloat-g3 { font-size: var(--fs-6); color: #ffe08a; }
+.efloat-g1 { font-size: 1.7rem; color: #ffb4ae; }
+.efloat-g2 { font-size: 2.3rem; color: #ff8078; }
+.efloat-g3 { font-size: 3rem; color: #ffe08a; }
 .efloat-heal { color: #8fe3a6; }
 .efloat-block { color: var(--block); }
 /* A hit fully absorbed by block says so in words. It never prints a 0, which would
@@ -2925,4 +2924,439 @@ html, body {
     .route-lit, .page.enter .map-row, .card .c-illus .g { animation: none !important; }
     .page-reward .card:hover, .page-reward .card:focus-visible { transform: none; }
   }
+}
+
+/* ==========================================================================================
+   COMBAT STAGE — presentation only.
+   The fight is a foundry floor: hero left, enemies on a ground line, hand fanned in the
+   dock. Selectors are compounds so they do not redeclare a top-level rule. Fan rotation
+   is on `.card`, never on `.card-wrap`, so the hand stays one measured row.
+   ========================================================================================== */
+
+.page-combat .stage-combat {
+  min-height: 0;
+  gap: 6px;
+  justify-content: flex-start;
+}
+.page-combat .fight {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 96px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid #3a2618;
+  background: #100c09;
+}
+.page-combat .backdrop { position: absolute; inset: 0; z-index: 0; pointer-events: auto; }
+.page-combat .backdrop svg { width: 100%; height: 100%; display: block; }
+.page-combat .backdrop .sky { fill: #120c09; }
+.page-combat .backdrop .wall { fill: #1b130e; }
+.page-combat .backdrop .furnace { fill: #2c160e; }
+.page-combat .backdrop .glow { fill: #ff9d3a; opacity: 0.72; }
+.page-combat .backdrop .floor { fill: #0c0806; }
+.page-combat .backdrop .lava { fill: none; stroke: #ff6a1a; stroke-width: 4; }
+.page-combat .backdrop .chain { fill: none; stroke: #6a5140; stroke-width: 1.6; }
+.page-combat .backdrop .spire { fill: #3a2216; }
+.page-combat .ground {
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  bottom: 10%;
+  height: 3px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, #ff9d3a 18%, #8a4a22 50%, #ff9d3a 82%, transparent);
+  box-shadow: 0 0 16px rgba(255, 157, 58, 0.45);
+}
+.page-combat .hero {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  width: min(220px, 28%);
+  height: 92%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 7% 2%;
+  pointer-events: none;
+}
+.page-combat .hero-name {
+  font-family: var(--display, Cinzel, serif);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f0d2b0;
+}
+.page-combat .hero .ehp { margin: 0; }
+.page-combat .hero .hpbar { width: 72%; }
+.page-combat .speed-dock {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  gap: 4px;
+}
+.page-combat .speed-btn { min-height: 28px; padding: 2px 8px; font-size: 0.75rem; line-height: 1; }
+.page-combat .speed-btn.is-on { color: var(--gold); border-color: var(--gold); }
+.page-combat .is-on { color: var(--gold); }
+
+.stage-combat .enemies {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  max-height: none;
+  max-width: none;
+  margin: 0;
+  padding: 0 2% 6% 0;
+  gap: 4px;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  justify-content: center;
+  background: none;
+  min-width: 0;
+  pointer-events: none;
+}
+.stage-combat .enemy {
+  pointer-events: auto;
+  background: none;
+  border: none;
+  box-shadow: none;
+  filter: none;
+  min-width: 0;
+  width: min(168px, 32%);
+  max-width: 180px;
+  padding: 0 4px 2px;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  color: inherit;
+  font: inherit;
+  flex: 0 1 168px;
+}
+.stage-combat .enemy.targeting { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 10px; }
+.stage-combat .enemy.aimed { outline: 3px solid #fff4e5; }
+.stage-combat .enemy .target-index {
+  position: absolute;
+  top: 28%;
+  left: 4px;
+  z-index: 3;
+}
+.stage-combat .enemy .target-mark { position: absolute; top: 26%; right: 2px; z-index: 3; color: var(--gold); }
+.stage-combat .enemy .ename { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.stage-combat .enemy .ehp { font-size: 0.75rem; margin: 0; }
+.stage-combat .enemy .hpbar { width: 80%; margin: 2px 0; }
+.stage-combat .enemy .eblock { font-size: 0.72rem; }
+.stage-combat .e-statuses { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.stage-combat .e-intent {
+  margin: 2px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  display: block;
+  text-align: center;
+  max-width: 150px;
+}
+.stage-combat .e-intent .ilabel {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  font-weight: 700;
+  color: #e7d2c0;
+}
+.stage-combat .intent-badge {
+  width: 40px;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  color: #ff9d3a;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+.stage-combat .intent-badge svg { width: 100%; height: 70%; display: block; }
+.stage-combat .intent-badge .b { fill: #1a100c; }
+.stage-combat .intent-badge .r { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.stage-combat .intent-badge .g { fill: none; stroke: #ff9d3a; stroke-width: 1.5; }
+.stage-combat .intent-badge.kind-block { color: #8fd0f2; }
+.stage-combat .intent-badge.kind-buff { color: #f5c542; }
+.stage-combat .intent-badge.kind-debuff { color: #c9a6ee; }
+.stage-combat .tier-1 { transform: scale(0.9); }
+.stage-combat .tier-2 { transform: scale(1.15); }
+.stage-combat .tier-3 { transform: scale(1.45); }
+.stage-combat .intent-num {
+  font-family: var(--num);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffd0c2;
+}
+
+.stage-combat .fig { width: min(150px, 100%); height: min(200px, 34vh); color: #f0d2b4; }
+.stage-combat .hero .fig { width: min(180px, 100%); height: min(250px, 42vh); }
+.stage-combat .fig svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.stage-combat .fig .b { fill: #140e0a; }
+.stage-combat .fig .r { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
+.stage-combat .fig .g { fill: none; stroke: #ff9d3a; stroke-width: 1.6; }
+.stage-combat .hero.is-low .fig { filter: saturate(0.55) brightness(0.78); }
+.stage-combat .enemy.is-dying { animation: ash-fall 0.5s ease-in both; }
+.stage-combat .ash { pointer-events: none; }
+
+.page-combat .dock {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "draw orb hand discard end";
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.page-combat .pile-draw { grid-area: draw; }
+.page-combat .dock > .energy-orb { grid-area: orb; }
+.page-combat .dock .hand { grid-area: hand; }
+.page-combat .pile-discard { grid-area: discard; }
+.page-combat .dock .controls { grid-area: end; align-self: end; }
+.page-combat .pile {
+  width: 54px;
+  min-height: 68px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #6a4328;
+  background: linear-gradient(180deg, #3a2418, #140e0b 70%);
+  color: var(--ink);
+  box-shadow: 5px 5px 0 #0c0806;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  align-self: end;
+}
+.page-combat .pile-count { font-family: var(--num); font-size: 1.15rem; color: var(--gold); line-height: 1; }
+.page-combat .pile-name { font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.page-combat .energy-orb {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  align-self: end;
+  justify-self: center;
+  background: radial-gradient(circle at 38% 32%, #ffe0bf, #ff9d3a 46%, #9a3e10 74%, #2a1008);
+  box-shadow: 0 0 22px rgba(255, 157, 58, 0.55), inset 0 -8px 12px rgba(0, 0, 0, 0.35);
+  color: #2a1008;
+}
+.page-combat .energy-orb.is-empty { filter: grayscale(0.65) brightness(0.72); box-shadow: none; }
+.page-combat .is-empty { filter: grayscale(0.65) brightness(0.72); }
+.page-combat .orb-num { font-family: var(--num); font-size: 1.85rem; font-weight: 700; line-height: 1; }
+.page-combat .orb-cap { position: absolute; font-size: 0.65rem; opacity: 0; }
+
+.stage-combat .hand {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  padding: 16px 8px 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+.stage-combat .card-wrap {
+  flex: 1 1 0;
+  max-width: 168px;
+  min-width: 0;
+  margin: 0 -6px;
+  transform: none;
+  z-index: calc(var(--i) + 1);
+}
+.stage-combat .card-wrap:hover:not(.is-disabled),
+.stage-combat .card-wrap:focus-within:not(.is-disabled),
+.stage-combat .card-wrap.is-pending { transform: none; z-index: 8; }
+.stage-combat .card {
+  width: 100%;
+  min-height: 0;
+  max-height: min(228px, 34vh);
+  overflow: hidden;
+  transform: translateY(-8px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 3deg));
+  transform-origin: 50% 100%;
+}
+.stage-combat .card-wrap:hover:not(.is-disabled) .card,
+.stage-combat .card-wrap:focus-within:not(.is-disabled) .card,
+.stage-combat .card-wrap.is-pending .card {
+  transform: translateY(-18px) rotate(0deg);
+}
+
+.page-combat .pile-back {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(6, 3, 2, 0.72);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.page-combat .pile-sheet {
+  width: min(420px, 92vw);
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  background: #1a120e;
+  border: 1px solid #6a4328;
+  border-radius: 12px;
+  padding: 16px 16px 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+.page-combat .pile-sheet h2 { margin: 0 0 8px; font-size: 1.05rem; }
+.page-combat .pile-list { margin: 0 0 10px; padding-left: 1.1em; }
+.page-combat .pile-exh { color: var(--faint); font-size: 0.85rem; }
+
+.hitstop .fig,
+.hitstop .efloat,
+.hitstop .fx-card,
+.hitstop .card { animation-play-state: paused !important; }
+.stage-combat .efloat.is-queued { opacity: 0; animation: none; }
+.stage-combat .efloat.is-static { animation: none; opacity: 1; position: absolute; }
+.stage-combat .is-queued { opacity: 0; }
+.stage-combat .is-static { animation: none; }
+
+@keyframes fig-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes fig-wind {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-3deg); }
+}
+@keyframes hero-strike {
+  0% { transform: translateX(0); }
+  40% { transform: translateX(16px) rotate(-4deg); }
+  100% { transform: translateX(0); }
+}
+@keyframes foe-strike {
+  0% { transform: translateX(0); }
+  40% { transform: translateX(-16px) rotate(4deg); }
+  100% { transform: translateX(0); }
+}
+@keyframes fig-hurt {
+  0% { transform: translateX(0); filter: none; }
+  35% { transform: translateX(-8px); filter: brightness(1.8); }
+  100% { transform: none; filter: none; }
+}
+@keyframes hero-hurt {
+  0% { transform: none; filter: none; }
+  35% { transform: translateX(8px); filter: brightness(1.7); }
+  100% { transform: none; filter: none; }
+}
+@keyframes fig-brace {
+  0% { transform: none; }
+  40% { transform: translateY(4px) scale(0.98); }
+  100% { transform: none; }
+}
+@keyframes ash-fall {
+  to { opacity: 0; transform: translateY(14px) scale(0.94); filter: blur(1px); }
+}
+.stage-combat .fig.pose-idle { animation: fig-idle 3.1s ease-in-out infinite; }
+.stage-combat .fig.pose-windup { animation: fig-wind 0.85s ease-in-out infinite; }
+.stage-combat .hero .fig.pose-strike { animation: hero-strike 0.32s ease-out; }
+.stage-combat .enemy .fig.pose-strike { animation: foe-strike 0.32s ease-out; }
+.stage-combat .hero .fig.pose-hurt { animation: hero-hurt 0.28s ease-out; }
+.stage-combat .enemy .fig.pose-hurt { animation: fig-hurt 0.28s ease-out; }
+.stage-combat .fig.pose-brace { animation: fig-brace 0.28s ease-out; }
+.stage-combat .fig.pose-low { animation: fig-idle 1.1s ease-in-out infinite; filter: saturate(0.55) brightness(0.78); }
+
+@media (max-width: 760px) {
+  .page-combat .dock {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "draw orb discard"
+      "hand hand hand"
+      "end end end";
+  }
+  .page-combat .dock .controls .btn { width: 100%; }
+  .page-combat .energy-orb { width: 52px; height: 52px; }
+  .page-combat .orb-num { font-size: 1.3rem; }
+  .page-combat .pile { width: 48px; min-height: 48px; }
+  .stage-combat .hero { width: 34%; }
+  .stage-combat .fig { height: min(150px, 28vh); }
+}
+@media (max-height: 480px) {
+  .page-combat .fight { min-height: 88px; }
+  .page-combat .hero { width: 22%; padding-bottom: 2%; }
+  .page-combat .hero-name,
+  .page-combat .hero .ehp,
+  .page-combat .hero .hpbar,
+  .page-combat .hero .eblock { display: none; }
+  .stage-combat .hero .fig,
+  .stage-combat .fig { height: 64px; width: auto; }
+  .stage-combat .enemy { width: min(150px, 34%); padding: 0; }
+  .stage-combat .enemy .ename,
+  .stage-combat .enemy .ehp { font-size: 0.62rem; line-height: 1.05; margin: 0; }
+  .stage-combat .enemy .hpbar { height: 5px; margin: 1px 0; }
+  .stage-combat .enemy .eblock { font-size: 0.62rem; line-height: 1; }
+  .stage-combat .e-intent { margin: 0; }
+  .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; font-size: 0.6rem; }
+  .stage-combat .intent-badge { width: 22px; height: 26px; }
+  .stage-combat .tier-2,
+  .stage-combat .tier-3 { transform: none; }
+  .page-combat .energy-orb { width: 48px; height: 48px; }
+  .page-combat .orb-num { font-size: 1.2rem; }
+  .page-combat .pile { width: 46px; min-height: 48px; box-shadow: 3px 3px 0 #0c0806; }
+  .stage-combat .card {
+    min-height: 0 !important;
+    max-height: 104px;
+    padding: 6px 4px 3px;
+    gap: 1px;
+  }
+  .stage-combat .card .cfoot,
+  .stage-combat .cflavor { display: none; }
+  .stage-combat .card .cname { font-size: 0.72rem; }
+  .stage-combat .card .cdesc { font-size: 0.66rem; line-height: 1.1; }
+  .stage-combat .hand { padding: 10px 4px 8px; }
+  .page-combat .dock { margin-bottom: 4px; }
+  .page-combat .speed-btn { min-height: 22px; padding: 0 6px; }
+}
+/* Portrait phones (360x640): the stacked dock plus a full figure must still clear End Turn. */
+@media (max-width: 700px) and (max-height: 760px) {
+  .stage-combat .hero .fig,
+  .stage-combat .fig { height: 100px; }
+  .stage-combat .intent-badge { width: 26px; height: 28px; }
+  .stage-combat .enemy .ename,
+  .stage-combat .enemy .ehp { font-size: 0.68rem; line-height: 1.05; }
+  .stage-combat .card { max-height: 100px; }
+  .stage-combat .hand { padding: 8px 2px 4px; }
+  .page-combat .energy-orb { width: 44px; height: 44px; }
+  .page-combat .pile { width: 44px; min-height: 44px; }
+  .page-combat .orb-num { font-size: 1.15rem; }
+}
+@media (min-height: 700px) {
+  .stage-combat .card {
+    max-height: min(250px, 36vh);
+    transform: translateY(-12px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 5deg));
+  }
+  .stage-combat .hero .fig { height: min(260px, 42vh); }
+  .stage-combat .fig { height: min(210px, 36vh); }
+}
+/* A tall foundry plus a wordy hand is what scrolls a 768px laptop. The fight keeps
+   the backdrop, and it stops above the hand so End Turn and the hint stay inside. */
+@media (min-height: 700px) and (max-height: 780px) {
+  .page-combat .fight { max-height: 348px; }
+  .stage-combat .card { max-height: 196px; }
+  .stage-combat .hand { padding: 12px 8px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-combat .fig,
+  .stage-combat .enemy.is-dying,
+  .stage-combat .card { animation: none !important; }
+  .stage-combat .fig.pose-low,
+  .stage-combat .hero.is-low .fig { transform: translateY(2px); filter: saturate(0.55) brightness(0.78); }
+  .hitstop .fig, .hitstop .card, .hitstop .efloat { animation-play-state: running !important; }
 }

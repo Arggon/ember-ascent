@@ -142,6 +142,10 @@ function variants(src) {
   }
   if (/demon\$\{won \? '' : ' lose'\}/.test(src)) out.add('lose');
   if (/page-\$\{kind\}/.test(src)) for (const k of ['map', 'combat', 'reward', 'rest', 'end']) out.add(`page-${k}`);
+  if (/pose-\$\{/.test(src)) {
+    for (const t of ['idle', 'strike', 'brace', 'hurt', 'low', 'windup']) out.add(`pose-${t}`);
+  }
+  if (/tier-\$\{/.test(src)) for (const t of [1, 2, 3]) out.add(`tier-${t}`);
   return out;
 }
 
