@@ -532,6 +532,11 @@ const GLYPHS = {
   horns: { box: '0 0 26 26', body: '<path class="m" d="M9 9 C5 6 4 3 4 2 C7 3 9 5 10 7"/><path class="m" d="M17 9 C21 6 22 3 22 2 C19 3 17 5 16 7"/><path class="m" d="M13 6 C17.4 6 20 9 20 12.6 C20 15 18.6 16.6 17.2 17.6 V21.4 H8.8 V17.6 C7.4 16.6 6 15 6 12.6 C6 9 8.6 6 13 6 Z"/><circle class="mf" cx="10" cy="12" r="1.5"/><circle class="mf" cx="16" cy="12" r="1.5"/>' },
   route: { box: '0 0 26 26', body: '<path class="m" d="M5 21 C12 21 8 5 21 5"/><circle class="mf" cx="5" cy="21" r="2.2"/><circle class="mf" cx="21" cy="5" r="2.2"/>' },
   crown: { box: '0 0 26 26', body: '<path class="m" d="M4 19 L4 8 L9 13 L13 5 L17 13 L22 8 L22 19 Z"/><path class="m" d="M4 22 H22"/>' },
+  // --- temper stamps (B2): struck into a tempered card's plate. Same woodcut stroke as the
+  //     node marks; the hue comes from the temper class (cold blue / ember / brass). ---
+  't-quench': { box: '0 0 20 20', body: '<path class="m" d="M10 2.5 C13 6.5 14.6 9 14.6 11.4 C14.6 14 12.6 15.8 10 15.8 C7.4 15.8 5.4 14 5.4 11.4 C5.4 9 7 6.5 10 2.5 Z"/><path class="m" d="M2.5 18 C5 16.6 7.5 19.4 10 18 C12.5 16.6 15 19.4 17.5 18"/>' },
+  't-redhot': { box: '0 0 20 20', body: '<path class="m" d="M10 18 C5 15 6.6 10.6 8.8 7.4 C9.6 10 12.4 9.8 11.8 6 C15.4 9.4 15.8 15 10 18 Z"/><path class="mf" d="M10 15.6 C8.4 14.4 8.8 12.6 9.8 11.4 C10.4 12.6 11.8 12.8 11.6 11.6 C12.6 13 12.2 14.8 10 15.6 Z"/>' },
+  't-balance': { box: '0 0 20 20', body: '<path class="m" d="M10 3 V17 M6 17 H14 M3.5 6 H16.5"/><path class="m" d="M3.5 6 L1.8 11 H5.2 Z"/><path class="m" d="M16.5 6 L14.8 11 H18.2 Z"/>' },
   broken: { box: '0 0 26 26', body: '<path class="m" d="M12 3 L15 11"/><path class="m" d="M14 15 L8 23"/><path class="m" d="M18 5 L21 12"/>' },
 
   // --- enemy illustrations (art-direction rev): forged-iron woodcut. Three layers per
@@ -572,6 +577,9 @@ function glyphBox(name, cls) {
 }
 
 /** Card type -> its mark. The three cues are hue, mark and the type word. */
+/** Temper id -> its stamp. */
+const TEMPER_GLYPH = { quenched: 't-quench', redhot: 't-redhot', balanced: 't-balance' };
+
 const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', status: 'hourglass', curse: 'skull' };
 
 /** Intent kind -> its mark. */
@@ -1870,10 +1878,18 @@ function cardTile(card, opts = {}) {
     tile.classList.add('has-illus');
   }
   tile.append(head);
-  // B2: a tempered instance wears a trim and names its temper (the kernel's own sentence).
+  // B2: a tempered instance wears a trim and a forged stamp (mark + temper name). The rules
+  // text below already carries the tempered numbers (the kernel renders it), so the stamp
+  // only says WHICH temper; its full sentence is the tooltip.
+  // It sits in the footer bar beside the compact code (placed below); a tile without a
+  // footer carries it on the plate instead.
+  let stamp = null;
   if (card.temper) {
     tile.classList.add('tempered', `temper-${card.temper}`);
-    tile.append(el('span', { cls: 'ctemper', text: card.temperText.split(':')[0], attrs: { title: card.temperText } }));
+    stamp = el('span', { cls: 'ctemper', attrs: { title: card.temperText } },
+      glyphBox(TEMPER_GLYPH[card.temper] || 'rune', 't-mark'),
+      el('span', { cls: 't-name', text: card.temperName || card.temperText.split(':')[0] }),
+    );
   }
   tile.append(el('span', { cls: 'cname', text: card.name }));
   if (card.flavor) tile.append(el('span', { cls: 'cflavor', text: card.flavor }));
@@ -1884,7 +1900,10 @@ function cardTile(card, opts = {}) {
     const foot = el('span', { cls: 'cfoot' });
     foot.append(el('span', { cls: 'csum', text: card.summary, attrs: { title: 'Compact form used by the agent-facing command line' } }));
     if (disabled) foot.append(el('span', { cls: 'cwhy', text: 'needs more Energy' }));
+    if (stamp) foot.append(stamp);
     tile.append(foot);
+  } else if (stamp) {
+    tile.append(stamp);
   }
 
   // Only the in-hand tiles get a wrapper: it carries the hover lift and the keyboard
@@ -2179,6 +2198,7 @@ function restView() {
   // B2: or temper one card instead of healing. Offers and sentences come from the kernel.
   const tempers = snap.rest.tempers || [];
   if (tempers.length > 0) {
+    wrap.classList.add('has-tempers');
     wrap.append(el('p', { cls: 'temper-head', text: 'Or temper a card at the forge (instead of resting):' }));
     const list = el('div', { cls: 'boon-list temper-list' });
     for (const t of tempers) {
