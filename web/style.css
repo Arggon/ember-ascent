@@ -2954,22 +2954,21 @@ html, body {
 .page-combat .backdrop { position: absolute; inset: 0; z-index: 0; pointer-events: auto; }
 .page-combat .backdrop svg { width: 100%; height: 100%; display: block; }
 .page-combat .backdrop .sky { fill: #120c09; }
-.page-combat .backdrop .wall { fill: #1d140e; }
-.page-combat .backdrop .floor { fill: #0e0907; }
-.page-combat .backdrop .lava { fill: none; stroke: #ff6a1a; stroke-width: 3; opacity: 0.85; }
+.page-combat .backdrop .wall { fill: #1b130e; }
+.page-combat .backdrop .floor { fill: #0c0806; }
+.page-combat .backdrop .lava { fill: none; stroke: #ff6a1a; stroke-width: 4; }
 .page-combat .backdrop .chain { fill: none; stroke: #6a5140; stroke-width: 1.6; }
-.page-combat .backdrop .spire { fill: #22160f; }
+.page-combat .backdrop .spire { fill: #3a2216; }
 .page-combat .ground {
   position: absolute;
   left: 3%;
   right: 3%;
   bottom: 10%;
-  height: 2px;
+  height: 3px;
   z-index: 1;
   pointer-events: none;
   background: linear-gradient(90deg, transparent, #ff9d3a 18%, #8a4a22 50%, #ff9d3a 82%, transparent);
   box-shadow: 0 0 16px rgba(255, 157, 58, 0.45);
-  opacity: 0.7;
 }
 .page-combat .hero {
   position: relative;
@@ -2990,7 +2989,6 @@ html, body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #f0d2b0;
-  text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.9);
 }
 .page-combat .hero .ehp { margin: 0; }
 .page-combat .hero .hpbar { width: 72%; }
@@ -3052,7 +3050,7 @@ html, body {
   z-index: 3;
 }
 .stage-combat .enemy .target-mark { position: absolute; top: 26%; right: 2px; z-index: 3; color: var(--gold); }
-.stage-combat .enemy .ename { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.9); }
+.stage-combat .enemy .ename { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .stage-combat .enemy .ehp { font-size: 0.75rem; margin: 0; }
 .stage-combat .enemy .hpbar { width: 80%; margin: 2px 0; }
 .stage-combat .enemy .eblock { font-size: 0.72rem; }
@@ -3085,14 +3083,8 @@ html, body {
   justify-content: flex-end;
   color: #ff9d3a;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
-  /* A carved iron token instead of a bare glyph floating in the air. */
-  border-radius: 12px 12px 14px 14px;
-  background: radial-gradient(circle at 50% 35%, #2e1b11, #120a06 70%);
-  border: 1px solid #5a3420;
-  box-shadow: inset 0 1px 0 rgba(255, 190, 120, 0.18), 0 3px 8px rgba(0, 0, 0, 0.6);
-  padding: 3px 0 2px;
 }
-.stage-combat .intent-badge svg { width: 100%; height: 58%; display: block; }
+.stage-combat .intent-badge svg { width: 100%; height: 70%; display: block; }
 .stage-combat .intent-badge .b { fill: #1a100c; }
 .stage-combat .intent-badge .r { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
 .stage-combat .intent-badge .g { fill: none; stroke: #ff9d3a; stroke-width: 1.5; }
@@ -3104,14 +3096,13 @@ html, body {
 .stage-combat .tier-3 { transform: scale(1.45); }
 .stage-combat .intent-num {
   font-family: var(--num);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 700;
   line-height: 1;
-  color: #ffe6c8;
-  text-shadow: 0 1px 0 #000, 0 0 6px rgba(255, 120, 40, 0.6);
+  color: #ffd0c2;
 }
 
-.stage-combat .fig { position: relative; width: min(150px, 100%); height: min(200px, 34vh); color: #f0d2b4; filter: none; }
+.stage-combat .fig { width: min(150px, 100%); height: min(200px, 34vh); color: #f0d2b4; }
 .stage-combat .hero .fig { width: min(180px, 100%); height: min(250px, 42vh); }
 .stage-combat .hero.is-low .fig { filter: saturate(0.55) brightness(0.78); }
 .stage-combat .enemy.is-dying { animation: ash-fall 0.5s ease-in both; }
@@ -3268,8 +3259,7 @@ html, body {
 @keyframes ash-fall {
   to { opacity: 0; transform: translateY(14px) scale(0.94); filter: blur(1px); }
 }
-/* Idle: the sprite breathes (.spr, below); the figure box itself stays still. */
-.stage-combat .fig.pose-idle { animation: none; }
+.stage-combat .fig.pose-idle { animation: fig-idle 3.1s ease-in-out infinite; }
 .stage-combat .fig.pose-windup { animation: fig-wind 0.85s ease-in-out infinite; }
 .stage-combat .hero .fig.pose-strike { animation: hero-strike 0.32s ease-out; }
 .stage-combat .enemy .fig.pose-strike { animation: foe-strike 0.32s ease-out; }
@@ -3368,26 +3358,42 @@ html, body {
 
 /* ===================================================== combat stage v2 (foundry dressing) */
 /* Stage: brick courses, a deeper furnace, carved floor, and a pool of light the cast stands in. */
+.page-combat .backdrop .wall { fill: #1d140e; }
 .page-combat .backdrop .beam { fill: #120b07; }
 .page-combat .backdrop .brick { fill: none; stroke: #120c08; stroke-width: 2; }
 .page-combat .backdrop .hook { fill: none; stroke: #6a5140; stroke-width: 2.4; }
+.page-combat .backdrop .spire { fill: #22160f; }
 .page-combat .backdrop .spire-cut { fill: none; stroke: #120b07; stroke-width: 2; }
+.page-combat .backdrop .floor { fill: #0e0907; }
 .page-combat .backdrop .floor-cut { fill: none; stroke: #2a1a10; stroke-width: 2; stroke-linecap: round; }
+.page-combat .backdrop .lava { stroke-width: 3; opacity: 0.85; }
 .page-combat .fight::after {
   content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background:
     radial-gradient(60% 34% at 50% 92%, rgba(255, 130, 50, 0.16), transparent 70%),
     radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55));
 }
+.page-combat .ground { height: 2px; opacity: 0.7; }
 
-/* Intent token and number styles live with the base .intent-badge / .intent-num rules. */
+/* Intent: a carved iron token instead of a bare glyph floating in the air. */
+.stage-combat .intent-badge {
+  border-radius: 12px 12px 14px 14px;
+  background: radial-gradient(circle at 50% 35%, #2e1b11, #120a06 70%);
+  border: 1px solid #5a3420;
+  box-shadow: inset 0 1px 0 rgba(255, 190, 120, 0.18), 0 3px 8px rgba(0, 0, 0, 0.6);
+  padding: 3px 0 2px;
+}
+.stage-combat .intent-badge svg { height: 58%; }
+.stage-combat .intent-num { font-size: 0.95rem; color: #ffe6c8; text-shadow: 0 1px 0 #000, 0 0 6px rgba(255, 120, 40, 0.6); }
 /* HP plates: framed iron troughs with molten fill. */
 .stage-combat .hpbar { background: #0a0605; border: 1px solid #4e2e1c; box-shadow: inset 0 1px 2px #000; border-radius: 3px; }
 .stage-combat .hpbar i { background: linear-gradient(180deg, #ff8a4a, #c0301c 60%, #8a1c12); box-shadow: 0 0 6px rgba(255, 90, 40, 0.45); }
+.stage-combat .enemy .ename, .page-combat .hero-name { text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.9); }
 
 /* ===================================================== combat art v3 (illustrated sprites)
    The .fig box sizes above are unchanged (layout frozen); the sprite fits inside it, feet
    on the box floor. A warm rim separates the dark ink from the dark stage. */
+.stage-combat .fig { position: relative; filter: none; }
 .stage-combat .fig .spr {
   position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 100%;
   object-fit: contain; object-position: 50% 100%;
@@ -3402,6 +3408,7 @@ html, body {
 .stage-combat .enemy .fig .spr-the_guardian { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
 @keyframes spr-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.03); } }
 .stage-combat .fig.pose-idle .spr, .stage-combat .fig.pose-low .spr { animation: spr-breathe 3.1s ease-in-out infinite; }
+.stage-combat .fig.pose-idle { animation: none; }
 /* Hit flash: the ink goes white-hot for a beat. */
 .stage-combat .fig.pose-hurt .spr { filter: brightness(2.3) sepia(0.4) drop-shadow(0 0 10px rgba(255, 220, 170, 0.9)); }
 .stage-combat .fig.pose-strike .spr { filter: brightness(1.15) drop-shadow(0 0 1px rgba(255, 196, 140, 0.7)) drop-shadow(0 0 12px rgba(255, 130, 40, 0.6)); }
@@ -3422,15 +3429,17 @@ html, body {
 /* Furnace: an illustrated sprite, dimmed into the wall, with a CSS-only fire breath. The
    flicker is a fixed keyframe pattern (no randomness), so every load looks the same. */
 .page-combat .backdrop .furnace-img { filter: brightness(0.62) saturate(1.1) contrast(1.05); }
-.page-combat .backdrop .fire-halo { fill: #ff7a24; opacity: 0.12; filter: blur(18px); animation: fire-breathe 4.7s ease-in-out infinite; }
-.page-combat .backdrop .fire-spill { fill: #ff8a3a; opacity: 0.1; filter: blur(14px); animation: fire-breathe 4.7s ease-in-out infinite; }
-.page-combat .backdrop .fire-mouth { fill: #ffb050; opacity: 0.22; mix-blend-mode: screen; filter: blur(8px); animation: fire-flicker 2.3s linear infinite; }
+.page-combat .backdrop .fire-halo { fill: #ff7a24; opacity: 0.12; filter: blur(18px); }
+.page-combat .backdrop .fire-spill { fill: #ff8a3a; opacity: 0.1; filter: blur(14px); }
+.page-combat .backdrop .fire-mouth { fill: #ffb050; opacity: 0.22; mix-blend-mode: screen; filter: blur(8px); }
 @keyframes fire-flicker {
   0% { opacity: 0.18; } 7% { opacity: 0.27; } 13% { opacity: 0.2; } 21% { opacity: 0.3; }
   34% { opacity: 0.22; } 41% { opacity: 0.32; } 55% { opacity: 0.19; } 63% { opacity: 0.28; }
   78% { opacity: 0.21; } 86% { opacity: 0.31; } 100% { opacity: 0.18; }
 }
 @keyframes fire-breathe { 0%, 100% { opacity: 0.1; } 50% { opacity: 0.17; } }
+.page-combat .backdrop .fire-mouth { animation: fire-flicker 2.3s linear infinite; }
+.page-combat .backdrop .fire-halo, .page-combat .backdrop .fire-spill { animation: fire-breathe 4.7s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .page-combat .backdrop .fire-mouth, .page-combat .backdrop .fire-halo, .page-combat .backdrop .fire-spill { animation: none; }
 }
