@@ -856,7 +856,12 @@ function positionClass(index, after, before = null, explicit = null) {
 
 const sumEnemyHp = (s) => s.enemies.reduce((n, e) => n + e.hp, 0);
 
-function newGame(seed = null) {
+/**
+ * @param {number|null} [seed]
+ * @param {{quiet?: boolean}} [opts] quiet: a hero switch on the Kindling screen, which must
+ *   not replay the act title card
+ */
+function newGame(seed = null, opts = {}) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
   // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
@@ -880,6 +885,7 @@ function newGame(seed = null) {
   dyingThisPaint = [];
   lastPlayerStatuses = [];
   paintedPhase = null;
+  quietIntro = opts.quiet === true;
   // A new run must animate its own entrance and its own victory/defeat, so every one-shot
   // presentation flag is cleared with the timers that would have released it.
   prevEnemies = [];
@@ -1281,6 +1287,9 @@ function render() {
 // No geometry is measured anywhere, so no effect can misplace itself after a repaint.
 */
 
+/** Set by a hero switch: the next first paint is the same screen, so no act title card. */
+let quietIntro = false;
+
 /** Put a node on the persistent screen layer. Null-safe: the test harness has no layer. */
 /**
  * Scene transitions (presentation only, skipped under reduced motion by fxAdd): the very
@@ -1291,6 +1300,9 @@ function render() {
  */
 function sceneBeat(from, to) {
   if (from === null) {
+    const quiet = quietIntro;
+    quietIntro = false;
+    if (quiet) return;
     if ((to === 'kindling' || to === 'map') && !(snap.map && snap.map.floor > 0)) {
       fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
         el('span', { cls: 'fx-act-num', text: 'Act I' }),
@@ -2125,6 +2137,20 @@ function heroFace(id) {
   return face;
 }
 
+/**
+ * B5: rebuild the run, same seed, on another path. Like a hero switch it is the SAME
+ * screen, not a new act: the Act I title card is not replayed, and focus follows the
+ * selection so the arrow keys keep working after the repaint.
+ * @param {string} id biome id from the kernel BIOMES table
+ */
+function switchPath(id) {
+  if (id === (snap.biome ?? DEFAULT_BIOME)) return;
+  biomeChoice = id;
+  newGame(snap.seed, { quiet: true });
+  const picked = document.querySelector('.biome-pick.on');
+  if (picked && typeof picked.focus === 'function') picked.focus();
+}
+
 /** B1: the act-start boon choice. Every word comes from the kernel snapshot. */
 function kindlingView() {
   const wrap = el('div', { cls: 'kindling' });
@@ -2145,14 +2171,34 @@ function kindlingView() {
       el('span', { cls: 'hp-blurb', text: h.blurb })));
     }
     wrap.append(heroes);
-    const paths = el('div', { cls: 'biome-select', attrs: { role: 'radiogroup', 'aria-label': 'Choose the path' } });
+    // Radio group like the hero picker (WAI-ARIA APG): one tab stop (the checked path),
+    // arrow keys move the selection, wrapping; Home/End jump to the ends. Selecting IS switching.
+    const biomes = snap.biomes ?? [];
+    const curBiome = snap.biome ?? DEFAULT_BIOME;
+    const atBiome = Math.max(0, biomes.findIndex((b) => b.id === curBiome));
+    const paths = el('div', {
+      cls: 'biome-select',
+      attrs: { role: 'radiogroup', 'aria-label': 'Choose the path' },
+      on: {
+        keydown: (ev) => {
+          const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+          let to = null;
+          if (step) to = (atBiome + step + biomes.length) % biomes.length;
+          else if (ev.key === 'Home') to = 0;
+          else if (ev.key === 'End') to = biomes.length - 1;
+          if (to === null || biomes.length === 0) return;
+          ev.preventDefault();
+          switchPath(biomes[to].id);
+        },
+      },
+    });
     paths.append(el('span', { cls: 'bs-label', text: 'Path' }));
-    for (const b of snap.biomes ?? []) {
-      const on = (snap.biome ?? DEFAULT_BIOME) === b.id;
+    for (const b of biomes) {
+      const on = curBiome === b.id;
       paths.append(el('button', {
         cls: `biome-pick${on ? ' on' : ''} bp-${b.id}`, text: b.name,
-        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false' },
-        on: { click: () => { if (on) return; biomeChoice = b.id; newGame(snap.seed); } },
+        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1' },
+        on: { click: () => switchPath(b.id) },
       }));
     }
     wrap.append(paths);
