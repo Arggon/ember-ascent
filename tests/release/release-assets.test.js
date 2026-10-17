@@ -63,11 +63,6 @@ test('release build: every module and asset the page references is served (no 40
     const path = new URL(url).pathname;
     if (!/\.(html|css|js|mjs)$/.test(path)) { await res.arrayBuffer(); continue; }
     const text = await res.text();
-    if (/\.m?js$/.test(path)) {
-      // Every import stays inside the release root: no '../' specifiers, which only work at a
-      // domain root because browsers clamp them there (itch.io serves from a subfolder).
-      for (const ref of refsOf(path, text)) if ((ref.match(/^(?:\.\.\/)+/)?.[0].length ?? 0) / 3 > path.split('/').length - 2) escaping.push(`${path} -> ${ref}`);
-    }
     for (const ref of refsOf(path, text)) queue.push([new URL(ref, url).href, path]);
   }
 
@@ -80,6 +75,18 @@ test('release build: every module and asset the page references is served (no 40
   }
 
   assert.deepEqual(missing, [], `release artifact is missing ${missing.length} file(s):\n  ${missing.join('\n  ')}`);
+  // Every copied module, not only the crawled ones (tokens.js ships with src/web/ but no page
+  // imports it, so the crawl never reaches it), keeps its imports inside the release root: no '../'
+  // that climbs above it. Those only work at a domain root, where browsers clamp them;
+  // itch.io serves from a subfolder.
+  for (const f of walk(out).filter((x) => /\.m?js$/.test(x))) {
+    const rel = '/' + relative(out, f).replace(/\\/g, '/');
+    for (const ref of refsOf(rel, readFileSync(f, 'utf8'))) {
+      const ups = (ref.match(/^(?:\.\.\/)+/)?.[0].length ?? 0) / 3;
+      if (ups > rel.split('/').length - 2) escaping.push(`${rel} -> ${ref}`);
+    }
+  }
+  assert.ok(walk(out).some((x) => x.endsWith(`${'/'}tokens.js`)), 'tokens.js is in the release');
   assert.deepEqual(escaping, [], `imports that leave the release root:\n  ${escaping.join('\n  ')}`);
   assert.ok(seen.size > 20, `crawl reached only ${seen.size} files`);
 });
