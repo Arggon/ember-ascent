@@ -17,6 +17,7 @@ const SPRITES = {
   hero: 'hero', jaw_worm: 'jaw_worm', cultist: 'cultist', red_louse: 'red_louse',
   acid_slime: 'acid_slime', gremlin_nob: 'gremlin_nob', the_guardian: 'the_guardian',
   bellows_keeper: 'bellows_keeper',
+  slag_crawler: 'slag_crawler', ash_wraith: 'ash_wraith', ash_wraith_elite: 'ash_wraith', cinder_foreman: 'cinder_foreman',
 };
 
 /** Hero sprite per character id (fixed table; unknown ids fall back to the Ashwright). */
@@ -36,9 +37,19 @@ export function enemyMarkup(id) {
   return sprite(SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id] : SPRITES.jaw_worm);
 }
 
-/** Act backdrop. Only act 1 exists; the foundry is the whole climb. */
-export function backdropMarkup() {
-  return svg(`
+/** Extra class for an enemy whose sprite is shared with a variant (the elite wraith). */
+export function enemyVariant(id) {
+  return id === 'ash_wraith_elite' ? ' is-elite-variant' : '';
+}
+
+/**
+ * Act backdrops by art key. Which biome uses which key is the `backdrop` field of the
+ * kernel BIOMES table (src/kernel/rules/encounters.js); stage-art only draws.
+ * `forge`: the Foundry hall (SVG + furnace sprite). `tunnel`: the Cinder Mines, a painted,
+ * pre-darkened tunnel (local WebP).
+ */
+export const BACKDROPS = Object.freeze({
+  forge: () => svg(`
     <path class="sky" d="M0 0 H800 V400 H0 Z"/>
     <path class="wall" d="M0 80 L80 40 H160 L200 70 H320 L360 30 H520 L560 64 H700 L800 28 V400 H0 Z"/>
     <path class="beam" d="M0 64 L800 40 L800 52 L0 76 Z"/>
@@ -54,7 +65,13 @@ export function backdropMarkup() {
     <path class="floor" d="M0 318 C160 300 280 336 400 312 C540 286 660 330 800 304 V400 H0 Z"/>
     <path class="floor-cut" d="M40 340 L120 334 M200 346 L300 342 M460 330 L560 326 M620 344 L720 338 M80 370 L180 366 M380 372 L500 368 M600 376 L740 370"/>
     <path class="lava" d="M0 360 C120 348 200 372 320 356 C460 338 600 374 800 350"/>
-  `, '0 0 800 400');
+  `, '0 0 800 400'),
+  tunnel: () => '<div class="mines-bg"><img class="mines-img" src="assets/mines.webp" alt="" draggable="false" decoding="async"></div><div class="mines-floor"></div>',
+});
+
+/** Backdrop markup for an art key (a BIOMES `backdrop` value); an unknown key draws the forge. */
+export function backdropMarkup(key) {
+  return (BACKDROPS[key] ?? BACKDROPS.forge)();
 }
 
 const GLYPHS = {

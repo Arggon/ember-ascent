@@ -26,6 +26,7 @@ import {
   EXIT,
 } from './session.js';
 import { measureRun, CEILINGS } from './tokens.js';
+import { DEFAULT_BIOME } from '../kernel/index.js';
 
 /** Common flags accepted by every subcommand. */
 export const COMMON = {
@@ -37,7 +38,7 @@ export const COMMON = {
 
 /** Per-subcommand flag specs. Types and defaults are printed by --help. */
 export const SPECS = {
-  new: { ...COMMON, '--seed': { type: 'int', default: 0 }, '--character': { type: 'string', default: 'ironclad' }, '--difficulty': { type: 'int', default: 0 }, '--kindling': { type: 'bool', default: false }, '--tempers': { type: 'bool', default: false }, '--quests': { type: 'bool', default: false } },
+  new: { ...COMMON, '--seed': { type: 'int', default: 0 }, '--character': { type: 'string', default: 'ironclad' }, '--difficulty': { type: 'int', default: 0 }, '--kindling': { type: 'bool', default: false }, '--tempers': { type: 'bool', default: false }, '--quests': { type: 'bool', default: false }, '--biome': { type: 'string', default: DEFAULT_BIOME } },
   state: { ...COMMON, '--brief': { type: 'bool', default: false }, '--verbose': { type: 'bool', default: false }, '--tokens': { type: 'bool', default: false } },
   actions: { ...COMMON },
   play: { ...COMMON },
@@ -65,6 +66,7 @@ commands
   new --seed N --character S --difficulty N   start a run, write --run (S: ironclad | bellows)
       [--kindling] [--tempers]                opt in to act-start boons (k<n>) / rest tempers (t<n>)
       [--quests]                              opt in to three seeded ember quests (side goals)
+      [--biome mines]                         the Cinder Mines: alternate backdrop and enemy set
   state [--brief|--verbose]                   current observation (R4 dump)
   actions                                     legal actions, one per line (R5)
   play <id>                                   apply one action id
@@ -267,7 +269,7 @@ export async function run(cmd, argv, io = {}) {
 async function dispatch(cmd, flags, positional, out, err) {
   switch (cmd) {
     case 'new': {
-      const session = begin({ seed: flags['--seed'], character: flags['--character'], difficulty: flags['--difficulty'], kindling: flags['--kindling'], tempers: flags['--tempers'], quests: flags['--quests'] });
+      const session = begin({ seed: flags['--seed'], character: flags['--character'], difficulty: flags['--difficulty'], kindling: flags['--kindling'], tempers: flags['--tempers'], quests: flags['--quests'], biome: flags['--biome'] });
       writeSave(flags['--run'], session);
       if (flags['--json']) {
         out(`${JSON.stringify({ ok: true, run: flags['--run'], hash: runHash(session), state: summary(session) })}\n`);

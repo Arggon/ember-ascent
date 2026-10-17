@@ -18,13 +18,15 @@
 
 import { createController } from '../src/surface/gui/controller.js';
 import { cardArtMarkup } from './card-art.js';
-import { attackTier, backdropMarkup, enemyMarkup, heroMarkup, intentGlyph } from './stage-art.js';
+import { attackTier, backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, intentGlyph } from './stage-art.js';
 // The ONE public kernel entry point (package.json `exports` is exactly this file, and it
 // is browser-safe by construction: no `node:*`, no clock, no unseeded randomness, all
 // enforced by tools/check-architecture.mjs). Every number the history screens show is
 // read from here or from a record this module built with `buildRunRecord` — the renderer
 // composes no game fact, it only chooses layout and words.
 import {
+  BIOMES,
+  DEFAULT_BIOME,
   RETAIN,
   SCORE_TABLE,
   SHIPPED_CARDS,
@@ -162,9 +164,12 @@ const HEROES = [
   { id: 'ironclad', name: 'Ashwright', blurb: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.' },
   { id: 'bellows', name: 'Bellows Keeper', blurb: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.' },
 ];
+/** B5: the chosen biome (an id from the kernel BIOMES table); `?biome=` seeds it. */
+const biomeParam = new URLSearchParams(location.search).get('biome');
+let biomeChoice = biomeParam && Object.hasOwn(BIOMES, biomeParam) ? biomeParam : DEFAULT_BIOME;
 let heroChoice = HEROES.some((h) => h.id === new URLSearchParams(location.search).get('hero')) ? new URLSearchParams(location.search).get('hero') : 'ironclad';
 
-let ctl = createController({ run: { seed: seedFromUrl(), character: heroChoice, kindling: true, tempers: true, quests: true } });
+let ctl = createController({ run: { seed: seedFromUrl(), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } });
 let snap = ctl.snapshot();
 /** Kernel events of the current run, accumulated for the run-history record (reset in newGame). */
 let runEvents = [];
@@ -868,7 +873,7 @@ function newGame(seed = null, opts = {}) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
   // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
-  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), character: heroChoice, kindling: true, tempers: true, quests: true } });
+  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } });
   snap = ctl.snapshot();
   // The event stream is per-RUN, so it dies with the run. It is the only source of the kill
   // / elite / boss counts the score needs, which is why it is accumulated rather than
@@ -1309,7 +1314,7 @@ function sceneBeat(from, to) {
     if ((to === 'kindling' || to === 'map') && !(snap.map && snap.map.floor > 0)) {
       fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
         el('span', { cls: 'fx-act-num', text: 'Act I' }),
-        el('span', { cls: 'fx-act-name', text: 'The Foundry' }),
+        el('span', { cls: 'fx-act-name', text: snap.biomeName ?? BIOMES[DEFAULT_BIOME].name }),
         el('span', { cls: 'fx-act-rule' })), 2300);
     }
     return;
@@ -1705,7 +1710,7 @@ function combatView() {
 
   const fight = el('div', { cls: 'fight' });
   const backdrop = el('div', { cls: 'backdrop', attrs: { 'aria-hidden': 'true' } });
-  backdrop.innerHTML = backdropMarkup();
+  backdrop.innerHTML = backdropMarkup((BIOMES[snap.biome] ?? BIOMES[DEFAULT_BIOME]).backdrop);
   // Empty foundry floor fast-forwards the feel queue. Cards, enemies and buttons sit above it.
   backdrop.addEventListener('pointerdown', () => skipAnim());
   fight.append(backdrop);
@@ -1786,7 +1791,7 @@ function enemyCard(e, position) {
 
   const pose = enemyPose(e);
   card.append(intentBadge(e));
-  const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
+  const fig = el('div', { cls: `fig pose-${pose}${enemyVariant(e.id)}`, attrs: { 'aria-hidden': 'true' } });
   fig.innerHTML = enemyMarkup(e.id);
   card.append(fig);
   // The target mark is a SHAPE, not a colour: a slot number, plus a crosshair on the
@@ -2165,6 +2170,20 @@ function switchHero(id) {
   if (picked && typeof picked.focus === 'function') picked.focus();
 }
 
+/**
+ * B5: rebuild the run, same seed, on another path. Like a hero switch it is the SAME
+ * screen, not a new act: the Act I title card is not replayed, and focus follows the
+ * selection so the arrow keys keep working after the repaint.
+ * @param {string} id biome id from the kernel BIOMES table
+ */
+function switchPath(id) {
+  if (id === (snap.biome ?? DEFAULT_BIOME)) return;
+  biomeChoice = id;
+  newGame(snap.seed, { quiet: true });
+  const picked = document.querySelector('.biome-pick.on');
+  if (picked && typeof picked.focus === 'function') picked.focus();
+}
+
 /** B1: the act-start boon choice. Every word comes from the kernel snapshot. */
 function kindlingView() {
   const wrap = el('div', { cls: 'kindling' });
@@ -2204,6 +2223,37 @@ function kindlingView() {
       el('span', { cls: 'hp-blurb', text: h.blurb })));
     }
     wrap.append(heroes);
+    // Radio group like the hero picker (WAI-ARIA APG): one tab stop (the checked path),
+    // arrow keys move the selection, wrapping; Home/End jump to the ends. Selecting IS switching.
+    const biomes = snap.biomes ?? [];
+    const curBiome = snap.biome ?? DEFAULT_BIOME;
+    const atBiome = Math.max(0, biomes.findIndex((b) => b.id === curBiome));
+    const paths = el('div', {
+      cls: 'biome-select',
+      attrs: { role: 'radiogroup', 'aria-label': 'Choose the path' },
+      on: {
+        keydown: (ev) => {
+          const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+          let to = null;
+          if (step) to = (atBiome + step + biomes.length) % biomes.length;
+          else if (ev.key === 'Home') to = 0;
+          else if (ev.key === 'End') to = biomes.length - 1;
+          if (to === null || biomes.length === 0) return;
+          ev.preventDefault();
+          switchPath(biomes[to].id);
+        },
+      },
+    });
+    paths.append(el('span', { cls: 'bs-label', text: 'Path' }));
+    for (const b of biomes) {
+      const on = curBiome === b.id;
+      paths.append(el('button', {
+        cls: `biome-pick${on ? ' on' : ''} bp-${b.id}`, text: b.name,
+        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1' },
+        on: { click: () => switchPath(b.id) },
+      }));
+    }
+    wrap.append(paths);
   }
   wrap.append(el('div', { cls: 'big-title kindling-head', text: 'The forge offers a kindling' }));
   wrap.append(el('p', { cls: 'kindling-note', text: 'Take one. Each gift has a price.' }));

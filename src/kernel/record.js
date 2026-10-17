@@ -184,6 +184,7 @@ export function buildRunRecord(opts) {
     ...(state.kindling ? { kindling: true } : {}),
     ...(state.tempers ? { tempers: true } : {}),
     ...(state.quests ? { quests: true } : {}),
+    ...(state.biome ? { biome: state.biome } : {}),
     profile: opts.profile ?? 'full',
     policy: opts.policy ?? 'human',
     provenance: opts.provenance ?? 'human',
