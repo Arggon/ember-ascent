@@ -4,6 +4,8 @@
 // without importing the entry point (which would be a cycle). The action-id scheme
 // is frozen by the requirements:
 //   p<n> play hand slot n · e1 end turn · c continue · s<n> reward pick · n<n> map node
+//   k<n> kindling boon (opt-in runs only; additive, no existing id changes)
+//   t<n> temper a card at a rest site (opt-in runs only; additive)
 //
 // TARGETED PLAYS (PM Document revision 5). A card whose content declares
 // `target: "enemy"` must be aimed by the player when the choice is real, i.e. when
@@ -21,7 +23,7 @@
 // CLI splits it out of argv, and JSONL logs must not depend on shell quoting. It costs
 // no interface tokens either way — measured with the repo's own countWorst, `p2 1` and
 // `p2_1` are both 4 tokens, over the full census:
-//   $ node tools/dev/measure-action-shapes.mjs
+//   $ node scripts/dev/measure-action-shapes.mjs
 //   7 PASS "p10 sword_boomerang"   <- current single-enemy line, unchanged
 //   ...
 //
@@ -105,6 +107,11 @@ export function actions(state) {
     case 'rest': {
       out.push({ id: 'c', kind: 'rest_heal' });
       out.push({ id: 'e1', kind: 'rest_leave' });
+      (state.temperOffers ?? []).forEach((offer, i) => out.push({ id: `t${i + 1}`, kind: 'temper', offer }));
+      break;
+    }
+    case 'kindling': {
+      state.kindling.offers.forEach((boon, i) => out.push({ id: `k${i + 1}`, kind: 'boon', boon }));
       break;
     }
     case 'ended':

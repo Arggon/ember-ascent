@@ -1,4 +1,4 @@
-// web/app.js — the browser surface: a pure VIEW on the kernel.
+// src/web/app.js — the browser surface: a pure VIEW on the kernel.
 //
 // It imports the SAME DOM-free controller the CLI-equivalence test drives
 // (src/surface/gui/controller.js), reads controller.snapshot() (a value model the
@@ -17,6 +17,30 @@
 // End Turn button is always present. Keyboard shortcuts exist but are never required.
 
 import { createController } from './src/surface/gui/controller.js';
+import { cardArtMarkup } from './card-art.js';
+import { attackTier, backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, intentGlyph } from './stage-art.js';
+// The ONE public kernel entry point (package.json `exports` is exactly this file, and it
+// is browser-safe by construction: no `node:*`, no clock, no unseeded randomness, all
+// enforced by scripts/check-architecture.mjs). Every number the history screens show is
+// read from here or from a record this module built with `buildRunRecord` — the renderer
+// composes no game fact, it only chooses layout and words.
+import {
+  BIOMES,
+  DEFAULT_BIOME,
+  RETAIN,
+  SCORE_TABLE,
+  SHIPPED_CARDS,
+  UNLOCK_CATALOG,
+  aggregate,
+  badgesForRun,
+  buildRunRecord,
+  contentForProfile,
+  emptyAgg,
+  evaluateUnlocks,
+  fullyUnlockedProfile,
+  pruneRuns,
+  scoreRun,
+} from './src/kernel/index.js';
 
 const hudEl = document.getElementById('hud');
 const stageEl = document.getElementById('stage');
@@ -38,6 +62,38 @@ const fxEl = document.getElementById('fx-layer');
 const reducedMotion = typeof matchMedia === 'function'
   ? matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
+
+/** Presentation speed. 1 and 2 scale the feel queue; 0 skips it. Never a rule. */
+const SPEED_KEY = 'ea.animSpeed';
+function readAnimSpeed() {
+  try {
+    const n = Number(localStorage.getItem(SPEED_KEY));
+    if (n === 0 || n === 1 || n === 2) return n;
+  } catch { /* private mode */ }
+  return 1;
+}
+let animSpeed = readAnimSpeed();
+let animGen = 0;
+let pileOpen = null;
+
+function animMs(ms) {
+  if (reducedMotion || animSpeed === 0) return 0;
+  return Math.max(0, Math.round(ms / animSpeed));
+}
+function clearHitstop() {
+  if (stageEl && stageEl.classList) stageEl.classList.remove('hitstop');
+  if (fxEl && fxEl.classList) fxEl.classList.remove('hitstop');
+}
+function revealFloats() {
+  if (!stageEl || !stageEl.querySelectorAll) return;
+  for (const n of stageEl.querySelectorAll('.efloat.is-queued')) n.classList.remove('is-queued');
+}
+/** Drop the rest of the feel queue and show the numbers now. */
+function skipAnim() {
+  animGen += 1;
+  clearHitstop();
+  revealFloats();
+}
 
 /**
  * Every timer the effect layer owns, so a new run can cancel the previous run's pending
@@ -77,7 +133,20 @@ function clearFxTimers() {
  * the previous boolean-only scheme could not promise that.
  */
 let flashGen = 0;
-let lastStatusKeys = [];
+/**
+ * The status keys the PREVIOUS paint saw, so a status that merely restacked can be told apart
+ * from one that just landed (see `freshStatusKeys`).
+ *
+ * This was assigned but never declared, and it is declared HERE because the omission broke the
+ * real page: `src/web/app.js` is an ES module, modules are strict mode, and a strict-mode
+ * assignment to an undeclared name throws. Every `render()` therefore died with
+ * `ReferenceError: lastPlayerStatuses is not defined` at the assignment in `render()`, and the
+ * browser surface stopped repainting after the first action — the stage kept whatever the
+ * boot paint had put there. The kernel tests did not catch it because they evaluate this file
+ * through `new Function()`, whose body is SLOPPY mode, where the same assignment silently
+ * creates a global. `git`-less local tree, no CI browser run: nothing executed it strictly.
+ */
+let lastPlayerStatuses = [];
 /** Polite live region. The targeting state is never conveyed by colour alone: every
  *  step that changes what the player can do is also announced as text. */
 const liveEl = document.getElementById('live');
@@ -90,8 +159,20 @@ function seedFromUrl() {
   return Number.isInteger(n) && n >= 0 ? n : Math.floor(Math.random() * 1000000);
 }
 
-let ctl = createController({ run: { seed: seedFromUrl() } });
+/** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it. */
+const HEROES = [
+  { id: 'ironclad', name: 'Ashwright', blurb: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.' },
+  { id: 'bellows', name: 'Bellows Keeper', blurb: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.' },
+];
+/** B5: the chosen biome (an id from the kernel BIOMES table); `?biome=` seeds it. */
+const biomeParam = new URLSearchParams(location.search).get('biome');
+let biomeChoice = biomeParam && Object.hasOwn(BIOMES, biomeParam) ? biomeParam : DEFAULT_BIOME;
+let heroChoice = HEROES.some((h) => h.id === new URLSearchParams(location.search).get('hero')) ? new URLSearchParams(location.search).get('hero') : 'ironclad';
+
+let ctl = createController({ run: { seed: seedFromUrl(), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } });
 let snap = ctl.snapshot();
+/** Kernel events of the current run, accumulated for the run-history record (reset in newGame). */
+let runEvents = [];
 /** Last time a value changed, so a click produces visible feedback. */
 let flash = { hp: false, energy: false, block: false, hits: [], n: 0, blockEat: false };
 /**
@@ -192,7 +273,7 @@ let enteringIds = new Set();
 //
 // `card.target` is the engine's own answer to "does this card need a target?". While the
 // snapshot omits that field the renderer falls back to the card's TYPE, which is an
-// INFERENCE, not a rule: see TARGETING-UI-STATUS.md. The fallback never overrides an
+// INFERENCE, not a rule: see docs/status/TARGETING-UI-STATUS.md. The fallback never overrides an
 // explicit `card.target`.
 
 /** The hand slot ('p3') of the card currently waiting for a target, or null. */
@@ -382,6 +463,34 @@ function el(tag, opts = {}, ...kids) {
   return node;
 }
 
+/**
+ * Fill `node` with `text`, wrapping kernel glossary words (Block, Vulnerable, Exhaust…)
+ * in gold keyword spans with the kernel's own meaning as the tooltip, and "Lose N HP"
+ * costs in ember red. Text nodes only: nothing is parsed as HTML. Presentation only.
+ * @param {HTMLElement} node
+ * @param {string} text
+ * @returns {HTMLElement}
+ */
+function keywordText(node, text) {
+  const terms = new Map();
+  for (const row of snap.glossary || []) {
+    if ((row.group === 'A' || row.group === 'B') && /^[A-Z][a-z]+$/.test(row.label || '')) terms.set(row.label.toLowerCase(), row.meaning);
+  }
+  const str = String(text ?? '');
+  if (terms.size === 0) { node.textContent = str; return node; }
+  const words = [...terms.keys()].sort((a, b) => b.length - a.length).join('|');
+  const re = new RegExp(`(Lose \\d+ (?:max )?HP)|\\b(${words})\\b`, 'gi');
+  let at = 0;
+  for (const m of str.matchAll(re)) {
+    if (m.index > at) node.append(str.slice(at, m.index));
+    if (m[1]) node.append(el('span', { cls: 'kw kw-cost', text: m[1] }));
+    else node.append(el('span', { cls: 'kw', text: m[2], attrs: { title: terms.get(m[2].toLowerCase()) || '' } }));
+    at = m.index + m[0].length;
+  }
+  if (at < str.length) node.append(str.slice(at));
+  return node;
+}
+
 function toast(msg, kind = 'warn') {
   toastEl.textContent = msg;
   toastEl.className = kind === 'info' ? 'show info' : 'show';
@@ -397,7 +506,7 @@ function toast(msg, kind = 'warn') {
 //     interpolated into it, which is what makes innerHTML safe here;
 //   * the <svg> element carries no `xmlns` attribute, because the HTML parser places
 //     it in the SVG namespace on its own. That keeps this file free of any URL-shaped
-//     string at all, so an "no external asset" grep over web/ can be trusted.
+//     string at all, so an "no external asset" grep over src/web/ can be trusted.
 // Anything unknown falls back to a rune, so a new enemy or node type in the kernel
 // renders as a generic shape rather than an empty box.
 
@@ -428,16 +537,23 @@ const GLYPHS = {
   horns: { box: '0 0 26 26', body: '<path class="m" d="M9 9 C5 6 4 3 4 2 C7 3 9 5 10 7"/><path class="m" d="M17 9 C21 6 22 3 22 2 C19 3 17 5 16 7"/><path class="m" d="M13 6 C17.4 6 20 9 20 12.6 C20 15 18.6 16.6 17.2 17.6 V21.4 H8.8 V17.6 C7.4 16.6 6 15 6 12.6 C6 9 8.6 6 13 6 Z"/><circle class="mf" cx="10" cy="12" r="1.5"/><circle class="mf" cx="16" cy="12" r="1.5"/>' },
   route: { box: '0 0 26 26', body: '<path class="m" d="M5 21 C12 21 8 5 21 5"/><circle class="mf" cx="5" cy="21" r="2.2"/><circle class="mf" cx="21" cy="5" r="2.2"/>' },
   crown: { box: '0 0 26 26', body: '<path class="m" d="M4 19 L4 8 L9 13 L13 5 L17 13 L22 8 L22 19 Z"/><path class="m" d="M4 22 H22"/>' },
+  // --- temper stamps (B2): struck into a tempered card's plate. Same woodcut stroke as the
+  //     node marks; the hue comes from the temper class (cold blue / ember / brass). ---
+  't-quench': { box: '0 0 20 20', body: '<path class="m" d="M10 2.5 C13 6.5 14.6 9 14.6 11.4 C14.6 14 12.6 15.8 10 15.8 C7.4 15.8 5.4 14 5.4 11.4 C5.4 9 7 6.5 10 2.5 Z"/><path class="m" d="M2.5 18 C5 16.6 7.5 19.4 10 18 C12.5 16.6 15 19.4 17.5 18"/>' },
+  't-redhot': { box: '0 0 20 20', body: '<path class="m" d="M10 18 C5 15 6.6 10.6 8.8 7.4 C9.6 10 12.4 9.8 11.8 6 C15.4 9.4 15.8 15 10 18 Z"/><path class="mf" d="M10 15.6 C8.4 14.4 8.8 12.6 9.8 11.4 C10.4 12.6 11.8 12.8 11.6 11.6 C12.6 13 12.2 14.8 10 15.6 Z"/>' },
+  't-balance': { box: '0 0 20 20', body: '<path class="m" d="M10 3 V17 M6 17 H14 M3.5 6 H16.5"/><path class="m" d="M3.5 6 L1.8 11 H5.2 Z"/><path class="m" d="M16.5 6 L14.8 11 H18.2 Z"/>' },
   broken: { box: '0 0 26 26', body: '<path class="m" d="M12 3 L15 11"/><path class="m" d="M14 15 L8 23"/><path class="m" d="M18 5 L21 12"/>' },
 
-  // --- enemy silhouettes (viewBox 100, drawn at ~92px) ---
-  'e-worm': { box: '0 0 100 100', body: '<path class="sl" d="M16 86 C6 62 24 40 46 48 C68 56 62 80 42 78 C26 76 24 56 40 50"/><path class="sl" d="M62 34 C74 30 86 40 84 54"/><circle class="dot" cx="68" cy="44" r="3.4"/>' },
-  'e-slime': { box: '0 0 100 100', body: '<path class="sl" d="M16 84 C16 48 32 28 50 28 C68 28 84 48 84 84 Z"/><circle class="dot" cx="38" cy="56" r="4.2"/><circle class="dot" cx="62" cy="56" r="4.2"/><path class="sl" d="M16 84 H84"/>' },
-  'e-louse': { box: '0 0 100 100', body: '<path class="sl" d="M50 30 C66 30 76 44 76 58 C76 72 66 82 50 82 C34 82 24 72 24 58 C24 44 34 30 50 30 Z"/><path class="sl" d="M30 50 L12 40 M30 62 L12 66 M70 50 L88 40 M70 62 L88 66"/><path class="sl" d="M42 30 L34 12 M58 30 L66 12"/><circle class="dot" cx="42" cy="52" r="3.6"/><circle class="dot" cx="58" cy="52" r="3.6"/>' },
-  'e-cultist': { box: '0 0 100 100', body: '<path class="sl" d="M50 8 L64 40 H36 Z"/><path class="sl" d="M50 34 C64 34 72 48 72 62 V84 H28 V62 C28 48 36 34 50 34 Z"/><path class="sl" d="M38 46 L62 46"/>' },
-  'e-brute': { box: '0 0 100 100', body: '<path class="sl" d="M30 30 C22 22 18 12 20 6 C28 10 34 20 36 26"/><path class="sl" d="M70 30 C78 22 82 12 80 6 C72 10 66 20 64 26"/><path class="sl" d="M50 24 C64 24 74 34 74 48 V84 H26 V48 C26 34 36 24 50 24 Z"/><path class="sl" d="M34 56 H66"/><circle class="dot" cx="40" cy="40" r="3.4"/><circle class="dot" cx="60" cy="40" r="3.4"/>' },
-  'e-sentinel': { box: '0 0 100 100', body: '<path class="sl" d="M50 6 L78 18 V46 C78 66 64 80 50 88 C36 80 22 66 22 46 V18 Z"/><path class="sl" d="M50 24 C58 24 64 30 64 38 V62 H36 V38 C36 30 42 24 50 24 Z"/><circle class="dot" cx="43" cy="40" r="3.4"/><circle class="dot" cx="57" cy="40" r="3.4"/>' },
-  'e-rune': { box: '0 0 100 100', body: '<path class="sl" d="M50 12 L86 50 L50 88 L14 50 Z"/><circle class="sl" cx="50" cy="50" r="14"/>' },
+  // --- enemy illustrations (art-direction rev): forged-iron woodcut. Three layers per
+  //     creature: `.b` body (near-black iron), `.r` rim light (currentColor = the creature's
+  //     tint), `.g` ember glow (eyes, cores, cracks). Constant markup, no interpolation. ---
+  'e-worm': { box: '0 0 100 100', body: '<path class="b" d="M10 92 C8 70 14 52 30 44 C42 38 56 40 64 30 C70 22 80 20 88 26 L84 36 C78 32 72 34 68 40 C60 52 46 54 38 60 C28 68 26 80 30 92 Z"/><path class="r" d="M10 92 C8 70 14 52 30 44 C42 38 56 40 64 30 C70 22 80 20 88 26"/><path class="r" d="M18 72 L28 76 M22 60 L32 66 M34 50 L40 58 M48 44 L50 52"/><path class="b" d="M66 30 L92 18 L84 34 L94 40 L70 42 Z"/><path class="r" d="M66 30 L92 18 L84 34 L94 40 L70 42"/><path class="g" d="M84 24 l3 3 -3 1z M74 36 l3 0 -1 3z"/><circle class="g" cx="76" cy="26" r="2.6"/><path class="gr" d="M4 94 H96"/>' },
+  'e-louse': { box: '0 0 100 100', body: '<path class="r" d="M26 56 L8 46 M26 66 L6 70 M30 76 L14 88 M74 56 L92 46 M74 66 L94 70 M70 76 L86 88"/><ellipse class="b" cx="50" cy="62" rx="28" ry="24"/><path class="r" d="M22 62 C22 48 34 38 50 38 C66 38 78 48 78 62 C78 76 66 86 50 86 C34 86 22 76 22 62 Z"/><path class="r" d="M28 54 C40 48 60 48 72 54 M26 66 C40 60 60 60 74 66 M30 77 C42 72 58 72 70 77"/><path class="b" d="M38 40 C38 30 62 30 62 40 Z"/><path class="r" d="M38 40 C38 30 62 30 62 40 M42 32 L32 14 M58 32 L68 14"/><circle class="g" cx="44" cy="36" r="2.6"/><circle class="g" cx="56" cy="36" r="2.6"/>' },
+  'e-slime': { box: '0 0 100 100', body: '<path class="b" d="M12 88 C12 66 20 50 30 40 C38 32 44 22 50 14 C56 22 62 32 70 40 C80 50 88 66 88 88 Z"/><path class="r" d="M12 88 C12 66 20 50 30 40 C38 32 44 22 50 14 C56 22 62 32 70 40 C80 50 88 66 88 88"/><path class="r" d="M30 88 C30 94 26 96 24 92 M64 88 C64 96 70 97 70 91"/><circle class="r" cx="62" cy="56" r="5"/><circle class="r" cx="34" cy="70" r="3.4"/><circle class="r" cx="56" cy="76" r="2.4"/><path class="g" d="M38 54 l8 4 -8 3z M62 66 l-8 -4 8 -3z" transform="translate(0 -6)"/><path class="gr" d="M6 89 H94"/>' },
+  'e-cultist': { box: '0 0 100 100', body: '<path class="b" d="M50 10 C64 12 70 28 68 42 L80 92 H20 L32 42 C30 28 36 12 50 10 Z"/><path class="r" d="M50 10 C64 12 70 28 68 42 L80 92 H20 L32 42 C30 28 36 12 50 10 Z"/><path class="b" d="M40 30 C40 22 60 22 60 30 L58 44 H42 Z"/><path class="r" d="M50 44 V92 M34 60 C42 56 58 56 66 60"/><circle class="g" cx="45" cy="34" r="2.3"/><circle class="g" cx="55" cy="34" r="2.3"/><path class="r" d="M80 92 L86 20"/><path class="g" d="M86 8 C90 14 90 18 86 20 C82 18 82 14 86 8 Z"/>' },
+  'e-brute': { box: '0 0 100 100', body: '<path class="b" d="M50 22 C70 22 84 34 86 52 L90 92 H10 L14 52 C16 34 30 22 50 22 Z"/><path class="r" d="M50 22 C70 22 84 34 86 52 L90 92 H10 L14 52 C16 34 30 22 50 22 Z"/><path class="r" d="M34 26 C24 18 20 8 22 2 C30 6 36 14 40 22 M66 26 C76 18 80 8 78 2 C70 6 64 14 60 22"/><path class="r" d="M30 50 C40 46 60 46 70 50 M38 62 L50 70 L62 62"/><path class="g" d="M36 40 l8 3 -8 2z M64 40 l-8 3 8 2z"/><path class="gc" d="M22 70 L30 78 L26 88 M78 70 L72 80 L76 88"/>' },
+  'e-sentinel': { box: '0 0 100 100', body: '<path class="b" d="M50 4 L84 16 L90 50 C86 72 70 86 50 96 C30 86 14 72 10 50 L16 16 Z"/><path class="r" d="M50 4 L84 16 L90 50 C86 72 70 86 50 96 C30 86 14 72 10 50 L16 16 Z"/><path class="r" d="M50 14 L74 24 L78 50 C74 66 64 76 50 84 C36 76 26 66 22 50 L26 24 Z"/><path class="r" d="M30 40 H70 M50 14 V30 M50 64 V84"/><path class="gc" d="M36 30 L42 36 L38 40 M64 30 L58 36 L62 40 M22 60 L30 62 M78 60 L70 62"/><circle class="g" cx="50" cy="52" r="8"/><circle class="r" cx="50" cy="52" r="12"/>' },
+  'e-rune': { box: '0 0 100 100', body: '<path class="b" d="M50 12 L86 50 L50 88 L14 50 Z"/><path class="r" d="M50 12 L86 50 L50 88 L14 50 Z"/><circle class="g" cx="50" cy="50" r="7"/><circle class="r" cx="50" cy="50" r="14"/>' },
 };
 
 /**
@@ -466,6 +582,9 @@ function glyphBox(name, cls) {
 }
 
 /** Card type -> its mark. The three cues are hue, mark and the type word. */
+/** Temper id -> its stamp. */
+const TEMPER_GLYPH = { quenched: 't-quench', redhot: 't-redhot', balanced: 't-balance' };
+
 const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', status: 'hourglass', curse: 'skull' };
 
 /** Intent kind -> its mark. */
@@ -474,29 +593,32 @@ const INTENT_GLYPH = { attack: 'strike', block: 'shieldWide', buff: 'chevUp', de
 /** Node type (after stripping the `combat_` prefix) -> its silhouette. */
 const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', rest: 'flame', boss: 'horns' };
 
+/** Node type -> the words a player reads on the map. Presentation only: the kernel's
+ *  own label ("fight", "fight+") still drives the title and the travel banner. The second
+ *  line states only what the kernel's NODE_TYPES.reward says (card or heal). */
+const NODE_WORDS = {
+  weak: ['Skirmish', 'card reward'], strong: ['Hard fight', 'card reward'], elite: ['Elite', 'card reward'],
+  rest: ['Campfire', 'heal'], boss: ['Slag Warden', 'final fight'],
+};
+
 /**
  * Pick a silhouette, boss/elite framing and a rim tint from the enemy's NAME. The
  * snapshot carries the name; nothing here reads a rule or a stat.
  * @param {string} name
  * @returns {{art: string, boss: boolean, elite: boolean, hue: number}}
  */
-function enemyLook(name) {
-  const n = String(name || '');
-  let art = 'e-rune';
-  if (/guardian|warden/i.test(n)) art = 'e-sentinel';
-  else if (/nob|brute/i.test(n)) art = 'e-brute';
-  else if (/worm|maw/i.test(n)) art = 'e-worm';
-  else if (/slime|ooze/i.test(n)) art = 'e-slime';
-  else if (/louse|lice|mite/i.test(n)) art = 'e-louse';
-  else if (/cultist|cantor/i.test(n)) art = 'e-cultist';
-  let hash = 0;
-  for (let i = 0; i < n.length; i += 1) hash = (hash * 31 + n.charCodeAt(i)) % 5;
-  return {
-    art,
-    boss: /guardian|warden/i.test(n),
-    elite: /nob|brute/i.test(n),
-    hue: hash,
+function enemyLook(id) {
+  const table = {
+    jaw_worm: { art: 'e-worm', hue: 1 },
+    cultist: { art: 'e-cultist', hue: 4 },
+    red_louse: { art: 'e-louse', hue: 1 },
+    acid_slime: { art: 'e-slime', hue: 3 },
+    gremlin_nob: { art: 'e-brute', elite: true, hue: 2 },
+    the_guardian: { art: 'e-sentinel', boss: true, hue: 1 },
   };
+  const hit = table[id];
+  if (hit) return { art: hit.art, boss: Boolean(hit.boss), elite: Boolean(hit.elite), hue: hit.hue };
+  return { art: 'e-rune', boss: false, elite: false, hue: 0 };
 }
 
 /* --------------------------------------------------------- the one dispatch path */
@@ -509,6 +631,7 @@ function enemyLook(name) {
  */
 function act(actionId, targetK = null) {
   if (!actionId) return;
+  pileOpen = null;
   const before = snap;
   // The map the player is standing on BEFORE this action, kept for the travel beat: the
   // node the step started from is gone from the rebuilt map, and this is the only handle on
@@ -520,6 +643,11 @@ function act(actionId, targetK = null) {
   const aimedAt = targetK != null ? before.enemies[targetK - 1] ?? null : null;
   const res = ctl.dispatch(actionId);
   const after = ctl.snapshot();
+  // The kernel's event stream for this step, kept for the run record. `submit()` inside the
+  // controller accumulates the same events on the session; the renderer accumulates them
+  // here because it builds the record at the end, and a record built from a dropped stream
+  // scores zero kills while looking perfectly well-formed (DR-6).
+  if (Array.isArray(res.events)) runEvents = [...runEvents, ...res.events];
 
   const fx = [];
   if (res.error) {
@@ -542,21 +670,35 @@ function act(actionId, targetK = null) {
     // Player hurt -> a screen pulse. It lives in the layer `render()` cannot clear, so
     // it does not depend on the enemy's HTML surviving the repaint.
     if (playerLost > 0) fx.push({ kind: 'vignette' });
+    // The number is the HP delta between the two kernel snapshots, so it is the damage
+    // that actually landed. Block gained is the same kind of delta.
+    if (playerLost > 0) {
+      fx.push({ kind: 'hero-float', amount: playerLost, tone: 'dmg', tier: playerLost >= 16 ? 3 : playerLost >= 8 ? 2 : 1 });
+    }
+    if (gainedBlock > 0) fx.push({ kind: 'hero-float', amount: gainedBlock, tone: 'block', tier: 1 });
+    if (playerLost > 0 && after.turn !== before.turn) {
+      for (const e of before.enemies) {
+        if (e.intent && e.intent.kind === 'attack') fx.push({ kind: 'enemy-strike', enemy: e.index });
+      }
+    }
 
-    // Per-enemy: the HP TOTAL it is left with (always agreeing with the HP bar), the
-    // MAGNITUDE of the hit as a glyph tier, and whether block ate all of it.
+    // Per-enemy: the damage that landed (HP delta), the glyph tier for that amount, and
+    // whether block ate all of it. The bar still shows the remaining total.
     const beforeByIdx = new Map(before.enemies.map((e) => [e.index, e]));
     let absorbed = false;
     for (const e of after.enemies) {
       const was = beforeByIdx.get(e.index);
       if (!was || e.hp >= was.hp) continue;
-      // `e.intent.damage` is the kernel's own announced damage. It is used only to SIZE
-      // the glyph, never printed as a number: printing pre-block damage would be an
-      // invented figure (nothing in the snapshot promises the enemy's mitigation).
-      const incoming = Math.max(was.hp - e.hp, Math.round(Number(was.intent?.damage) || 0));
-      const tier = incoming >= 16 ? 3 : incoming >= 8 ? 2 : 1;
-      fx.push({ kind: 'float', enemy: e.index, hp: e.hp, maxHp: e.maxHp, tier, defeated: e.hp <= 0 });
+      const dealt = was.hp - e.hp;
+      const tier = dealt >= 16 ? 3 : dealt >= 8 ? 2 : 1;
+      fx.push({ kind: 'float', enemy: e.index, amount: dealt, tone: 'dmg', tier, defeated: e.hp <= 0 });
       if (was.block > 0) fx.push({ kind: 'block-eat', enemy: e.index });
+    }
+    for (const e of after.enemies) {
+      const was = beforeByIdx.get(e.index);
+      if (was && e.block > was.block && e.hp === was.hp) {
+        fx.push({ kind: 'float', enemy: e.index, amount: e.block - was.block, tone: 'block', tier: 1 });
+      }
     }
     // A hit that was FULLY absorbed leaves the enemy's HP untouched, so the loop above
     // never fires. Detected by the enemy's block falling while its HP held — and it says
@@ -631,7 +773,7 @@ function act(actionId, targetK = null) {
       // collapse reads, and nothing else. The victory beat is gated on this below, which is
       // how "the boss dies, THEN the panel arrives" is sequenced without asking the kernel
       // for a new field.
-      boss: enemyLook(e.name).boss,
+      boss: enemyLook(e.id).boss,
     }));
   // Each departure becomes a `death` burst, which the next paint draws as an inert ghost
   // card that collapses. The ghost is positioned by ENEMY ROW ORDER (`side-*`), never by a
@@ -650,6 +792,10 @@ function act(actionId, targetK = null) {
    */
   if (after.phase === 'ended' && before.phase !== 'ended') {
     phaseArriving = after.outcome === 'win' ? 'victory' : 'defeat';
+    // The run just ended: build, score and store its record ONCE, so the end screen shows
+    // the ledger, marks and unlocks (it was defined but never called, so S1 always fell
+    // back to the no-record branch).
+    recordRun();
   }
 
   // The generation advances ONLY if a flash state actually changed, so an unrelated
@@ -718,17 +864,36 @@ function positionClass(index, after, before = null, explicit = null) {
 
 const sumEnemyHp = (s) => s.enemies.reduce((n, e) => n + e.hp, 0);
 
-function newGame() {
-  ctl = createController({ run: { seed: seedFromUrl() } });
+/**
+ * @param {number|null} [seed]
+ * @param {{quiet?: boolean}} [opts] quiet: a hero switch on the Kindling screen, which must
+ *   not replay the act title card
+ */
+function newGame(seed = null, opts = {}) {
+  // A NEW run, built for the profile the player's own history has earned (DR-4). The
+  // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
+  // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
+  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } });
   snap = ctl.snapshot();
+  // The event stream is per-RUN, so it dies with the run. It is the only source of the kill
+  // / elite / boss counts the score needs, which is why it is accumulated rather than
+  // re-derived later from a snapshot that never carried them.
+  runEvents = [];
+  lastRecord = null;
+  lastUnlock = null;
+  savedOk = true;
   clearFxTimers();
   if (fxEl && fxEl.replaceChildren) fxEl.replaceChildren();
   flash = { hp: false, energy: false, block: false, hits: [], n: 0, blockEat: false };
   bursts = [];
+  pileOpen = null;
+  animGen += 1;
+  clearHitstop();
   dealPending = false;
   dyingThisPaint = [];
-  lastStatusKeys = [];
+  lastPlayerStatuses = [];
   paintedPhase = null;
+  quietIntro = opts.quiet === true;
   // A new run must animate its own entrance and its own victory/defeat, so every one-shot
   // presentation flag is cleared with the timers that would have released it.
   prevEnemies = [];
@@ -752,8 +917,11 @@ function renderHud() {
   const p = snap.player;
 
   hudEl.append(
-    el('span', { cls: 'hud-char', text: snap.characterName || capitalize(snap.character) },
-      snap.difficulty > 0 ? el('span', { cls: 'diff', text: `diff ${snap.difficulty}` }) : null),
+    el('span', {
+      cls: 'hud-char',
+      text: snap.characterName || capitalize(snap.character),
+      attrs: { title: snap.relicName ? `${snap.characterName} — relic: ${snap.relicName}` : '' },
+    }),
   );
 
   // DESIGN REV 3 (UX spec): the word label is NOT part of the value text. Emitting `HP 60/60`
@@ -790,7 +958,7 @@ function renderHud() {
     cls: 'btn ghost',
     text: 'New Run',
     attrs: { type: 'button', title: `New run (seed ${snap.seed}) — keyboard: n` },
-    on: { click: newGame },
+    on: { click: () => newGame() },
   }));
 }
 
@@ -882,7 +1050,7 @@ function helpPanel() {
       cls: 'btn secondary',
       text: 'New Run',
       attrs: { type: 'button', title: 'Discard this run and start a new one (keyboard: n)' },
-      on: { click: newGame },
+      on: { click: () => newGame() },
     }),
   ));
 
@@ -932,14 +1100,20 @@ function page(kind, chapter, mark, extra, kids) {
 
 /**
  * How long the end-of-run panel is held back on the motion path, so the killing blow is a
- * beat of its own instead of a frame. A boss death gets longer, because the collapse is the
- * biggest single event in a run and "the boss dies, THEN the panel arrives" is the brief.
+ * beat of its own instead of a frame: "the enemy dies, THEN the summary arrives".
+ *
+ * It is clamped to the COLLAPSE ITSELF, not to how long a boss is worth pausing for. The
+ * dying enemy's ghost animates `juice-shatter` for exactly `COLLAPSE_MS` (`.enemy.is-dying`
+ * in style.css), with `fill: both`, so from 500 ms on it is at `opacity: 0`. A hold longer
+ * than the collapse could only ever hold an EMPTY stage — which is what the old boss window
+ * did for 1150 ms. The load-bearing bound on an empty stage is AC-5.6's 250 ms, and the
+ * hold now ends while the collapse is still on screen.
  *
  * These are read at ONE instant per action (the boot/restart calls have no death to wait
  * for), and `act()` never reads them, so the 8-token action line and the action ids are
- * untouched. Reduced motion uses 0 on both counts: the panel is simply there.
+ * untouched. Reduced motion uses 0: the panel is simply there.
  */
-const BOSS_DEATH_MS = 1150;
+const COLLAPSE_MS = 500;
 const END_DELAY_MS = 480;
 
 /**
@@ -1014,20 +1188,42 @@ function render() {
       if (enteredIds.has(e.id)) continue;
       enteredIds.add(e.id);
       enteringIds.add(e.id);
-      if (enemyLook(e.name).boss) bossWelcomed.push(e.name);
+      if (enemyLook(e.id).boss) bossWelcomed.push(e.name);
     }
   }
   // The boss's arrival is NAMED on screen as well as animated, so the fact ("the boss is
   // here") is readable with no motion at all.
   if (bossWelcomed.length > 0) arriving.boss = true;
 
-  // The end of a run: an arriving victory waits for a boss collapse (which the ghost card
-  // is drawing below), an arriving defeat waits for the player's own collapse.
+  /* The end of a run: a VICTORY or DEFEAT that arrives on the same action as a death holds
+   * the collapse on screen before the summary replaces it, so "the enemy dies, THEN the
+   * panel arrives" is a beat rather than a single frame.
+   *
+   * WHAT THE HOLD IS FOR. `combatView()` cannot draw the collapse of the enemy that ended
+   * the run: `resolveVictory` empties `snap.enemies`, so that card has already left the
+   * snapshot by the paint this hold acts on. The ghost drawn here is the only place it can
+   * appear, and it is drawn by the SAME `dyingRow()` the combat view uses. The hold used to
+   * paint an EMPTY `.ended-hold` spacer instead, which left the stage blank for the entire
+   * hold — 480 ms on a defeat, 1150 ms on a boss kill — while `juice-shatter` has the ghost
+   * at `opacity: 0` from 500 ms on (`fill: both`).
+   *
+   * WHY IT IS GUARDED, AND WHAT THAT FIXES. A hold is worth exactly one thing: the collapse.
+   * A DEFEAT has none to show — the player is the one who died, no death burst is emitted,
+   * and the enemies are still standing — so there is nothing for a hold to hold, and holding
+   * anyway is what burned 480 ms of blank stage on the run's most common ending (the bot wins
+   * about 7% of runs). The guard then falls through to the switch below and the DEFEAT panel
+   * is simply there on the next paint. The fight that killed the player is on screen right up
+   * to that paint; it is the blank window, not the panel, that used to discard it.
+   *
+   * HOW LONG. `wait` is clamped to the collapse duration: past `COLLAPSE_MS` the ghost is
+   * transparent and the stage would be blank again. The sequence the brief asks for survives
+   * — the collapse is still a beat of its own, before the summary.
+   */
   const endHeld = arriving.victory || arriving.defeat;
-  if (endHeld) {
-    const bossDown = dyingThisPaint.some((d) => d.boss);
-    const wait = (arriving.victory && bossDown ? BOSS_DEATH_MS : END_DELAY_MS) * (reducedMotion ? 0 : 1);
-    stageEl.replaceChildren(el('div', { cls: 'ended-hold', attrs: { 'aria-hidden': 'true' } }));
+  if (endHeld && dyingThisPaint.length > 0) {
+    const wait = reducedMotion ? 0 : Math.min(END_DELAY_MS, COLLAPSE_MS);
+    stageEl.replaceChildren(dyingRow(dyingThisPaint),
+      el('div', { cls: 'ended-hold', attrs: { 'aria-hidden': 'true' } }));
     laterPaint(() => { if (snap.phase === 'ended') render(); }, wait);
     paintedPhase = snap.phase;
     lastPlayerStatuses = statusKeysNow;
@@ -1043,6 +1239,7 @@ function render() {
     case 'combat': stageEl.append(combatView()); break;
     case 'reward': stageEl.append(rewardView()); break;
     case 'rest': stageEl.append(restView()); break;
+    case 'kindling': stageEl.append(kindlingView()); break;
     case 'ended': stageEl.append(endView()); break;
     default: stageEl.append(el('p', { text: `phase ${snap.phase}` }));
   }
@@ -1050,6 +1247,7 @@ function render() {
   // card play would flash the whole screen.
   if (phaseChanged && stageEl.firstElementChild) {
     stageEl.firstElementChild.classList.add('enter');
+    sceneBeat(paintedPhase, snap.phase);
     paintedPhase = snap.phase;
   }
   // The first-run explanation, shown once. A player who has never seen the game should
@@ -1097,11 +1295,39 @@ function render() {
 // No geometry is measured anywhere, so no effect can misplace itself after a repaint.
 */
 
+/** Set by a hero switch: the next first paint is the same screen, so no act title card. */
+let quietIntro = false;
+
 /** Put a node on the persistent screen layer. Null-safe: the test harness has no layer. */
+/**
+ * Scene transitions (presentation only, skipped under reduced motion by fxAdd): the very
+ * first map of a run gets the act title card; every later phase change gets a short
+ * ember-and-heat wipe. Fixed overlay, pointer-events none, so layout and clicks are untouched.
+ * @param {string|null} from the phase painted before
+ * @param {string} to the phase being painted
+ */
+function sceneBeat(from, to) {
+  if (from === null) {
+    const quiet = quietIntro;
+    quietIntro = false;
+    if (quiet) return;
+    if ((to === 'kindling' || to === 'map') && !(snap.map && snap.map.floor > 0)) {
+      fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
+        el('span', { cls: 'fx-act-num', text: 'Act I' }),
+        el('span', { cls: 'fx-act-name', text: snap.biomeName ?? BIOMES[DEFAULT_BIOME].name }),
+        el('span', { cls: 'fx-act-rule' })), 2300);
+    }
+    return;
+  }
+  if (to === 'ended') return;
+  fxAdd(el('div', { cls: `fx-scene to-${to}`, attrs: { 'aria-hidden': 'true' } }), 700);
+}
+
 function fxAdd(node, ms) {
   if (!fxEl || reducedMotion) return;
   fxEl.append(node);
-  later(() => { if (node.parent) node.parent.removeChild(node); }, ms);
+  // `parentNode`, not `parent`: DOM nodes have no `.parent`, so effect nodes used to pile up forever.
+  later(() => { node.remove(); }, ms);
 }
 
 /**
@@ -1131,9 +1357,10 @@ function dispatchFx() {
       case 'card-fly':
         // `b.side` is already my own full lane class (`side-0` / `side-mid` / `side-1` /
         // `side-none`), so it is interpolated directly — prefixing it here produced
-        // `side-side-0`, which no rule matches.
+        // `side-side-0`, which no rule matches. Instant speed skips the flight.
+        if (animSpeed === 0) break;
         fxAdd(el('div', { cls: `fx-card ${b.side || 'side-none'} type-${b.type || 'skill'}` },
-          el('span', { cls: 'fx-card-name', text: b.name || '' })), 460);
+          el('span', { cls: 'fx-card-name', text: b.name || '' })), animMs(460) || 460);
         break;
       default:
         break;
@@ -1155,28 +1382,52 @@ function dispatchFx() {
     fxBanner('DEFEAT', 'defeat', '', 1700);
     fxAdd(el('div', { cls: 'fx-darken' }), 1700);
   }
+  // Feel queue: the card is already in flight. Hold the stage for a short hit-stop,
+  // then let the damage and block numbers rise. A newer action bumps `animGen` and
+  // this wait becomes a no-op. Speed 0 and reduced motion never wait.
+  const gen = ++animGen;
+  if (reducedMotion || animSpeed === 0) {
+    revealFloats();
+    return;
+  }
+  later(() => {
+    if (gen !== animGen) return;
+    if (stageEl && stageEl.classList) stageEl.classList.add('hitstop');
+    if (fxEl && fxEl.classList) fxEl.classList.add('hitstop');
+    later(() => {
+      if (gen !== animGen) return;
+      clearHitstop();
+      revealFloats();
+    }, animMs(70));
+  }, animMs(240));
 }
 
 /**
  * The floating marker for one enemy, appended INSIDE that enemy's own card.
  *
- * What it says, and why: the readable number is the enemy's HP TOTAL, which is the same
- * number the HP bar and the `.ehp` line are showing at that instant, so the floater can
- * never disagree with them. The SIZE OF THE HIT rides on the glyph (`·` chip, `◆` hurt,
- * `✸` hard) and the text size — a second readable number would be a second source of
- * truth, which the brief forbids. A fully absorbed hit says "absorbed" in words, because
- * "0" or "−0" would contradict a bar that deliberately did not move.
+ * The readable number is the damage dealt or the block gained: the HP or block delta
+ * between the two kernel snapshots of this action. The bar still shows the remaining
+ * total. A fully absorbed hit says "absorbed", because a 0 would contradict a bar that
+ * did not move. The glyph (`·` `◆` `✸`) scales with the amount.
  */
+function floatHold() {
+  if (reducedMotion) return '';
+  return animSpeed === 0 ? ' is-static' : ' is-queued';
+}
+
 function floatNode(b) {
   const span = el('span', { cls: 'efloat' });
   if (b.kind === 'absorbed') {
-    span.className = 'efloat efloat-absorbed';
+    span.className = 'efloat efloat-absorbed' + floatHold();
     span.append(el('b', { text: '⛨' }), el('b', { text: 'absorbed' }));
     return span;
   }
-  const glyph = b.tier >= 3 ? '✸' : b.tier >= 2 ? '◆' : '·';
-  span.className = `efloat efloat-g${b.tier}`;
-  span.append(el('b', { text: glyph }), el('b', { text: `−${b.hp}` }));
+  const tier = b.tier || 1;
+  const glyph = tier >= 3 ? '✸' : tier >= 2 ? '◆' : '·';
+  const tone = b.tone === 'block' ? ' efloat-block' : '';
+  span.className = `efloat efloat-g${tier}${tone}` + floatHold();
+  const text = b.tone === 'block' ? `+${b.amount}` : `−${b.amount}`;
+  span.append(el('b', { text: glyph }), el('b', { text }));
   if (b.defeated) span.append(el('b', { text: 'down' }));
   return span;
 }
@@ -1215,6 +1466,16 @@ function efxBox(index) {
   return box;
 }
 
+function heroEfx() {
+  const box = el('span', { cls: 'efx' });
+  if (reducedMotion) return box;
+  for (const b of bursts) {
+    if (b.kind !== 'hero-float') continue;
+    box.append(floatNode(b));
+  }
+  return box;
+}
+
 /**
  * Which status keys on this list were NOT present on the previous snapshot — i.e. which
  * ones just landed. Purely a comparison of two kernel snapshots; it decides an animation,
@@ -1222,50 +1483,208 @@ function efxBox(index) {
  * re-animate every turn.
  */
 function freshStatusKeys(list) {
-  const prev = new Set((lastStatusKeys || []));
+  const prev = new Set((lastPlayerStatuses || []));
   return new Set((list || []).map((s) => s.key).filter((k) => !prev.has(k)));
 }
 
-function combatView() {
-  const targeting = pendingSlot !== null && snap.enemies.length > 1;
-  const wrap = el('div', { cls: 'stage-combat' + (targeting ? ' sc-targeting' : '') });
-
-  if (snap.enemies.length > 0) {
-    wrap.append(el('p', { cls: 'section-title', text: 'Enemies' }));
-    // `position` is the living-enemy slot k the engine's action ids use, so the digit a
-    // player reads on screen is the digit they type — and the same k the state dump prints.
-    const row = el('div', { cls: 'enemies' }, ...snap.enemies.map((e, i) => enemyCard(e, i)));
-    // An enemy that died this action is no longer in the snapshot, so its collapse cannot
-    // be animated on the new tree. It is drawn one last time, inert, as a ghost that fades.
-    // Under reduced motion the ghost is STILL drawn — statically, with no animation — because
-    // it carries a fact that would otherwise vanish with the enemy: this slot was just held
-    // by a live enemy whose name and HP are no longer anywhere else on the screen. What is
-    // dropped on that path is the movement, not the fact.
-    for (const d of dyingThisPaint) {
-      const boss = d.boss
-        ? { art: enemyLook(d.name).art, label: 'BOSS DOWN' }
-        : { art: enemyLook(d.name).art, label: 'DOWN' };
-      row.append(el('div', { cls: `enemy is-dying side-${d.side}` + (d.boss ? ' boss-down' : '') },
-        el('div', { cls: 'e-art' }, glyphBox(boss.art, 'e-silhouette')),
-        el('div', { cls: 'ename', text: d.name }),
-        el('div', { cls: 'ehp', text: boss.label }),
-      ));
-    }
-    wrap.append(row);
+/**
+ * The collapse of enemies that died on the action being painted: the ghost cards.
+ *
+ * FACTORY, NOT A CONSTANT: it returns a fresh `.enemies` row holding one ghost per death,
+ * so there is no single node that two places could move between two parents.
+ *
+ * It is shared by `combatView()` and by the end-of-run hold in `render()`, and it is the
+ * SAME builder for both on purpose. A kill empties `snap.enemies` (`resolveVictory`), so
+ * `combatView()` draws only the hand and the hold is the sole place the collapse is ever
+ * drawn; an ordinary kill in a fight that continues is drawn by `combatView()`. One builder
+ * means the two cannot drift apart, and the ordinary path's output is unchanged.
+ *
+ * The ghost carries the `side-*` recorded when the enemy was still alive — a lane class, not
+ * a measured coordinate — so a collapse cannot drift into another enemy's column.
+ *
+ * An enemy that died this action is no longer in the snapshot, so its collapse cannot be
+ * animated on the new tree. It is drawn one last time, inert, as a ghost that fades. Under
+ * reduced motion the ghost is STILL drawn — statically, with no animation — because it
+ * carries a fact that would otherwise vanish with the enemy: this slot was just held by a
+ * live enemy whose name and HP are no longer anywhere else on the screen. What is dropped on
+ * that path is the movement, not the fact (see the reduced-motion block in style.css).
+ *
+ * @param {Array<{name: string, side: string, boss?: boolean}>} dying the death bursts
+ * @param {HTMLElement} [row] the row to append the ghosts to; a fresh one when omitted
+ * @returns {HTMLElement} the row the ghosts were appended to
+ */
+function dyingRow(dying, row = el('div', { cls: 'enemies' })) {
+  for (const d of dying) {
+    // A boss says so: its collapse is the biggest single event in the run, and the word is
+    // what makes the difference readable with no motion at all (the row is also the only
+    // place the boss's name is still on screen, its card having left the snapshot).
+    const label = d.boss ? 'BOSS DOWN' : 'DOWN';
+    const ghost = el('div', { cls: `enemy is-dying ash side-${d.side}` + (d.boss ? ' boss-down' : '') });
+    const fig = el('div', { cls: 'fig pose-hurt', attrs: { 'aria-hidden': 'true' } });
+    fig.innerHTML = enemyMarkup(d.id);
+    ghost.append(fig);
+    ghost.append(el('div', { cls: 'ename', text: d.name }));
+    ghost.append(el('div', { cls: 'ehp', text: label }));
+    row.append(ghost);
   }
+  return row;
+}
 
-  const piles = `draw ${snap.piles.draw} · discard ${snap.piles.discard}` + (snap.piles.exhaust > 0 ? ` · exhaust ${snap.piles.exhaust}` : '');
-  wrap.append(el('p', { cls: 'section-title', text: `Your Hand — ${piles}` }));
-  // `.deal-in` lands on exactly one paint per hand change (see `dealPending`), so an
-  // incidental repaint — hovering an enemy calls render() — cannot re-deal the hand.
-  wrap.append(el('div', { cls: 'hand' + (dealPending ? ' deal-in' : '') },
-    ...snap.hand.map((c, i) => cardTile(c, { index: i + 1 }))));
+function heroPose() {
+  const p = snap.player;
+  const ratio = p.maxHp > 0 ? p.hp / p.maxHp : 1;
+  if (bursts.some((b) => b.kind === 'hero-float' && b.tone === 'dmg')) return 'hurt';
+  const fly = bursts.find((b) => b.kind === 'card-fly');
+  if (fly && fly.type === 'attack') return 'strike';
+  if (fly && (fly.type === 'skill' || fly.type === 'power')) return 'brace';
+  if (ratio <= 0.35) return 'low';
+  return 'idle';
+}
 
+function heroFigure() {
+  const p = snap.player;
+  const ratio = p.maxHp > 0 ? p.hp / p.maxHp : 1;
+  const pose = heroPose();
+  const isBellows = snap.character === 'bellows';
+  const node = el('div', {
+    cls: 'hero' + (ratio <= 0.35 ? ' is-low' : '') + (isBellows ? ' is-bellows' : ''),
+    attrs: { role: 'group', 'aria-label': `${snap.characterName || 'Ashwright'}, ${p.hp} of ${p.maxHp} HP, block ${p.block}` },
+  });
+  const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
+  fig.innerHTML = heroMarkup(snap.character);
+  node.append(fig);
+  node.append(el('div', { cls: 'hero-name', text: snap.characterName || 'Ashwright' }));
+  node.append(el('div', { cls: 'ehp', text: `${p.hp}/${p.maxHp}` }));
+  const bar = el('div', { cls: 'hpbar' }, el('i', {}));
+  bar.querySelector('i').style.width = `${Math.max(0, Math.round((p.hp / Math.max(1, p.maxHp)) * 100))}%`;
+  node.append(bar);
+  if (p.block > 0) node.append(el('div', { cls: 'eblock', text: `⛨ ${p.block}` }));
+  node.append(heroEfx());
+  return node;
+}
+
+function enemyPose(e) {
+  if (bursts.some((b) => b.kind === 'enemy-strike' && b.enemy === e.index)) return 'strike';
+  if (flash.hits.includes(e.index)) return 'hurt';
+  if (e.hp / Math.max(1, e.maxHp) <= 0.35) return 'low';
+  if (e.intent && e.intent.kind === 'attack') return 'windup';
+  return 'idle';
+}
+
+function intentBadge(e) {
+  const kind = e.intent.kind;
+  let which = 'buff';
+  let tier = 1;
+  if (kind === 'attack') {
+    tier = attackTier(e.intent.damage);
+    which = tier >= 3 ? 'meteor' : tier >= 2 ? 'axe' : 'dagger';
+  } else if (kind === 'block') which = 'shield';
+  else if (kind === 'debuff') which = 'down';
+  const badge = el('div', {
+    cls: `intent-badge kind-${kind} tier-${tier}`,
+    attrs: { title: e.intent.text || e.intent.label || '', 'aria-hidden': 'true' },
+  });
+  badge.innerHTML = intentGlyph(which);
+  if (kind === 'attack') {
+    // `damage` is the intent's TOTAL (all hits); the badge reads per-hit × hits, as the label does.
+    const n = e.intent.hits > 1 ? `${Math.round(e.intent.damage / e.intent.hits)}×${e.intent.hits}` : String(e.intent.damage ?? '');
+    badge.append(el('b', { cls: 'intent-num', text: n }));
+  }
+  return badge;
+}
+
+function pileButton(which) {
+  const isDraw = which === 'draw';
+  const count = snap.piles[which] ?? 0;
+  const names = (isDraw ? snap.piles.drawCards : snap.piles.discardCards) || [];
+  const label = isDraw ? 'Draw' : 'Discard';
+  const extra = !isDraw && snap.piles.exhaust > 0 ? `, exhaust ${snap.piles.exhaust}` : '';
+  return el('button', {
+    cls: isDraw ? 'pile pile-draw' : 'pile pile-discard',
+    attrs: {
+      type: 'button',
+      title: names.length ? `${label}: ${names.join(', ')}` : `${label} pile empty`,
+      'aria-label': `${label} pile, ${count} cards${extra}`,
+    },
+    on: {
+      click: (ev) => {
+        consumeClick(ev);
+        pileOpen = pileOpen === which ? null : which;
+        render();
+      },
+    },
+  },
+    el('b', { cls: 'pile-count', text: String(count) }),
+    el('span', { cls: 'pile-name', text: label }),
+  );
+}
+
+function energyOrb() {
+  const n = snap.player.energy;
+  const max = snap.energyPerTurn;
+  return el('div', {
+    cls: 'energy-orb' + (n === 0 ? ' is-empty' : ''),
+    attrs: { title: `Energy ${n} of ${max}`, 'aria-label': `Energy ${n} of ${max}` },
+  },
+    el('b', { cls: 'orb-num', text: String(n) }),
+    el('span', { cls: 'orb-cap', text: `/${max}` }),
+  );
+}
+
+function speedDock() {
+  const dock = el('div', { cls: 'speed-dock', attrs: { role: 'group', 'aria-label': 'Animation speed' } });
+  const add = (speed, text, title) => dock.append(el('button', {
+    cls: 'btn ghost speed-btn' + (animSpeed === speed ? ' is-on' : ''),
+    text,
+    attrs: { type: 'button', title },
+    on: {
+      click: (ev) => {
+        consumeClick(ev);
+        animSpeed = speed;
+        try { localStorage.setItem(SPEED_KEY, String(speed)); } catch { /* private mode */ }
+        if (speed === 0) skipAnim();
+        render();
+      },
+    },
+  }));
+  add(1, '1×', 'Animation speed 1×');
+  add(2, '2×', 'Animation speed 2×');
+  add(0, '»', 'Skip animation');
+  return dock;
+}
+
+function pileModal(which) {
+  const names = (which === 'draw' ? snap.piles.drawCards : snap.piles.discardCards) || [];
+  const title = which === 'draw' ? 'Draw pile' : 'Discard pile';
+  const back = el('div', { cls: 'pile-back', attrs: { role: 'dialog', 'aria-label': title } });
+  back.addEventListener('click', (ev) => {
+    if (ev.target === back) { pileOpen = null; render(); }
+  });
+  const sheet = el('div', { cls: 'pile-sheet' }, el('h2', { text: `${title} (${names.length})` }));
+  if (names.length === 0) sheet.append(el('p', { text: 'Empty.' }));
+  else {
+    const list = el('ul', { cls: 'pile-list' });
+    for (const name of names) list.append(el('li', { text: name }));
+    sheet.append(list);
+  }
+  if (which === 'discard' && snap.piles.exhaust > 0) {
+    const exh = snap.piles.exhaustCards || [];
+    sheet.append(el('p', { cls: 'pile-exh', text: `Exhausted (${snap.piles.exhaust}): ${exh.join(', ') || '—'}` }));
+  }
+  sheet.append(el('button', {
+    cls: 'btn secondary',
+    text: 'Close',
+    attrs: { type: 'button' },
+    on: { click: (ev) => { consumeClick(ev); pileOpen = null; render(); } },
+  }));
+  back.append(sheet);
+  return back;
+}
+
+function combatControls(targeting) {
   const hit = pendingCard();
   const controls = el('div', { cls: 'controls' });
   if (targeting && hit) {
-    // The obvious way out: a labelled Cancel affordance, alongside Escape, a re-click on
-    // the card and a click on empty space.
     controls.append(el('span', { cls: 'target-banner', text: `${hit.name} — choose an enemy target` }));
     controls.append(el('button', {
       cls: 'btn secondary cancel-target',
@@ -1282,10 +1701,43 @@ function combatView() {
       on: { click: () => act(endTurn && endTurn.id) },
     }));
   }
-  wrap.append(controls);
+  return controls;
+}
+
+function combatView() {
+  const targeting = pendingSlot !== null && snap.enemies.length > 1;
+  const wrap = el('div', { cls: 'stage-combat' + (targeting ? ' sc-targeting' : '') });
+
+  const fight = el('div', { cls: 'fight' });
+  const backdrop = el('div', { cls: 'backdrop', attrs: { 'aria-hidden': 'true' } });
+  backdrop.innerHTML = backdropMarkup((BIOMES[snap.biome] ?? BIOMES[DEFAULT_BIOME]).backdrop);
+  // Empty foundry floor fast-forwards the feel queue. Cards, enemies and buttons sit above it.
+  backdrop.addEventListener('pointerdown', () => skipAnim());
+  fight.append(backdrop);
+  fight.append(el('div', { cls: 'ground', attrs: { 'aria-hidden': 'true' } }));
+  fight.append(heroFigure());
+  const row = el('div', { cls: 'enemies' }, ...snap.enemies.map((e, i) => enemyCard(e, i)));
+  dyingRow(dyingThisPaint, row);
+  fight.append(row);
+  fight.append(speedDock());
+  wrap.append(fight);
+
+  const dock = el('div', { cls: 'dock' });
+  dock.append(pileButton('draw'));
+  dock.append(energyOrb());
+  // Fan rotation lives on the inner card (`--i`), never on this wrap, so the hand stays one row.
+  dock.append(el('div', {
+    cls: 'hand' + (dealPending ? ' deal-in' : ''),
+    attrs: { style: `--n:${snap.hand.length}` },
+  }, ...snap.hand.map((c, i) => cardTile(c, { index: i + 1 }))));
+  dock.append(pileButton('discard'));
+  dock.append(combatControls(targeting));
+  wrap.append(dock);
+
   wrap.append(el('p', { cls: 'hint', text: targeting
     ? 'Click a highlighted enemy, or press 1–9 · Esc or click empty space to cancel'
     : 'Click a card to play it · a card that needs a target asks you to pick one' }));
+  if (pileOpen === 'draw' || pileOpen === 'discard') wrap.append(pileModal(pileOpen));
   return page('combat', 'II — The Fight', 'blade', '', [wrap]);
 }
 
@@ -1296,7 +1748,7 @@ function combatView() {
  */
 function enemyCard(e, position) {
   const kind = e.intent.kind;
-  const look = enemyLook(e.name);
+  const look = enemyLook(e.id);
   const targeting = pendingSlot !== null && snap.enemies.length > 1;
   const isAimed = targeting && aimed === position + 1;
   // The damage flash is keyed on the enemy's stable identity (`index`), never on its
@@ -1337,63 +1789,43 @@ function enemyCard(e, position) {
       : {},
   });
 
-  // Portrait plate: an inline-SVG silhouette on a lit alcove. No image file.
-  const art = el('div', { cls: 'e-art' });
-  art.append(glyphBox(look.art, 'e-silhouette'));
-  // The target mark is a SHAPE, not a colour: a slot number in a ring, plus a crosshair
-  // that only the SELECTED enemy shows. Colour alone never carries the state.
+  const pose = enemyPose(e);
+  card.append(intentBadge(e));
+  const fig = el('div', { cls: `fig pose-${pose}${enemyVariant(e.id)}`, attrs: { 'aria-hidden': 'true' } });
+  fig.innerHTML = enemyMarkup(e.id);
+  card.append(fig);
+  // The target mark is a SHAPE, not a colour: a slot number, plus a crosshair on the
+  // enemy the player has actually selected.
   if (targeting) {
-    art.append(el('span', { cls: 'target-index', text: String(position + 1), attrs: { 'aria-hidden': 'true' } }));
-    art.append(el('span', { cls: 'target-mark', text: '◎', attrs: { 'aria-hidden': 'true' } }));
+    card.append(el('span', { cls: 'target-index', text: String(position + 1), attrs: { 'aria-hidden': 'true' } }));
+    card.append(el('span', { cls: 'target-mark', text: '◎', attrs: { 'aria-hidden': 'true' } }));
   }
-  card.append(art);
-
-  // UX rev 3: name + HP promoted INTO a full-bleed head plate — the cards' sibling treatment.
-  card.append(el('div', { cls: 'e-head' },
-    el('div', { cls: 'ename', text: e.name }),
-    el('div', { cls: 'ehp', text: `HP ${e.hp}/${e.maxHp}` }),
-  ));
+  card.append(el('div', { cls: 'ename', text: e.name }));
+  card.append(el('div', { cls: 'ehp', text: `${e.hp}/${e.maxHp}` }));
   const bar = el('div', { cls: 'hpbar' }, el('i', {}));
   bar.querySelector('i').style.width = `${Math.max(0, Math.round((e.hp / e.maxHp) * 100))}%`;
   card.append(bar);
   if (e.block > 0) {
-    card.append(el('div', { cls: 'eblock', text: `⛨ block ${e.block}` }));
-    // The block shield flares and is visibly consumed when it actually ate a hit. The
-    // class fires on the paint that follows the absorption, so the bar the player is
-    // watching is the one that reacts.
+    card.append(el('div', { cls: 'eblock', text: `⛨ ${e.block}` }));
     const eaten = flash.blockEat && !reducedMotion;
     const bb = el('div', { cls: 'hpbar block' + (eaten ? ' block-eat' : '') }, el('i', {}));
     bb.querySelector('i').style.width = `${Math.min(100, Math.round((e.block / Math.max(1, e.maxHp)) * 100))}%`;
     card.append(bb);
   }
-  // Statuses. A status that JUST landed is marked so the CSS can give it a treatment by
-  // KIND: Vulnerable fractures, Weak droops, Strength/Dexterity lift. Shape, not colour.
   const fresh = freshStatusKeys(e.statuses);
   const statuses = e.statuses.map((s) => el('span', {
     cls: `pill ${s.key}` + (fresh.has(s.key) ? ' juice-in' : ''),
     text: s.text || `${s.label} ${s.stacks}`,
     attrs: { title: s.explain || '' },
   }));
-  if (statuses.length > 0) card.append(el('div', {}, ...statuses));
-  // The mounting point for this enemy's effects (floater). Absolute and pointer-inert, so
-  // it floats over the card without ever intercepting a click meant for the enemy.
+  if (statuses.length > 0) card.append(el('div', { cls: 'e-statuses' }, ...statuses));
   card.append(efxBox(e.index));
-
-  // Intent: `intent.text` is the kernel's plain-English sentence, `label` the compact
-  // form. The banner's treatment (bar / shield / up chevrons / down chevrons) plus its
-  // glyph distinguishes the four kinds without relying on colour.
+  // The sentence stays readable under the figure. The badge above is the scaled glyph.
   const plain = e.intent.text || `${e.intent.label}`;
-  const sub = (kind === 'attack' && e.intent.hits > 1)
-    ? `${e.intent.hits} hits · ${e.intent.label}`
-    : e.intent.label;
-  const banner = el('div', { cls: `e-intent kind-${kind}` },
-    glyphBox(INTENT_GLYPH[kind] || 'rune', 'intent-glyph'),
-    el('div', { cls: 'intent-body' },
-      el('span', { cls: 'ilabel', text: plain }),
-      el('span', { cls: 'isub', text: sub }),
-    ),
-  );
-  card.append(banner);
+  card.append(el('div', {
+    cls: `e-intent kind-${kind}`,
+    attrs: { title: plain },
+  }, el('span', { cls: 'ilabel', text: plain })));
   return card;
 }
 
@@ -1444,30 +1876,51 @@ function cardTile(card, opts = {}) {
   );
   tile.append(gem);
 
-  // Art band: a per-type silhouette in the former dead space. Decorative only — it changes
-  // no legality, no outcome and no data, so it stays in the renderer. The pool member is
-  // dealt by the hand slot, which needs no RNG and keeps two copies of the same card from
-  // looking identical.
-  const ART_POOL = { attack: ['cleave', 'sweep', 'blade'], skill: ['shield', 'ward', 'rune'], power: ['star', 'spikes', 'flame'] };
-  const pool = ART_POOL[card.type] || ['rune'];
-  const slotSeed = Number((card.slot || '').replace(/[^0-9]/g, '')) || 1;
-  const art = glyphBox(pool[slotSeed % pool.length], 'c-art p' + (1 + (slotSeed % 3)));
-  art.setAttribute('aria-hidden', 'true');
-  tile.append(art);
-
-  tile.append(el('span', { cls: 'ctype' },
+  // The head plate is the illustration window: one woodcut drawing per card id
+  // (src/web/card-art.js), decorative and aria-hidden. The type mark + word stay on top, so
+  // type is still carried by hue, mark and word. Unknown ids fall back to the type mark.
+  const head = el('span', { cls: 'ctype' },
     glyphBox(TYPE_GLYPH[card.type] || 'rune', 'c-type-mark'),
     el('span', { text: card.typeLabel || card.type }),
-  ));
+  );
+  const drawn = cardArtMarkup(card.cardId);
+  if (drawn) {
+    const ill = el('span', { cls: 'c-illus', attrs: { 'aria-hidden': 'true' } });
+    ill.innerHTML = drawn;
+    head.prepend(ill);
+    // A large, faint echo of the same drawing fills the effect panel behind the words.
+    const echo = el('span', { cls: 'c-art c-echo', attrs: { 'aria-hidden': 'true' } });
+    echo.innerHTML = drawn;
+    tile.append(echo);
+    tile.classList.add('has-illus');
+  }
+  tile.append(head);
+  // B2: a tempered instance wears a trim and a forged stamp (mark + temper name). The rules
+  // text below already carries the tempered numbers (the kernel renders it), so the stamp
+  // only says WHICH temper; its full sentence is the tooltip.
+  // It sits in the footer bar beside the compact code (placed below); a tile without a
+  // footer carries it on the plate instead.
+  let stamp = null;
+  if (card.temper) {
+    tile.classList.add('tempered', `temper-${card.temper}`);
+    stamp = el('span', { cls: 'ctemper', attrs: { title: card.temperText } },
+      glyphBox(TEMPER_GLYPH[card.temper] || 'rune', 't-mark'),
+      el('span', { cls: 't-name', text: card.temperName || card.temperText.split(':')[0] }),
+    );
+  }
   tile.append(el('span', { cls: 'cname', text: card.name }));
-  tile.append(el('span', { cls: 'cdesc', text: desc }));
+  if (card.flavor) tile.append(el('span', { cls: 'cflavor', text: card.flavor }));
+  tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));
   // The compact code is NOT repeated on a reward tile: the player is choosing a card to
   // keep, not playing one, so the shorthand is noise there.
   if (card.showSummary !== false) {
     const foot = el('span', { cls: 'cfoot' });
     foot.append(el('span', { cls: 'csum', text: card.summary, attrs: { title: 'Compact form used by the agent-facing command line' } }));
     if (disabled) foot.append(el('span', { cls: 'cwhy', text: 'needs more Energy' }));
+    if (stamp) foot.append(stamp);
     tile.append(foot);
+  } else if (stamp) {
+    tile.append(stamp);
   }
 
   // Only the in-hand tiles get a wrapper: it carries the hover lift and the keyboard
@@ -1475,6 +1928,7 @@ function cardTile(card, opts = {}) {
   if (!opts.index) return tile;
   const wrap = el('div', {
     cls: 'card-wrap' + (disabled ? ' is-disabled' : '') + (inactive ? ' is-inactive' : '') + (isPending ? ' is-pending' : ''),
+    attrs: opts.index ? { style: `--i:${opts.index - 1}` } : {},
   },
     el('span', { cls: 'hand-index', text: String(opts.index), attrs: { title: `Keyboard shortcut: ${opts.index}` } }),
     // The in-card cue that this card is the one waiting for a target. A shape and a word,
@@ -1498,6 +1952,7 @@ function mapView(travel = null) {
   // The wrapper carries `.panel`; this inner div is content only.
   const wrap = el('div');
   wrap.append(el('p', { cls: 'section-title', text: `Map — floor ${snap.map.floor + 1}/${snap.map.floorCount}` }));
+  if (snap.quests) wrap.append(questStrip(snap.quests));
   const travelFromId = travel ? (prevMapCurrent ?? null) : null;
   const travelFromRow = travel ? (prevMapFloor ?? null) : null;
   const map = el('div', { cls: 'map' });
@@ -1515,9 +1970,82 @@ function mapView(travel = null) {
     if (showTravel) rowEl.append(travelMarker(travel));
     map.append(rowEl);
   });
+  // The world behind the path (decorative, constant markup): lava at the foot where the
+  // climb starts, two ridge lines, and the Guardian's spire at the summit.
+  const world = el('div', { cls: 'map-world', attrs: { 'aria-hidden': 'true' } });
+  world.innerHTML = MAP_WORLD;
+  map.prepend(world);
   wrap.append(map);
+  requestAnimationFrame(() => drawRoutes(map));
   wrap.append(el('p', { cls: 'hint', text: 'Click a glowing node to travel. Fight something weak, risk an elite, or rest.' }));
   return page('map', 'I — The Path', 'route', 'panel', [wrap]);
+}
+
+/** B3 Ember quests: one compact chip per quest, progress as text and as a bar. */
+function questStrip(quests) {
+  const strip = el('div', { cls: 'quests', attrs: { 'aria-label': 'Ember quests' } });
+  for (const q of quests) {
+    const pct = Math.round((100 * q.progress) / q.goal);
+    const chip = el('div', {
+      cls: `quest${q.done ? ' done' : ''}`,
+      attrs: { title: `${q.text} Reward: ${q.rewardText}.` },
+    },
+    el('span', { cls: 'q-name', text: q.name }),
+    el('span', { cls: 'q-prog', text: q.done ? `done · ${q.rewardText}` : `${q.progress}/${q.goal} · ${q.rewardText}` }));
+    const bar = el('span', { cls: 'q-bar' });
+    bar.style.setProperty('--q', `${pct}%`);
+    chip.append(bar);
+    strip.append(chip);
+  }
+  return strip;
+}
+
+const MAP_WORLD = '<svg viewBox="0 0 400 600" preserveAspectRatio="none">'
+  + '<path class="w-sky" d="M0 0 H400 V600 H0 Z"/>'
+  + '<path class="w-far" d="M0 150 L40 120 L70 135 L110 80 L150 110 L200 30 L250 100 L290 75 L330 115 L370 90 L400 110 V600 H0 Z"/>'
+  + '<path class="w-spire" d="M188 70 L196 18 L200 4 L204 18 L212 70 Z"/>'
+  + '<path class="w-mid" d="M0 330 L50 290 L90 310 L140 250 L190 290 L240 240 L290 280 L340 245 L400 285 V600 H0 Z"/>'
+  + '<path class="w-crack" d="M140 250 L150 300 L138 340 M290 280 L282 330"/>'
+  + '<path class="w-near" d="M0 500 L60 470 L120 490 L180 455 L250 485 L320 460 L400 490 V600 H0 Z"/>'
+  + '<path class="w-lava" d="M0 575 C70 555 130 590 200 570 C270 550 330 588 400 566"/>'
+  + '</svg>';
+
+/**
+ * Draw the routes between floors. The kernel connects every node on a floor to every node
+ * on the next one (rules/map.js availableNodes), so every pair is drawn; the legs the player
+ * can take right now are lit. Geometry is read from the laid-out nodes, so it follows any
+ * breakpoint. Decorative: aria-hidden, pointer-inert, and it carries no fact the node
+ * buttons do not already state.
+ * @param {HTMLElement} map
+ */
+function drawRoutes(map) {
+  if (!map.isConnected) return;
+  const box = map.getBoundingClientRect();
+  if (box.width === 0) return;
+  const rows = [...map.querySelectorAll('.map-row')].map((r) => [...r.querySelectorAll('.node')]);
+  // offset* geometry, not getBoundingClientRect: it ignores the rows' entrance transform,
+  // so the routes are drawn where the nodes come to rest.
+  const c = (n) => { const r = n.parentElement; return [r.offsetLeft + n.offsetLeft + n.offsetWidth / 2, r.offsetTop + n.offsetTop + n.offsetHeight / 2]; };
+  let lit = '';
+  let dim = '';
+  for (let r = 0; r + 1 < rows.length; r += 1) {
+    for (const a of rows[r]) {
+      for (const b of rows[r + 1]) {
+        const [x1, y1] = c(a); const [x2, y2] = c(b);
+        const my = (y1 + y2) / 2;
+        const d = `M${x1.toFixed(1)} ${y1.toFixed(1)} C${x1.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)} `;
+        if (a.classList.contains('current') && b.classList.contains('available')) lit += d; else dim += d;
+      }
+    }
+  }
+  // innerHTML on a constant template keeps this file free of any namespace URL string;
+  // the only interpolated values are numbers this function computed.
+  const holder = el('div');
+  holder.innerHTML = `<svg class="map-routes" aria-hidden="true" width="${Math.round(box.width)}" height="${Math.round(box.height)}">`
+    + (dim ? `<path class="route-dim" d="${dim}"/>` : '') + (lit ? `<path class="route-lit" d="${lit}"/>` : '') + '</svg>';
+  const svg = holder.firstChild;
+  map.querySelector('.map-routes')?.remove();
+  map.insertBefore(svg, map.querySelector('.map-row'));
 }
 
 /**
@@ -1535,21 +2063,56 @@ function travelMarker(travel) {
   return mark;
 }
 
+/* Map pins (M5): up to 3 planning marks per run, kept in localStorage under the run's
+   seed and NEVER in run state, so the kernel, replays and hashes are untouched. */
+const PINS_KEY = 'dlb.mapPins.v1';
+const PIN_MAX = 3;
+function mapPins() {
+  const all = storeGet(PINS_KEY);
+  const list = all && Array.isArray(all[String(snap.seed)]) ? all[String(snap.seed)] : [];
+  return list.filter((x) => typeof x === 'string');
+}
+function toggleMapPin(id) {
+  let list = mapPins();
+  list = list.includes(id) ? list.filter((x) => x !== id) : [...list, id].slice(-PIN_MAX);
+  // Only the current seed is kept, so the store never grows across runs.
+  storePut(PINS_KEY, { [String(snap.seed)]: list });
+  announce(list.includes(id) ? 'Pin placed.' : 'Pin removed.');
+}
+
 function mapNode(n) {
   const short = n.type.replace('combat_', '');
   const cls = `node t-${short}` + (n.available ? ' available' : '') + (n.current ? ' current' : '');
   const node = el(n.available ? 'button' : 'span', {
     cls,
-    attrs: n.available ? { type: 'button', title: `Travel to ${n.label}` } : {},
-    on: n.available && n.actionId ? { click: () => act(n.actionId) } : {},
+    attrs: n.available ? { type: 'button', title: `Travel to ${n.label}`, 'aria-label': `Travel to ${(NODE_WORDS[short] || [n.label])[0]}` } : {},
+    on: {
+      ...(n.available && n.actionId ? { click: () => act(n.actionId) } : {}),
+      // Right-click (long-press on touch) drops or lifts a planning pin. Browser-only state.
+      contextmenu: (ev) => { ev.preventDefault(); toggleMapPin(n.id); render(); },
+    },
   });
+  if (n.available) node.title = `Travel to ${n.label} · right-click to pin`;
+  else node.setAttribute('title', 'Right-click to pin this node');
   node.append(glyphBox(NODE_GLYPH[short] || 'rune', 'ntype-mark'));
-  node.append(el('span', { cls: 'ntype', text: n.label }));
-  node.append(el('span', { cls: 'nsub', text: n.type.replace('_', ' ') }));
+  if (mapPins().includes(n.id)) {
+    node.classList.add('pinned');
+    node.append(el('span', { cls: 'node-pin', attrs: { 'aria-label': 'pinned' } }));
+  }
+  const words = NODE_WORDS[short] || [n.label, ''];
+  node.append(el('span', { cls: 'ntype', text: words[0] }));
+  if (words[1]) node.append(el('span', { cls: 'nsub', text: words[1] }));
   return node;
 }
 
 /* ------------------------------------------------------------------- REWARD */
+
+/** Header illustration for the reward and rest scenes: a local WebP, decorative only. */
+function sceneIllus(key) {
+  const box = el('div', { cls: `scene-illus scene-${key}`, attrs: { 'aria-hidden': 'true' } });
+  box.append(el('img', { attrs: { src: `assets/sprites/${key}.webp`, alt: '', draggable: 'false', decoding: 'async' } }));
+  return box;
+}
 
 function rewardView() {
   const wrap = el('div');
@@ -1557,13 +2120,14 @@ function rewardView() {
   // sequence rather than all at once. `.reveal` is on the ONCE-per-arrival class string
   // built in `render()`; an incidental repaint inside the phase reproduces the same string
   // and the browser restarts nothing.
+  wrap.append(sceneIllus('reward'));
   wrap.append(el('div', { cls: 'reward-head' + (arriving.reward ? ' reveal' : ''), text: 'Victory — choose a card' }));
   const row = el('div', { cls: 'hand' + (arriving.reward ? ' reveal-cards' : '') });
   for (const c of snap.reward.cards) {
     // The reward tile's own action: taking a card, not playing one. Marked with `data-action`
     // so the hotkey handler can also reach it.
     const tile = cardTile(
-      { slot: c.actionId, cardId: c.cardId, name: c.name, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, playable: true, showSummary: false },
+      { slot: c.actionId, cardId: c.cardId, name: c.name, flavor: c.flavor, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, playable: true, showSummary: false },
       { actionId: c.actionId, onClick: (ev) => { consumeClick(ev); act(c.actionId); } },
     );
     row.append(tile);
@@ -1583,6 +2147,129 @@ function rewardView() {
   return page('reward', 'III — The Spoils', 'star', 'panel', [wrap]);
 }
 
+/* ------------------------------------------------------------------ KINDLING */
+
+/** A hero portrait for the select buttons (constant markup from a fixed table). */
+function heroFace(id) {
+  const face = el('span', { cls: 'hp-face', attrs: { 'aria-hidden': 'true' } });
+  face.innerHTML = heroMarkup(id);
+  return face;
+}
+
+/**
+ * B4: rebuild the run, same seed, for another hero. It is the SAME screen with a different
+ * hero, not a new act: the Act I title card is not replayed. Focus follows the selection,
+ * so the arrow keys keep working after the repaint.
+ * @param {string} id hero id from HEROES
+ */
+function switchHero(id) {
+  if (id === (snap.character ?? 'ironclad')) return;
+  heroChoice = id;
+  newGame(snap.seed, { quiet: true });
+  const picked = document.querySelector('.hero-pick.on');
+  if (picked && typeof picked.focus === 'function') picked.focus();
+}
+
+/**
+ * B5: rebuild the run, same seed, on another path. Like a hero switch it is the SAME
+ * screen, not a new act: the Act I title card is not replayed, and focus follows the
+ * selection so the arrow keys keep working after the repaint.
+ * @param {string} id biome id from the kernel BIOMES table
+ */
+function switchPath(id) {
+  if (id === (snap.biome ?? DEFAULT_BIOME)) return;
+  biomeChoice = id;
+  newGame(snap.seed, { quiet: true });
+  const picked = document.querySelector('.biome-pick.on');
+  if (picked && typeof picked.focus === 'function') picked.focus();
+}
+
+/** B1: the act-start boon choice. Every word comes from the kernel snapshot. */
+function kindlingView() {
+  const wrap = el('div', { cls: 'kindling' });
+  wrap.append(sceneIllus('event'));
+  // B4 hero select: only before the first choice of a run. Switching rebuilds the run
+  // with the same seed for the other hero, so nothing about the climb is rerolled by hand.
+  if (snap.stepIndex === 0) {
+    // Radio-group semantics (WAI-ARIA APG): one tab stop (the checked hero), and the arrow
+    // keys move the selection, wrapping; Home/End jump to the ends. Selecting IS switching.
+    const current = snap.character ?? 'ironclad';
+    const at = Math.max(0, HEROES.findIndex((h) => h.id === current));
+    const heroes = el('div', {
+      cls: 'hero-select',
+      attrs: { role: 'radiogroup', 'aria-label': 'Choose your hero' },
+      on: {
+        keydown: (ev) => {
+          const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+          let to = null;
+          if (step) to = (at + step + HEROES.length) % HEROES.length;
+          else if (ev.key === 'Home') to = 0;
+          else if (ev.key === 'End') to = HEROES.length - 1;
+          if (to === null) return;
+          ev.preventDefault();
+          switchHero(HEROES[to].id);
+        },
+      },
+    });
+    for (const h of HEROES) {
+      const on = current === h.id;
+      heroes.append(el('button', {
+        cls: `hero-pick${on ? ' on' : ''} hp-${h.id}`,
+        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1', title: h.blurb },
+        on: { click: () => switchHero(h.id) },
+      },
+      heroFace(h.id),
+      el('span', { cls: 'hp-name', text: h.name }),
+      el('span', { cls: 'hp-blurb', text: h.blurb })));
+    }
+    wrap.append(heroes);
+    // Radio group like the hero picker (WAI-ARIA APG): one tab stop (the checked path),
+    // arrow keys move the selection, wrapping; Home/End jump to the ends. Selecting IS switching.
+    const biomes = snap.biomes ?? [];
+    const curBiome = snap.biome ?? DEFAULT_BIOME;
+    const atBiome = Math.max(0, biomes.findIndex((b) => b.id === curBiome));
+    const paths = el('div', {
+      cls: 'biome-select',
+      attrs: { role: 'radiogroup', 'aria-label': 'Choose the path' },
+      on: {
+        keydown: (ev) => {
+          const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+          let to = null;
+          if (step) to = (atBiome + step + biomes.length) % biomes.length;
+          else if (ev.key === 'Home') to = 0;
+          else if (ev.key === 'End') to = biomes.length - 1;
+          if (to === null || biomes.length === 0) return;
+          ev.preventDefault();
+          switchPath(biomes[to].id);
+        },
+      },
+    });
+    paths.append(el('span', { cls: 'bs-label', text: 'Path' }));
+    for (const b of biomes) {
+      const on = curBiome === b.id;
+      paths.append(el('button', {
+        cls: `biome-pick${on ? ' on' : ''} bp-${b.id}`, text: b.name,
+        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1' },
+        on: { click: () => switchPath(b.id) },
+      }));
+    }
+    wrap.append(paths);
+  }
+  wrap.append(el('div', { cls: 'big-title kindling-head', text: 'The forge offers a kindling' }));
+  wrap.append(el('p', { cls: 'kindling-note', text: 'Take one. Each gift has a price.' }));
+  const list = el('div', { cls: 'boon-list' });
+  for (const b of snap.kindling.boons) {
+    list.append(el('button', {
+      cls: 'boon', attrs: { type: 'button', 'data-action': b.actionId, 'aria-label': `${b.name}: ${b.text}` },
+      on: { click: () => act(b.actionId) },
+    },
+    el('span', { cls: 'boon-name', text: b.name }),
+    keywordText(el('span', { cls: 'boon-text' }), b.text)));
+  }
+  wrap.append(list);
+  return page('kindling', '0 — The Kindling', 'flame', 'panel', [wrap]);
+}
+
 /* --------------------------------------------------------------------- REST */
 
 function restView() {
@@ -1594,6 +2281,7 @@ function restView() {
   wrap.append(el('div', { cls: 'rest-embers', attrs: { 'aria-hidden': 'true' } },
     el('span', { cls: 'ember e1' }), el('span', { cls: 'ember e2' }), el('span', { cls: 'ember e3' }),
   ));
+  wrap.append(sceneIllus('event'));
   wrap.append(el('div', { cls: 'big-title rest-head', text: 'A quiet moment' }));
   // The one thing this screen must SAY without motion: resting is safe, and leaving is safe.
   wrap.append(el('p', { cls: 'rest-note', text: `HP ${snap.player.hp}/${snap.player.maxHp} — you may heal ${snap.rest.heal} or move on.` }));
@@ -1602,6 +2290,23 @@ function restView() {
     el('button', { cls: 'btn', text: `Rest (+${snap.rest.heal} HP)`, attrs: { type: 'button' }, on: { click: () => act(snap.rest.healId) } }),
     el('button', { cls: 'btn secondary', text: 'Move on', attrs: { type: 'button' }, on: { click: () => act(snap.rest.leaveId) } }),
   ));
+  // B2: or temper one card instead of healing. Offers and sentences come from the kernel.
+  const tempers = snap.rest.tempers || [];
+  if (tempers.length > 0) {
+    wrap.classList.add('has-tempers');
+    wrap.append(el('p', { cls: 'temper-head', text: 'Or temper a card at the forge (instead of resting):' }));
+    const list = el('div', { cls: 'boon-list temper-list' });
+    for (const t of tempers) {
+      list.append(el('button', {
+        cls: `boon temper-offer temper-${t.temper}`,
+        attrs: { type: 'button', 'data-action': t.actionId, 'aria-label': `Temper ${t.cardName}. ${t.text}` },
+        on: { click: () => act(t.actionId) },
+      },
+      el('span', { cls: 'boon-name', text: `${t.cardName} · ${t.temperName}` }),
+      keywordText(el('span', { cls: 'boon-text' }), t.text.split(': ').slice(1).join(': '))));
+    }
+    wrap.append(list);
+  }
   return page('rest', 'IV — The Ember', 'flame', 'panel', [wrap]);
 }
 
@@ -1613,18 +2318,348 @@ function endView() {
   const wrap = el('div');
   wrap.append(el('p', { cls: 'section-title', text: 'Run Over' }));
   wrap.append(el('div', { cls: `demon${won ? '' : ' lose'}` }, glyphBox(won ? 'crown' : 'broken', 'demon-glyph')));
+  // THE OUTCOME IS THE HEADLINE, NEVER THE SCORE (S1). No score may ever occupy this slot:
+  // a number is not an achievement, and a run's meaning is not its arithmetic.
   wrap.append(el('div', { cls: `big-title ${won ? 'win' : 'loss'}`, text: won ? 'VICTORY' : 'DEFEAT' }));
   wrap.append(el('hr', { cls: 'end-rule' }));
   wrap.append(el('p', { cls: 'end-stats', text: `Reached floor ${e.floor} · ${e.steps} steps · seed ${snap.seed}` }));
-  wrap.append(el('p', { cls: 'def', text: won
-    ? 'You cleared Act 1 and the boss fell.'
-    : 'The Ashwright falls. Try a different route or a better card pick.' }));
+
+  const math = lastRecord ? ledgerMath(lastRecord) : null;
+  if (math) {
+    wrap.append(ledgerBlock(math));
+    if (math.earned) {
+      wrap.append(el('p', { cls: 'def', text: won
+        ? 'You cleared Act 1 and the Slag Warden fell.'
+        : 'The Ashwright falls. Try a different route or a better card pick.' }));
+    } else {
+      // AC-7.4 (ANTI-HOLLOW). No elite, no boss, no victory: the total does NOT get display
+      // size and no celebratory word is attached to it. The factual recognition below keeps
+      // the run's real content on screen — floors climbed, enemies killed, and where the
+      // larger totals actually come from — instead of an empty "0 elites" and a flourish.
+      wrap.append(el('p', { cls: 'recognition', text: recognitionText(math) }));
+    }
+  } else {
+    // No record exists for this run (the ended transition was never observed, e.g. a page
+    // that was reloaded onto a finished run). The screen shows what it has and NO ledger:
+    // an itemised block would have to invent every line.
+    wrap.append(el('p', { cls: 'def', text: won
+      ? 'You cleared Act 1 and the Slag Warden fell.'
+      : 'The Ashwright falls. Try a different route or a better card pick.' }));
+  }
+
+  if (!savedOk) {
+    wrap.append(el('p', { cls: 'save-failed', text: 'This run could not be saved — your browser refused local storage.' }));
+  }
+
+  // MARKS (AC-7.3). Name AND the condition that earned each one. None => no block at all,
+  // never a placeholder: an empty "Marks" heading would promise a feature that is absent.
+  const marks = Array.isArray(lastRecord?.badges) ? lastRecord.badges.filter(Boolean) : [];
+  if (marks.length > 0) {
+    wrap.append(el('hr', { cls: 'end-rule' }));
+    wrap.append(el('p', { cls: 'section-title', text: 'Marks' }));
+    const list = el('ul', { cls: 'marks' });
+    for (const mark of marks) {
+      list.append(el('li', { cls: 'mark-item' },
+        el('span', { cls: 'mark-name', text: mark.name }),
+        el('span', { cls: 'mark-cond', text: mark.condition }),
+      ));
+    }
+    wrap.append(list);
+    wrap.append(el('p', { cls: 'ledger-note', text: 'Marks do not add to the total.' }));
+  }
+
+  // UNLOCK NARRATION (S4) sits between the totals and the actions: visible on arrival and
+  // never below the button, because the moment after a loss is when the player decides
+  // whether to play again. It is a block, NOT a modal — a dialog here would interrupt that
+  // exact decision. Nothing about it auto-dismisses, so reduced motion loses no fact.
+  if (lastUnlock) wrap.append(unlockBlock(lastUnlock));
+
   wrap.append(el('div', { cls: 'restart-row' },
-    el('button', { cls: 'btn', text: 'Restart  (r)', attrs: { type: 'button' }, on: { click: newGame } }),
+    el('button', { cls: 'btn', text: 'Restart  (r)', attrs: { type: 'button' }, on: { click: () => newGame() } }),
+    el('button', {
+      cls: 'btn secondary',
+      text: 'Open the Ledger  (h)',
+      attrs: { type: 'button', 'data-end-ledger': '1' },
+      on: { click: () => openLedger({ from: 'end' }) },
+    }),
   ));
   return page('end', 'V — The Ledger', won ? 'crown' : 'broken', `panel page-end${won ? '' : ' lose'}`, [wrap]);
 }
 
+/* -------------------------------------------------------------------- RUN HISTORY */
+//
+// WHAT THIS OWNS: the shape of browser storage, the layout of the history screens, and
+// every word on them. WHAT IT DOES NOT OWN: any game fact. The score comes from
+// `scoreRun`, the counts from the kernel's own event stream, the marks from
+// `badgesForRun`, the unlock verdict from `evaluateUnlocks`, the card pool from
+// `contentForProfile`. `localStorage` is host state the kernel is forbidden to touch (R3),
+// so the persistence belongs here and only here.
+//
+// THE TWO ERAS (DR-7). A stored record with no `actions` array yields
+// `scoreRun(record) === null`: no score is derivable, so NO score is shown — not a dash,
+// not a zero, not an estimate. `not scored` in --faint stands where a scored row shows a
+// total, in ONE time-ordered list. An honest gap beats a plausible fiction.
+//
+// RETENTION (AC-6.4). The newest RETAIN records are kept, the cap is STATED on the screen
+// (a silent cap is a defect), and a lifetime aggregate is folded for every finished run so
+// that "floors climbed" can never DECAY when the oldest record is dropped.
+
+const RUNS_KEY = 'dlb.runs.v1';
+const UNLOCKS_KEY = 'dlb.unlocks.v1';
+/** How many rows are painted before the "Show more" control. The full list stays in memory;
+ *  this only bounds the first paint, so a 100-run history does not build 100 buttons at once. */
+const LEDGER_PAGE = 25;
+
+/** `?pool=full` — the tester flag (DR-5). It has NO UI surface by design: a tester who is
+ *  told "this build draws from the whole pool" must be blind to which pool they got, or the
+ *  measure is biased. Drawing it as a control would be a control that lies. */
+const fullPool = (() => {
+  try { return new URLSearchParams(location.search).get('pool') === 'full'; }
+  catch { return false; }
+})();
+
+function storeGet(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw);
+    return parsed !== null && typeof parsed === 'object' ? parsed : null;
+  } catch { return null; }
+}
+/** `false` when the browser refused the write (private mode, quota, storage disabled). */
+function storePut(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch { return false; }
+}
+
+/** Every record this browser holds, oldest first, with the lifetime aggregate beside it. */
+let history = { records: [], agg: emptyAgg() };
+/** Only the bits of unlock state that are NOT derivable: which unlocks were already
+ *  narrated, and which record crossed which threshold. */
+let unlocksState = { narrated: [], byRecord: {} };
+/** The record for the run that just ended, and the unlock verdict that run produced. */
+let lastRecord = null;
+let lastUnlock = null;
+/** `false` once a write was refused, so the summary can say so instead of pretending. */
+let savedOk = true;
+/** Set when retention has dropped a record at some point in this session. */
+let evictedThisSession = false;
+
+/** The kernel's counters, read as an unlock profile. Mirrors surface/runs.js `profileFor`. */
+function profileOf(agg) {
+  const badges = {};
+  for (const [id, n] of Object.entries(agg?.badges ?? {})) badges[id] = Number(n) > 0;
+  return { scoreTotal: agg?.score?.total ?? 0, runs: agg?.runs ?? 0, badges };
+}
+/** The profile the NEXT run is built for: the player's own lifetime counters. */
+function currentProfile() {
+  return fullPool ? fullyUnlockedProfile() : profileOf(history.agg);
+}
+/** The `profile` a record is stamped with — which pool this run was actually drawn from. */
+const poolLabel = () => (fullPool ? 'full' : 'fresh');
+
+/** The number of cards that exist for a profile, MEASURED from the kernel's own narrowing
+ *  rather than assumed, so "Cards in play: n of 42" cannot drift from what is dealt. */
+let cardsInPlayCache = { key: '', n: null };
+function cardsInPlay(profile) {
+  const key = `${profile.scoreTotal}|${profile.runs}|${Object.values(profile.badges ?? {}).filter(Boolean).length}|${fullPool}`;
+  if (cardsInPlayCache.key !== key) {
+    let n = null;
+    try { n = contentForProfile(profile).cardList.length; } catch { n = null; }
+    cardsInPlayCache = { key, n };
+  }
+  return cardsInPlayCache.n;
+}
+
+function loadHistory() {
+  const runs = storeGet(RUNS_KEY);
+  if (runs && Array.isArray(runs.records)) {
+    const good = runs.records.filter((r) => r !== null && typeof r === 'object' && !Array.isArray(r));
+    // A malformed entry is dropped rather than rendered as a broken row, and the loss is
+    // REPORTED: silently discarding a stored run would make the list disagree with itself.
+    if (good.length !== runs.records.length) savedOk = false;
+    history.records = good;
+    history.agg = runs.agg && typeof runs.agg === 'object' ? runs.agg : aggregate(good);
+  }
+  const un = storeGet(UNLOCKS_KEY);
+  if (un) {
+    if (Array.isArray(un.narrated)) unlocksState.narrated = un.narrated.filter((s) => typeof s === 'string');
+    if (un.byRecord && typeof un.byRecord === 'object') unlocksState.byRecord = un.byRecord;
+  }
+}
+loadHistory();
+
+/**
+ * The itemised score for a record, or **null** when none is derivable (DR-7).
+ * @param {any} record
+ */
+function ledgerMath(record) {
+  const score = scoreRun(record);
+  if (score === null || score === undefined) return null;
+  const counts = score.counts ?? {};
+  const lines = score.lines.map((row) => {
+    // `boss` and `victory` are 0/1 flags, not tallies, so they read "no"/"yes" with a
+    // signed value while a count reads "3 × 5". Zeros stay EXPLICIT on every line: a
+    // missing line is indistinguishable from a zero, and the formula has to be learnable.
+    const flag = row.key === 'boss' || row.key === 'victory';
+    return {
+      key: row.key,
+      label: row.label,
+      math: flag ? (row.count > 0 ? 'yes' : 'no') : `${row.count} × ${row.each}`,
+      points: flag ? `+${row.points}` : String(row.points),
+    };
+  });
+  // AC-7.4: an elite, the boss or a victory is what EARNS the display-size total. Nothing
+  // else may promote it — the total is a consequence of what happened, not a reward for
+  // having played at all.
+  const earned = (counts.elites ?? 0) > 0 || (counts.boss ?? 0) > 0 || (counts.victory ?? 0) > 0;
+  return { total: score.total, lines, counts, earned };
+}
+
+/** The factual recognition that replaces an advice-only line on a hollow run (AC-7.4). */
+function recognitionText(math) {
+  const c = math.counts ?? {};
+  const floor = c.floors ?? 0;
+  const kills = c.kills ?? 0;
+  return `This run ended on floor ${floor}. You climbed ${floor} ${floor === 1 ? 'floor' : 'floors'} `
+    + `and killed ${kills} ${kills === 1 ? 'enemy' : 'enemies'}. `
+    + 'Killing an elite (+10) or the boss (+50) is where the larger totals come from.';
+}
+
+/**
+ * The score ledger. A REAL list, so every contributing line is individually reachable
+ * (AC-7.1) rather than being one text block whose arithmetic must be re-derived by hand.
+ * @param {ReturnType<typeof ledgerMath>} math
+ */
+function ledgerBlock(math) {
+  const block = el('div', { cls: 'run-ledger', attrs: { role: 'list', 'aria-label': 'Score ledger' } });
+  for (const line of math.lines) {
+    block.append(el('div', { cls: 'ledger-line', attrs: { role: 'listitem' } },
+      el('span', { cls: 'ledger-label', text: line.label }),
+      el('span', { cls: 'ledger-math', text: line.math }),
+      el('span', { cls: 'ledger-points', text: line.points }),
+    ));
+  }
+  block.append(el('div', { cls: 'ledger-rule', attrs: { 'aria-hidden': 'true' } }));
+  block.append(el('div', { cls: 'ledger-total' + (math.earned ? ' is-earned' : ''), attrs: { role: 'listitem' } },
+    el('span', { cls: 'ledger-total-label', text: 'Total' }),
+    el('span', { cls: 'ledger-total-value', text: String(math.total) }),
+  ));
+  return block;
+}
+
+/** Which catalog threshold an unlock was met by, as a sentence (AC-9.2: the THRESHOLD
+ *  CROSSED is half of what has to be stated, not just "unlocked!"). */
+function unlockThresholdLine(entry, info) {
+  const at = entry?.at ?? null;
+  if (at && typeof at.score === 'number') return `Score ${info.scoreTotalAfter} crossed the ${at.score}-point mark.`;
+  if (at && typeof at.runs === 'number') return `Run ${info.runCountAfter} crossed the ${at.runs}-run mark.`;
+  return `Condition met: ${entry?.condition ?? 'a threshold'}.`;
+}
+
+/** The post-run narration block: threshold crossed, option opened, pool size, limitation. */
+function unlockBlock(info) {
+  const block = el('div', { cls: 'unlock-block' });
+  for (const unlocked of info.newly) {
+    const entry = (UNLOCK_CATALOG ?? []).find((e) => e.id === unlocked.id) ?? null;
+    block.append(el('p', { cls: 'unlock-head', text: `UNLOCKED — ${unlocked.name}` }));
+    block.append(el('p', { cls: 'unlock-that', text: unlockThresholdLine(entry, info) }));
+    // The kernel's own narration sentence: what the option now IS. Never "you are
+    // stronger" — an unlock adds an OPTION, and the framing may not imply the game eased.
+    block.append(el('p', { cls: 'unlock-line', text: unlocked.narration }));
+  }
+  const inPlay = info.cardsAfter;
+  if (typeof inPlay === 'number') {
+    block.append(el('p', { cls: 'unlock-pool', text: `Cards in play: ${inPlay} of ${SHIPPED_CARDS}.` }));
+  }
+  // The limitation, stated plainly ONCE, in the kernel's frozen-content terms: the pool is
+  // re-ordered and gated, it is never enlarged.
+  block.append(el('p', { cls: 'unlock-limit', text: `The card pool is the same ${SHIPPED_CARDS} cards. `
+    + 'Unlocking changes which of them you are offered — it does not add cards.' }));
+  return block;
+}
+
+/**
+ * Write the record for the run that just ended.
+ *
+ * ORDER IS THE INVARIANT: build the record from the kernel's own state, attach the marks
+ * the kernel derives from it, ask the kernel what this run OPENED, then fold and persist.
+ * Asking after folding would report the aggregate as the "before" and lose every threshold
+ * this very run crossed.
+ */
+function recordRun() {
+  const record = buildRunRecord({
+    state: ctl.state,
+    submitted: ctl.submitted,
+    events: runEvents,
+    profile: poolLabel(),
+    policy: 'human',
+    provenance: 'human',
+  });
+  const marks = badgesForRun(record);
+  if (marks.length > 0) record.badges = marks;
+
+  const before = profileOf(history.agg);
+  const verdict = evaluateUnlocks(before, record);
+  const newly = (verdict.newly ?? []).filter((u) => !unlocksState.narrated.includes(u.id));
+
+  history.agg = aggregate(record, history.agg);
+  const next = [...history.records, record];
+  const pruned = pruneRuns(next, { keep: RETAIN });
+  if (pruned.dropped.length > 0) evictedThisSession = true;
+  history.records = pruned.kept;
+
+  savedOk = storePut(RUNS_KEY, { v: 1, records: history.records, agg: history.agg });
+  for (const unlocked of newly) if (!unlocksState.narrated.includes(unlocked.id)) unlocksState.narrated.push(unlocked.id);
+  const byRecord = { ...unlocksState.byRecord };
+  // Keyed by the record's own identity (the kernel's state hash). Two identical replays
+  // share a key, which is correct rather than a collision: identical state means identical
+  // thresholds, so the annotation is the same fact.
+  if (newly.length > 0) byRecord[record.id] = newly.map((u) => u.id);
+  unlocksState.byRecord = byRecord;
+  if (!storePut(UNLOCKS_KEY, { v: 1, narrated: unlocksState.narrated, byRecord })) savedOk = false;
+
+  lastRecord = record;
+  lastUnlock = newly.length > 0
+    ? {
+      newly,
+      scoreTotalAfter: history.agg.score?.total ?? 0,
+      runCountAfter: history.agg.runs ?? 0,
+      cardsBefore: cardsInPlay(before),
+      cardsAfter: cardsInPlay(profileOf(history.agg)),
+    }
+    : null;
+  cardsInPlayCache = { key: '', n: null };
+}
+
+/** The cumulative score reached by (and including) one record, from the stored order. */
+function cumulativeAt(record) {
+  let sum = 0;
+  for (const r of history.records) {
+    sum += scoreRun(r)?.total ?? 0;
+    if (r === record) return sum;
+  }
+  return sum;
+}
+
+/** The persistent unlock line for a stored entry, if that run crossed a threshold. */
+function unlockPersistentLine(record) {
+  const ids = unlocksState.byRecord?.[record.id] ?? [];
+  const names = [];
+  let score = null;
+  let runs = null;
+  for (const id of ids) {
+    const entry = (UNLOCK_CATALOG ?? []).find((e) => e.id === id);
+    if (!entry) continue;
+    names.push(entry.name);
+    if (typeof entry.at?.score === 'number') score = entry.at.score;
+    if (typeof entry.at?.runs === 'number') runs = entry.at.runs;
+  }
+  if (names.length === 0) return null;
+  if (score !== null) return `Unlocked at score ${cumulativeAt(record)}: ${names.join('; ')}.`;
+  if (runs !== null) return `Unlocked after ${runs} ${runs === 1 ? 'run' : 'runs'}: ${names.join('; ')}.`;
+  return `Unlocked by this run: ${names.join('; ')}.`;
+}
 /* ---------------------------------------------------------------- keyboard bonus */
 
 document.addEventListener('keydown', (ev) => {

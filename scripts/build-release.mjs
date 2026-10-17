@@ -8,11 +8,10 @@
 // WHAT IT PRODUCES (default: ../release/, overridable with OUT=...):
 //
 //   release/                        <- the artifact directory
-//     index.html                    <- src/web/index.html, FLATTENED to the artifact root
-//     app.js                        <- src/web/app.js, one import path rewritten (see below)
-//     style.css                     <- src/web/style.css, verbatim
-//     tokens.js                     <- src/web/tokens.js, verbatim
-//     src/...                       <- the rest of the import closure, verbatim
+//     index.html, *.js, style.css   <- ALL of src/web/, FLATTENED to the artifact root
+//     assets/                       <- src/web/assets/ (sprites, backdrops), verbatim
+//     fonts/                        <- assets/fonts/ (fonts.css, woff2, OFL licences)
+//     src/...                       <- the import closure outside src/web/, verbatim
 //     tools/serve.mjs               <- copy of scripts/serve.mjs for the documented run-locally command
 //     HOW-TO-RUN-LOCALLY.txt        <- generated
 //   deckbuilder-demo.zip            <- the exact file the owner uploads to itch.io
@@ -20,14 +19,13 @@
 // WHY THE FLATTEN: itch.io's HTML5 player serves the zip root as the game's web
 // root, so the entry must be at the top level, not nested under src/web/.
 //
-// WHY app.js IS REWRITTEN: src/web/app.js imports '../surface/gui/
-// controller.js'. From src/web/ that resolves to <repo>/src/...; once app.js sits at the
-// artifact root the same text would resolve OUTSIDE the artifact and 404. The copy
-// rewrites that one specifier to './src/surface/gui/controller.js'. The original
-// under src/web/ is never touched.
+// WHY WEB MODULES ARE REWRITTEN: src/web/*.js import '../kernel/...' and '../surface/...'.
+// From src/web/ that resolves to <repo>/src/...; once flattened to the artifact root the
+// same text would resolve OUTSIDE the artifact and 404. The copy rewrites those quoted
+// specifiers to './src/kernel/...' / './src/surface/...'. Sources are never touched.
 //
 // WHY src/surface/tokens.js IS SHIPPED EVEN THOUGH IT IS OPTIONAL: src/web/tokens.js
-// does `await import('../src/surface/tokens.js')` inside a try/catch for the on-screen
+// does `await import('../surface/tokens.js')` inside a try/catch for the on-screen
 // token badge. In a browser that module then fails on its own bare 'js-tiktoken'
 // specifier, the catch swallows it, and the badge shows its no-encoder state. Shipping
 // the file means the failure is the intended, tested "no encoder in this host" path
@@ -55,47 +53,38 @@ const OUT = resolve(process.env.OUT ?? join(REPO, 'release'));
 const ZIP = OUT.endsWith('.zip') ? OUT : `${OUT}.zip`;
 
 // ---------------------------------------------------------------------------
-// The import closure (Task 1). Derived by following every static and dynamic
-// ES module specifier from src/web/index.html; the method and the raw scan output
-// are recorded in RELEASE-STATUS.md. Sources are repo-relative, destinations
-// artifact-relative.
+// What ships (#47). Nothing here is a hand-kept file list:
+//   1. the WHOLE web app folder (src/web/, incl. src/web/assets/ sprites and backdrops),
+//      flattened to the artifact root, because itch.io serves index.html from the root;
+//   2. the ES-module import closure of those pages outside src/web/ (kernel, surface),
+//      found by following every static and dynamic specifier, copied to the SAME
+//      repo-relative path (src/...), so their own relative imports need no rewrite;
+//   3. the fonts folder (assets/fonts/ -> fonts/).
+// The old hand-kept list silently missed stage-art.js, card-art.js, the sprites, the
+// fonts and 6 kernel/surface modules added after it was written.
 // ---------------------------------------------------------------------------
-const CLOSURE = Object.freeze([
-  ['src/web/index.html', 'index.html'],
-  ['src/web/app.js', 'app.js'],
-  ['src/web/style.css', 'style.css'],
-  ['src/web/tokens.js', 'tokens.js'],
-  ['src/surface/gui/controller.js', 'src/surface/gui/controller.js'],
-  ['src/surface/session.js', 'src/surface/session.js'],
-  ['src/surface/tokens.js', 'src/surface/tokens.js'],
-  ['src/kernel/index.js', 'src/kernel/index.js'],
-  ['src/kernel/state.js', 'src/kernel/state.js'],
-  ['src/kernel/sha256.js', 'src/kernel/sha256.js'],
-  ['src/kernel/content.js', 'src/kernel/content.js'],
-  ['src/kernel/observe.js', 'src/kernel/observe.js'],
-  ['src/kernel/describe.js', 'src/kernel/describe.js'],
-  ['src/kernel/actions.js', 'src/kernel/actions.js'],
-  ['src/kernel/rng.js', 'src/kernel/rng.js'],
-  ['src/kernel/content/cards.bundle.js', 'src/kernel/content/cards.bundle.js'],
-  ['src/kernel/rules/act.js', 'src/kernel/rules/act.js'],
-  ['src/kernel/rules/card-instance.js', 'src/kernel/rules/card-instance.js'],
-  ['src/kernel/rules/encounters.js', 'src/kernel/rules/encounters.js'],
-  ['src/kernel/rules/map.js', 'src/kernel/rules/map.js'],
-  ['src/kernel/rules/powers.js', 'src/kernel/rules/powers.js'],
-  ['src/kernel/rules/vocabulary.js', 'src/kernel/rules/vocabulary.js'],
-  ['src/kernel/rules/effects/index.js', 'src/kernel/rules/effects/index.js'],
-]);
+const WEB = 'src/web';
+const FONTS = ['assets/fonts', 'fonts'];
+const SPEC_RES = [
+  /\b(?:import|export)\s[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/g,
+  /\bimport\s*['"]([^'"]+)['"]/g,
+  /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g,
+];
+const specifiersOf = (text) => SPEC_RES.flatMap((re) => [...text.matchAll(re)].map((m) => m[1]))
+  .filter((sp) => sp.startsWith('./') || sp.startsWith('../'));
 
-// The only content rewrites in the whole build: import specifiers in app.js and tokens.js.
-const REWRITES = Object.freeze([
-  { dest: 'app.js', from: "'../surface/gui/controller.js'", to: "'./src/surface/gui/controller.js'" },
-  // Since the repo remap, src/web/ is a sibling of src/kernel and src/surface, so the
-  // source specifiers are '../kernel/...' / '../surface/...'. Map them back to the exact
-  // strings the artifact has always shipped so release/ stays byte-identical.
-  { dest: 'app.js', from: "'../kernel/index.js'", to: "'../src/kernel/index.js'" },
-  { dest: 'index.html', from: 'href="../../assets/fonts/fonts.css"', to: 'href="./fonts/fonts.css"' },
-  { dest: 'tokens.js', from: "'../surface/tokens.js'", to: "'../src/surface/tokens.js'" },
-]);
+// A page at the artifact root that imports '../kernel/x.js' (repo: src/kernel/x.js) must
+// say './src/kernel/x.js' once flattened. Rewrites the quoted specifier only.
+function rewriteWebSpecifiers(text) {
+  return text.replace(/(['"])\.\.\/((?:kernel|surface)\/[^'"]+)\1/g, (_m, q, rest) => `${q}./src/${rest}${q}`);
+}
+
+// The only non-JS rewrite: the font stylesheet link in index.html.
+// Designed 404s: specifiers a module resolves inside try/catch for a file that does not
+// exist on purpose (see the header). Skipped by the closure walk, allowed by the test.
+export const OPTIONAL_MISSING = Object.freeze(['src/surface/gui/renderer.js']);
+
+const FONT_LINK = ['href="../../assets/fonts/fonts.css"', 'href="./fonts/fonts.css"'];
 
 // serve.mjs derives its doc root from `new URL('..')`, so it must sit one level
 // down in the artifact. Its printed banner says "/src/web/"; once flattened it must say
@@ -244,25 +233,48 @@ function main() {
     written.push([destRel, body.length]);
   };
 
-  for (const [srcRel, destRel] of CLOSURE) {
-    const srcAbs = join(REPO, srcRel);
-    if (!existsSync(srcAbs)) {
+  const repoFiles = (dirRel) => walkFiles(join(REPO, dirRel)).map((rel) => `${dirRel}/${rel}`);
+
+  // 1. The whole web app folder, flattened.
+  const queue = [];
+  for (const srcRel of repoFiles(WEB)) {
+    const destRel = srcRel.slice(WEB.length + 1);
+    let body = readFileSync(join(REPO, srcRel));
+    if (/\.(m?js)$/.test(srcRel)) {
+      const text = body.toString('utf8');
+      for (const sp of specifiersOf(text)) queue.push(join(dirname(srcRel), sp).replace(/\\/g, '/'));
+      body = Buffer.from(rewriteWebSpecifiers(text), 'utf8');
+    } else if (destRel === 'index.html') {
+      const text = body.toString('utf8');
+      if (!text.includes(FONT_LINK[0])) {
+        // A rewrite that no longer applies is a broken layout assumption: fail loudly
+        // rather than shipping an artifact that 404s.
+        process.stderr.write(`build-release: font link not found in ${srcRel}: ${FONT_LINK[0]}\n`);
+        process.exit(1);
+      }
+      body = Buffer.from(text.split(FONT_LINK[0]).join(FONT_LINK[1]), 'utf8');
+    }
+    put(destRel, body);
+  }
+
+  // 2. The import closure outside src/web/, at the same repo-relative paths.
+  const done = new Set();
+  while (queue.length) {
+    const srcRel = queue.shift();
+    if (done.has(srcRel) || srcRel.startsWith(`${WEB}/`)) continue;
+    if (OPTIONAL_MISSING.includes(srcRel) && !existsSync(join(REPO, srcRel))) continue;
+    done.add(srcRel);
+    if (!srcRel.startsWith('src/') || !existsSync(join(REPO, srcRel))) {
       process.stderr.write(`build-release: MISSING SOURCE ${srcRel}\n`);
       process.exit(1);
     }
-    let text = readFileSync(srcAbs, 'utf8');
-    for (const r of REWRITES) {
-      if (r.dest !== destRel) continue;
-      if (!text.includes(r.from)) {
-        // A rewrite that no longer applies is a broken layout assumption, not a
-        // warning: fail loudly rather than shipping an artifact that 404s.
-        process.stderr.write(`build-release: rewrite target not found in ${srcRel}: ${r.from}\n`);
-        process.exit(1);
-      }
-      text = text.split(r.from).join(r.to);
-    }
-    put(destRel, Buffer.from(text, 'utf8'));
+    const text = readFileSync(join(REPO, srcRel), 'utf8');
+    for (const sp of specifiersOf(text)) queue.push(join(dirname(srcRel), sp).replace(/\\/g, '/'));
+    put(srcRel, Buffer.from(text, 'utf8'));
   }
+
+  // 3. Fonts (stylesheet, woff2, OFL licence texts).
+  for (const srcRel of repoFiles(FONTS[0])) put(`${FONTS[1]}/${srcRel.slice(FONTS[0].length + 1)}`, readFileSync(join(REPO, srcRel)));
 
   const serveSrc = readFileSync(join(REPO, 'scripts', 'serve.mjs'), 'utf8');
   put(SERVE_DEST, Buffer.from(SERVE_REWRITES.reduce((s, [a, b]) => s.split(a).join(b), serveSrc), 'utf8'));
@@ -289,4 +301,4 @@ function main() {
   process.stdout.write(`zip sha256:        ${createHash('sha256').update(zipBuf).digest('hex')}\n`);
 }
 
-main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

@@ -10,11 +10,15 @@
 //
 // Budget: the dump is designed to stay under 250 tokens (worst of o200k/cl100k) and
 // every action line under 8 — enforced by tests/golden/budget.test.js on measured counts.
-import { ENEMIES } from './rules/encounters.js';
+import { ENEMIES, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { availableNodes, NODE_TYPES } from './rules/map.js';
 import { defaultContent } from './content.js';
 import { actions as legalActions } from './actions.js';
 import { intentLabel, intentDamage, REST_HEAL } from './rules/act.js';
+import { BOONS, boonText } from './rules/kindling.js';
+import { RELICS, relicId } from './rules/relics.js';
+import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
+import { QUESTS } from './rules/quests.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -121,6 +125,22 @@ function defOf(card) {
 }
 
 /**
+ * B2: the definition a tempered instance actually plays — the same card with the effect
+ * list the kernel resolves (rules/tempers.js temperEffects), so every rendering of it
+ * (CLI hand line, GUI sentence, compact summary) shows the tempered numbers. An
+ * untempered instance, or a run without tempers, gets the shared definition untouched.
+ * @param {any} state
+ * @param {any} card hand instance
+ * @param {any} def its content definition
+ * @returns {{def: any, temper: string | null}}
+ */
+export function temperedView(state, card, def) {
+  const temper = state.tempers?.[card.uid] ?? null;
+  if (!temper || !TEMPERS[temper]) return { def, temper: null };
+  return { def: { ...def, effects: temperEffects(def.effects, temper) }, temper };
+}
+
+/**
  * The R4 state dump. Shape fixed by the requirement:
  *   T3 | HP 42/60 | EN 3/3 | BLK 0 | draw5 disc3 | PWR2 VULN1
  *   HAND
@@ -159,6 +179,8 @@ function body(state, opts) {
       return restBody(state);
     case 'map':
       return mapBody(state, opts);
+    case 'kindling':
+      return kindlingBody(state);
     case 'ended':
       return [
         `GAME OVER — ${state.outcome === 'win' ? 'VICTORY' : 'DEFEAT'} | floor ${state.floor + 1} | steps ${state.stepIndex}`,
@@ -172,8 +194,11 @@ function combatBody(state, opts) {
   const lines = ['HAND'];
   if (state.combat.hand.length === 0) lines.push(' (empty)');
   state.combat.hand.forEach((card, i) => {
-    const def = defOf(card);
-    lines.push(` ${i + 1} ${pad(def.name, 12)} ${effectSummary(def)}`);
+    const view = temperedView(state, card, defOf(card));
+    // A tempered card shows the numbers it really plays plus its temper tag, e.g.
+    // ` 1 Hammerfall   A9 [RH]`. Untempered lines are byte-identical to before.
+    const tag = view.temper ? ` [${TEMPERS[view.temper].label}]` : '';
+    lines.push(` ${i + 1} ${pad(view.def.name, 12)} ${effectSummary(view.def)}${tag}`);
   });
   lines.push('ENEMY');
   const live = state.combat.enemies.filter((e) => !e.dead);
@@ -197,6 +222,7 @@ function combatBody(state, opts) {
 }
 
 const pileNames = (pile) => (pile.length === 0 ? '-' : pile.map((c) => defOf(c).name).join(', '));
+const pileCardNames = (pile) => (pile ?? []).map((c) => defOf(c).name);
 
 function rewardBody(state) {
   const lines = ['REWARD — pick one'];
@@ -209,11 +235,23 @@ function rewardBody(state) {
 }
 
 function restBody(state) {
-  return ['REST — heal or move on', ` HP ${state.player.hp}/${state.player.maxHp}`];
+  const lines = ['REST — heal or move on', ` HP ${state.player.hp}/${state.player.maxHp}`];
+  if (state.temperOffers && state.temperOffers.length > 0) {
+    lines.push('TEMPER (instead of healing)');
+    state.temperOffers.forEach((o, i) => lines.push(` t${i + 1} ${o.cardId} ${TEMPERS[o.temper].label}`));
+  }
+  return lines;
+}
+
+function kindlingBody(state) {
+  return ['KINDLING — take one boon (upside and cost)',
+    ...state.kindling.offers.map((id, i) => ` k${i + 1} ${id} ${BOONS[id].label}`)];
 }
 
 function mapBody(state, opts) {
-  const lines = [`MAP — floor ${state.floor + 1}/${state.map.rows.length}`, 'NEXT'];
+  const lines = [`MAP — floor ${state.floor + 1}/${state.map.rows.length}`];
+  if (state.quests) lines.push(`QUESTS ${state.quests.map((q) => `${q.id} ${q.done ? 'DONE' : `${q.progress}/${QUESTS[q.id].goal}`}`).join(' | ')}`);
+  lines.push('NEXT');
   availableNodes(state).forEach((n, i) => {
     lines.push(` n${i + 1} ${NODE_TYPES[n.type].label}`);
   });
@@ -273,6 +311,12 @@ export function observeActions(state) {
       case 'rest_leave':
         lines.push(`${a.id} leave`);
         break;
+      case 'boon':
+        lines.push(`${a.id} ${a.boon}`);
+        break;
+      case 'temper':
+        lines.push(`${a.id} temper ${a.offer.cardId} ${a.offer.temper}`);
+        break;
       default:
         lines.push(`${a.id} ?`);
     }
@@ -318,6 +362,14 @@ function statusPairs(statuses) {
  * @param {{verbose?: boolean}} [opts]
  * @returns {object} JSON-safe value model
  */
+/** The hero's relic name and switched-off text, for relic-off boon text. */
+function heroRelic(state) {
+  return {
+    name: defaultContent().characters.get(state.character)?.relicName ?? 'relic',
+    offText: RELICS[relicId(state)]?.offText ?? 'stops working',
+  };
+}
+
 export function snapshot(state) {
   const legal = legalActions(state);
   // A card that needs a target is offered as ONE action per living enemy (`p1_1`, `p1_2`),
@@ -341,7 +393,8 @@ export function snapshot(state) {
   const pick = new Map(legal.filter((a) => a.kind === 'pick').map((a) => [a.cardId, a.id]));
 
   const hand = (state.combat?.hand ?? []).map((card, i) => {
-    const def = cardDef(card.cardId);
+    const { def, temper } = temperedView(state, card, cardDef(card.cardId));
+    const hpCost = temperHpCost(temper);
     const slot = `p${i + 1}`;
     const playable = playableSlots.has(slot);
     const targets = targetsBySlot.get(slot) ?? [];
@@ -353,11 +406,16 @@ export function snapshot(state) {
       cost: card.cost,
       type: def.type,
       rarity: def.rarity,
+      // B2: the instance's temper (null when untempered or the run has none).
+      temper,
+      temperName: temper ? TEMPERS[temper].name : '',
+      temperText: temper ? TEMPERS[temper].text : '',
       // Same card, second rendering. `summary` stays the CLI's compact form (frozen by
       // tests/budget.test.js); `description` is the sentence a human reads instead.
       typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
+      // Both read the TEMPERED definition, so a Red-hot Hammerfall says "Deal 9 damage."
       summary: effectSummary(def),
-      description: describeCard(def, card),
+      description: describeCard(def, card) + (hpCost > 0 ? ` Lose ${hpCost} HP when played.` : ''),
       playable,
       // The engine's own answer to "may this card be aimed?" — so a renderer never has to
       // infer it from the card type (Defend is type 'skill', Bash is 'attack', but the
@@ -447,6 +505,9 @@ export function snapshot(state) {
     turn: state.combat?.turn ?? 0,
     energyPerTurn: state.energyPerTurn ?? 3,
     character: state.character,
+    biome: state.biome ?? DEFAULT_BIOME,
+    biomeName: BIOMES[state.biome ?? DEFAULT_BIOME].name,
+    biomes: Object.entries(BIOMES).map(([id, b]) => ({ id, name: b.name })),
     characterName: defaultContent().characters.get(state.character)?.name ?? state.character,
     relicName: defaultContent().characters.get(state.character)?.relicName ?? '',
     difficulty: state.difficulty,
@@ -472,11 +533,29 @@ export function snapshot(state) {
       draw: state.combat?.draw?.length ?? 0,
       discard: state.combat?.discard?.length ?? 0,
       exhaust: state.combat?.exhaust?.length ?? 0,
+      // Names only, for the pile viewer. Counts above stay the compact facts.
+      drawCards: pileCardNames(state.combat?.draw),
+      discardCards: pileCardNames(state.combat?.discard),
+      exhaustCards: pileCardNames(state.combat?.exhaust),
     },
     enemies,
     map,
     reward,
-    rest: state.phase === 'rest' ? { healId: legal.find((a) => a.kind === 'rest_heal')?.id ?? null, leaveId: legal.find((a) => a.kind === 'rest_leave')?.id ?? null, heal: REST_HEAL } : null,
+    rest: state.phase === 'rest' ? {
+      healId: legal.find((a) => a.kind === 'rest_heal')?.id ?? null,
+      leaveId: legal.find((a) => a.kind === 'rest_leave')?.id ?? null,
+      heal: REST_HEAL,
+      tempers: (state.temperOffers ?? []).map((o, i) => ({
+        actionId: `t${i + 1}`, cardId: o.cardId, cardName: cardDef(o.cardId)?.name ?? o.cardId,
+        temper: o.temper, temperName: TEMPERS[o.temper].name, text: TEMPERS[o.temper].text,
+      })),
+    } : null,
+    kindling: state.phase === 'kindling'
+      ? { boons: state.kindling.offers.map((id, i) => ({ id, name: BOONS[id].name, text: boonText(id, heroRelic(state)), label: BOONS[id].label, actionId: `k${i + 1}` })) }
+      : null,
+    quests: state.quests
+      ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))
+      : null,
     ended: state.phase === 'ended' ? { outcome: state.outcome, floor: state.floor + 1, steps: state.stepIndex } : null,
     // The plain-English layer, computed from this same state. A human surface paints
     // `description` / `text` / `glossary`; the compact fields above stay untouched for
