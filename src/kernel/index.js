@@ -15,6 +15,7 @@ import { poolSelection } from './unlocks.js';
 import { generateMap, availableNodes, findNode, NODE_TYPES, ROWS } from './rules/map.js';
 import { ENCOUNTERS, ENEMIES } from './rules/encounters.js';
 import { VOCABULARY } from './rules/vocabulary.js';
+import { DEFAULT_RELIC } from './rules/relics.js';
 import { intAt, shuffleAt, pickAt } from './rng.js';
 import { actions as legalActions, parsePlayId } from './actions.js';
 import {
@@ -259,7 +260,7 @@ export function newRun(opts = {}) {
 
   // B4 second hero: a character whose relic is not the Kindled Heart records it, so the
   // default (Ashwright) state keeps no new field and every existing hash is unchanged.
-  if (character.startingRelic && character.startingRelic !== 'burning_blood') state.relic = character.startingRelic;
+  if (character.startingRelic && character.startingRelic !== DEFAULT_RELIC) state.relic = character.startingRelic;
   // B1 Kindling (opt-in). Only an opted-in run gains the extra fields and draws, so the
   // default state — and every existing golden hash — is byte-identical to before.
   if (opts.kindling === true) {
