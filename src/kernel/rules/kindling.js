@@ -16,11 +16,21 @@ export const KINDLING_OFFERS = 3;
  */
 export const BOONS = Object.freeze({
   bellows: { name: 'Bellows Breath', label: 'EN+1 MAXHP-12', text: 'Gain 1 Energy every turn. Lose 12 max HP.', energy: 1, maxHp: -12 },
-  ironskin: { name: 'Iron Skin', label: 'MAXHP+15 RELIC-OFF', text: 'Gain 15 max HP and heal fully. Your Kindled Heart no longer heals after fights.', maxHp: 15, fullHeal: true, relicOff: true },
+  ironskin: { name: 'Iron Skin', label: 'MAXHP+15 RELIC-OFF', text: 'Gain 15 max HP and heal fully. Your {relic} {relicOff}.', maxHp: 15, fullHeal: true, relicOff: true },
   sparkfall: { name: 'Sparkfall', label: 'ADD 2 Spark HP-6', text: 'Add 2 Spark to your deck. Lose 6 HP.', add: ['anger', 'anger'], hp: -6 },
   purge: { name: 'Ash Purge', label: 'DEL 2 Hammerfall MAXHP-6', text: 'Remove 2 Hammerfall from your deck. Lose 6 max HP.', remove: ['strike', 'strike'], maxHp: -6 },
   stoke: { name: 'Banked Coals', label: 'ADD Stoke HP-15', text: 'Add Stoke to your deck. Lose 15 HP.', add: ['inflame'], hp: -15 },
 });
+
+/**
+ * Player-facing boon text for one hero. A relic-off boon names that hero's own relic and
+ * what it stops doing (`relic` = the hero's relic name, `relicOff` = its RELICS offText).
+ * @param {string} id
+ * @param {{name: string, offText: string}} relic
+ */
+export function boonText(id, relic) {
+  return BOONS[id].text.replace('{relic}', relic.name).replace('{relicOff}', relic.offText);
+}
 
 /** Stable boon order: the pick indexes into this list, so it is part of the format. */
 export const BOON_IDS = Object.freeze(['bellows', 'ironskin', 'sparkfall', 'purge', 'stoke']);
