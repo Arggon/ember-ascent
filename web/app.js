@@ -2157,6 +2157,20 @@ function heroFace(id) {
 }
 
 /**
+ * B4: rebuild the run, same seed, for another hero. It is the SAME screen with a different
+ * hero, not a new act: the Act I title card is not replayed. Focus follows the selection,
+ * so the arrow keys keep working after the repaint.
+ * @param {string} id hero id from HEROES
+ */
+function switchHero(id) {
+  if (id === (snap.character ?? 'ironclad')) return;
+  heroChoice = id;
+  newGame(snap.seed, { quiet: true });
+  const picked = document.querySelector('.hero-pick.on');
+  if (picked && typeof picked.focus === 'function') picked.focus();
+}
+
+/**
  * B5: rebuild the run, same seed, on another path. Like a hero switch it is the SAME
  * screen, not a new act: the Act I title card is not replayed, and focus follows the
  * selection so the arrow keys keep working after the repaint.
@@ -2177,13 +2191,32 @@ function kindlingView() {
   // B4 hero select: only before the first choice of a run. Switching rebuilds the run
   // with the same seed for the other hero, so nothing about the climb is rerolled by hand.
   if (snap.stepIndex === 0) {
-    const heroes = el('div', { cls: 'hero-select', attrs: { role: 'radiogroup', 'aria-label': 'Choose your hero' } });
+    // Radio-group semantics (WAI-ARIA APG): one tab stop (the checked hero), and the arrow
+    // keys move the selection, wrapping; Home/End jump to the ends. Selecting IS switching.
+    const current = snap.character ?? 'ironclad';
+    const at = Math.max(0, HEROES.findIndex((h) => h.id === current));
+    const heroes = el('div', {
+      cls: 'hero-select',
+      attrs: { role: 'radiogroup', 'aria-label': 'Choose your hero' },
+      on: {
+        keydown: (ev) => {
+          const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+          let to = null;
+          if (step) to = (at + step + HEROES.length) % HEROES.length;
+          else if (ev.key === 'Home') to = 0;
+          else if (ev.key === 'End') to = HEROES.length - 1;
+          if (to === null) return;
+          ev.preventDefault();
+          switchHero(HEROES[to].id);
+        },
+      },
+    });
     for (const h of HEROES) {
-      const on = (snap.character ?? 'ironclad') === h.id;
+      const on = current === h.id;
       heroes.append(el('button', {
         cls: `hero-pick${on ? ' on' : ''} hp-${h.id}`,
-        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', title: h.blurb },
-        on: { click: () => { if (on) return; heroChoice = h.id; newGame(snap.seed); } },
+        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1', title: h.blurb },
+        on: { click: () => switchHero(h.id) },
       },
       heroFace(h.id),
       el('span', { cls: 'hp-name', text: h.name }),
