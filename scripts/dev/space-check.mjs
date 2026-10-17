@@ -117,9 +117,15 @@ const wsUrl = await new Promise((res, rej) => {
 const ws = new WebSocket(wsUrl); const pend = new Map();
 await new Promise((r, j) => { ws.addEventListener('open', r); ws.addEventListener('error', j); });
 ws.addEventListener('message', (m) => { const x = JSON.parse(m.data); if (x.id && pend.has(x.id)) { pend.get(x.id)(x); pend.delete(x.id); } });
+// Every DevTools call is bounded: a reply that never comes used to hang the harness
+// silently forever (#36). Now it throws and the row fails with the method name.
+const CDP_TIMEOUT_MS = 20000;
 const send = (method, params = {}, sessionId) => {
   const i = id++; ws.send(JSON.stringify({ id: i, method, params, ...(sessionId ? { sessionId } : {}) }));
-  return new Promise((r) => pend.set(i, r));
+  return new Promise((r, j) => {
+    const t = setTimeout(() => { pend.delete(i); j(new Error(`DevTools ${method} got no reply in ${CDP_TIMEOUT_MS}ms`)); }, CDP_TIMEOUT_MS);
+    pend.set(i, (x) => { clearTimeout(t); r(x); });
+  });
 };
 const { targetId } = (await send('Target.createTarget', { url: 'about:blank' })).result;
 const { sessionId } = (await send('Target.attachToTarget', { targetId, flatten: true })).result;
@@ -144,20 +150,45 @@ async function waitFor(expr, timeoutMs = 15000) {
   return false;
 }
 const MAP_READY = `!!(document.querySelector('.node.available') || [...document.querySelectorAll('button')].some(x => /got it/i.test(x.textContent || '')))`;
+const MAP_OR_KINDLING = `!!(document.querySelector('.node.available, .kindling .boon') || [...document.querySelectorAll('button')].some(x => /got it/i.test(x.textContent || '')))`;
 const FIGHT_READY = `!!([...document.querySelectorAll('button')].some(b => /end turn/i.test(b.textContent || '')) && document.querySelector('.hand .card'))`;
+async function must(expr, what) {
+  if (!(await waitFor(expr))) throw new Error(`${what} not reached within 15s`);
+}
 async function cycle(url) {
   await S('Page.navigate', { url });
-  await waitFor(MAP_READY);
+  await must(MAP_OR_KINDLING, 'first load (map, Kindling or help)');
   await sleep(300);
   await ev(`(()=>{const b=[...document.querySelectorAll('button')].find(x=>/got it/i.test(x.textContent||''));if(b)b.click();try{localStorage.setItem('dlb.helpSeen.v1','1')}catch{};return 1})()`);
   await S('Page.navigate', { url });
-  await waitFor(MAP_READY);
+  await must(MAP_OR_KINDLING, 'reload (map or Kindling)');
+  await sleep(300);
+  // Kindling (v2/2): runs open on the act-start boon choice. Take the first boon (taking
+  // one is mandatory; every boon keeps the 5-card opening hand) to reach the map. Same
+  // step as viewport-check.mjs; without it the map never appeared and the run hung (#36).
+  await ev(`(()=>{const b=document.querySelector('.kindling .boon');if(b)b.click();return 1})()`);
+  await must(MAP_READY, 'map after Kindling');
   await sleep(300);
   // Travel into the first fight: the densest screen.
   await ev(`(()=>{const n=document.querySelector('.node.available');if(n)n.click();return 1})()`);
-  await waitFor(FIGHT_READY);
+  await must(FIGHT_READY, 'first fight (End Turn + hand)');
   await sleep(1300);
 }
+
+// Per-row and overall time limits, with progress on stderr, so a stuck row fails loudly
+// instead of the whole run going quiet (#36).
+const ROW_TIMEOUT_MS = 90000;
+const TOTAL_TIMEOUT_MS = 20 * 60000;
+const totalTimer = setTimeout(() => {
+  console.error(`space-check: OVERALL TIMEOUT after ${TOTAL_TIMEOUT_MS / 60000} min, aborting`);
+  try { child.kill('SIGKILL'); } catch {}
+  process.exit(3);
+}, TOTAL_TIMEOUT_MS);
+totalTimer.unref();
+const withTimeout = (p, ms, what) => Promise.race([p, new Promise((_, j) => setTimeout(() => j(new Error(`${what} exceeded ${ms / 1000}s`)), ms).unref())]);
+const T0 = Date.now();
+let rowNo = 0;
+const ROW_TOTAL = SIZES_SEL.length * SEEDS.length;
 
 const rows = [];
 for (const [w, h, label, scale] of SIZES_SEL) {
@@ -166,57 +197,73 @@ for (const [w, h, label, scale] of SIZES_SEL) {
   await S('Emulation.setTouchEmulationEnabled', { enabled: isPhone, maxTouchPoints: isPhone ? 5 : 1 });
   for (const seed of SEEDS) {
     const url = urlFor(seed);
-    const textScaleId = await beginTextScale(S, scale);
-    await cycle(url);
+    rowNo++;
+    const rowT0 = Date.now();
+    process.stderr.write(`[${rowNo}/${ROW_TOTAL}] ${sizeKey(w, h, scale)} seed ${seed} ... `);
+    let m;
+    try {
+      m = await withTimeout((async () => {
+      const textScaleId = await beginTextScale(S, scale);
+      await cycle(url);
 
-    const m = await ev(`(() => {
-      const vh = window.innerHeight, vw = window.innerWidth;
-      const app = document.getElementById('app');
-      const hand = document.querySelector('.hand');
-      const controls = document.querySelector('.controls');
-      const hint = document.querySelector('.stage-combat .hint') || document.querySelector('.hint');
-      const rect = (e) => e ? e.getBoundingClientRect() : null;
-      const rHint = rect(hint), rHand = rect(hand), rCtrl = rect(controls);
-      const contentBottom = Math.max(rHint ? rHint.bottom : 0, rCtrl ? rCtrl.bottom : 0, rHand ? rHand.bottom : 0);
-      // How much of the hand row's width is actually used by its cards?
-      const wraps = [...document.querySelectorAll('.card-wrap')];
-      const used = wraps.length ? (wraps[wraps.length-1].getBoundingClientRect().right - wraps[0].getBoundingClientRect().left) : 0;
-      const rEnemies = rect(document.querySelector('.enemies'));
-      const rHandTop = rect(document.querySelector('.hand'));
-      const gap = (rEnemies && rHandTop) ? Math.round(rHandTop.top - rEnemies.bottom) : null;
-      // The seed the app itself reports (src/web/app.js sets this title from snap.seed).
-      const newRun = [...document.querySelectorAll('button')].find(b => /New run \\(seed \\d+\\)/.test(b.title||''));
-      const seedMatch = newRun ? /seed (\\d+)/.exec(newRun.title) : null;
-      const seedReported = seedMatch ? Number(seedMatch[1]) : null;
-      const doc = document.documentElement;
-      return {
-        internalGap: gap,
-        viewport: [vw, vh],
-        seedReported,
-        docScrollHeight: doc.scrollHeight,
-        appHeight: app ? Math.round(rect(app).height) : null,
-        contentBottom: Math.round(contentBottom),
-        wastePx: Math.round(vh - contentBottom),
-        wastePct: Math.round((vh - contentBottom) / vh * 100),
-        handWidth: rHand ? Math.round(rHand.width) : null,
-        cardsUsedWidth: Math.round(used),
-        handFillPct: rHand ? Math.round(used / rHand.width * 100) : null,
-      };
-    })()`);
-    m.requestedSeed = SEED_IN_URL ? seed : null;
-    m.requested = [w, h];
-    const ts = await ev(TEXT_SCALE_PROBE);
-    m.textScale = scale; m.textScaleApplied = ts.applied; m.rootFontPx = ts.rootPx;
-    m.label = label;
-    const shot = await S('Page.captureScreenshot', { format: 'png' });
-    await writeFile(resolve(OUT, `${label}-${sizeKey(w, h, scale).replace('@', '-at')}-s${seed}.png`), Buffer.from(shot.result.data, 'base64'));
-    await endTextScale(S, textScaleId);
+      const m = await ev(`(() => {
+        const vh = window.innerHeight, vw = window.innerWidth;
+        const app = document.getElementById('app');
+        const hand = document.querySelector('.hand');
+        const controls = document.querySelector('.controls');
+        const hint = document.querySelector('.stage-combat .hint') || document.querySelector('.hint');
+        const rect = (e) => e ? e.getBoundingClientRect() : null;
+        const rHint = rect(hint), rHand = rect(hand), rCtrl = rect(controls);
+        const contentBottom = Math.max(rHint ? rHint.bottom : 0, rCtrl ? rCtrl.bottom : 0, rHand ? rHand.bottom : 0);
+        // How much of the hand row's width is actually used by its cards?
+        const wraps = [...document.querySelectorAll('.card-wrap')];
+        const used = wraps.length ? (wraps[wraps.length-1].getBoundingClientRect().right - wraps[0].getBoundingClientRect().left) : 0;
+        const rEnemies = rect(document.querySelector('.enemies'));
+        const rHandTop = rect(document.querySelector('.hand'));
+        const gap = (rEnemies && rHandTop) ? Math.round(rHandTop.top - rEnemies.bottom) : null;
+        // The seed the app itself reports (src/web/app.js sets this title from snap.seed).
+        const newRun = [...document.querySelectorAll('button')].find(b => /New run \\(seed \\d+\\)/.test(b.title||''));
+        const seedMatch = newRun ? /seed (\\d+)/.exec(newRun.title) : null;
+        const seedReported = seedMatch ? Number(seedMatch[1]) : null;
+        const doc = document.documentElement;
+        return {
+          internalGap: gap,
+          viewport: [vw, vh],
+          seedReported,
+          docScrollHeight: doc.scrollHeight,
+          appHeight: app ? Math.round(rect(app).height) : null,
+          contentBottom: Math.round(contentBottom),
+          wastePx: Math.round(vh - contentBottom),
+          wastePct: Math.round((vh - contentBottom) / vh * 100),
+          handWidth: rHand ? Math.round(rHand.width) : null,
+          cardsUsedWidth: Math.round(used),
+          handFillPct: rHand ? Math.round(used / rHand.width * 100) : null,
+        };
+      })()`);
+      m.requestedSeed = SEED_IN_URL ? seed : null;
+      m.requested = [w, h];
+      const ts = await ev(TEXT_SCALE_PROBE);
+      m.textScale = scale; m.textScaleApplied = ts.applied; m.rootFontPx = ts.rootPx;
+      m.label = label;
+      const shot = await S('Page.captureScreenshot', { format: 'png' });
+      await writeFile(resolve(OUT, `${label}-${sizeKey(w, h, scale).replace('@', '-at')}-s${seed}.png`), Buffer.from(shot.result.data, 'base64'));
+      await endTextScale(S, textScaleId);
+      return m;
+      })(), ROW_TIMEOUT_MS, 'row');
+      process.stderr.write(`ok ${((Date.now() - rowT0) / 1000).toFixed(1)}s (total ${((Date.now() - T0) / 1000).toFixed(0)}s)\n`);
+    } catch (e) {
+      process.stderr.write(`FAILED: ${e.message}\n`);
+      m = { error: e.message, seedReported: null, wastePx: '-', wastePct: '-', docScrollHeight: '-', handFillPct: '-', label, requested: [w, h], requestedSeed: SEED_IN_URL ? seed : null, textScale: scale, viewport: [w, h] };
+      try { await S('Emulation.clearDeviceMetricsOverride'); } catch {}
+      try { await S('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: isPhone }); } catch {}
+    }
     rows.push([sizeKey(w, h, scale), label, m]);
   }
 }
 
 // ---- Evaluate per row: negative wastePx is the existing signal; seed mismatch is invalid. ----
 function evaluateRow(m) {
+  if (m.error) return [`ROW ERROR: ${m.error}`];
   const fails = [];
   const tsFail = textScaleFailure(m);
   if (tsFail) fails.push(tsFail);
