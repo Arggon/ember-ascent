@@ -6,7 +6,7 @@
 // the five viewports the gate names: 1366x768, 1280x800, 915x412, 1200x450, 844x390.
 //
 // Read-only against the product: it loads the real page, measures, and prints. It never
-// writes under web/ or tools/. It exits 1 if any target viewport has a .btn min box < 44.
+// writes under src/web/ or scripts/. It exits 1 if any target viewport has a .btn min box < 44.
 //
 // Usage: node tests/qa-layout-fix/touch-probe.mjs [--seeds 1,3,7,11]
 import { spawn } from 'node:child_process';
@@ -25,7 +25,7 @@ const argv = process.argv.slice(2);
 let seeds = [11];
 for (let i = 0; i < argv.length; i++) if (argv[i] === '--seeds') seeds = argv[++i].split(',').map(Number);
 
-const BASE = 'http://localhost:5173/web/index.html?seed={seed}';
+const BASE = 'http://localhost:5173/src/web/index.html?seed={seed}';
 const OUT = 'tests/qa-layout-fix';
 mkdirSync(OUT, { recursive: true });
 const PORT = 9355, PROFILE = '/tmp/dlb-qa-touch5555';

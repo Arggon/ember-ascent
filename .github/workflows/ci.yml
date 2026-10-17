@@ -40,4 +40,4 @@ jobs:
         run: npm run gate
 
       - name: Surface art check
-        run: node tools/check-surface-art.mjs
+        run: node scripts/check-surface-art.mjs

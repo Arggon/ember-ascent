@@ -6,7 +6,7 @@
 // [object PointerEvent]"), the handler threw, and no new run started. Only the `n` hotkey,
 // which calls `newGame()` with no argument, worked.
 //
-// Drives the REAL web/app.js against a fake DOM (shim from click-targeting.test.js) with
+// Drives the REAL src/web/app.js against a fake DOM (shim from click-targeting.test.js) with
 // real controllers, and clicks the buttons the way a browser does: with an event object.
 import { readFileSync } from 'node:fs';
 
@@ -97,7 +97,7 @@ globalThis.requestAnimationFrame = () => 0;
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const appUrl = new URL('../../web/app.js', import.meta.url);
+const appUrl = new URL('../../src/web/app.js', import.meta.url);
 const rawSrc = readFileSync(appUrl, 'utf8');
 const IMPORT_RE = /^import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"];?[ \t]*$/gm;
 const importPrelude = [];

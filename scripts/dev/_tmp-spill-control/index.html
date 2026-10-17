@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- Positive control for the spillPx gate. NOT a product file: it exists only so
+     scripts/dev/viewport-check.mjs can be pointed at a layout that MUST clip, via --base.
+     It reproduces the exact structure the metric traverses:
+       #stage (overflow: hidden) > .page-combat (flex: 1 1 auto; min-height: 0) > .hand
+     and makes .hand 900px tall, which #stage must swallow. -->
+<html lang="en">
+<head><meta charset="utf-8" /><style>
+  html, body { margin: 0; height: 100%; }
+  #app { height: 100%; display: flex; flex-direction: column; }
+  #stage { flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+  .page-combat { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  .hand { min-height: 900px; background: #123; }
+</style></head>
+<body>
+  <div id="app">
+    <header id="hud"></header>
+    <main id="stage">
+      <div class="page page-combat">
+        <div class="hand"></div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
