@@ -51,6 +51,7 @@ test('release build: every module and asset the page references is served (no 40
 
   const seen = new Set();
   const missing = [];
+  const escaping = [];
   const queue = [[new URL('index.html', base).href, '(entry)']];
   while (queue.length) {
     const [url, from] = queue.shift();
@@ -62,6 +63,11 @@ test('release build: every module and asset the page references is served (no 40
     const path = new URL(url).pathname;
     if (!/\.(html|css|js|mjs)$/.test(path)) { await res.arrayBuffer(); continue; }
     const text = await res.text();
+    if (/\.m?js$/.test(path)) {
+      // Every import stays inside the release root: no '../' specifiers, which only work at a
+      // domain root because browsers clamp them there (itch.io serves from a subfolder).
+      for (const ref of refsOf(path, text)) if ((ref.match(/^(?:\.\.\/)+/)?.[0].length ?? 0) / 3 > path.split('/').length - 2) escaping.push(`${path} -> ${ref}`);
+    }
     for (const ref of refsOf(path, text)) queue.push([new URL(ref, url).href, path]);
   }
 
@@ -74,5 +80,6 @@ test('release build: every module and asset the page references is served (no 40
   }
 
   assert.deepEqual(missing, [], `release artifact is missing ${missing.length} file(s):\n  ${missing.join('\n  ')}`);
+  assert.deepEqual(escaping, [], `imports that leave the release root:\n  ${escaping.join('\n  ')}`);
   assert.ok(seen.size > 20, `crawl reached only ${seen.size} files`);
 });

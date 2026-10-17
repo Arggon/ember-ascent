@@ -93,6 +93,8 @@ const SERVE_DEST = 'tools/serve.mjs'; // path INSIDE the artifact (unchanged); s
 const SERVE_REWRITES = Object.freeze([
   ['${base}/src/web/', '${base}/'],
   ['/src/web/   ·', '/   ·'],
+  // Help text and comments name the repo path; inside the release the server is tools/serve.mjs.
+  ['node scripts/serve.mjs', 'node tools/serve.mjs'],
 ]);
 
 const RUN_LOCALLY = `HOW TO RUN THIS GAME LOCALLY

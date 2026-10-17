@@ -9,7 +9,7 @@
 // costs nothing and cannot become a supply-chain surface. It serves the PROJECT ROOT
 // only; anything that resolves outside it is refused (path traversal).
 //
-// Usage:  node scripts/serve.mjs [--port 5173]
+// Usage:  node tools/serve.mjs [--port 5173]
 import { createServer } from 'node:http';
 import { createReadStream, statSync } from 'node:fs';
 import { extname, join, resolve, normalize, relative, sep } from 'node:path';
@@ -24,7 +24,7 @@ const { values } = parseArgs({
 });
 
 if (values.help) {
-  process.stdout.write('usage: node scripts/serve.mjs [--port 5173]\n');
+  process.stdout.write('usage: node tools/serve.mjs [--port 5173]\n');
   process.exit(0);
 }
 
@@ -73,16 +73,16 @@ function resolveInsideRoot(urlPath) {
  * when the PATH already ends in `/`. The slash goes on the path, BEFORE the query.
  *
  * WHY: this used to test and append to the whole `req.url`, query included. So
- * `/web/?seed=11` (path already ending in `/`) was still "missing" its slash and was
- * redirected to `/web/?seed=11/`, where `Number("11/")` is NaN and the page silently
+ * `/src/web/?seed=11` (path already ending in `/`) was still "missing" its slash and was
+ * redirected to `/src/web/?seed=11/`, where `Number("11/")` is NaN and the page silently
  * fell back to a random seed. That is the "instrument was lying" root cause recorded in
- * LAYOUT-ACCEPTANCE.md §1. `/web?seed=11` now goes to `/web/?seed=11`.
+ * LAYOUT-ACCEPTANCE.md §1. `/src/web?seed=11` now goes to `/src/web/?seed=11`.
  *
  * The Location is built from the RESOLVED directory (`file`, already checked to be inside
  * ROOT), never from the raw request path, and its leading slashes are collapsed to one. So
  * it is always a same-origin `/...` path. Copying the raw path was an open redirect:
- * `GET //evil.com/../web` resolves to the web/ directory, but answered
- * `Location: //evil.com/../web/`, which a browser reads as a protocol-relative URL to
+ * `GET //evil.com/../src/web` resolves to the src/web/ directory, but answered
+ * `Location: //evil.com/../src/web/`, which a browser reads as a protocol-relative URL to
  * evil.com (likewise `/\evil.com/...`, since browsers treat `\` as `/`).
  * @param {string} url request target: path plus optional `?query`
  * @param {string} file absolute directory path inside ROOT that `url` resolved to
@@ -105,7 +105,7 @@ const server = createServer((req, res) => {
     return;
   }
 
-  // A malformed %-escape (`GET /web%`, `/%E0%A4%A`) makes decodeURIComponent throw a
+  // A malformed %-escape (`GET /src/web%`, `/%E0%A4%A`) makes decodeURIComponent throw a
   // URIError. Uncaught, it killed the whole server; it is the client's bad request.
   let file;
   try {
