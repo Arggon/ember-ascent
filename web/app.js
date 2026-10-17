@@ -772,6 +772,10 @@ function act(actionId, targetK = null) {
    */
   if (after.phase === 'ended' && before.phase !== 'ended') {
     phaseArriving = after.outcome === 'win' ? 'victory' : 'defeat';
+    // The run just ended: build, score and store its record ONCE, so the end screen shows
+    // the ledger, marks and unlocks (it was defined but never called, so S1 always fell
+    // back to the no-record branch).
+    recordRun();
   }
 
   // The generation advances ONLY if a flash state actually changed, so an unrelated
@@ -2366,7 +2370,7 @@ function unlockBlock(info) {
 function recordRun() {
   const record = buildRunRecord({
     state: ctl.state,
-    submitted: runSubmitted,
+    submitted: ctl.submitted,
     events: runEvents,
     profile: poolLabel(),
     policy: 'human',
