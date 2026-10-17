@@ -121,9 +121,8 @@ test('AC-7.2: the same seed and action log yield a byte-identical score and reco
 
 test('AC-7.1: the score is the frozen formula, itemised, and the total is the sum of the lines', () => {
   // 4 floors, 3 kills in ONE elite fight, a victory, and 2 parseable plays. 'p2_1' is a
-  // targeted play; the reject is not a play. Deliberately a single combat: the
-  // cross-combat kill tally is broken (see the [TODO] case below), and this test is about
-  // the ARITHMETIC of the lines, which must stay provable while that defect is open.
+  // targeted play; the reject is not a play. Deliberately a single combat: this test is
+  // about the ARITHMETIC of the lines (the cross-combat tally has its own case below).
   const record = recordOf({
     floor: 4,
     outcome: 'win',
@@ -207,14 +206,10 @@ test('AC-7.1: a multi-hit attack counts one kill per enemy, not one per damage e
 });
 
 test(
-  'AC-7.1 [TODO — real defect]: kills must accumulate across combats, not reset at each combat_start',
-  { todo: true },
+  'AC-7.1: kills accumulate across combats, not reset at each combat_start',
   () => {
-    // DEFECT: src/kernel/record.js deriveCounts() calls `seenDead.clear()` on every
-    // `combat_start`, so the death set only ever holds the CURRENT combat's kills. A run
-    // that kills 2 enemies in the first fight and 1 in the second scores 1 kill, not 3.
-    // The per-combat key is already `${combatSeq}:${target}`, which makes the clear()
-    // unnecessary: the sequence number alone prevents cross-combat collisions.
+    // Was a defect: deriveCounts() cleared its death set on every `combat_start`, so only
+    // the LAST combat's kills counted. The `${combatSeq}:${target}` key separates combats.
     const events = [...combatKilling('weak_1', [0, 1]), ...combatKilling('weak_2', [0])];
     const counts = deriveCounts(recordOf({ events }));
     assert.equal(counts.kills, 3, `2 kills then 1 kill must total 3, got ${counts.kills}`);
@@ -222,7 +217,7 @@ test(
 );
 
 test('AC-7.1: elite and boss points come from the fight flag on the winning combat', () => {
-  // The passing control for the two [TODO] cases above: given a `combat_won` for a
+  // The control for the two kill cases above: given a `combat_won` for a
   // flagged encounter, deriveCounts scores it correctly. That localises the real-run
   // kill defect to the missing EMISSION, not to this arithmetic.
   assert.equal(deriveCounts(recordOf({ events: combatKilling('elite_1', [0]) })).elites, 1);
@@ -535,14 +530,17 @@ test('DR-6: a record built from a real completed run carries the accumulated eve
   assert.ok(REAL_A.score.counts.floors > 0, `the floor reached must be scored, got ${REAL_A.score.counts.floors}`);
 });
 
-test('DR-6 [TODO — real defect]: a real completed run must score a non-zero kill count', { todo: true }, () => {
-  // DEFECT: src/kernel/index.js:405 resolves a combat won by a CARD through
-  // resolveVictory(), which emits heal / reward_offered / rest_ready / run_end but never
-  // `combat_won`. Only the endTurn path (src/kernel/rules/act.js:301) emits it. Since
-  // deriveCounts() counts kills from `damage` events but only awards elite/boss points on
-  // `combat_won`, and the killed-enemy tally is the same stream, every run that wins a
-  // fight with a card scores 0 kills and 0 elites. Measured over 12 seeds: 77 enemy
-  // deaths, 0 `combat_won` events, 0 kills on every run.
+test('DR-6: every combat won in a real run emits combat_won, whether a card or end turn finished it', () => {
+  const starts = REAL_A.events.filter((e) => e.t === 'combat_start').length;
+  const won = REAL_A.events.filter((e) => e.t === 'combat_won').length;
+  const lost = REAL_A.outcome === 'loss' ? 1 : 0;
+  assert.equal(won, starts - lost, `combats started ${starts}, won ${won}, lost ${lost}`);
+});
+
+test('DR-6: a real completed run scores a non-zero kill count', () => {
+  // Was a defect: kills were reset per combat (see AC-7.1 above) and a combat won by a
+  // CARD never emitted `combat_won` (only the end-turn path did), so real runs scored
+  // 0 kills and 0 elites. Both are fixed in src/kernel/record.js and src/kernel/index.js.
   assert.ok(
     REAL_A.score.counts.kills > 0,
     `a run that killed enemies must score kills, got ${REAL_A.score.counts.kills} (events carry ${REAL_A.events.filter((e) => e.t === 'damage' && e.hp <= 0).length} enemy deaths)`,
