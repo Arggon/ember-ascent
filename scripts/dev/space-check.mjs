@@ -28,6 +28,7 @@
 //   node scripts/dev/space-check.mjs --base 'http://localhost:5173/src/web/index.html?seed={seed}'
 // The old --base override still works (a base containing seed= is re-seeded per seed).
 import { spawn } from 'node:child_process';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
@@ -127,10 +128,25 @@ const send = (method, params = {}, sessionId) => {
     pend.set(i, (x) => { clearTimeout(t); r(x); });
   });
 };
-const { targetId } = (await send('Target.createTarget', { url: 'about:blank' })).result;
-const { sessionId } = (await send('Target.attachToTarget', { targetId, flatten: true })).result;
-const S = (m, p) => send(m, p, sessionId);
-await S('Page.enable'); await S('Runtime.enable');
+// One tab per run, REPLACED after a failed row: a timed-out row's async work keeps running
+// after Promise.race gives up on it, so it must not be able to touch the next row (#49
+// review). Each row runs in its own AsyncLocalStorage context; once a row is cancelled
+// (liveRow moves on), any DevTools call it still makes is rejected before it is sent, and
+// its tab is closed, so pending calls on it fail too.
+const rowCtx = new AsyncLocalStorage();
+let liveRow = 0;
+let targetId, sessionId;
+async function openTab() {
+  ({ targetId } = (await send('Target.createTarget', { url: 'about:blank' })).result);
+  ({ sessionId } = (await send('Target.attachToTarget', { targetId, flatten: true })).result);
+  await send('Page.enable', {}, sessionId); await send('Runtime.enable', {}, sessionId);
+}
+const S = (m, p) => {
+  const row = rowCtx.getStore();
+  if (row !== undefined && row !== liveRow) return Promise.reject(new Error(`row ${row} cancelled`));
+  return send(m, p, sessionId);
+};
+await openTab();
 const ev = async (e) => {
   const r = await S('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true });
   if (r.result?.exceptionDetails) throw new Error(r.result.exceptionDetails.text);
@@ -177,7 +193,7 @@ async function cycle(url) {
 
 // Per-row and overall time limits, with progress on stderr, so a stuck row fails loudly
 // instead of the whole run going quiet (#36).
-const ROW_TIMEOUT_MS = 90000;
+const ROW_TIMEOUT_MS = Number(process.env.SPACE_ROW_TIMEOUT_MS) || 90000; // env override to exercise the cancel path
 const TOTAL_TIMEOUT_MS = 20 * 60000;
 const totalTimer = setTimeout(() => {
   console.error(`space-check: OVERALL TIMEOUT after ${TOTAL_TIMEOUT_MS / 60000} min, aborting`);
@@ -201,9 +217,11 @@ for (const [w, h, label, scale] of SIZES_SEL) {
     const rowT0 = Date.now();
     process.stderr.write(`[${rowNo}/${ROW_TOTAL}] ${sizeKey(w, h, scale)} seed ${seed} ... `);
     let m;
+    let textScaleId = null;
+    liveRow = rowNo;
     try {
-      m = await withTimeout((async () => {
-      const textScaleId = await beginTextScale(S, scale);
+      m = await withTimeout(rowCtx.run(rowNo, async () => {
+      textScaleId = await beginTextScale(S, scale);
       await cycle(url);
 
       const m = await ev(`(() => {
@@ -248,14 +266,27 @@ for (const [w, h, label, scale] of SIZES_SEL) {
       const shot = await S('Page.captureScreenshot', { format: 'png' });
       await writeFile(resolve(OUT, `${label}-${sizeKey(w, h, scale).replace('@', '-at')}-s${seed}.png`), Buffer.from(shot.result.data, 'base64'));
       await endTextScale(S, textScaleId);
+      textScaleId = null;
       return m;
-      })(), ROW_TIMEOUT_MS, 'row');
+      }), ROW_TIMEOUT_MS, 'row');
       process.stderr.write(`ok ${((Date.now() - rowT0) / 1000).toFixed(1)}s (total ${((Date.now() - T0) / 1000).toFixed(0)}s)\n`);
     } catch (e) {
       process.stderr.write(`FAILED: ${e.message}\n`);
-      m = { error: e.message, seedReported: null, wastePx: '-', wastePct: '-', docScrollHeight: '-', handFillPct: '-', label, requested: [w, h], requestedSeed: SEED_IN_URL ? seed : null, textScale: scale, viewport: [w, h] };
-      try { await S('Emulation.clearDeviceMetricsOverride'); } catch {}
-      try { await S('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: isPhone }); } catch {}
+      m = { error: e.message, seedReported: null, wastePx: null, wastePct: null, docScrollHeight: null, handFillPct: null, label, requested: [w, h], requestedSeed: SEED_IN_URL ? seed : null, textScale: scale, viewport: [w, h] };
+      liveRow = -rowNo; // cancel the row: its late calls are now rejected
+      // Undo the text scale this row applied (best effort: the tab may be the stuck part).
+      if (textScaleId !== null) { try { await withTimeout(endTextScale(S, textScaleId), 5000, 'endTextScale'); } catch {} }
+      // Fresh tab for the next row, with this size's emulation re-applied.
+      try { await withTimeout(send('Target.closeTarget', { targetId }), 5000, 'closeTarget'); } catch {}
+      try {
+        await openTab();
+        await S('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: isPhone });
+        await S('Emulation.setTouchEmulationEnabled', { enabled: isPhone, maxTouchPoints: isPhone ? 5 : 1 });
+      } catch (e2) {
+        console.error(`space-check: could not open a fresh tab after a failed row: ${e2.message}`);
+        try { child.kill('SIGKILL'); } catch {}
+        process.exit(3);
+      }
     }
     rows.push([sizeKey(w, h, scale), label, m]);
   }
@@ -300,10 +331,10 @@ for (const [size, label, m, fails] of evaluated) {
     String(m.requestedSeed === null ? 'n/a' : m.requestedSeed).padEnd(6) +
     String(m.seedReported === null ? '-' : m.seedReported).padEnd(10) +
     JSON.stringify(m.viewport).padEnd(14) +
-    String(m.wastePx + 'px').padEnd(8) +
-    String(m.wastePct + '%').padEnd(8) +
-    String(m.docScrollHeight).padEnd(9) +
-    String(m.handFillPct + '%').padEnd(11) +
+    String(m.wastePx == null ? '-' : m.wastePx + 'px').padEnd(8) +
+    String(m.wastePct == null ? '-' : m.wastePct + '%').padEnd(8) +
+    String(m.docScrollHeight ?? '-').padEnd(9) +
+    String(m.handFillPct == null ? '-' : m.handFillPct + '%').padEnd(11) +
     (fails.length ? 'FAIL' : 'pass'),
   );
 }
