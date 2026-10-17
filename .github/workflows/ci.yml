@@ -1,0 +1,43 @@
+name: CI
+
+# Runs on every pull request (any base branch, so stacked PRs get checks too) and on
+# pushes to main. Nothing else triggers it, to keep within the free Actions minutes.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same PR/branch cancels the run still in progress.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test + gate + surface-art
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Tests (npm test)
+        run: npm test
+
+      - name: Architecture gate (npm run gate)
+        run: npm run gate
+
+      - name: Surface art check
+        run: node tools/check-surface-art.mjs
