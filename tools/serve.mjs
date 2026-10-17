@@ -57,6 +57,7 @@ const TYPES = {
  * request escapes the root. This is the only place traversal is decided.
  * @param {string} urlPath
  * @returns {string|null}
+ * @throws {URIError} on a malformed %-escape (the caller answers 400)
  */
 function resolveInsideRoot(urlPath) {
   const decoded = decodeURIComponent(urlPath.split('?')[0].split('#')[0]);
@@ -104,7 +105,17 @@ const server = createServer((req, res) => {
     return;
   }
 
-  let file = resolveInsideRoot(req.url ?? '/');
+  // A malformed %-escape (`GET /web%`, `/%E0%A4%A`) makes decodeURIComponent throw a
+  // URIError. Uncaught, it killed the whole server; it is the client's bad request.
+  let file;
+  try {
+    file = resolveInsideRoot(req.url ?? '/');
+  } catch (err) {
+    if (!(err instanceof URIError)) throw err;
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('bad request: malformed percent-encoding in the path\n');
+    return;
+  }
   if (file === null) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('forbidden: path escapes the project root\n');

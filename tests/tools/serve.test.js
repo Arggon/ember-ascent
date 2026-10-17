@@ -119,3 +119,15 @@ test('a nested directory redirects to its normalized path', async () => {
   assert.equal(r.status, 301);
   assert.equal(r.location, '/web/assets/');
 });
+
+// THE BUG THIS PINS: a malformed %-escape made decodeURIComponent throw a URIError inside
+// the request handler, uncaught, so one bad request (`GET /web%`) took the server down.
+for (const input of ['/web%', '/%E0%A4%A', '/web/%zz']) {
+  test(`${input} is a 400, and the server keeps serving`, async () => {
+    const r = await rawGet(input);
+    assert.equal(r.status, 400);
+    const ok = await get('/web/?seed=11');
+    assert.equal(ok.status, 200, 'the server is still up after the bad request');
+    await ok.body?.cancel();
+  });
+}
