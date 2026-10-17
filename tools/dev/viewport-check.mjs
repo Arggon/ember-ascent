@@ -57,6 +57,7 @@ const NAME_MIDWORD_BREAKS_MAX = 0;  // no card-name word may lay out on more tha
 const CARDS_OUTSIDE_HAND_MAX = 0;   // every hand card inside the hand's visible box and viewport
 const DESC_OCCLUDED_MAX = 0;        // both ends of every visible rules line must be on its card
 const HERO_NAME_MIN_WIDTH = 381;    // from this width up the HUD shows the full hero name
+const NAME_MIN_PX = 9;              // a hand card name is never set below 9px (QA floor)
 // -------------------------------------------------------------------------------------------
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -101,9 +102,40 @@ const SIZES = [
   [1366, 768, 'laptop'],
   [1200, 450, 'short-desktop-window'],
 ];
+// Max-hand rows: the kernel caps the hand at 10 (src/kernel/rules/act.js and friends:
+// `hand.length < 10`). No seed deals 10 on turn 1, so the harness builds the worst case from
+// the real hand markup (see HAND_FIXTURE): ten card tiles carrying the card names with the
+// longest single words in the card list. Phone sizes only: wider layouts have the room.
+const MAX_HAND = 10;
+const HAND_SIZES = [
+  [360, 640, 'phone-small-hand10', MAX_HAND],
+  [390, 844, 'iphone-14-hand10', MAX_HAND],
+  [414, 896, 'phone-large-hand10', MAX_HAND],
+];
+const MATRIX = [...SIZES.map(([w, h, label]) => [w, h, label, 0]), ...HAND_SIZES];
+const keyOf = (w, h, hand) => `${w}x${h}` + (hand ? `+hand${hand}` : '');
 const SIZES_SEL = sizesArg
-  ? SIZES.filter(([w, h]) => sizesArg.split(',').some((s) => s.trim() === `${w}x${h}`))
-  : SIZES;
+  ? MATRIX.filter(([w, h, , hand]) => sizesArg.split(',').some((s) => s.trim() === keyOf(w, h, hand)))
+  : MATRIX;
+// Grows the rendered hand to `n` tiles by cloning the app's own .card-wrap markup (so every
+// class and rule is the real one), re-indexes the fan (--i on each wrap, --n on the hand, as
+// web/app.js sets them) and puts the longest-word card names on them, longest first.
+const LONG_NAMES = ['Hammerfall', 'Untempered', 'Overtemper', 'Returning Brand', 'Forgeclap',
+  'Climbing Heat', 'Unbroken', 'Twin Hammers', 'Ash Embrace', 'Ash Harvest'];
+const HAND_FIXTURE = (n) => `(() => {
+  const hand = document.querySelector('.hand'); if (!hand) return 0;
+  hand.classList.remove('deal-in');
+  const src = [...hand.children];
+  while (hand.children.length < ${n}) hand.append(src[hand.children.length % src.length].cloneNode(true));
+  const names = ${JSON.stringify(LONG_NAMES)};
+  [...hand.children].forEach((w, i) => {
+    w.style.setProperty('--i', String(i));
+    const nm = w.querySelector('.cname'); if (nm) nm.textContent = names[i % names.length];
+  });
+  hand.style.setProperty('--n', String(hand.children.length));
+  hand.scrollLeft = 0;
+  return hand.children.length;
+})()`;
 if (!SIZES_SEL.length) { console.error('no sizes matched --sizes ' + sizesArg); process.exit(2); }
 
 const DEFAULT_BASE = 'http://localhost:5173/web/index.html?seed={seed}';
@@ -159,13 +191,14 @@ async function cycle(url) {
 }
 
 const rows = [];
-for (const [w, h, label] of SIZES_SEL) {
+for (const [w, h, label, handN] of SIZES_SEL) {
   const isPhone = w <= 500;
   await S('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: isPhone });
   await S('Emulation.setTouchEmulationEnabled', { enabled: isPhone, maxTouchPoints: isPhone ? 5 : 1 });
   for (const seed of SEEDS) {
     const url = urlFor(seed);
     await cycle(url);
+    if (handN) { await ev(HAND_FIXTURE(handN)); await sleep(400); }
 
     const m = await ev(`(() => {
       const doc = document.documentElement;
@@ -235,6 +268,12 @@ for (const [w, h, label] of SIZES_SEL) {
         return clips ? [Math.max(0, r.left), Math.min(vw, r.right)] : [0, vw];
       })();
       const handCards = hand ? [...hand.querySelectorAll('.card')] : [];
+      // A hand that scrolls sideways (the max-hand layout) shows a window of its cards on
+      // purpose: cards beyond the window are reached by scrolling, so they are not "cut off".
+      // What must hold instead: at scroll 0 the FIRST card is whole, and the last card can be
+      // scrolled fully into view (lastCardReach, measured after this snapshot).
+      const handScrolls = !!hand && /auto|scroll/.test(getComputedStyle(hand).overflowX) && hand.scrollWidth > hand.clientWidth + 1;
+      const inBox = (c) => { const r = c.getBoundingClientRect(); return r.left >= handBox[0] - 1 && r.right <= handBox[1] + 1; };
       const cardName = (c) => ((c.querySelector('.cname') || {}).textContent || '?').trim();
       const textNodes = (el) => {
         const out = []; const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let t;
@@ -246,10 +285,7 @@ for (const [w, h, label] of SIZES_SEL) {
       const cardsOutside = handCards.map((c) => {
         const r = c.getBoundingClientRect();
         return cardName(c) + '[' + Math.round(r.left) + ',' + Math.round(r.right) + ']';
-      }).filter((s, i) => {
-        const r = handCards[i].getBoundingClientRect();
-        return r.left < handBox[0] - 1 || r.right > handBox[1] + 1;
-      });
+      }).filter((s, i) => (handScrolls ? i === 0 : true) && !inBox(handCards[i]));
       // A single word of a card name that lays out as more than one line fragment was broken
       // mid-word (overflow-wrap: anywhere / break-word kicks in only when the word cannot fit).
       const nameBreaks = [];
@@ -264,31 +300,63 @@ for (const [w, h, label] of SIZES_SEL) {
             if (frags > 1) nameBreaks.push(cardName(c) + ': "' + mm[0] + '" on ' + frags + ' lines');
           }
         }
+        // A name too wide for the card does not break (overflow-wrap: normal): it pushes the card's
+        // grid track wider and is clipped by the card ("HAMMERFAL"). Its widest line must fit the
+        // card's content box (clientWidth is untransformed; a fanned card's range rects grow by
+        // well under 1px at these angles, inside the 1px allowance).
+        const ccs = getComputedStyle(c);
+        const contentW = c.clientWidth - parseFloat(ccs.paddingLeft) - parseFloat(ccs.paddingRight);
+        const rgN = document.createRange(); rgN.selectNodeContents(n);
+        const widest = Math.max(0, ...[...rgN.getClientRects()].map((x) => x.width));
+        if (widest > contentW + 1) nameBreaks.push(cardName(c) + ': ' + Math.round(widest) + 'px wide in a ' + Math.round(contentW) + 'px card (clipped)');
       }
       // Rules text must be visible: for every rendered line inside the (line-clamped) rules
       // box, both ends of the line must hit this card (not a neighbour, not off-screen).
       const descOccluded = [];
       for (const c of handCards) {
         const d = c.querySelector('.cdesc'); if (!d) continue;
+        if (handScrolls && !inBox(c)) continue; // scrolled out of the window, by design
         const wrap = c.closest('.card-wrap') || c;
         const box = d.getBoundingClientRect();
         let bad = 0;
+        // Lines past the -webkit-line-clamp count are not painted (line N ends in an ellipsis)
+        // but still have rects, so only the first N laid-out lines are checked.
+        const dcs = getComputedStyle(d);
+        const clampN = parseInt(dcs.webkitLineClamp, 10) || Infinity;
+        const rects = [];
         for (const t of textNodes(d)) {
           if (!t.data.trim()) continue;
           const rg = document.createRange(); rg.selectNodeContents(t);
-          for (const x of rg.getClientRects()) {
-            const y = (x.top + x.bottom) / 2;
-            if (x.width < 1 || y < box.top || y > box.bottom) continue; // clamped-away line
-            for (const px of [x.left + 1.5, x.right - 1.5]) {
-              const hit = (px >= 0 && px <= vw && y >= 0 && y <= vh) ? document.elementFromPoint(px, y) : null;
-              // A bare .card-wrap or the hand itself is transparent (a neighbour's unrotated
-              // hit box); anything inside ANOTHER card, or outside the hand, hides the text.
-              const other = hit && hit.closest('.card');
-              const ok = hit && (wrap.contains(hit) || (!other && hit.closest('.hand')));
-              if (!ok) bad++;
-            }
+          for (const x of rg.getClientRects()) if (x.width >= 1) rects.push(x);
+        }
+        const lineTops = [];
+        for (const x of [...rects].sort((a, b) => a.top - b.top)) {
+          if (!lineTops.length || x.top - lineTops[lineTops.length - 1] > 2) lineTops.push(x.top);
+        }
+        const lastShownTop = lineTops[Math.min(clampN, lineTops.length) - 1];
+        // The visible window is the rules box clipped by its card (the card has a max-height and
+        // overflow: hidden too). A shown line whose glyph box crosses that window's edge is cut
+        // off (Anvil Blow's 4th line "Apply 2" half-drawn at 360x640). Glyph boxes are taller than
+        // line boxes when line-height < ~1.3, so the allowance is that difference plus 1px.
+        const cbox = c.getBoundingClientRect();
+        const winTop = Math.max(box.top, cbox.top), winBottom = Math.min(box.bottom, cbox.bottom);
+        const lh = parseFloat(dcs.lineHeight) || parseFloat(dcs.fontSize) * 1.2;
+        const cutLines = new Set();
+        for (const x of rects) {
+          if (lastShownTop === undefined || x.top > lastShownTop + 2) continue; // clamped away
+          const y = (x.top + x.bottom) / 2;
+          const slack = Math.max(0, (x.height - lh) / 2) + 1;
+          if (x.bottom > winBottom + slack || x.top < winTop - slack) { cutLines.add(Math.round(x.top)); continue; }
+          for (const px of [x.left + 1.5, x.right - 1.5]) {
+            const hit = (px >= 0 && px <= vw && y >= 0 && y <= vh) ? document.elementFromPoint(px, y) : null;
+            // A bare .card-wrap or the hand itself is transparent (a neighbour's unrotated hit
+            // box); anything inside ANOTHER card, or outside the hand, hides the text.
+            const other = hit && hit.closest('.card');
+            const ok = hit && (wrap.contains(hit) || (!other && hit.closest('.hand')));
+            if (!ok) bad++;
           }
         }
+        if (cutLines.size) descOccluded.push(cardName(c) + ' (' + cutLines.size + ' of its first ' + (clampN === Infinity ? 'all' : clampN) + ' lines cut off by the card/rules box)');
         if (bad) descOccluded.push(cardName(c) + ' (' + bad + ' line end(s) hidden)');
       }
       // The HUD hero name: dropped by design only below 381px wide (no room at 360px).
@@ -296,6 +364,8 @@ for (const [w, h, label] of SIZES_SEL) {
       const heroName = !heroEl ? 'missing'
         : !heroEl.getClientRects().length ? 'hidden'
         : heroEl.scrollWidth > heroEl.clientWidth + 1 ? 'truncated' : 'shown';
+      const nameSmall = handCards.map((c) => { const n = c.querySelector('.cname'); return n ? cardName(c) + ' ' + parseFloat(getComputedStyle(n).fontSize).toFixed(1) + 'px' : null; })
+        .filter((x, i) => x && parseFloat(getComputedStyle(handCards[i].querySelector('.cname')).fontSize) < ${NAME_MIN_PX} - 0.05);
       return {
         viewport: [vw, vh],
         seedReported,
@@ -314,6 +384,9 @@ for (const [w, h, label] of SIZES_SEL) {
         nameBreaks,
         descOccluded,
         heroName,
+        nameSmall,
+        handCount: handCards.length,
+        handScrolls,
         handBox: handBox.map(Math.round),
         cardsClipped: cards.filter(c => c.getBoundingClientRect().right > (hand ? hand.getBoundingClientRect().right + 1 : vw)).length,
         lastCardBottom: last ? Math.round(last.getBoundingClientRect().bottom) : null,
@@ -392,7 +465,19 @@ for (const [w, h, label] of SIZES_SEL) {
     m.label = label;
     const shot = await S('Page.captureScreenshot', { format: 'png' });
     await writeFile(resolve(OUT, `${label}-${w}x${h}-s${seed}.png`), Buffer.from(shot.result.data, 'base64'));
-    rows.push([`${w}x${h}`, label, m]);
+    m.handWanted = handN;
+    // A hand that scrolls must reach its last card: scroll to the end, check that card sits
+    // fully inside the hand's box, and scroll back.
+    m.lastCardReach = await ev(`(() => {
+      const hand = document.querySelector('.hand'); if (!hand || hand.scrollWidth <= hand.clientWidth + 1) return null;
+      hand.scrollLeft = hand.scrollWidth;
+      const hb = hand.getBoundingClientRect(), last = hand.lastElementChild.querySelector('.card').getBoundingClientRect();
+      const ok = last.left >= Math.max(0, hb.left) - 1 && last.right <= Math.min(innerWidth, hb.right) + 1;
+      const out = ok ? 'ok' : Math.round(last.left) + ',' + Math.round(last.right) + ' vs [' + Math.round(hb.left) + ',' + Math.round(hb.right) + ']';
+      hand.scrollLeft = 0;
+      return out;
+    })()`);
+    rows.push([keyOf(w, h, handN), label, m]);
   }
 }
 
@@ -436,13 +521,22 @@ function evaluateRow(m) {
     fails.push(`stageSpillPx: #stage clips content: descendant spill=${m.spillPx}px > ${STAGE_SPILL_ALLOW_PX}px (deepest: ${m.spillWorst}; #stage is overflow: hidden and swallows it)`);
   }
   if (m.nameBreaks.length > NAME_MIDWORD_BREAKS_MAX) {
-    fails.push(`card name broken mid-word: ${m.nameBreaks.join('; ')}`);
+    fails.push(`card name broken mid-word or clipped: ${m.nameBreaks.join('; ')}`);
   }
   if (m.cardsOutside.length > CARDS_OUTSIDE_HAND_MAX) {
     fails.push(`hand card(s) cut off outside the visible hand box [${m.handBox.join(',')}]: ${m.cardsOutside.join(' ')}`);
   }
   if (m.descOccluded.length > DESC_OCCLUDED_MAX) {
     fails.push(`rules text hidden (covered or off-screen): ${m.descOccluded.join('; ')}`);
+  }
+  if (m.handWanted && m.handCount !== m.handWanted) {
+    fails.push(`max-hand fixture lost: wanted ${m.handWanted} cards, measured ${m.handCount} (the app re-rendered the hand)`);
+  }
+  if (m.nameSmall.length) {
+    fails.push(`card name below ${NAME_MIN_PX}px: ${m.nameSmall.join('; ')}`);
+  }
+  if (m.lastCardReach !== null && m.lastCardReach !== 'ok') {
+    fails.push(`scrolling hand cannot bring its last card fully into view: ${m.lastCardReach}`);
   }
   if (m.viewport[0] >= HERO_NAME_MIN_WIDTH && m.heroName !== 'shown') {
     fails.push(`HUD hero name ${m.heroName} at ${m.viewport[0]}px wide (must be shown in full from ${HERO_NAME_MIN_WIDTH}px)`);
@@ -463,13 +557,14 @@ console.log('thresholds: EndTurn bottom <= innerHeight - ' + END_TURN_CLEARANCE_
   + ' | cards outside hand <= ' + CARDS_OUTSIDE_HAND_MAX
   + ' | rules lines hidden <= ' + DESC_OCCLUDED_MAX
   + ' | hero name shown from ' + HERO_NAME_MIN_WIDTH + 'px'
+  + ' | card names >= ' + NAME_MIN_PX + 'px'
   + ' | seed pinned: ' + (SEED_IN_URL ? 'yes' : 'no'));
 console.log('base: ' + BASE_TEMPLATE + '  seeds: ' + SEEDS.join(','));
 console.log('');
-console.log('size         label            seed  reported  eTbot/vh  clear  scrollPx  handRows  stageClip  spillPx  onTop  result');
+console.log('size            label                 seed  reported  eTbot/vh  clear  scrollPx  handRows  stageClip  spillPx  onTop  result');
 for (const [size, label, m] of evaluated) {
   console.log(
-    size.padEnd(13) + label.padEnd(17) +
+    size.padEnd(16) + label.padEnd(22) +
     String(m.requestedSeed === null ? 'n/a' : m.requestedSeed).padEnd(6) +
     String(m.seedReported === null ? '-' : m.seedReported).padEnd(10) +
     (m.endTurnFound ? `${m.endTurnBottom}/${m.viewport[1]}` : 'NOT FOUND').padEnd(10) +

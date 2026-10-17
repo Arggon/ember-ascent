@@ -3492,6 +3492,7 @@ html, body {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
   overflow: hidden;
+  min-width: 0;
 }
 @media (max-height: 480px) {
   .stage-combat .card .cdesc { -webkit-line-clamp: 3; line-height: 1; }
@@ -3506,15 +3507,20 @@ html, body {
      (cqi), capped at the old size, so the longest single word in the card list ("Untempered",
      "Hammerfall") fits on one line. Desktop cards are wide enough that the cap still applies:
      same size there. The 18px gem clearance is dropped because in combat the name sits below
-     the type band, not beside the gem. */
+     the type band, not beside the gem.
+     The floor is 9px (QA's legibility floor), in px rather than rem so large system text
+     cannot push it past the card width; the layouts below guarantee a card wide enough for
+     a ten-letter word at 9px. min-width: 0 on the name and the rules box keeps a long word
+     from widening the card's grid track (which would clip every line at the card edge). */
 .stage-combat .card .cname {
   padding-left: 0;
   overflow-wrap: normal;
   hyphens: none;
-  font-size: clamp(0.56rem, 13.5cqi, 0.98rem);
+  min-width: 0;
+  font-size: max(9px, min(0.98rem, 13.5cqi));
 }
 @media (max-height: 480px) {
-  .stage-combat .card .cname { font-size: clamp(0.56rem, 13.5cqi, 0.72rem); }
+  .stage-combat .card .cname { font-size: max(9px, min(0.72rem, 13.5cqi)); }
 }
 /* - The fan stays inside the hand. The hand clips (overflow: hidden), the outer card-wraps sat
      6px outside it on negative margins, and the 3deg/5deg fan swung their corners further out,
@@ -3536,20 +3542,62 @@ html, body {
     transform: translateY(-8px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 1.5deg));
   }
   .stage-combat .card .ctype { margin-left: -4px; margin-right: -4px; padding-left: 18px; padding-right: 4px; gap: 2px; }
-  .stage-combat .card .cname { text-align: center; letter-spacing: 0; font-size: clamp(0.56rem, 14cqi, 0.98rem); }
+  .stage-combat .card .cname { text-align: center; letter-spacing: 0; font-size: max(9px, min(0.98rem, 14cqi)); }
 }
 @media (max-width: 1000px) and (min-height: 700px) {
   .stage-combat .card { transform: translateY(-12px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 1.5deg)); }
 }
 @media (max-width: 1000px) and (max-height: 480px) {
-  .stage-combat .card .cname { font-size: clamp(0.56rem, 14cqi, 0.72rem); }
+  .stage-combat .card .cname { font-size: max(9px, min(0.72rem, 14cqi)); }
 }
 /* - Portrait phones: ~75px a card. The neighbours overlap by exactly the 4px side padding, so
      the overlap only ever covers padding, never words. */
 @media (max-width: 620px) {
   .stage-combat .hand { padding-left: 10px; padding-right: 10px; }
   .stage-combat .card-wrap { margin: 0 -2px; }
-  .stage-combat .card .cname { font-size: clamp(0.56rem, 14cqi, 0.82rem); }
+  .stage-combat .card .cname { font-size: max(9px, min(0.82rem, 14cqi)); }
+}
+/* - 360px phones: 5 cards leave ~60px of text width, under the 62px a ten-letter name needs
+     at 9px. The hand inset drops to 6px (the 1.5deg fan swings the corners ~5px) and the card
+     inset/overlap to 3px, which gives ~63px. */
+@media (max-width: 380px) {
+  .stage-combat .hand { padding-left: 6px; padding-right: 6px; }
+  .stage-combat .card-wrap { margin: 0 -1.5px; }
+  .stage-combat .card { padding-left: 3px; padding-right: 3px; }
+  .stage-combat .card .ctype { margin-left: -3px; margin-right: -3px; }
+}
+/* - Big hands on phones (6 to 10 cards; the kernel caps the hand at 10). Squeezing them into
+     the row took names to 8.4px and cut them ("ATTA", "HAMMERFAL"), and pushed the end cards
+     out of the hand. From 6 cards the hand scrolls sideways instead: every card keeps the
+     5-card width (names whole and >= 9px, 4-line rules cap unchanged), the row starts at the
+     first card, the next card peeks in at the right edge as the cue to swipe, and the fan
+     flattens because rotated tiles in a scroller would clip at its edges. Tap targets and
+     keyboard digits are unchanged. */
+@media (max-width: 620px) {
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 10px;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) > .card-wrap {
+    flex: 0 0 76px;
+    scroll-snap-align: start;
+  }
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) .card { transform: translateY(-8px); }
+}
+@media (max-width: 380px) {
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) > .card-wrap { flex-basis: 72px; }
+}
+/* - Short portrait phones (360x640): the card is capped at 100px, which holds three rules
+     lines, not four, so a fourth was drawn half-cut under the card edge (Anvil Blow's
+     "Apply 2"). Three lines ending in an ellipsis instead; the full sentence stays in the
+     card's aria-label/tooltip and the glossary, as with the 4-line cap. */
+@media (max-width: 700px) and (max-height: 760px) {
+  .stage-combat .card .cdesc { -webkit-line-clamp: 3; }
 }
 /* - The HUD hero name comes back from 381px up: the pills give back 2px a side each and the
      name truncates with an ellipsis rather than widening the row. Below 381px it stays dropped
