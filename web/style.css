@@ -3599,6 +3599,17 @@ html, body {
 @media (max-width: 700px) and (max-height: 760px) {
   .stage-combat .card .cdesc { -webkit-line-clamp: 3; }
 }
+/* - Tall-narrow phones at large text (#28: 360x780 with 130% text). Between 700 and 780px
+     tall the fight is capped at 348px and the figures are 36-42vh (210-260px), so the hero
+     and enemy columns (figure + name + HP + intent) are the fight's floor. 130% text grows
+     the name, HP and intent lines and the dock, and the page scrolled 7px (17px with a
+     10-card hand; 61-72px on older bases, see #28). Shorter figures on portrait phones in
+     that band let the fight give the room back. At 100% text the fight keeps its height;
+     only the sprites are drawn smaller. */
+@media (max-width: 620px) and (min-height: 700px) and (max-height: 780px) {
+  .stage-combat .fig,
+  .stage-combat .hero .fig { height: min(160px, 26vh); }
+}
 /* - The HUD hero name comes back from 381px up: the pills give back 2px a side each and the
      name truncates with an ellipsis rather than widening the row. Below 381px it stays dropped
      (the max-width: 620px rule near the top) because the 360px row has no room. */

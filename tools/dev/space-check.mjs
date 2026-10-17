@@ -23,6 +23,8 @@
 //   node tools/dev/space-check.mjs --seeds 1-12             # seed range
 //   node tools/dev/space-check.mjs --seeds 3,7,11           # seed list (ranges may mix)
 //   node tools/dev/space-check.mjs --sizes 1366x768,915x412 # subset of SIZES
+//   node tools/dev/space-check.mjs --sizes 360x640@130,412x915@130 # large-font rows (text-scale.mjs)
+//   node tools/dev/space-check.mjs --port 9400                # own DevTools port + profile
 //   node tools/dev/space-check.mjs --base 'http://localhost:5173/web/index.html?seed={seed}'
 // The old --base override still works (a base containing seed= is re-seeded per seed).
 import { spawn } from 'node:child_process';
@@ -30,6 +32,7 @@ import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LARGE_FONT_SIZES, sizeKey, beginTextScale, endTextScale, TEXT_SCALE_PROBE, textScaleFailure } from './text-scale.mjs';
 
 // ---- Acceptance thresholds (LAYOUT-ACCEPTANCE.md). Adjust here, not below. ----
 const WASTE_PX_FAIL_BELOW = 0;   // exit 1 when any row has wastePx < this (existing signal)
@@ -39,16 +42,20 @@ const SEED_MUST_MATCH = true;    // page-reported seed must equal the requested 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OUT = resolve(ROOT, 'shots/space');
 mkdirSync(OUT, { recursive: true });
-const PORT = 9343, PROFILE = '/tmp/dlb-space';
 
 const argv = process.argv.slice(2);
-let seedsArg = null, sizesArg = null, baseArg = null;
+let portArg = null, seedsArg = null, sizesArg = null, baseArg = null;
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--seeds') seedsArg = argv[++i];
   else if (argv[i] === '--sizes') sizesArg = argv[++i];
   else if (argv[i] === '--base') baseArg = argv[++i];
+  else if (argv[i] === '--port') portArg = Number(argv[++i]);
   else baseArg = baseArg || argv[i]; // tolerate a positional BASE too
 }
+
+// --port: the DevTools port, with a profile dir named after it, so two runs on one machine
+// (several agents share it) never attach to each other's browser.
+const PORT = portArg || 9343, PROFILE = portArg ? '/tmp/dlb-space-' + portArg : '/tmp/dlb-space';
 
 function parseSeeds(s) {
   const out = [];
@@ -77,9 +84,12 @@ const SIZES = [
   [844, 390, 'iphone-14-landscape'],
   [1200, 450, 'short-window'],
 ];
+// Every 100% row, then the large-font rows (tools/dev/text-scale.mjs: Gonzalo's rule, every
+// build at 360-412dp with 130% text). --sizes takes "360x640" for 100% and "360x640@130".
+const MATRIX = [...SIZES.map(([w, h, label]) => [w, h, label, 1]), ...LARGE_FONT_SIZES];
 const SIZES_SEL = sizesArg
-  ? SIZES.filter(([w, h]) => sizesArg.split(',').some((s) => s.trim() === `${w}x${h}`))
-  : SIZES;
+  ? MATRIX.filter(([w, h, , scale]) => sizesArg.split(',').some((s) => s.trim() === sizeKey(w, h, scale)))
+  : MATRIX;
 if (!SIZES_SEL.length) { console.error('no sizes matched --sizes ' + sizesArg); process.exit(2); }
 
 const DEFAULT_BASE = 'http://localhost:5173/web/index.html?seed={seed}';
@@ -122,23 +132,41 @@ const ev = async (e) => {
 };
 
 // Full navigate - dismiss - navigate - travel cycle, per viewport x seed.
+// Each step WAITS for the element it needs before the old settle time: with fixed sleeps alone a
+// loaded machine produced "End Turn NOT FOUND" / "no seed" rows because the page had not
+// rendered yet. The final 1300ms settle stays so the deal-in animation is over.
+async function waitFor(expr, timeoutMs = 15000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    try { if (await ev(expr)) return true; } catch { /* mid-navigation */ }
+    await sleep(100);
+  }
+  return false;
+}
+const MAP_READY = `!!(document.querySelector('.node.available') || [...document.querySelectorAll('button')].some(x => /got it/i.test(x.textContent || '')))`;
+const FIGHT_READY = `!!([...document.querySelectorAll('button')].some(b => /end turn/i.test(b.textContent || '')) && document.querySelector('.hand .card'))`;
 async function cycle(url) {
   await S('Page.navigate', { url });
-  await sleep(1300);
+  await waitFor(MAP_READY);
+  await sleep(300);
   await ev(`(()=>{const b=[...document.querySelectorAll('button')].find(x=>/got it/i.test(x.textContent||''));if(b)b.click();try{localStorage.setItem('dlb.helpSeen.v1','1')}catch{};return 1})()`);
   await S('Page.navigate', { url });
-  await sleep(1200);
+  await waitFor(MAP_READY);
+  await sleep(300);
+  // Travel into the first fight: the densest screen.
   await ev(`(()=>{const n=document.querySelector('.node.available');if(n)n.click();return 1})()`);
+  await waitFor(FIGHT_READY);
   await sleep(1300);
 }
 
 const rows = [];
-for (const [w, h, label] of SIZES_SEL) {
+for (const [w, h, label, scale] of SIZES_SEL) {
   const isPhone = w <= 500;
   await S('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: isPhone });
   await S('Emulation.setTouchEmulationEnabled', { enabled: isPhone, maxTouchPoints: isPhone ? 5 : 1 });
   for (const seed of SEEDS) {
     const url = urlFor(seed);
+    const textScaleId = await beginTextScale(S, scale);
     await cycle(url);
 
     const m = await ev(`(() => {
@@ -176,16 +204,27 @@ for (const [w, h, label] of SIZES_SEL) {
       };
     })()`);
     m.requestedSeed = SEED_IN_URL ? seed : null;
+    m.requested = [w, h];
+    const ts = await ev(TEXT_SCALE_PROBE);
+    m.textScale = scale; m.textScaleApplied = ts.applied; m.rootFontPx = ts.rootPx;
     m.label = label;
     const shot = await S('Page.captureScreenshot', { format: 'png' });
-    await writeFile(resolve(OUT, `${label}-${w}x${h}-s${seed}.png`), Buffer.from(shot.result.data, 'base64'));
-    rows.push([`${w}x${h}`, label, m]);
+    await writeFile(resolve(OUT, `${label}-${sizeKey(w, h, scale).replace('@', '-at')}-s${seed}.png`), Buffer.from(shot.result.data, 'base64'));
+    await endTextScale(S, textScaleId);
+    rows.push([sizeKey(w, h, scale), label, m]);
   }
 }
 
 // ---- Evaluate per row: negative wastePx is the existing signal; seed mismatch is invalid. ----
 function evaluateRow(m) {
   const fails = [];
+  const tsFail = textScaleFailure(m);
+  if (tsFail) fails.push(tsFail);
+  // A mobile page wider than the screen is zoomed out to fit, so innerWidth/innerHeight come
+  // back LARGER than the device and every other number is measured on a shrunken page.
+  if (m.viewport[0] !== m.requested[0] || m.viewport[1] !== m.requested[1]) {
+    fails.push(`page wider than the screen: rendered viewport ${m.viewport.join('x')} != device ${m.requested.join('x')} (mobile zooms out to fit)`);
+  }
   if (SEED_MUST_MATCH) {
     if (m.requestedSeed === null) {
       fails.push(`seed check n/a (base URL has no seed param): page reported seed ${m.seedReported}`);
@@ -207,10 +246,10 @@ const failedRows = evaluated.filter(([, , , fails]) => fails.length > 0);
 console.log('thresholds: wastePx >= ' + WASTE_PX_FAIL_BELOW + ' (negative = content below the fold) | seed pinned: ' + (SEED_IN_URL ? 'yes' : 'no'));
 console.log('base: ' + BASE_TEMPLATE + '  seeds: ' + SEEDS.join(','));
 console.log('');
-console.log('size         label            seed  reported  viewport      waste   waste%  scrollH  handFill%  result');
+console.log('size         label                   seed  reported  viewport      waste   waste%  scrollH  handFill%  result');
 for (const [size, label, m, fails] of evaluated) {
   console.log(
-    size.padEnd(13) + label.padEnd(17) +
+    size.padEnd(13) + label.padEnd(24) +
     String(m.requestedSeed === null ? 'n/a' : m.requestedSeed).padEnd(6) +
     String(m.seedReported === null ? '-' : m.seedReported).padEnd(10) +
     JSON.stringify(m.viewport).padEnd(14) +

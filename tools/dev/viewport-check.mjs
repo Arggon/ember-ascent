@@ -17,6 +17,8 @@
 //   node tools/dev/viewport-check.mjs --seeds 1-12             # seed range
 //   node tools/dev/viewport-check.mjs --seeds 3,7,11           # seed list (ranges may mix)
 //   node tools/dev/viewport-check.mjs --sizes 1366x768,915x412 # subset of SIZES
+//   node tools/dev/viewport-check.mjs --sizes 360x640@130,412x915@130 # large-font rows (text-scale.mjs)
+//   node tools/dev/viewport-check.mjs --port 9400                # own DevTools port + profile
 //   node tools/dev/viewport-check.mjs --base 'http://localhost:5173/web/index.html?seed={seed}'
 //   node tools/dev/viewport-check.mjs --diag                   # + per-block height dump
 // The old positional BASE argument still works:
@@ -26,6 +28,7 @@ import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LARGE_FONT_SIZES, sizeKey, beginTextScale, endTextScale, TEXT_SCALE_PROBE, textScaleFailure } from './text-scale.mjs';
 
 // ---- Acceptance thresholds (LAYOUT-ACCEPTANCE.md S1/S2/S3/S5). Adjust here, not below. ----
 const END_TURN_CLEARANCE_PX = 8;  // End Turn bottom must be <= innerHeight - this (S1/S3)
@@ -63,17 +66,21 @@ const NAME_MIN_PX = 9;              // a hand card name is never set below 9px (
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OUT = resolve(ROOT, 'shots/viewport');
 mkdirSync(OUT, { recursive: true });
-const PORT = 9341, PROFILE = '/tmp/dlb-viewport';
 
 const argv = process.argv.slice(2);
-let seedsArg = null, sizesArg = null, baseArg = null, diag = false;
+let portArg = null, seedsArg = null, sizesArg = null, baseArg = null, diag = false;
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--seeds') seedsArg = argv[++i];
   else if (argv[i] === '--sizes') sizesArg = argv[++i];
   else if (argv[i] === '--base') baseArg = argv[++i];
+  else if (argv[i] === '--port') portArg = Number(argv[++i]);
   else if (argv[i] === '--diag') diag = true;
   else baseArg = baseArg || argv[i]; // old positional BASE still works
 }
+
+// --port: the DevTools port, with a profile dir named after it, so two runs on one machine
+// (several agents share it) never attach to each other's browser.
+const PORT = portArg || 9341, PROFILE = portArg ? '/tmp/dlb-viewport-' + portArg : '/tmp/dlb-viewport';
 
 function parseSeeds(s) {
   const out = [];
@@ -112,10 +119,19 @@ const HAND_SIZES = [
   [390, 844, 'iphone-14-hand10', MAX_HAND],
   [414, 896, 'phone-large-hand10', MAX_HAND],
 ];
-const MATRIX = [...SIZES.map(([w, h, label]) => [w, h, label, 0]), ...HAND_SIZES];
-const keyOf = (w, h, hand) => `${w}x${h}` + (hand ? `+hand${hand}` : '');
+// Rows are [w, h, label, textScale, handN]: every 100% row, then the large-font rows
+// (tools/dev/text-scale.mjs: Gonzalo's rule, every build at 360-412dp with 130% text), then
+// the 10-card hand at every phone size, at 100% and at 130%. --sizes takes "360x640",
+// "360x640@130", "360x640+hand10" and "360x640@130+hand10".
+const MATRIX = [
+  ...SIZES.map(([w, h, label]) => [w, h, label, 1, 0]),
+  ...LARGE_FONT_SIZES.map(([w, h, label, scale]) => [w, h, label, scale, 0]),
+  ...HAND_SIZES.map(([w, h, label, n]) => [w, h, label, 1, n]),
+  ...LARGE_FONT_SIZES.map(([w, h, label, scale]) => [w, h, label + '-hand10', scale, MAX_HAND]),
+];
+const keyOf = (w, h, scale, hand) => sizeKey(w, h, scale) + (hand ? `+hand${hand}` : '');
 const SIZES_SEL = sizesArg
-  ? MATRIX.filter(([w, h, , hand]) => sizesArg.split(',').some((s) => s.trim() === keyOf(w, h, hand)))
+  ? MATRIX.filter(([w, h, , scale, hand]) => sizesArg.split(',').some((s) => s.trim() === keyOf(w, h, scale, hand)))
   : MATRIX;
 // Grows the rendered hand to `n` tiles by cloning the app's own .card-wrap markup (so every
 // class and rule is the real one), re-indexes the fan (--i on each wrap, --n on the hand, as
@@ -179,24 +195,41 @@ const ev = async (e) => {
 };
 
 // Full navigate - dismiss - navigate - travel cycle, per viewport x seed.
+// Each step WAITS for the element it needs before the old settle time: with fixed sleeps alone a
+// loaded machine produced "End Turn NOT FOUND" / "no seed" rows because the page had not
+// rendered yet. The final 1300ms settle stays so the deal-in animation is over.
+async function waitFor(expr, timeoutMs = 15000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    try { if (await ev(expr)) return true; } catch { /* mid-navigation */ }
+    await sleep(100);
+  }
+  return false;
+}
+const MAP_READY = `!!(document.querySelector('.node.available') || [...document.querySelectorAll('button')].some(x => /got it/i.test(x.textContent || '')))`;
+const FIGHT_READY = `!!([...document.querySelectorAll('button')].some(b => /end turn/i.test(b.textContent || '')) && document.querySelector('.hand .card'))`;
 async function cycle(url) {
   await S('Page.navigate', { url });
-  await sleep(1300);
+  await waitFor(MAP_READY);
+  await sleep(300);
   await ev(`(()=>{const b=[...document.querySelectorAll('button')].find(x=>/got it/i.test(x.textContent||''));if(b)b.click();try{localStorage.setItem('dlb.helpSeen.v1','1')}catch{};return 1})()`);
   await S('Page.navigate', { url });
-  await sleep(1200);
+  await waitFor(MAP_READY);
+  await sleep(300);
   // Travel into the first fight: the densest screen.
   await ev(`(()=>{const n=document.querySelector('.node.available');if(n)n.click();return 1})()`);
+  await waitFor(FIGHT_READY);
   await sleep(1300);
 }
 
 const rows = [];
-for (const [w, h, label, handN] of SIZES_SEL) {
+for (const [w, h, label, scale, handN] of SIZES_SEL) {
   const isPhone = w <= 500;
   await S('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: isPhone });
   await S('Emulation.setTouchEmulationEnabled', { enabled: isPhone, maxTouchPoints: isPhone ? 5 : 1 });
   for (const seed of SEEDS) {
     const url = urlFor(seed);
+    const textScaleId = await beginTextScale(S, scale);
     await cycle(url);
     if (handN) { await ev(HAND_FIXTURE(handN)); await sleep(400); }
 
@@ -301,9 +334,9 @@ for (const [w, h, label, handN] of SIZES_SEL) {
           }
         }
         // A name too wide for the card does not break (overflow-wrap: normal): it pushes the card's
-        // grid track wider and is clipped by the card ("HAMMERFAL"). Its widest line must fit the
-        // card's content box (clientWidth is untransformed; a fanned card's range rects grow by
-        // well under 1px at these angles, inside the 1px allowance).
+        // grid track wider and is clipped by the card ("HAMMERFAL" at 130% text). Its widest line
+        // must fit the card's content box (clientWidth is untransformed; a fanned card's range
+        // rects grow by well under 1px at these angles, inside the 1px allowance).
         const ccs = getComputedStyle(c);
         const contentW = c.clientWidth - parseFloat(ccs.paddingLeft) - parseFloat(ccs.paddingRight);
         const rgN = document.createRange(); rgN.selectNodeContents(n);
@@ -462,9 +495,12 @@ for (const [w, h, label, handN] of SIZES_SEL) {
       };
     })()`);
     m.requestedSeed = SEED_IN_URL ? seed : null;
+    m.requested = [w, h];
+    const ts = await ev(TEXT_SCALE_PROBE);
+    m.textScale = scale; m.textScaleApplied = ts.applied; m.rootFontPx = ts.rootPx;
     m.label = label;
     const shot = await S('Page.captureScreenshot', { format: 'png' });
-    await writeFile(resolve(OUT, `${label}-${w}x${h}-s${seed}.png`), Buffer.from(shot.result.data, 'base64'));
+    await writeFile(resolve(OUT, `${label}-${sizeKey(w, h, scale).replace('@', '-at')}-s${seed}.png`), Buffer.from(shot.result.data, 'base64'));
     m.handWanted = handN;
     // A hand that scrolls must reach its last card: scroll to the end, check that card sits
     // fully inside the hand's box, and scroll back.
@@ -477,13 +513,21 @@ for (const [w, h, label, handN] of SIZES_SEL) {
       hand.scrollLeft = 0;
       return out;
     })()`);
-    rows.push([keyOf(w, h, handN), label, m]);
+    await endTextScale(S, textScaleId);
+    rows.push([keyOf(w, h, scale, handN), label, m]);
   }
 }
 
 // ---- Evaluate the contract per row. -----------------------------------------------
 function evaluateRow(m) {
   const fails = [];
+  const tsFail = textScaleFailure(m);
+  if (tsFail) fails.push(tsFail);
+  // A mobile page wider than the screen is zoomed out to fit, so innerWidth/innerHeight come
+  // back LARGER than the device and every other number is measured on a shrunken page.
+  if (m.viewport[0] !== m.requested[0] || m.viewport[1] !== m.requested[1]) {
+    fails.push(`page wider than the screen: rendered viewport ${m.viewport.join('x')} != device ${m.requested.join('x')} (mobile zooms out to fit)`);
+  }
   const vh = m.viewport[1];
   if (m.requestedSeed === null) {
     fails.push(`seed check n/a (base URL has no seed param): page reported seed ${m.seedReported}`);
@@ -561,10 +605,10 @@ console.log('thresholds: EndTurn bottom <= innerHeight - ' + END_TURN_CLEARANCE_
   + ' | seed pinned: ' + (SEED_IN_URL ? 'yes' : 'no'));
 console.log('base: ' + BASE_TEMPLATE + '  seeds: ' + SEEDS.join(','));
 console.log('');
-console.log('size            label                 seed  reported  eTbot/vh  clear  scrollPx  handRows  stageClip  spillPx  onTop  result');
+console.log('size                label                       seed  reported  eTbot/vh  clear  scrollPx  handRows  stageClip  spillPx  onTop  result');
 for (const [size, label, m] of evaluated) {
   console.log(
-    size.padEnd(16) + label.padEnd(22) +
+    size.padEnd(20) + label.padEnd(28) +
     String(m.requestedSeed === null ? 'n/a' : m.requestedSeed).padEnd(6) +
     String(m.seedReported === null ? '-' : m.seedReported).padEnd(10) +
     (m.endTurnFound ? `${m.endTurnBottom}/${m.viewport[1]}` : 'NOT FOUND').padEnd(10) +
