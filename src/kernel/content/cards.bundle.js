@@ -26,6 +26,24 @@ export const cardsBundle = {
       ],
       "startingRelic": "burning_blood",
       "relicName": "Kindled Heart"
+    },
+    "bellows": {
+      "name": "Bellows Keeper",
+      "maxHp": 54,
+      "startingDeck": [
+        "strike",
+        "strike",
+        "strike",
+        "strike",
+        "defend",
+        "defend",
+        "defend",
+        "defend",
+        "gust",
+        "fan_flames"
+      ],
+      "startingRelic": "cyan_lantern",
+      "relicName": "Cyan Lantern"
     }
   },
   "cards": [
@@ -79,6 +97,42 @@ export const cardsBundle = {
         }
       ],
       "flavor": "The anvil answers louder than the hammer."
+    },
+    {
+      "id": "gust",
+      "name": "Bellows Gust",
+      "cost": 1,
+      "type": "attack",
+      "rarity": "starter",
+      "target": "all",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 4,
+          "target": "all_enemies"
+        }
+      ],
+      "flavor": "One long breath across the coals.",
+      "hero": "bellows"
+    },
+    {
+      "id": "fan_flames",
+      "name": "Fan the Flames",
+      "cost": 0,
+      "type": "skill",
+      "rarity": "starter",
+      "target": "none",
+      "effects": [
+        {
+          "verb": "energy",
+          "amount": 1
+        },
+        {
+          "verb": "exhaust"
+        }
+      ],
+      "flavor": "Work the leather and the fire leans in.",
+      "hero": "bellows"
     },
     {
       "id": "anger",

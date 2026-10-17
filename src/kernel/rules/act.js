@@ -11,6 +11,7 @@ import { ENEMIES, chooseIntent } from './encounters.js';
 import { NODE_TYPES, ROWS } from './map.js';
 import { fireHook, endOfTurnStatuses, decayStatuses } from './powers.js';
 import { shuffleAt, pickAt } from '../rng.js';
+import { activeRelic, relicId } from './relics.js';
 
 /** Hand size at the start of each turn. */
 export const HAND_SIZE = 5;
@@ -18,8 +19,8 @@ export const HAND_SIZE = 5;
 export const BASE_ENERGY = 3;
 /** HP restored at a rest site. */
 export const REST_HEAL = 8;
-/** HP restored by the Kindled Heart relic (id `burning_blood`) after each combat. */
-export const RELIC_HEAL = 6;
+/** Relic numbers live with the relic table; re-exported here for existing importers. */
+export { RELIC_HEAL, LANTERN_ENERGY } from './relics.js';
 /** Reward choice count after a normal fight; elites offer one more. */
 export const REWARD_CHOICES = 3;
 
@@ -120,6 +121,12 @@ export function startCombat(state, node, cardDefs) {
   };
 
   const turn = beginTurn(base, cardDefs);
+  // A first-turn Energy relic (B4 Cyan Lantern): extra Energy on the first turn of every fight.
+  const lantern = activeRelic(state)?.firstTurnEnergy ?? 0;
+  if (lantern > 0) {
+    turn.state = { ...turn.state, player: { ...turn.state.player, energy: turn.state.player.energy + lantern } };
+    turn.events.push({ t: 'energy', who: 'player', amount: lantern, source: relicId(state) });
+  }
   return {
     state: turn.state,
     events: [
@@ -320,10 +327,11 @@ export function resolveVictory(state, cardDefs) {
   // documented rule that they last only the fight. Caught by tests/kernel/status-reset.test.js.
   let next = { ...state, combat: { ...state.combat, active: false, enemies: [] }, player: { ...state.player, statuses: {} } };
 
-  const healed = state.relicOff ? 0 : Math.min(state.player.maxHp - state.player.hp, RELIC_HEAL);
+  // Only a relic with a post-fight heal (the Kindled Heart) heals; Iron Skin switches it off.
+  const healed = Math.min(state.player.maxHp - state.player.hp, activeRelic(state)?.healAfterFight ?? 0);
   if (healed > 0) {
     next = { ...next, player: { ...next.player, hp: next.player.hp + healed } };
-    events.push({ t: 'heal', who: 'player', amount: healed, source: 'burning_blood' });
+    events.push({ t: 'heal', who: 'player', amount: healed, source: relicId(state) });
   }
 
   const nodeType = state.combat.nodeType;

@@ -157,7 +157,14 @@ function seedFromUrl() {
   return Number.isInteger(n) && n >= 0 ? n : Math.floor(Math.random() * 1000000);
 }
 
-let ctl = createController({ run: { seed: seedFromUrl(), kindling: true, tempers: true, quests: true } });
+/** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it. */
+const HEROES = [
+  { id: 'ironclad', name: 'Ashwright', blurb: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.' },
+  { id: 'bellows', name: 'Bellows Keeper', blurb: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.' },
+];
+let heroChoice = HEROES.some((h) => h.id === new URLSearchParams(location.search).get('hero')) ? new URLSearchParams(location.search).get('hero') : 'ironclad';
+
+let ctl = createController({ run: { seed: seedFromUrl(), character: heroChoice, kindling: true, tempers: true, quests: true } });
 let snap = ctl.snapshot();
 /** Kernel events of the current run, accumulated for the run-history record (reset in newGame). */
 let runEvents = [];
@@ -856,7 +863,7 @@ function newGame(seed = null) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
   // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
-  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), kindling: true, tempers: true, quests: true } });
+  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), character: heroChoice, kindling: true, tempers: true, quests: true } });
   snap = ctl.snapshot();
   // The event stream is per-RUN, so it dies with the run. It is the only source of the kill
   // / elite / boss counts the score needs, which is why it is accumulated rather than
@@ -1521,12 +1528,13 @@ function heroFigure() {
   const p = snap.player;
   const ratio = p.maxHp > 0 ? p.hp / p.maxHp : 1;
   const pose = heroPose();
+  const isBellows = snap.character === 'bellows';
   const node = el('div', {
-    cls: 'hero' + (ratio <= 0.35 ? ' is-low' : ''),
+    cls: 'hero' + (ratio <= 0.35 ? ' is-low' : '') + (isBellows ? ' is-bellows' : ''),
     attrs: { role: 'group', 'aria-label': `${snap.characterName || 'Ashwright'}, ${p.hp} of ${p.maxHp} HP, block ${p.block}` },
   });
   const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
-  fig.innerHTML = heroMarkup();
+  fig.innerHTML = heroMarkup(snap.character);
   node.append(fig);
   node.append(el('div', { cls: 'hero-name', text: snap.characterName || 'Ashwright' }));
   node.append(el('div', { cls: 'ehp', text: `${p.hp}/${p.maxHp}` }));
@@ -2124,10 +2132,34 @@ function rewardView() {
 
 /* ------------------------------------------------------------------ KINDLING */
 
+/** A hero portrait for the select buttons (constant markup from a fixed table). */
+function heroFace(id) {
+  const face = el('span', { cls: 'hp-face', attrs: { 'aria-hidden': 'true' } });
+  face.innerHTML = heroMarkup(id);
+  return face;
+}
+
 /** B1: the act-start boon choice. Every word comes from the kernel snapshot. */
 function kindlingView() {
   const wrap = el('div', { cls: 'kindling' });
   wrap.append(sceneIllus('event'));
+  // B4 hero select: only before the first choice of a run. Switching rebuilds the run
+  // with the same seed for the other hero, so nothing about the climb is rerolled by hand.
+  if (snap.stepIndex === 0) {
+    const heroes = el('div', { cls: 'hero-select', attrs: { role: 'radiogroup', 'aria-label': 'Choose your hero' } });
+    for (const h of HEROES) {
+      const on = (snap.character ?? 'ironclad') === h.id;
+      heroes.append(el('button', {
+        cls: `hero-pick${on ? ' on' : ''} hp-${h.id}`,
+        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', title: h.blurb },
+        on: { click: () => { if (on) return; heroChoice = h.id; newGame(snap.seed); } },
+      },
+      heroFace(h.id),
+      el('span', { cls: 'hp-name', text: h.name }),
+      el('span', { cls: 'hp-blurb', text: h.blurb })));
+    }
+    wrap.append(heroes);
+  }
   wrap.append(el('div', { cls: 'big-title kindling-head', text: 'The forge offers a kindling' }));
   wrap.append(el('p', { cls: 'kindling-note', text: 'Take one. Each gift has a price.' }));
   const list = el('div', { cls: 'boon-list' });

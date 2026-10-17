@@ -15,7 +15,8 @@ import { availableNodes, NODE_TYPES } from './rules/map.js';
 import { defaultContent } from './content.js';
 import { actions as legalActions } from './actions.js';
 import { intentLabel, intentDamage, REST_HEAL } from './rules/act.js';
-import { BOONS } from './rules/kindling.js';
+import { BOONS, boonText } from './rules/kindling.js';
+import { RELICS, relicId } from './rules/relics.js';
 import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
@@ -361,6 +362,14 @@ function statusPairs(statuses) {
  * @param {{verbose?: boolean}} [opts]
  * @returns {object} JSON-safe value model
  */
+/** The hero's relic name and switched-off text, for relic-off boon text. */
+function heroRelic(state) {
+  return {
+    name: defaultContent().characters.get(state.character)?.relicName ?? 'relic',
+    offText: RELICS[relicId(state)]?.offText ?? 'stops working',
+  };
+}
+
 export function snapshot(state) {
   const legal = legalActions(state);
   // A card that needs a target is offered as ONE action per living enemy (`p1_1`, `p1_2`),
@@ -539,7 +548,7 @@ export function snapshot(state) {
       })),
     } : null,
     kindling: state.phase === 'kindling'
-      ? { boons: state.kindling.offers.map((id, i) => ({ id, name: BOONS[id].name, text: BOONS[id].text, label: BOONS[id].label, actionId: `k${i + 1}` })) }
+      ? { boons: state.kindling.offers.map((id, i) => ({ id, name: BOONS[id].name, text: boonText(id, heroRelic(state)), label: BOONS[id].label, actionId: `k${i + 1}` })) }
       : null,
     quests: state.quests
       ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))

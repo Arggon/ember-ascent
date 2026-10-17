@@ -62,7 +62,7 @@ const USAGE = `dlb — agent-playable deckbuilder, headless CLI
 usage: dlb <command> [flags]
 
 commands
-  new --seed N --character S --difficulty N   start a run, write --run
+  new --seed N --character S --difficulty N   start a run, write --run (S: ironclad | bellows)
       [--kindling] [--tempers]                opt in to act-start boons (k<n>) / rest tempers (t<n>)
       [--quests]                              opt in to three seeded ember quests (side goals)
   state [--brief|--verbose]                   current observation (R4 dump)

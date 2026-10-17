@@ -248,3 +248,11 @@ Each with the default I would ship without an answer.
   (scrollHeight = 412). Runs without quests keep the old map sizes, because the rules are
   scoped with `.page-map:has(.quests)`. At 1440×900 the strip adds 42px to the map page, which
   already scrolled before this change (1351px → 1393px).
+
+- **2026-10-16 — v2/5 Bellows Keeper (owner-approved layout change).** The Kindling screen
+  (the first screen of a browser run) gains a hero-select row above the boons, but only at
+  step 0. It holds two portrait buttons: Ashwright, and the Bellows Keeper with a cyan
+  selected state. At `max-height: 480px` the portraits are 34×38px and the text is compacted.
+  The screen still fits 1440×900 and 915×412 with no page scroll (scrollHeight = window
+  height). In combat the Keeper uses the same hero slot and sizing rules as the Ashwright,
+  with a cyan name and glow.

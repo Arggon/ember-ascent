@@ -16,20 +16,24 @@ const shadow = (rx = 34, cx = 60) => `<ellipse class="sh" cx="${cx}" cy="152" rx
 const SPRITES = {
   hero: 'hero', jaw_worm: 'jaw_worm', cultist: 'cultist', red_louse: 'red_louse',
   acid_slime: 'acid_slime', gremlin_nob: 'gremlin_nob', the_guardian: 'the_guardian',
+  bellows_keeper: 'bellows_keeper',
 };
+
+/** Hero sprite per character id (fixed table; unknown ids fall back to the Ashwright). */
+const HERO_SPRITES = { ironclad: 'hero', bellows: 'bellows_keeper' };
 
 const sprite = (key) =>
   `<span class="sh" aria-hidden="true"></span>` +
   `<img class="spr spr-${key}" src="assets/sprites/${key}.webp" alt="" draggable="false" decoding="async">`;
 
 /** The Ashwright: hooded smith with a forge hammer, facing the enemies. */
-export function heroMarkup() {
-  return sprite(SPRITES.hero);
+export function heroMarkup(character = 'ironclad') {
+  return sprite(HERO_SPRITES[character] ?? SPRITES.hero);
 }
 
 /** Enemy figure markup keyed by stable encounter id. */
 export function enemyMarkup(id) {
-  return sprite(SPRITES[id] && id !== 'hero' ? SPRITES[id] : SPRITES.jaw_worm);
+  return sprite(SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id] : SPRITES.jaw_worm);
 }
 
 /** Act backdrop. Only act 1 exists; the foundry is the whole climb. */

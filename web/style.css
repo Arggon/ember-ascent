@@ -3657,6 +3657,33 @@ html, body {
   .quests { margin-bottom: 2px; }
 }
 
+/* B4 hero select (on the Kindling screen, before the first choice) and Bellows accents. */
+.hero-select { display: flex; gap: 10px; justify-content: center; margin: 4px 0 10px; }
+.hero-pick {
+  display: grid; grid-template-columns: 56px 1fr; grid-template-rows: auto 1fr; column-gap: 10px;
+  align-items: start; text-align: left; max-width: 300px; padding: 6px 10px 6px 6px; cursor: pointer;
+  background: rgba(24, 14, 9, 0.85); border: 1px solid rgba(255, 170, 90, 0.3); border-radius: 8px; color: inherit;
+}
+.hero-pick .hp-face { grid-row: 1 / span 2; width: 56px; height: 64px; position: relative; overflow: hidden; }
+.hero-pick .hp-face .sh { display: none; }
+.hero-pick .hp-face .spr { width: 100%; height: 100%; object-fit: contain; object-position: top; }
+.hero-pick .hp-name { font-weight: 700; color: #ffcf8a; font-size: 0.9rem; }
+.hero-pick .hp-blurb { font-size: 0.72rem; line-height: 1.25; color: #d8c3ad; }
+.hero-pick.on { border-color: var(--gold, #ffd27a); box-shadow: 0 0 0 2px rgba(255, 207, 107, 0.2); }
+.hero-pick.hp-bellows.on { border-color: #7fe3f0; box-shadow: 0 0 0 2px rgba(110, 220, 240, 0.25), 0 0 14px rgba(90, 210, 235, 0.25); }
+.hero-pick.hp-bellows .hp-name { color: #a6eef7; }
+.hero-pick:focus-visible { outline: 2px solid #ffd27a; outline-offset: 2px; }
+.page-combat .hero.is-bellows .hero-name { color: #a6eef7; text-shadow: 0 0 8px rgba(90, 210, 235, 0.45); }
+.stage-combat .hero.is-bellows .fig .spr { filter: drop-shadow(0 0 10px rgba(90, 210, 235, 0.3)); }
+@media (max-height: 480px) {
+  .hero-select { margin: 0 0 4px; gap: 6px; }
+  .hero-pick { grid-template-columns: 34px 1fr; padding: 3px 8px 3px 3px; max-width: 280px; }
+  .hero-pick .hp-face { width: 34px; height: 38px; }
+  .hero-pick .hp-name { font-size: 0.78rem; }
+  .hero-pick .hp-blurb { font-size: 0.6rem; }
+}
+.hero-pick.hp-ironclad .hp-face .spr { object-position: center; transform: scale(1.25); }
+
 /* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
    than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at
    768x1024. Cap combat-hand rules at 4 lines; the full sentence stays in the card's
