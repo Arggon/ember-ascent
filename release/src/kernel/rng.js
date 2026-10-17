@@ -6,7 +6,7 @@
 // Replaying `seed + ordered action log` therefore reproduces every draw exactly,
 // across processes and across machines.
 //
-// Forbidden in this file (enforced by tools/check-architecture.mjs): Date, Math.random,
+// Forbidden in this file (enforced by scripts/check-architecture.mjs): Date, Math.random,
 // node:perf_hooks, and every I/O import.
 
 /** 64-bit mask for wrapping arithmetic on BigInt. */

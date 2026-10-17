@@ -10,9 +10,12 @@
 // No globals, no daemon, no hidden mutable state: a save file holds the entire run.
 import { freezeDeep, hash as hashState, canonical } from './state.js';
 import { loadContent, defaultContent, draftPoolFrom } from './content.js';
+// Imported as a VALUE as well as re-exported below: `contentForProfile` calls it.
+import { poolSelection } from './unlocks.js';
 import { generateMap, availableNodes, findNode, NODE_TYPES, ROWS } from './rules/map.js';
-import { ENCOUNTERS, ENEMIES } from './rules/encounters.js';
+import { ENCOUNTERS, ENEMIES, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { VOCABULARY } from './rules/vocabulary.js';
+import { DEFAULT_RELIC } from './rules/relics.js';
 import { intAt, shuffleAt, pickAt } from './rng.js';
 import { actions as legalActions, parsePlayId } from './actions.js';
 import {
@@ -26,6 +29,9 @@ import {
   REWARD_CHOICES,
 } from './rules/act.js';
 import { fireHook } from './rules/powers.js';
+import { offerBoons, applyBoon } from './rules/kindling.js';
+import { rollQuests, advanceQuests } from './rules/quests.js';
+import { offerTempers, temperEffects, temperHpCost } from './rules/tempers.js';
 import './rules/effects/index.js'; // registers the exotic handlers exactly once
 import { observe as observeState, observeActions, snapshot as snapshotState } from './observe.js';
 import {
@@ -47,6 +53,8 @@ import {
 _setCardDefs(defaultContent().cards);
 
 export { hashState as hash, canonical };
+// B5: the one biome table, for surfaces (GUI picker, Act I card, CLI).
+export { BIOMES, DEFAULT_BIOME };
 export { observeState as observe, observeActions, snapshotState as snapshot };
 // The plain-English layer (R4's second rendering). Exported so every surface reaches it
 // through the ONE public entry point; a surface may not import kernel internals (R1).
@@ -66,13 +74,73 @@ export { actions } from './actions.js';
 export { FORMAT_VERSION, ENGINE_VERSION, validateSave, toSave, serializeSave } from './state.js';
 export { loadContent } from './content.js';
 
-/** Encounter ids that may spawn at a given node type (excluding the boss). */
-const ENCOUNTER_BY_TYPE = {
-  combat_weak: ['weak_1', 'weak_2', 'weak_3', 'weak_4'],
-  combat_strong: ['strong_1', 'strong_2', 'strong_3'],
-  elite: ['elite_1'],
-  boss: ['boss_1'],
-};
+// The run-record layer (DR-1, DR-3, DR-6, DR-7) and the unlock layer (DR-4, DR-5).
+//
+// These are re-exported through the ONE public entry point on purpose: a surface may
+// not import kernel internals (R1), and `package.json`'s `exports` map is frozen to
+// exactly ["./kernel/index.js"], so a second entry point is not available even if a
+// surface wanted one. Every symbol below therefore has to be reachable from here or it
+// is unreachable in the browser (which resolves the same single entry).
+//
+// The record builder living IN the kernel is what makes AC-6.5 (the CLI and the GUI
+// agree on the record) a property instead of a promise: both call this one function.
+export {
+  RECORD_VERSION,
+  RETAIN,
+  SCORE_TABLE,
+  deriveCounts,
+  scoreRun,
+  buildRunRecord,
+  emptyAgg,
+  aggregate,
+  aggScoreMean,
+  pruneRuns,
+  isLegacyRecord,
+} from './record.js';
+export {
+  GRANT_KEYS,
+  FRESH_SIZE,
+  TYPE_RATIO,
+  SHIPPED_CARDS,
+  UNLOCK_CATALOG,
+  BADGE_CATALOG,
+  unlocksFor,
+  badgesForRun,
+  evaluateUnlocks,
+  poolPlan,
+  poolSelection,
+  fullyUnlockedProfile,
+} from './unlocks.js';
+
+/**
+ * Shipped content narrowed to one profile's card pool (DR-4, DR-5).
+ *
+ * WHY THIS IS IN THE KERNEL AND NOT IN A SURFACE: narrowing a pool means re-validating
+ * content, and `cards.bundle.js` is a kernel module — a surface that reached for it
+ * directly would be reaching past the one public entry point. This is a pure filter
+ * over data (no I/O, no clock, no randomness), so the browser can call it too.
+ *
+ * The direction of dependency is the point: the profile decides WHICH CARDS EXIST for
+ * this run, and nothing in the rules ever reads the profile. A run built from a narrowed
+ * pool is therefore a strictly different deck-building game, never a stronger one —
+ * starting HP, energy, hand size and every card's numbers are untouched (AC-9.3).
+ * @param {any} [profile] a lifetime-counter profile (see surface/runs.js profileFor);
+ *                        omitted/null means the fresh, unlock-free pool.
+ * @returns {ReturnType<typeof loadContent>}
+ */
+export function contentForProfile(profile = null) {
+  const full = defaultContent();
+  const ids = new Set(poolSelection(full, profile).ids);
+  return loadContent(
+    JSON.stringify({
+      contentVersion: full.contentVersion,
+      // Hero-only starters (B4) are outside the selection but every run may need them.
+      cards: full.cardList.filter((c) => ids.has(c.id) || c.hero),
+      characters: Object.fromEntries(full.characters),
+      statuses: full.statuses,
+    }),
+  );
+}
 
 /**
  * Start a run.
@@ -84,6 +152,11 @@ export function newRun(opts = {}) {
   const seed = opts.seed ?? 0;
   const characterId = opts.character ?? 'ironclad';
   const difficulty = opts.difficulty ?? 0;
+  const biome = opts.biome ?? DEFAULT_BIOME;
+  if (!Object.hasOwn(BIOMES, biome)) {
+    throw Object.assign(new Error(`unknown biome "${biome}" (known: ${Object.keys(BIOMES).join(', ')})`), { code: 3 });
+  }
+  const byType = BIOMES[biome].byType;
 
   if (!Number.isInteger(seed) || seed < 0 || seed > 2 ** 32) {
     throw Object.assign(new Error(`seed must be an integer in [0, 2^32], got ${opts.seed}`), { code: 3 });
@@ -107,7 +180,7 @@ export function newRun(opts = {}) {
   const encounterTable = {};
   for (const row of mapGen.rows) {
     for (const node of row) {
-      const pool = ENCOUNTER_BY_TYPE[node.type];
+      const pool = byType[node.type];
       if (!pool) {
         // Non-combat node (rest): no enemies, no draws consumed. Skipping the draw
         // keeps the stream aligned to *content that needs randomness*; rest nodes
@@ -184,6 +257,32 @@ export function newRun(opts = {}) {
     reward: null,
   };
 
+  // B5 alternate biome: recorded only when not the default, so foundry hashes are unchanged.
+  if (biome !== DEFAULT_BIOME) state.biome = biome;
+  // B4 second hero: a character whose relic is not the Kindled Heart records it, so the
+  // default (Ashwright) state keeps no new field and every existing hash is unchanged.
+  if (character.startingRelic && character.startingRelic !== DEFAULT_RELIC) state.relic = character.startingRelic;
+  // B1 Kindling (opt-in). Only an opted-in run gains the extra fields and draws, so the
+  // default state — and every existing golden hash — is byte-identical to before.
+  if (opts.kindling === true) {
+    const offer = offerBoons(seed, state.rngDraws);
+    state.rngDraws += offer.draws;
+    state.phase = 'kindling';
+    state.kindling = { offers: offer.ids, taken: null };
+    state.relicOff = false;
+  }
+  // B2 Tempers (opt-in): the same rule — absent unless asked for.
+  if (opts.tempers === true) {
+    state.tempers = {};
+    state.temperOffers = null;
+  }
+  // B3 Ember quests (opt-in): three seeded side goals, rolled after any Kindling draws.
+  if (opts.quests === true) {
+    const roll = rollQuests(seed, state.rngDraws);
+    state.rngDraws += roll.draws;
+    state.quests = roll.quests;
+  }
+
   return freezeDeep(state);
 }
 
@@ -232,18 +331,33 @@ export function step(state, id) {
     case 'rest_heal': {
       const healed = Math.min(REST_HEAL, bumped.player.maxHp - bumped.player.hp);
       result = {
-        state: { ...bumped, player: { ...bumped.player, hp: bumped.player.hp + healed }, phase: 'map' },
+        state: { ...bumped, player: { ...bumped.player, hp: bumped.player.hp + healed }, phase: 'map', ...(bumped.tempers ? { temperOffers: null } : {}) },
         events: [{ t: 'heal', who: 'player', amount: healed, source: 'rest' }],
       };
       break;
     }
+    case 'temper': {
+      const o = match.offer;
+      result = {
+        state: { ...bumped, tempers: { ...bumped.tempers, [o.uid]: o.temper }, temperOffers: null, phase: 'map' },
+        events: [{ t: 'card_tempered', uid: o.uid, cardId: o.cardId, temper: o.temper }],
+      };
+      break;
+    }
+    case 'boon':
+      result = applyBoon(bumped, match.boon);
+      break;
     case 'rest_leave':
-      result = { state: { ...bumped, phase: 'map' }, events: [{ t: 'rest_left' }] };
+      result = { state: { ...bumped, phase: 'map', ...(bumped.tempers ? { temperOffers: null } : {}) }, events: [{ t: 'rest_left' }] };
       break;
     default:
       return { state, events: [], error: { code: 1, error: 'internal', id: String(id) } };
   }
 
+  if (bumped.quests && result.state.phase !== 'ended') {
+    const q = advanceQuests(result.state, { events: result.events, played: match.kind === 'play', nodeType: bumped.combat?.nodeType ?? null });
+    result = { state: q.state, events: [...result.events, ...q.events] };
+  }
   return { state: freezeDeep(result.state), events: result.events, error: null };
 }
 
@@ -289,9 +403,18 @@ function playCard(state, action, content) {
   };
 
   const events = [];
-  const exhausted = def.effects.some((e) => e.verb === 'exhaust');
+  // B2: a tempered instance resolves its modified effect list (looked up by uid).
+  const temper = state.tempers ? state.tempers[card.uid] : undefined;
+  const effects = temper ? temperEffects(def.effects, temper) : def.effects;
+  const exhausted = effects.some((e) => e.verb === 'exhaust');
+  const hpCost = temperHpCost(temper);
+  if (hpCost > 0) {
+    const paid = Math.min(hpCost, next.player.hp - 1);
+    next = { ...next, player: { ...next.player, hp: next.player.hp - paid } };
+    events.push({ t: 'hp_cost', amount: paid, source: 'temper' });
+  }
 
-  for (const effect of def.effects) {
+  for (const effect of effects) {
     // Re-resolved per effect, not hoisted: if an earlier effect killed the aimed enemy,
     // the remaining effects of the SAME card must land somewhere legal rather than
     // write to a corpse (rule 5). Re-resolution is what makes that a property instead of
@@ -334,7 +457,9 @@ function playCard(state, action, content) {
   // we settle victory immediately rather than making the player press end turn.
   if (next.combat.active && next.combat.enemies.every((e) => e.dead)) {
     const won = resolveVictory(next, content.cards);
-    return { state: won.state, events: [...events, ...won.events] };
+    // Same event shape as the end-turn path (rules/act.js): a combat won by a card must
+    // also emit `combat_won`, or elite/boss points are never awarded (DR-6).
+    return { state: won.state, events: [...events, { t: 'combat_won' }, ...won.events] };
   }
   if (next.combat.enemies.some((e) => e.dead)) {
     next = { ...next, combat: { ...next.combat, enemies: next.combat.enemies.map((e) => (e.dead ? e : { ...e, index: e.index })) } };
@@ -353,6 +478,13 @@ function travel(state, action, content) {
     return startCombat(at, node, content.cards);
   }
   if (node.type === 'rest') {
+    if (at.tempers) {
+      const offer = offerTempers(at, content.cards);
+      return {
+        state: { ...at, phase: 'rest', rngDraws: at.rngDraws + offer.draws, temperOffers: offer.offers },
+        events: [{ t: 'rest_ready', node: node.id }],
+      };
+    }
     return { state: { ...at, phase: 'rest' }, events: [{ t: 'rest_ready', node: node.id }] };
   }
   throw new Error(`unhandled node type "${node.type}"`);

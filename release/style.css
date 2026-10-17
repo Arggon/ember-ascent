@@ -1,4 +1,4 @@
-/* web/style.css — the browser surface's whole visual layer.
+/* src/web/style.css — the browser surface's whole visual layer.
  *
  * No image files, no external fonts, no network requests: every mark is CSS or inline
  * SVG painted by app.js, and every hue comes from the palette declared below. The
@@ -131,7 +131,6 @@ html, body {
   font-size: var(--fs-4);
   letter-spacing: 0.02em;
 }
-.hud-char .diff { color: var(--gold); font-weight: 700; margin-left: 6px; font-size: var(--fs-2); }
 
 .stat {
   flex: 0 0 auto;
@@ -145,7 +144,7 @@ html, body {
   border-radius: 999px;
   border: 1px solid transparent;
   background: rgba(0, 0, 0, 0.28);
-  /* Second instance of the same truncation artifact (found by tools/dev/css-parse-probe.mjs
+  /* Second instance of the same truncation artifact (found by scripts/dev/css-parse-probe.mjs
      once the #hud one above was repaired). Same shape: `font-size: var(--fs-2)` with no
      terminating semicolon, followed by a line of declarations, so the parser dropped
      `font-size: var(--fs-2) display: inline-flex;` and read the rest as .stat's own. Repair
@@ -211,6 +210,12 @@ html, body {
   flex: 1 1 auto;
   justify-content: space-between;
 }
+
+/* The same wrapper while a targeting step is open (`sc-targeting`). The state's real cue is
+   the gold ring on every legal candidate plus the `.target-banner` in the controls, so this
+   rule has nothing to ADD: it marks the step at the top of the screen as well, so the
+   question "which enemy?" is legible from the heading without hunting the row. */
+.stage-combat.sc-targeting > .section-title { color: var(--gold); }
 
 #stage {
   flex: 1 1 auto;
@@ -613,6 +618,20 @@ html, body {
   stroke-linejoin: round;
 }
 .c-type-mark .mf { fill: currentColor; stroke: none; }
+
+/* Flavor is content, shown only where the stage has room. Short viewports keep the
+   effect sentence and hide this line so the hand does not grow. */
+.cflavor {
+  display: none;
+  font-family: var(--serif, Georgia, serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--faint);
+  line-height: 1.25;
+}
+@media (min-width: 1100px) and (min-height: 880px) {
+  .card .cflavor { display: block; font-size: var(--fs-1); margin-top: 2px; }
+}
 
 .card .cname {
   font-weight: 800;
@@ -1444,9 +1463,8 @@ html, body {
   z-index: 5;
 }
 
-/* The readable part is the enemy's HP TOTAL, which always agrees with the HP bar that is
-   updating at the same moment. The MAGNITUDE of the hit is carried by a glyph and by
-   size — never by a second number, so the floater can never contradict the bar. */
+/* The readable number is the HP delta (damage dealt) or the block delta. The bar still
+   shows the remaining total, so the floater and the bar describe the same kernel step. */
 .efloat {
   position: absolute;
   left: 50%;
@@ -1464,9 +1482,9 @@ html, body {
 }
 /* The glyph ladder. Shape and size carry the hit magnitude, so it survives a monochrome
    screen and does not depend on colour. */
-.efloat-g1 { font-size: var(--fs-4); color: #ffb4ae; }
-.efloat-g2 { font-size: var(--fs-5); color: #ff8078; }
-.efloat-g3 { font-size: var(--fs-6); color: #ffe08a; }
+.efloat-g1 { font-size: 1.7rem; color: #ffb4ae; }
+.efloat-g2 { font-size: 2.3rem; color: #ff8078; }
+.efloat-g3 { font-size: 3rem; color: #ffe08a; }
 .efloat-heal { color: #8fe3a6; }
 .efloat-block { color: var(--block); }
 /* A hit fully absorbed by block says so in words. It never prints a 0, which would
@@ -1507,6 +1525,11 @@ html, body {
   pointer-events: none;
   animation: juice-shatter 0.5s ease-in both;
 }
+
+/* A boss that has just gone down says so. The ghost's `.ename`/`.ehp` lines carry the words
+   ("Slag Warden" above "BOSS DOWN"); this is the frame colour, so the biggest death in a
+   run is not readable ONLY by colour — the text is the fact, this is the emphasis. */
+.enemy.is-dying.boss-down { border-color: var(--loss, #e2504c); }
 
 /* ---------- Status applied, by KIND ---------- */
 
@@ -1686,7 +1709,10 @@ html, body {
 
   /* Keep the static, non-moving part of a couple of these cues. A hit is still visible
      as a border change (no geometry moves); an absorbed hit still reads in the block
-     line; a dying enemy is simply gone, as before this pass. */
+     line. The dying enemy is NOT "simply gone": the `animation: none` above removes the
+     collapse, not the card, so the ghost is still painted — statically, at its resting
+     opacity, carrying the enemy's name and its DOWN line. See `dyingRow()` in src/web/app.js,
+     which draws it on this path deliberately. */
   #fx-layer { display: none; }
   .enemy.damaged { border-color: #8d3b3b; }
   .pill.juice-in,
@@ -1707,7 +1733,7 @@ html, body {
 /* ============================================================ P3 — run-level beats ==
    The CSS half of the P3 pass. app.js was edited first and this half was lost to a budget
    cut, so for a while the renderer referenced classes with no rules — which is exactly the
-   "style ships invisible" defect `tools/check-surface-art.mjs` exists to catch. Every rule
+   "style ships invisible" defect `scripts/check-surface-art.mjs` exists to catch. Every rule
    below is paired with a reduced-motion override so no FACT is carried by motion alone. */
 
 /* ---- Boss entrance: a banner word plus a ring that opens outward ---- */
@@ -1950,7 +1976,6 @@ html, body {
   /* --- HUD: compressed to about two rows, and the buttons move up beside the pills --- */
   #hud { padding: 5px 8px; gap: 4px 6px; border-radius: var(--radius); }
   .hud-char { font-size: var(--fs-3); letter-spacing: 0; }
-  .hud-char .diff { margin-left: 4px; font-size: var(--fs-1); }
   .stat { font-size: var(--fs-2); gap: 3px; padding: 1px 6px; }
   .pill { font-size: var(--fs-1); padding: 1px 5px; }
   #hud .btn { font-size: var(--fs-2); padding: 6px 10px; min-height: 44px; }
@@ -2160,7 +2185,7 @@ html, body {
    `max-height: 830px` so 1280x1000 (which passes with 58px to spare) stays OUT of it.
    830px = 800 (the tallest gated laptop height) + headroom for browser chrome heights;
    anything taller than 830px keeps the untouched desktop layout. This tier intentionally
-   does NOT use !important — the lesson recorded in LAYOUT-ACCEPTANCE.md is that a height
+   does NOT use !important — the lesson recorded in docs/specs/LAYOUT-ACCEPTANCE.md is that a height
    fix must be scoped, monotone (it only ever FREES height), and verifiable per seed.
 
    BEWARE ITS OVERLAP WITH SHORT LANDSCAPE (915x412, 1200x450): this tier is gated on
@@ -2212,7 +2237,7 @@ html, body {
      Cost, measured across seeds 1/3/7/11: the button grows 40 -> 44px, so End Turn clearance
      drops by 1-2px and nothing else moves -- 1366x768 68/52/52/66px (was 69/53/53/67),
      1280x800 72/59/59/75px (was 73/60/60/76), body scroll 0, stage spill unchanged. Still
-     6-9x the 8px threshold LAYOUT-ACCEPTANCE.md S1/S3 requires. */
+     6-9x the 8px threshold docs/specs/LAYOUT-ACCEPTANCE.md S1/S3 requires. */
   #stage .btn { min-height: 44px; }
   .hint { margin-top: 0; }
 }
@@ -2270,7 +2295,7 @@ html, body {
 
 /* ============================================================ HEIGHT STRATEGY ======= --
 
-   PROBLEM (measured, `tools/dev/space-check.mjs`): the combat screen was content-height and
+   PROBLEM (measured, `scripts/dev/space-check.mjs`): the combat screen was content-height and
    glued to the top of `#stage`, so every viewport taller than the content simply had blank
    ground under it — 261px (29%) on the owner's 412x915 phone, 343px (38%) at 414x896.
    Neither `#app` nor `#stage` was at fault: both already stretch to the viewport
@@ -2425,6 +2450,9 @@ html, body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 26px rgba(0, 0, 0, 0.5);
 }
 .page-reward .hand.reveal-cards { animation: fade-up var(--dur-slow) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
+/* The spoils HEAD comes in with the tiles rather than before them, so the reward reads as one
+   arriving beat instead of a label that beats its own contents onto the screen. */
+.page-reward .reward-head.reveal { animation: fade-up var(--dur-slow) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
 .page-reward .card-wrap { flex: 1 1 0; min-width: 0; min-height: 236px; }
 .page-reward .card { width: 100%; height: 100%; min-height: 236px; }
 .page-reward .controls { flex-direction: column-reverse; gap: 6px; margin-top: var(--sp-3); }
@@ -2456,3 +2484,1489 @@ html, body {
   font-weight: 800;
   margin-bottom: 2px;
 }
+
+/* ==========================================================================================
+   EMBER THEME — art pass 2 (2026-10-16).
+   Presentation only: colours, surfaces, borders, glows and CSS-painted fire. No sizing,
+   spacing or layout values change here, so the frozen viewport contract
+   (docs/specs/LAYOUT-ACCEPTANCE.md) is untouched. No images, fonts or network requests.
+   Wrapped in `@media screen` on purpose: it is a single late layer that wins the cascade
+   without re-declaring any top-level selector (scripts/check-surface-art.mjs rule 2).
+   Idea: you climb out of a furnace. Heat rises from the bottom of the screen, embers drift
+   up, and the one warm accent is now ember orange instead of gold. Block / skill stay cool
+   blue: fire vs. ice keeps "damage vs. defence" readable at a glance.
+   ========================================================================================== */
+@media screen {
+  :root {
+    --ground: #0c0806;
+    --raised: #1b120d;
+    --edge: #3b261a;
+    --ink: #f8eee5;
+    --dim: #c9ad98;
+    --faint: #94786a;
+    --gold: #ff9d3a;          /* ember: energy, primary actions, reachable nodes */
+    --gold-ink: #2b1200;
+    --hp: #ff5a3c;
+    --danger: #ff5a3c;
+    --win: #ffc552;
+    --loss: #ff5a3c;
+    --attack: #ff6e40;
+    --skill: #6fb6e4;
+    --power: #d9a2ff;
+    --ember-hot: #ffcf6b;
+    --ember-mid: #ff7a2f;
+    --ember-deep: #a3200f;
+    --char: #140d09;
+    --glow-ember: 0 0 0 1px rgba(255, 140, 50, 0.35), 0 0 22px rgba(255, 110, 30, 0.28);
+  }
+
+  /* Furnace light from below, cold soot above. One painted surface (html), so no seam. */
+  html {
+    background:
+      radial-gradient(120% 60% at 50% 112%, rgba(255, 96, 24, 0.30) 0%, rgba(163, 32, 15, 0.14) 38%, rgba(12, 8, 6, 0) 70%),
+      radial-gradient(80% 50% at 50% -10%, rgba(60, 40, 30, 0.35) 0%, rgba(12, 8, 6, 0) 70%),
+      var(--ground);
+    background-attachment: fixed;
+  }
+  body { background: transparent; }
+
+  /* Drifting embers: three dot fields at different speeds behind everything. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.55;
+    background-image:
+      radial-gradient(1.6px 1.6px at 12% 80%, var(--ember-hot), transparent 70%),
+      radial-gradient(1.2px 1.2px at 28% 64%, var(--ember-mid), transparent 70%),
+      radial-gradient(2px 2px at 47% 90%, var(--ember-hot), transparent 70%),
+      radial-gradient(1.3px 1.3px at 63% 72%, var(--ember-mid), transparent 70%),
+      radial-gradient(1.8px 1.8px at 81% 86%, var(--ember-hot), transparent 70%),
+      radial-gradient(1.1px 1.1px at 92% 58%, var(--ember-mid), transparent 70%);
+    background-size: 100% 100%;
+    animation: ember-rise 14s linear infinite;
+  }
+  #app { position: relative; z-index: 1; }
+  @keyframes ember-rise {
+    0%   { transform: translateY(0);     opacity: 0; }
+    15%  { opacity: 0.55; }
+    85%  { opacity: 0.4; }
+    100% { transform: translateY(-60vh); opacity: 0; }
+  }
+
+  /* ---------- HUD: soot glass with a heated top edge ---------- */
+  #hud {
+    background: linear-gradient(180deg, rgba(38, 24, 17, 0.92) 0%, rgba(20, 13, 9, 0.92) 100%);
+    border-color: var(--edge);
+    box-shadow: inset 0 1px 0 rgba(255, 160, 80, 0.22), 0 8px 24px rgba(0, 0, 0, 0.55);
+  }
+  .hud-char { color: var(--ember-hot); text-shadow: 0 0 12px rgba(255, 140, 40, 0.35); }
+  .stat { background: rgba(0, 0, 0, 0.28); }
+  .stat.hp { border-color: rgba(255, 90, 60, 0.45); }
+  .stat.energy { color: var(--ember-hot); border-color: rgba(255, 157, 58, 0.55); box-shadow: 0 0 10px rgba(255, 130, 40, 0.18); }
+
+  /* ---------- Buttons: the primary action is a coal ---------- */
+  .btn {
+    background: linear-gradient(180deg, #ffb357 0%, #ff7a2f 55%, #e2521f 100%);
+    color: var(--gold-ink);
+    border-color: #ffb357;
+    box-shadow: 0 0 0 1px rgba(255, 120, 40, 0.35), 0 6px 18px rgba(255, 90, 20, 0.25);
+  }
+  .btn.secondary, .btn.ghost {
+    background: rgba(30, 19, 13, 0.85);
+    color: var(--ink);
+    border-color: var(--edge);
+    box-shadow: none;
+  }
+  .btn.ghost:hover, .btn.secondary:hover { border-color: var(--ember-mid); color: var(--ember-hot); }
+
+  /* ---------- Panels / pages ---------- */
+  .page .page-num { color: var(--faint); }
+  .section-title { color: var(--dim); }
+  .stage-combat.sc-targeting > .section-title { color: var(--ember-hot); }
+  .page-glyph { color: var(--ember-mid); }
+
+  /* ---------- Enemies: silhouettes standing in front of a fire ---------- */
+  .enemy {
+    background: linear-gradient(180deg, #22150f 0%, #150d09 100%);
+    border-color: #4a2c1c;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 150, 70, 0.12);
+  }
+  .e-art {
+    background:
+      radial-gradient(70% 90% at 50% 100%, rgba(255, 110, 30, 0.42) 0%, rgba(163, 32, 15, 0.18) 45%, rgba(0, 0, 0, 0) 75%),
+      linear-gradient(180deg, #1a0f0a 0%, #2a150c 100%);
+    border-bottom-color: #4a2c1c;
+  }
+  .e-silhouette .sl { fill: #0a0604; }
+  .enemy.eh-0 .e-silhouette { color: #ffb070; }
+  .enemy.eh-1 .e-silhouette { color: #ff7f5c; }
+  .enemy.eh-2 .e-silhouette { color: #e3a6ff; }
+  .enemy.eh-3 .e-silhouette { color: #b6d29a; }
+  .enemy.eh-4 .e-silhouette { color: #ffd36b; }
+  .enemy.e-elite { border-color: #6a3f86; }
+  .enemy.e-boss { border-color: #a3200f; box-shadow: 0 0 0 1px rgba(255, 60, 30, 0.35), 0 0 30px rgba(255, 60, 20, 0.28), 0 10px 26px rgba(0, 0, 0, 0.6); }
+  .enemy.e-boss .e-art {
+    background:
+      radial-gradient(80% 100% at 50% 100%, rgba(255, 70, 20, 0.6) 0%, rgba(163, 32, 15, 0.3) 45%, rgba(0, 0, 0, 0) 80%),
+      linear-gradient(180deg, #1c0806 0%, #3a0f08 100%);
+  }
+  .enemy .ehp { color: #ff8a6a; }
+
+  /* Intents: an attack is a flare, block stays ice. */
+  .e-intent.kind-attack {
+    background: linear-gradient(90deg, rgba(255, 90, 40, 0.24) 0%, rgba(120, 25, 10, 0.18) 100%);
+    border-color: rgba(255, 110, 60, 0.6);
+  }
+  .e-intent.kind-attack .ilabel { color: #ffc2a8; }
+  .e-intent.kind-buff .ilabel { color: #ffd890; }
+
+  /* ---------- Cards: forged plates; the hue is the metal's glow ---------- */
+  .card {
+    background:
+      radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--card-hue, #ff7a2f) 18%, transparent) 0%, transparent 60%),
+      linear-gradient(180deg, #24170f 0%, #150d09 100%);
+    border-color: color-mix(in srgb, var(--card-hue, #ff7a2f) 45%, #3b261a);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 190, 120, 0.12);
+  }
+  .card:hover:not(.disabled) {
+    border-color: var(--card-hue, #ff7a2f);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-hue, #ff7a2f) 50%, transparent), 0 0 24px color-mix(in srgb, var(--card-hue, #ff7a2f) 30%, transparent), 0 12px 26px rgba(0, 0, 0, 0.55);
+  }
+  /* Legibility fix: the big background mark sat at 30-40% under the rules text. */
+  .card .c-art.p1, .card .c-art.p2, .card .c-art.p3 { opacity: 0.12; }
+  .card .cname { color: var(--ink); }
+  .card .cdesc { color: #f2e4d8; }
+  .card .cost-gem {
+    background: radial-gradient(circle at 35% 30%, #ffe2a0 0%, #ff9d3a 45%, #c2410c 100%);
+    color: var(--gold-ink);
+    box-shadow: 0 0 0 2px #1b120d, 0 0 12px rgba(255, 140, 40, 0.55);
+  }
+  .card.disabled { filter: saturate(0.4) brightness(0.75); }
+
+  /* ---------- Map: a climb up the chimney ---------- */
+  .map {
+    background:
+      radial-gradient(90% 40% at 50% 100%, rgba(255, 90, 20, 0.18) 0%, transparent 70%),
+      linear-gradient(180deg, rgba(27, 18, 13, 0.92) 0%, rgba(16, 10, 7, 0.95) 100%);
+    border-color: var(--edge);
+  }
+  .node { background: rgba(20, 13, 9, 0.9); border-color: #3b261a; color: var(--dim); }
+  .node.available {
+    background: linear-gradient(180deg, rgba(255, 140, 50, 0.22) 0%, rgba(120, 40, 10, 0.25) 100%);
+    border-color: var(--ember-mid);
+    color: var(--ink);
+    box-shadow: var(--glow-ember);
+  }
+  .node.current { border-color: var(--ember-hot); color: var(--ember-hot); }
+  .node.t-boss { border-color: #6a1d10; color: #ff9a80; }
+  .node.t-boss.available { border-color: var(--hp); box-shadow: 0 0 0 3px rgba(255, 60, 30, 0.25), 0 0 26px rgba(255, 60, 20, 0.35); }
+  .node.t-rest { border-color: #3d4a2c; color: #c8d9a5; }
+  .node.t-rest .ntype-mark { color: #ffb35c; }    /* the campfire */
+
+  /* ---------- Reward / end ---------- */
+  .reward-head { color: var(--ember-hot); text-shadow: 0 0 18px rgba(255, 130, 40, 0.4); }
+
+  /* Round 2: the remaining cold surfaces. */
+  .fx-turn-wipe { background: linear-gradient(180deg, rgba(255, 140, 50, 0) 0%, rgba(255, 140, 50, 0.05) 60%, rgba(255, 140, 50, 0) 100%); }
+  .panel, .modal { background: linear-gradient(180deg, var(--raised) 0%, var(--char) 100%); }
+  .panel::after { border-color: rgba(255, 157, 58, 0.16); }
+  .hand-index { background: var(--char); }
+  .enemy.aimed { border-color: var(--ember-hot); box-shadow: 0 0 0 3px var(--ember-hot) inset, 0 0 28px rgba(255, 150, 50, 0.35), var(--shadow-lg); }
+  .enemy.aimed .e-art {
+    background:
+      radial-gradient(70% 100% at 50% 100%, rgba(255, 190, 90, 0.55) 0%, rgba(255, 90, 20, 0.25) 45%, rgba(0, 0, 0, 0) 80%),
+      linear-gradient(180deg, #1f120a 0%, #3a1a0b 100%);
+  }
+  .card .c-art.p1, .card .c-art.p2, .card .c-art.p3 { opacity: 0.08; }
+  .fx-card { background: linear-gradient(180deg, #24170f 0%, #150d09 100%); border-color: var(--edge); }
+
+  @media (prefers-reduced-motion: reduce) {
+    body::before { animation: none; opacity: 0.35; }
+  }
+}
+
+/* ==========================================================================================
+   ART DIRECTION PROTOTYPE — "Forge-lit woodcut" (branch art-direction, phase 1 mockups)
+   One late layer, like the ember theme above. Paint, type and decoration only: no box in
+   the combat layout changes width/height (docs/specs/LAYOUT-ACCEPTANCE.md). Fonts come from
+   assets/fonts/fonts.css (local, OFL). The single accent stays ember orange.
+   ========================================================================================== */
+@media screen {
+  :root {
+    --display: "Cinzel", "Iowan Old Style", Georgia, serif;
+    --text: "Alegreya Sans", system-ui, sans-serif;
+    --rules: "Alegreya", Georgia, serif;
+    --num: "Barlow Condensed", "Alegreya Sans", sans-serif;
+    --deco: "Cinzel Decorative", "Cinzel", serif;
+    --iron: #1a120d;
+    --iron-hi: #3a271b;
+    --brass: #b98a52;
+  }
+  body, button { font-family: var(--text); }
+  #hud .stat, .ehp, .gem-core, .csum, .hand-index, .efloat { font-family: var(--num); font-weight: 600; font-variant-numeric: tabular-nums lining-nums; letter-spacing: 0.02em; }
+  .card .cdesc, .ilabel { font-family: var(--rules); }
+  .enemy.e-boss .ename { font-family: var(--deco); }
+
+  /* --- Type: Cinzel for names and chapter marks only; never body copy. --- */
+  .section-title, .page-num, .card .cname, .ename, .node .ntype, #hud .who, .reward h2, .end h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .card .cname { font-size: 0.98rem; letter-spacing: 0.02em; text-transform: none; }
+  .ename { font-size: 0.95rem; color: #ffe2c4; }
+  .section-title { letter-spacing: 0.22em; color: var(--brass); }
+
+  /* --- Card frame: forged plaque. Iron rim, brass keyline, a sunken illustration window. --- */
+  .card {
+    background:
+      radial-gradient(120% 60% at 50% 30%, color-mix(in srgb, var(--card-hue) 16%, transparent) 0%, transparent 60%),
+      linear-gradient(180deg, #24170f 0%, #170f0a 55%, #0f0906 100%);
+    border: 1px solid #4a2f1e;
+    box-shadow: inset 0 0 0 3px #120b07, inset 0 0 0 4px rgba(185, 138, 82, 0.35), inset 0 0 26px rgba(0, 0, 0, 0.5);
+  }
+  .card::after { border-color: rgba(185, 138, 82, 0.22); background: linear-gradient(180deg, rgba(255, 200, 140, 0.06) 0%, transparent 30%); }
+  .card .ctype {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--card-hue) 30%, #120b07) 0%, #140c08 100%);
+    border-bottom: 1px solid rgba(185, 138, 82, 0.4);
+    color: color-mix(in srgb, var(--card-hue) 80%, #fff);
+  }
+  .card .c-art {
+    border-radius: 6px;
+    background: radial-gradient(70% 70% at 50% 60%, color-mix(in srgb, var(--card-hue) 22%, transparent) 0%, transparent 75%);
+    box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.16);
+    opacity: 0.55;
+  }
+  .card .c-art .m { stroke-width: 1.3; }
+  .card .c-art .mf { opacity: 0.3; }
+  .card .cdesc { color: #f3e3d3; }
+  .cost-gem { filter: drop-shadow(0 0 6px rgba(255, 120, 40, 0.55)); z-index: 4; }
+
+  /* --- Enemies: woodcut iron figures, rim-lit by the furnace, ember eyes. --- */
+  .e-silhouette { width: 96px; height: 96px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)); }
+  .e-silhouette .b { fill: #0b0705; }
+  .e-silhouette .r { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .e-silhouette .g { fill: #ffcf6b; stroke: none; filter: drop-shadow(0 0 3px #ff7a2f); }
+  .e-silhouette .gc { fill: none; stroke: #ff7a2f; stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 2px #ff5a1f); }
+  .e-silhouette .gr { fill: none; stroke: rgba(255, 140, 60, 0.35); stroke-width: 1.5; }
+  .enemy.eh-0 .e-silhouette, .enemy.eh-1 .e-silhouette, .enemy.eh-2 .e-silhouette,
+  .enemy.eh-3 .e-silhouette, .enemy.eh-4 .e-silhouette { color: #d98a5c; }
+  .enemy.e-elite .e-silhouette { color: #e0a070; }
+  .enemy.e-boss .e-silhouette { color: #ff8a4a; width: 104px; height: 104px; }
+  .enemy:not(.is-dying) .e-silhouette svg { animation: ea-breathe 4.2s ease-in-out infinite; transform-origin: 50% 100%; }
+  @keyframes ea-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025, 1.035); } }
+
+  /* --- Map as a world: a ridge line and a lava river under the path, fog at the edges. --- */
+  .page-map.panel {
+    background:
+      linear-gradient(180deg, rgba(14, 9, 7, 0.0) 0%, rgba(14, 9, 7, 0.0) 55%, rgba(255, 90, 30, 0.10) 100%),
+      radial-gradient(90% 60% at 50% 0%, rgba(60, 38, 26, 0.6) 0%, transparent 70%),
+      #0f0a07;
+    border-color: #3b261a;
+  }
+  /* Two ridge silhouettes and a lava seam, cut with clip-path: no image, no URL. */
+  .page-map.panel::before {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 62%; z-index: 0; pointer-events: none;
+    background: linear-gradient(180deg, #1a0f0a 0%, #120a07 70%, #2a0f06 100%);
+    clip-path: polygon(0 100%, 0 40%, 10% 22%, 18% 32%, 28% 6%, 38% 24%, 48% 0, 58% 20%, 65% 10%, 75% 30%, 85% 4%, 100% 30%, 100% 100%);
+  }
+  .page-map.panel::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 18%; z-index: 0; pointer-events: none;
+    background: radial-gradient(60% 40% at 50% 100%, rgba(255, 110, 40, 0.45), transparent 75%), #0d0705;
+    clip-path: polygon(0 100%, 0 40%, 14% 20%, 30% 46%, 46% 18%, 60% 40%, 76% 14%, 90% 38%, 100% 22%, 100% 100%);
+  }
+  /* `:not(.page-glyph)`: this rule out-specified `.page-glyph { position: absolute }`, so the
+     watermark (an SVG 62% of the panel wide) sat IN FLOW under the hint and made the map
+     page ~550px taller than its content: at 1280x800 the map page scrolled ~470px. */
+  .page-map.panel > *:not(.page-glyph) { position: relative; z-index: 1; }
+  .map-row::after { background: none; border-bottom: 1px dashed rgba(255, 157, 58, 0.22); }
+  .node { background: rgba(20, 13, 9, 0.82); border-color: #3b261a; backdrop-filter: blur(1px); }
+  .node .ntype-mark {
+    display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #2a1a10, #0c0705); box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.4);
+  }
+  .node .ntype-mark svg { width: 18px; height: 18px; }
+  .page-map .map { background: transparent; border-color: transparent; }
+  .node .ntype-mark { grid-row: 1 / span 2; }
+  .node .ntype { grid-column: 2; grid-row: 1; display: block !important; color: var(--ink); line-height: 1.1; }
+  .node .nsub { grid-column: 2; grid-row: 2; display: block; font-size: 0.72rem; color: var(--faint); line-height: 1.1; }
+  .node.available::after { grid-row: 1 / span 2; }
+  .node .ntype { text-transform: none; font-size: 0.86rem; letter-spacing: 0.03em; }
+  .node .nsub { text-transform: none; letter-spacing: 0.02em; font-weight: 500; font-family: var(--text); }
+  .node.available { border-color: var(--gold); background: rgba(40, 20, 10, 0.9); }
+  .node.t-boss { border-color: #7a2414; }
+
+  /* --- Phone landscape (max-height 480): the portrait plate was display:none, so the
+         enemy read as a text box. Bring a 34px portrait back INSIDE the head plate's own
+         padding: absolute, so the card's height does not change. --- */
+  @media (max-height: 480px) {
+    .enemy .e-art {
+      display: block; position: absolute; top: 4px; left: 6px; width: 34px; height: 34px;
+      margin: 0; border: 1px solid #4a2c1c; border-radius: 6px; z-index: 3;
+    }
+    .enemy .e-art .e-silhouette { width: 32px; height: 32px; animation: none; }
+    .enemy .e-art .target-index, .enemy .e-art .target-mark { display: none; }
+    .enemy .e-head { padding-left: 36px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .enemy .e-silhouette svg { animation: none; }
+  }
+}
+
+/* ==========================================================================================
+   ART PHASE 2 — card illustrations, the drawn world map, motion polish, fixes.
+   Same rules as above: paint/type only inside the combat layout; the map page is outside
+   LAYOUT-ACCEPTANCE's combat scope and is restyled here.
+   ========================================================================================== */
+@media screen {
+  /* --- Card head = illustration window. The drawing sits right, type mark + word left. --- */
+  .card.has-illus .ctype { position: relative; overflow: hidden; justify-content: flex-start; padding-left: 12px; }
+  /* The mark keeps its per-breakpoint HEIGHT (it sets the head plate's height, which the
+     layout contract measured) but gives up its width to the drawing. Type stays readable
+     by hue, the type word and the head shape. */
+  .card.has-illus .c-type-mark { width: 0; margin-right: -6px; visibility: hidden; }
+  .card.has-illus .ctype { align-items: flex-end; }
+  .card.has-illus .ctype > span:last-child { text-shadow: 0 1px 2px #000, 0 0 8px #000; }
+  .c-illus {
+    position: absolute; top: 2px; bottom: 2px; right: 4px; width: 70%;
+    z-index: 0; pointer-events: none; color: color-mix(in srgb, var(--card-hue) 85%, #fff);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%);
+            mask-image: linear-gradient(90deg, transparent 0%, #000 22%);
+  }
+  .c-illus svg { display: block; width: 100%; height: 100%; }
+  .c-illus .b { fill: #0b0705; }
+  .c-illus .r { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+  .c-illus .g { fill: #ffcf6b; filter: drop-shadow(0 0 2px #ff7a2f); }
+  .c-illus .gc { fill: none; stroke: #ff8a3a; stroke-width: 1.4; stroke-linecap: round; filter: drop-shadow(0 0 2px #ff5a1f); }
+  .card.has-illus .ctype > .c-type-mark, .card.has-illus .ctype > span:last-child { position: relative; z-index: 1; }
+  .card.has-illus .c-art.c-echo {
+    display: grid; opacity: 0.13; transform: none; color: var(--card-hue);
+    background: none; box-shadow: none; filter: blur(0.3px);
+  }
+  .c-echo .b { fill: none; } .c-echo .r, .c-echo .gc { fill: none; stroke: currentColor; stroke-width: 1; }
+  .c-echo .g { fill: currentColor; }
+  @media (max-height: 480px), (max-width: 620px) { .card.has-illus .c-art.c-echo { display: none; } }
+  .card.disabled .c-illus { opacity: 0.45; filter: grayscale(0.6); }
+  .card:hover:not(.disabled) .c-illus .g, .card:focus-visible .c-illus .g { animation: ea-flicker 0.9s ease-in-out infinite alternate; }
+  @keyframes ea-flicker { from { opacity: 1; } to { opacity: 0.55; } }
+
+  /* --- HUD step counter: Barlow numerals, not the leftover monospace. --- */
+  #hud .hud-step, #hud .stat { font-family: var(--num); font-weight: 600; letter-spacing: 0.03em; }
+
+  /* --- The world map: climb from the lava (floor 1, bottom) to the Guardian (top). --- */
+  .page-map.panel { background: #0c0806; }
+  .page-map.panel::before, .page-map.panel::after { display: none; }
+  .page-map .map {
+    position: relative; display: flex; flex-direction: column-reverse; gap: 14px;
+    max-width: 640px; padding: 14px 10px; border-radius: 12px; overflow: hidden;
+    background: transparent; border: 1px solid #3b261a;
+  }
+  .map-world { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .map-world svg { width: 100%; height: 100%; display: block; }
+  .map-world .w-sky { fill: #120b08; }
+  .map-world .w-far { fill: #1c120c; }
+  .map-world .w-spire { fill: #2a1610; stroke: #ff6a2a; stroke-opacity: 0.5; stroke-width: 1.5; }
+  .map-world .w-mid { fill: #170e09; }
+  .map-world .w-crack { fill: none; stroke: #ff6a26; stroke-opacity: 0.35; stroke-width: 2; }
+  .map-world .w-near { fill: #0f0806; }
+  .map-world .w-lava { fill: none; stroke: #ff7a2f; stroke-width: 5; stroke-opacity: 0.7; filter: drop-shadow(0 0 6px #ff5a1f); }
+  .map-routes { position: absolute; left: 0; top: 0; z-index: 1; pointer-events: none; overflow: visible; }
+  .route-dim { fill: none; stroke: rgba(201, 173, 152, 0.18); stroke-width: 1.5; stroke-dasharray: 2 5; stroke-linecap: round; }
+  .route-lit { fill: none; stroke: var(--gold); stroke-width: 2.5; stroke-dasharray: 6 6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 120, 40, 0.7)); animation: ea-march 1.2s linear infinite; }
+  @keyframes ea-march { to { stroke-dashoffset: -24; } }
+  .page-map .map-row {
+    position: relative; z-index: 2; display: flex; flex-wrap: nowrap; justify-content: center;
+    gap: 36px; max-width: none; margin: 0; grid-template-columns: none;
+  }
+  .page-map .map-row::after { display: none; }
+  .page-map .map-floor-label { left: 4px; transform: translateY(-50%); font-family: var(--num); color: var(--faint); }
+  .page-map .node {
+    flex: 0 0 auto; min-width: 0; width: auto; min-height: 40px; padding: 4px 12px 4px 4px;
+    grid-template-columns: 30px auto 12px; column-gap: 8px; border-radius: 22px;
+    background: rgba(14, 9, 6, 0.92); opacity: 1;
+  }
+  .page-map .node:not(.available):not(.current) { opacity: 0.62; }
+  .page-map .node .ntype-mark { width: 30px; height: 30px; }
+  .page-map .node .ntype { white-space: nowrap; font-size: 0.82rem; }
+  .page-map .node .nsub { white-space: nowrap; }
+  .page-map .node.current { border-color: var(--ember-hot); box-shadow: 0 0 0 3px rgba(255, 207, 107, 0.18); }
+  .page-map .node-you { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+
+  /* Short screens (915x412): 8 floors must fit, so the outcome line goes and nodes shrink.
+     The outcome is still in each node's aria-label/title. */
+  @media (max-height: 480px) {
+    .page-map .map { gap: 4px; padding: 4px 8px; }
+    .page-map .node { min-height: 30px; padding: 2px 10px 2px 2px; grid-template-columns: 24px auto 10px; }
+    .page-map .node .ntype-mark { width: 24px; height: 24px; }
+    .page-map .node .ntype-mark svg { width: 14px; height: 14px; }
+    .page-map .node .nsub { display: none; }
+    .page-map .node .ntype { grid-row: 1 / span 2; font-size: 0.76rem; }
+    .page-map .map-row { gap: 20px; }
+    .page-map .section-title, .page-map .hint, .page-map .page-num { display: none; }
+  }
+  @media (max-width: 620px) {
+    .page-map .map-row { gap: 8px; }
+    .page-map .node .nsub { display: none; }
+    .page-map .node .ntype { grid-row: 1 / span 2; }
+  }
+  /* Phones (360-412 wide): a floor of three nodes was ~506px of nowrap pills, and that
+     min-content width set the map panel's width, so the panel overflowed <main> (which
+     clips) by ~150px. The right-hand node of a three-wide floor and the third quest chip
+     were off-screen and unreachable. The panel now takes the column's width, and each node
+     stacks its mark ABOVE its name and shares the row equally, so three always fit (also
+     at 130% text). Type stays readable from the name, the mark and the border hue. */
+  @media (max-width: 620px) {
+    .page-map.panel { width: 100%; min-width: 0; }
+    .page-map .map-row { gap: 6px; padding-left: 14px; }
+    .page-map .node {
+      flex: 1 1 0; min-width: 0; max-width: 132px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 1px; padding: 3px 4px 4px; border-radius: 14px; text-align: center;
+    }
+    .page-map .node .ntype-mark { width: 22px; height: 22px; }
+    .page-map .node .ntype-mark svg { width: 13px; height: 13px; }
+    .page-map .node .ntype {
+      max-width: 100%; font-size: 0.72rem; letter-spacing: 0.02em; line-height: 1.1;
+      white-space: normal; overflow: hidden; /* a two-word name wraps at its space, never mid-word */
+    }
+    .page-map .node.available::after { display: none; }
+  }
+
+  /* --- Motion polish: one beat per action, eased; heat rises. --- */
+  .page.enter .map-row { animation: ea-rise 0.42s cubic-bezier(.2,.7,.2,1) both; }
+  .page.enter .map-row:nth-child(n+4) { animation-delay: 0.04s; }
+  .page.enter .map-row:nth-child(n+6) { animation-delay: 0.08s; }
+  .page.enter .map-row:nth-child(n+8) { animation-delay: 0.12s; }
+  @keyframes ea-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .page-reward .card { transition: transform 0.18s ease-out, filter 0.18s ease-out; }
+  .page-reward .card:hover, .page-reward .card:focus-visible { transform: translateY(-4px); filter: drop-shadow(0 10px 18px rgba(255, 110, 30, 0.25)); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .route-lit, .page.enter .map-row, .card .c-illus .g { animation: none !important; }
+    .page-reward .card:hover, .page-reward .card:focus-visible { transform: none; }
+  }
+}
+
+/* ==========================================================================================
+   COMBAT STAGE — presentation only.
+   The fight is a foundry floor: hero left, enemies on a ground line, hand fanned in the
+   dock. Selectors are compounds so they do not redeclare a top-level rule. Fan rotation
+   is on `.card`, never on `.card-wrap`, so the hand stays one measured row.
+   ========================================================================================== */
+
+.page-combat .stage-combat {
+  min-height: 0;
+  gap: 6px;
+  justify-content: flex-start;
+}
+.page-combat .fight {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 96px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid #3a2618;
+  background: #100c09;
+}
+.page-combat .backdrop { position: absolute; inset: 0; z-index: 0; pointer-events: auto; }
+.page-combat .backdrop svg { width: 100%; height: 100%; display: block; }
+.page-combat .backdrop .sky { fill: #120c09; }
+.page-combat .backdrop .wall { fill: #1d140e; }
+.page-combat .backdrop .floor { fill: #0e0907; }
+.page-combat .backdrop .lava { fill: none; stroke: #ff6a1a; stroke-width: 3; opacity: 0.85; }
+.page-combat .backdrop .chain { fill: none; stroke: #6a5140; stroke-width: 1.6; }
+.page-combat .backdrop .spire { fill: #22160f; }
+.page-combat .ground {
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  bottom: 10%;
+  height: 2px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, #ff9d3a 18%, #8a4a22 50%, #ff9d3a 82%, transparent);
+  box-shadow: 0 0 16px rgba(255, 157, 58, 0.45);
+  opacity: 0.7;
+}
+.page-combat .hero {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  width: min(220px, 28%);
+  height: 92%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 7% 2%;
+  pointer-events: none;
+}
+.page-combat .hero-name {
+  font-family: var(--display, Cinzel, serif);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f0d2b0;
+  text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.9);
+}
+.page-combat .hero .ehp { margin: 0; }
+.page-combat .hero .hpbar { width: 72%; }
+.page-combat .speed-dock {
+  position: absolute;
+  /* Top-left corner, above the hero's head: centred it sat on the first foe's sprite and
+     name (e.g. Ash Cantor at 915x412). */
+  top: 8px;
+  left: 8px;
+  z-index: 4;
+  display: flex;
+  gap: 4px;
+}
+.page-combat .speed-btn { min-height: 28px; padding: 2px 8px; font-size: 0.75rem; line-height: 1; }
+.page-combat .speed-btn.is-on { color: var(--gold); border-color: var(--gold); }
+.page-combat .is-on { color: var(--gold); }
+
+.stage-combat .enemies {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  max-height: none;
+  max-width: none;
+  margin: 0;
+  padding: 0 2% 6% 0;
+  gap: 4px;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  justify-content: center;
+  background: none;
+  min-width: 0;
+  pointer-events: none;
+}
+.stage-combat .enemy {
+  pointer-events: auto;
+  background: none;
+  border: none;
+  box-shadow: none;
+  filter: none;
+  min-width: 0;
+  width: min(168px, 32%);
+  max-width: 180px;
+  padding: 0 4px 2px;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  color: inherit;
+  font: inherit;
+  flex: 0 1 168px;
+}
+.stage-combat .enemy.targeting { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 10px; }
+.stage-combat .enemy.aimed { outline: 3px solid #fff4e5; }
+.stage-combat .enemy .target-index {
+  position: absolute;
+  top: 28%;
+  left: 4px;
+  z-index: 3;
+}
+.stage-combat .enemy .target-mark { position: absolute; top: 26%; right: 2px; z-index: 3; color: var(--gold); }
+.stage-combat .enemy .ename { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.9); }
+.stage-combat .enemy .ehp { font-size: 0.75rem; margin: 0; }
+.stage-combat .enemy .hpbar { width: 80%; margin: 2px 0; }
+.stage-combat .enemy .eblock { font-size: 0.72rem; }
+.stage-combat .e-statuses { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.stage-combat .e-intent {
+  margin: 2px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  display: block;
+  text-align: center;
+  max-width: 150px;
+}
+.stage-combat .e-intent .ilabel {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  font-weight: 700;
+  color: #e7d2c0;
+}
+.stage-combat .intent-badge {
+  width: 40px;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  color: #ff9d3a;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+  /* A carved iron token instead of a bare glyph floating in the air. */
+  border-radius: 12px 12px 14px 14px;
+  background: radial-gradient(circle at 50% 35%, #2e1b11, #120a06 70%);
+  border: 1px solid #5a3420;
+  box-shadow: inset 0 1px 0 rgba(255, 190, 120, 0.18), 0 3px 8px rgba(0, 0, 0, 0.6);
+  padding: 3px 0 2px;
+}
+.stage-combat .intent-badge svg { width: 100%; height: 58%; display: block; }
+.stage-combat .intent-badge .b { fill: #1a100c; }
+.stage-combat .intent-badge .r { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.stage-combat .intent-badge .g { fill: none; stroke: #ff9d3a; stroke-width: 1.5; }
+.stage-combat .intent-badge.kind-block { color: #8fd0f2; }
+.stage-combat .intent-badge.kind-buff { color: #f5c542; }
+.stage-combat .intent-badge.kind-debuff { color: #c9a6ee; }
+.stage-combat .tier-1 { transform: scale(0.9); }
+.stage-combat .tier-2 { transform: scale(1.15); }
+.stage-combat .tier-3 { transform: scale(1.45); }
+.stage-combat .intent-num {
+  font-family: var(--num);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffe6c8;
+  text-shadow: 0 1px 0 #000, 0 0 6px rgba(255, 120, 40, 0.6);
+}
+
+.stage-combat .fig { position: relative; width: min(150px, 100%); height: min(200px, 34vh); color: #f0d2b4; filter: none; }
+.stage-combat .hero .fig { width: min(180px, 100%); height: min(250px, 42vh); }
+.stage-combat .hero.is-low .fig { filter: saturate(0.55) brightness(0.78); }
+.stage-combat .enemy.is-dying { animation: ash-fall 0.5s ease-in both; }
+.stage-combat .ash { pointer-events: none; }
+
+.page-combat .dock {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "draw orb hand discard end";
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.page-combat .pile-draw { grid-area: draw; }
+.page-combat .dock > .energy-orb { grid-area: orb; }
+.page-combat .dock .hand { grid-area: hand; }
+.page-combat .pile-discard { grid-area: discard; }
+.page-combat .dock .controls { grid-area: end; align-self: end; }
+.page-combat .pile {
+  width: 54px;
+  min-height: 68px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #6a4328;
+  background: linear-gradient(180deg, #3a2418, #140e0b 70%);
+  color: var(--ink);
+  box-shadow: 5px 5px 0 #0c0806;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  align-self: end;
+}
+.page-combat .pile-count { font-family: var(--num); font-size: 1.15rem; color: var(--gold); line-height: 1; }
+.page-combat .pile-name { font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.page-combat .energy-orb {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  align-self: end;
+  justify-self: center;
+  background: radial-gradient(circle at 38% 32%, #ffe0bf, #ff9d3a 46%, #9a3e10 74%, #2a1008);
+  box-shadow: 0 0 22px rgba(255, 157, 58, 0.55), inset 0 -8px 12px rgba(0, 0, 0, 0.35);
+  color: #2a1008;
+}
+.page-combat .energy-orb.is-empty { filter: grayscale(0.65) brightness(0.72); box-shadow: none; }
+.page-combat .is-empty { filter: grayscale(0.65) brightness(0.72); }
+.page-combat .orb-num { font-family: var(--num); font-size: 1.85rem; font-weight: 700; line-height: 1; }
+.page-combat .orb-cap { position: absolute; font-size: 0.65rem; opacity: 0; }
+
+.stage-combat .hand {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  padding: 16px 8px 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+.stage-combat .card-wrap {
+  flex: 1 1 0;
+  max-width: 168px;
+  min-width: 0;
+  margin: 0 -6px;
+  transform: none;
+  z-index: calc(var(--i) + 1);
+}
+.stage-combat .card-wrap:hover:not(.is-disabled),
+.stage-combat .card-wrap:focus-within:not(.is-disabled),
+.stage-combat .card-wrap.is-pending { transform: none; z-index: 8; }
+.stage-combat .card {
+  width: 100%;
+  min-height: 0;
+  max-height: min(228px, 34vh);
+  overflow: hidden;
+  transform: translateY(-8px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 3deg));
+  transform-origin: 50% 100%;
+  /* Query container for the name size (cqi), see "Combat-hand legibility" below. */
+  container-type: inline-size;
+}
+.stage-combat .card-wrap:hover:not(.is-disabled) .card,
+.stage-combat .card-wrap:focus-within:not(.is-disabled) .card,
+.stage-combat .card-wrap.is-pending .card {
+  transform: translateY(-18px) rotate(0deg);
+}
+
+.page-combat .pile-back {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(6, 3, 2, 0.72);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.page-combat .pile-sheet {
+  width: min(420px, 92vw);
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  background: #1a120e;
+  border: 1px solid #6a4328;
+  border-radius: 12px;
+  padding: 16px 16px 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+.page-combat .pile-sheet h2 { margin: 0 0 8px; font-size: 1.05rem; }
+.page-combat .pile-list { margin: 0 0 10px; padding-left: 1.1em; }
+.page-combat .pile-exh { color: var(--faint); font-size: 0.85rem; }
+
+.hitstop .fig,
+.hitstop .efloat,
+.hitstop .fx-card,
+.hitstop .card { animation-play-state: paused !important; }
+.stage-combat .efloat.is-queued { opacity: 0; animation: none; }
+.stage-combat .efloat.is-static { animation: none; opacity: 1; position: absolute; }
+.stage-combat .is-queued { opacity: 0; }
+.stage-combat .is-static { animation: none; }
+
+@keyframes fig-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes fig-wind {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-3deg); }
+}
+@keyframes hero-strike {
+  0% { transform: translateX(0); }
+  40% { transform: translateX(16px) rotate(-4deg); }
+  100% { transform: translateX(0); }
+}
+@keyframes foe-strike {
+  0% { transform: translateX(0); }
+  40% { transform: translateX(-16px) rotate(4deg); }
+  100% { transform: translateX(0); }
+}
+@keyframes fig-hurt {
+  0% { transform: translateX(0); filter: none; }
+  35% { transform: translateX(-8px); filter: brightness(1.8); }
+  100% { transform: none; filter: none; }
+}
+@keyframes hero-hurt {
+  0% { transform: none; filter: none; }
+  35% { transform: translateX(8px); filter: brightness(1.7); }
+  100% { transform: none; filter: none; }
+}
+@keyframes fig-brace {
+  0% { transform: none; }
+  40% { transform: translateY(4px) scale(0.98); }
+  100% { transform: none; }
+}
+@keyframes ash-fall {
+  to { opacity: 0; transform: translateY(14px) scale(0.94); filter: blur(1px); }
+}
+/* Idle: the sprite breathes (.spr, below); the figure box itself stays still. */
+.stage-combat .fig.pose-idle { animation: none; }
+.stage-combat .fig.pose-windup { animation: fig-wind 0.85s ease-in-out infinite; }
+.stage-combat .hero .fig.pose-strike { animation: hero-strike 0.32s ease-out; }
+.stage-combat .enemy .fig.pose-strike { animation: foe-strike 0.32s ease-out; }
+.stage-combat .hero .fig.pose-hurt { animation: hero-hurt 0.28s ease-out; }
+.stage-combat .enemy .fig.pose-hurt { animation: fig-hurt 0.28s ease-out; }
+.stage-combat .fig.pose-brace { animation: fig-brace 0.28s ease-out; }
+.stage-combat .fig.pose-low { animation: fig-idle 1.1s ease-in-out infinite; filter: saturate(0.55) brightness(0.78); }
+
+@media (max-width: 760px) {
+  .page-combat .dock {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "draw orb discard"
+      "hand hand hand"
+      "end end end";
+  }
+  .page-combat .dock .controls .btn { width: 100%; }
+  .page-combat .energy-orb { width: 52px; height: 52px; }
+  .page-combat .orb-num { font-size: 1.3rem; }
+  .page-combat .pile { width: 48px; min-height: 48px; }
+  .stage-combat .hero { width: 34%; }
+  .stage-combat .fig { height: min(150px, 28vh); }
+}
+@media (max-height: 480px) {
+  .page-combat .fight { min-height: 88px; }
+  .page-combat .hero { width: 22%; padding-bottom: 2%; }
+  .page-combat .hero-name,
+  .page-combat .hero .ehp,
+  .page-combat .hero .hpbar,
+  .page-combat .hero .eblock { display: none; }
+  .stage-combat .hero .fig,
+  .stage-combat .fig { height: 64px; width: auto; }
+  .stage-combat .enemy { width: min(150px, 34%); padding: 0; }
+  .stage-combat .enemy .ename,
+  .stage-combat .enemy .ehp { font-size: 0.62rem; line-height: 1.05; margin: 0; }
+  .stage-combat .enemy .hpbar { height: 5px; margin: 1px 0; }
+  .stage-combat .enemy .eblock { font-size: 0.62rem; line-height: 1; }
+  .stage-combat .e-intent { margin: 0; }
+  .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; font-size: 0.6rem; }
+  .stage-combat .intent-badge { width: 22px; height: 26px; }
+  .stage-combat .tier-2,
+  .stage-combat .tier-3 { transform: none; }
+  .page-combat .energy-orb { width: 48px; height: 48px; }
+  .page-combat .orb-num { font-size: 1.2rem; }
+  .page-combat .pile { width: 46px; min-height: 48px; box-shadow: 3px 3px 0 #0c0806; }
+  .stage-combat .card {
+    min-height: 0 !important;
+    max-height: 104px;
+    padding: 6px 4px 3px;
+    gap: 1px;
+  }
+  .stage-combat .card .cfoot,
+  .stage-combat .cflavor { display: none; }
+  .stage-combat .card .cname { font-size: 0.72rem; }
+  .stage-combat .card .cdesc { font-size: 0.66rem; line-height: 1.1; }
+  .stage-combat .hand { padding: 10px 4px 8px; }
+  .page-combat .dock { margin-bottom: 4px; }
+  .page-combat .speed-btn { min-height: 22px; padding: 0 6px; }
+}
+/* Portrait phones (360x640): the stacked dock plus a full figure must still clear End Turn. */
+@media (max-width: 700px) and (max-height: 760px) {
+  .stage-combat .hero .fig,
+  .stage-combat .fig { height: 100px; }
+  .stage-combat .intent-badge { width: 26px; height: 28px; }
+  .stage-combat .enemy .ename,
+  .stage-combat .enemy .ehp { font-size: 0.68rem; line-height: 1.05; }
+  .stage-combat .card { max-height: 100px; }
+  .stage-combat .hand { padding: 8px 2px 4px; }
+  .page-combat .energy-orb { width: 44px; height: 44px; }
+  .page-combat .pile { width: 44px; min-height: 44px; }
+  .page-combat .orb-num { font-size: 1.15rem; }
+}
+@media (min-height: 700px) {
+  .stage-combat .card {
+    max-height: min(250px, 36vh);
+    transform: translateY(-12px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 5deg));
+  }
+  .stage-combat .hero .fig { height: min(260px, 42vh); }
+  .stage-combat .fig { height: min(210px, 36vh); }
+}
+/* A tall foundry plus a wordy hand is what scrolls a 768px laptop. The fight keeps
+   the backdrop, and it stops above the hand so End Turn and the hint stay inside. */
+@media (min-height: 700px) and (max-height: 780px) {
+  .page-combat .fight { max-height: 348px; }
+  .stage-combat .card { max-height: 196px; }
+  .stage-combat .hand { padding: 12px 8px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-combat .fig,
+  .stage-combat .enemy.is-dying,
+  .stage-combat .card { animation: none !important; }
+  .stage-combat .fig.pose-low,
+  .stage-combat .hero.is-low .fig { transform: translateY(2px); filter: saturate(0.55) brightness(0.78); }
+  .hitstop .fig, .hitstop .card, .hitstop .efloat { animation-play-state: running !important; }
+}
+
+/* ===================================================== combat stage v2 (foundry dressing) */
+/* Stage: brick courses, a deeper furnace, carved floor, and a pool of light the cast stands in. */
+.page-combat .backdrop .beam { fill: #120b07; }
+.page-combat .backdrop .brick { fill: none; stroke: #120c08; stroke-width: 2; }
+.page-combat .backdrop .hook { fill: none; stroke: #6a5140; stroke-width: 2.4; }
+.page-combat .backdrop .spire-cut { fill: none; stroke: #120b07; stroke-width: 2; }
+.page-combat .backdrop .floor-cut { fill: none; stroke: #2a1a10; stroke-width: 2; stroke-linecap: round; }
+.page-combat .fight::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    radial-gradient(60% 34% at 50% 92%, rgba(255, 130, 50, 0.16), transparent 70%),
+    radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55));
+}
+
+/* Intent token and number styles live with the base .intent-badge / .intent-num rules. */
+/* HP plates: framed iron troughs with molten fill. */
+.stage-combat .hpbar { background: #0a0605; border: 1px solid #4e2e1c; box-shadow: inset 0 1px 2px #000; border-radius: 3px; }
+.stage-combat .hpbar i { background: linear-gradient(180deg, #ff8a4a, #c0301c 60%, #8a1c12); box-shadow: 0 0 6px rgba(255, 90, 40, 0.45); }
+
+/* ===================================================== combat art v3 (illustrated sprites)
+   The .fig box sizes above are unchanged (layout frozen); the sprite fits inside it, feet
+   on the box floor. A warm rim separates the dark ink from the dark stage. */
+.stage-combat .fig .spr {
+  position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 100%;
+  object-fit: contain; object-position: 50% 100%;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.55)) drop-shadow(0 0 7px rgba(255, 110, 40, 0.32));
+  user-select: none; pointer-events: none;
+}
+.stage-combat .fig .sh {
+  position: absolute; left: 12%; right: 12%; bottom: -5px; height: 12px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.78), transparent);
+}
+.stage-combat .enemy .fig .spr-the_guardian { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
+@keyframes spr-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.03); } }
+.stage-combat .fig.pose-idle .spr, .stage-combat .fig.pose-low .spr { animation: spr-breathe 3.1s ease-in-out infinite; }
+/* Hit flash: the ink goes white-hot for a beat. */
+.stage-combat .fig.pose-hurt .spr { filter: brightness(2.3) sepia(0.4) drop-shadow(0 0 10px rgba(255, 220, 170, 0.9)); }
+.stage-combat .fig.pose-strike .spr { filter: brightness(1.15) drop-shadow(0 0 1px rgba(255, 196, 140, 0.7)) drop-shadow(0 0 12px rgba(255, 130, 40, 0.6)); }
+.stage-combat .fig.pose-brace .spr { transform: scale(0.98, 0.96); }
+.stage-combat .fig.pose-windup .spr { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 12px rgba(255, 70, 30, 0.6)); }
+@media (max-height: 480px) {
+  .stage-combat .fig .spr { filter: brightness(1.25) drop-shadow(0 0 1px rgba(255, 200, 150, 0.8)) drop-shadow(0 0 5px rgba(255, 120, 40, 0.5)); }
+  .stage-combat .fig .sh { bottom: -3px; height: 7px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-combat .fig .spr { animation: none !important; transform: none; }
+}
+@media (max-height: 480px) {
+  /* The svg used to give the 64px-tall box its width; an absolutely placed sprite cannot. */
+  .stage-combat .hero .fig, .stage-combat .fig { width: 84px; max-width: 100%; }
+}
+
+/* Furnace: an illustrated sprite, dimmed into the wall, with a CSS-only fire breath. The
+   flicker is a fixed keyframe pattern (no randomness), so every load looks the same. */
+.page-combat .backdrop .furnace-img { filter: brightness(0.62) saturate(1.1) contrast(1.05); }
+.page-combat .backdrop .fire-halo { fill: #ff7a24; opacity: 0.12; filter: blur(18px); animation: fire-breathe 4.7s ease-in-out infinite; }
+.page-combat .backdrop .fire-spill { fill: #ff8a3a; opacity: 0.1; filter: blur(14px); animation: fire-breathe 4.7s ease-in-out infinite; }
+.page-combat .backdrop .fire-mouth { fill: #ffb050; opacity: 0.22; mix-blend-mode: screen; filter: blur(8px); animation: fire-flicker 2.3s linear infinite; }
+@keyframes fire-flicker {
+  0% { opacity: 0.18; } 7% { opacity: 0.27; } 13% { opacity: 0.2; } 21% { opacity: 0.3; }
+  34% { opacity: 0.22; } 41% { opacity: 0.32; } 55% { opacity: 0.19; } 63% { opacity: 0.28; }
+  78% { opacity: 0.21; } 86% { opacity: 0.31; } 100% { opacity: 0.18; }
+}
+@keyframes fire-breathe { 0%, 100% { opacity: 0.1; } 50% { opacity: 0.17; } }
+@media (prefers-reduced-motion: reduce) {
+  .page-combat .backdrop .fire-mouth, .page-combat .backdrop .fire-halo, .page-combat .backdrop .fire-spill { animation: none; }
+}
+
+/* Keywords in rules text: gold for game terms (tooltip = kernel glossary), ember red for costs. */
+.card .cdesc .kw { color: #f5c542; font-weight: 700; cursor: help; }
+.card .cdesc .kw-cost { color: #ff7a5a; cursor: default; }
+
+/* ---------- Scene transitions + act title card (fx layer, never intercepts input) ---------- */
+.fx-scene {
+  position: fixed; inset: 0; z-index: 55; pointer-events: none;
+  background:
+    radial-gradient(70% 50% at 50% 110%, rgba(255, 120, 40, 0.55), transparent 70%),
+    linear-gradient(180deg, rgba(10, 6, 4, 0) 0%, rgba(10, 6, 4, 0.85) 45%, rgba(10, 6, 4, 0) 100%);
+  animation: scene-heat 0.7s ease-in-out both;
+}
+@keyframes scene-heat {
+  0% { opacity: 0; transform: translateY(40%); }
+  45% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-40%); }
+}
+.fx-act-card {
+  position: fixed; inset: 0; z-index: 58; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: radial-gradient(70% 45% at 50% 50%, rgba(12, 8, 5, 0.97) 35%, rgba(12, 8, 5, 0.55) 80%, rgba(12, 8, 5, 0.3));
+  animation: act-card 2.3s ease-in-out both;
+}
+.fx-act-num { font-family: var(--display, Cinzel, serif); font-size: 0.95rem; letter-spacing: 0.5em; color: #ff9d3a; text-transform: uppercase; }
+.fx-act-name { font-family: 'Cinzel Decorative', var(--display, Cinzel, serif); font-size: clamp(1.8rem, 5vw, 3.4rem); color: #f3dcc0; text-shadow: 0 0 30px rgba(255, 120, 40, 0.5); }
+.fx-act-rule { width: min(320px, 50vw); height: 2px; background: linear-gradient(90deg, transparent, #ff9d3a, transparent); box-shadow: 0 0 12px rgba(255, 140, 50, 0.7); }
+@keyframes act-card {
+  0% { opacity: 0; letter-spacing: 0.02em; }
+  18% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .fx-scene, .fx-act-card { display: none; } }
+
+/* Map pins: a hot-iron tack in the node's corner. Absolute, so no node changes size. */
+.node .node-pin {
+  position: absolute; top: -7px; right: -7px; width: 16px; height: 16px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffe0a8, #ff8a2a 45%, #8a2a10 100%);
+  box-shadow: 0 0 0 2px #1a0f0a, 0 0 10px rgba(255, 140, 50, 0.8);
+  pointer-events: none;
+}
+.node .node-pin::after {
+  content: ''; position: absolute; left: 7px; top: 14px; width: 2px; height: 6px; background: #1a0f0a;
+}
+.node.pinned { outline: 1px dashed rgba(245, 197, 66, 0.7); outline-offset: 3px; }
+
+/* ---------- Scene illustrations (reward, rest): a woodcut plate above the choice ---------- */
+.scene-illus { display: flex; justify-content: center; margin: 0 auto 6px; pointer-events: none; }
+.scene-illus img {
+  height: clamp(110px, 24vh, 230px); width: auto; max-width: 90%; object-fit: contain;
+  filter: brightness(0.85) drop-shadow(0 0 18px rgba(255, 120, 40, 0.28));
+  -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent);
+          mask-image: linear-gradient(180deg, #000 78%, transparent);
+}
+.scene-reward img { filter: brightness(0.9) drop-shadow(0 0 22px rgba(255, 140, 50, 0.4)); }
+.rest .scene-illus { position: relative; z-index: 1; }
+/* Short landscape (915×412): a slim banner, so the choices stay above the fold. */
+@media (max-height: 480px) {
+  .scene-illus { margin-bottom: 2px; }
+  .scene-illus img { height: 64px; }
+}
+/* The rest illustration takes over the breathing ember ring's job: the brazier glow breathes. */
+.rest .rest-embers { display: none; }
+@keyframes illus-breathe { 0%, 100% { filter: brightness(0.82) drop-shadow(0 0 14px rgba(255, 120, 40, 0.22)); } 50% { filter: brightness(0.95) drop-shadow(0 0 26px rgba(255, 140, 50, 0.42)); } }
+.scene-event img { animation: illus-breathe 4.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .scene-event img { animation: none; } }
+@media (max-height: 480px) {
+  .rest { gap: 2px; padding-top: 4px; padding-bottom: 4px; }
+  .rest > * { margin-top: 0; margin-bottom: 2px; }
+  .rest .rest-calm { font-size: 0.8rem; }
+  .rest .section-title { display: none; }
+}
+
+/* ---------- Kindling (act-start boons): banner buttons under the forge plate ---------- */
+.kindling { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.kindling-head { font-size: var(--fs-5); font-weight: 800; color: var(--ember-hot, #ff9d3a); margin: 0; }
+.kindling-note { margin: 0; color: #cbb59e; font-size: 0.9rem; }
+.boon-list { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; width: 100%; }
+.boon {
+  flex: 1 1 200px; max-width: 260px; min-height: 92px; padding: 10px 12px; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 4px; color: #f0dcc4; font: inherit;
+  background: linear-gradient(180deg, #2a1810, #160d08); border: 1px solid #5a3420; border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 190, 120, 0.15), 0 4px 12px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.boon:hover, .boon:focus-visible { border-color: #ff9d3a; transform: translateY(-2px); box-shadow: 0 0 0 1px #ff9d3a, 0 0 18px rgba(255, 130, 40, 0.35); outline: none; }
+.boon-name { font-family: var(--display, Cinzel, serif); font-weight: 700; color: #ffd27a; letter-spacing: 0.04em; }
+.boon-text { font-size: 0.86rem; line-height: 1.3; }
+.boon-text .kw { color: #f5c542; font-weight: 700; }
+.boon-text .kw-cost { color: #ff7a5a; }
+@media (max-height: 480px) {
+  .kindling { gap: 3px; }
+  .kindling-head { font-size: var(--fs-4); }
+  .kindling-note { display: none; }
+  .boon { min-height: 0; padding: 6px 8px; }
+  .boon-text { font-size: 0.76rem; }
+}
+@media (prefers-reduced-motion: reduce) { .boon { transition: none; } .boon:hover { transform: none; } }
+
+/* ---------- Tempers (B2): frame trim per temper + rest-site offers ---------- */
+.card.tempered { position: relative; }
+/* The stamp: a small forged iron tab struck into the plate, notched like a maker's mark,
+   brass keyline inside, the temper's hue on the rim and the mark. --tc is that hue. */
+.card .ctemper {
+  --tc: #ff9d3a;
+  /* Struck into the footer bar beside the compact code, like a maker's mark, clear of the
+     rules text (which now carries the tempered numbers and can run a line longer). */
+  position: relative; z-index: 3;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px 1px 4px;
+  background: linear-gradient(180deg, #3b261a, #1a120d 70%);
+  border: 1px solid var(--tc);
+  box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 2px 4px rgba(0, 0, 0, 0.7);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 4px 100%, 0 50%);
+  font-family: var(--display, Cinzel, serif);
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #f8eee5; text-shadow: 0 1px 0 #000;
+}
+.card .ctemper .t-mark { display: inline-flex; width: 12px; height: 12px; color: var(--tc); }
+.card .ctemper .t-mark svg { width: 100%; height: 100%; }
+.card .ctemper .t-mark .m { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.card .ctemper .t-mark .mf { fill: currentColor; }
+.card .ctemper .t-name { line-height: 1.2; }
+.card.temper-quenched { box-shadow: 0 0 0 2px #6fb6e4, 0 0 14px rgba(111, 182, 228, 0.45); }
+.card.temper-quenched .ctemper { --tc: #8fd0f2; }
+.card.temper-redhot { box-shadow: 0 0 0 2px #ff6a2a, 0 0 16px rgba(255, 90, 30, 0.55); }
+.card.temper-redhot .ctemper { --tc: #ff8a4a; box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 0 8px rgba(255, 106, 42, 0.55); }
+.card.temper-balanced { box-shadow: 0 0 0 2px #e8c45a, 0 0 14px rgba(232, 196, 90, 0.45); }
+.card.temper-balanced .ctemper { --tc: #f5c542; }
+.temper-head { margin: 6px 0 0; color: #cbb59e; font-size: 0.85rem; }
+.temper-list .boon { min-height: 64px; }
+.temper-offer.temper-quenched { border-color: #4f7f99; }
+.temper-offer.temper-redhot { border-color: #9a3a1a; }
+.temper-offer.temper-balanced { border-color: #8a7330; }
+@media (max-height: 480px) {
+  .rest .rest-calm { display: none; }
+  .temper-head { margin: 2px 0 0; font-size: 0.72rem; }
+  /* Short windows: the three offers sit in ONE row, and each keeps its effect AND cost
+     (Red-hot's HP, Balanced's exhaust) in small type instead of hiding them. One row of
+     three is shorter than the two-row wrap of names alone, so nothing is pushed down. */
+  .temper-list { flex-wrap: nowrap; gap: 6px; }
+  .temper-list .boon { flex: 1 1 0; min-width: 0; min-height: 0; padding: 3px 6px; gap: 1px; }
+  .temper-list .boon-text { display: block; font-size: 0.64rem; line-height: 1.2; }
+  .temper-list .boon-name { font-size: 0.66rem; letter-spacing: 0.01em; white-space: nowrap; }
+}
+/* Phones in portrait: with forge offers on the screen, the calm line is the one thing that
+   can go (the heading already says it) so the last offer is not pushed below the fold. */
+@media (max-width: 620px) {
+  .rest.has-tempers .rest-calm { display: none; }
+}
+/* A tile with no footer (none today; defensive) wears the stamp on the plate. */
+.card > .ctemper { position: absolute; bottom: 6px; right: 8px; }
+/* Where the footer bar is dropped (phones, short windows), the tempered card keeps ONLY the
+   stamp, lifted out of flow to the top-right of the plate: no height is added to the card. */
+@media (max-width: 620px), (max-height: 480px) {
+  .card.tempered .cfoot,
+  .stage-combat .card.tempered .cfoot {
+    display: block; position: absolute; top: 2px; right: 6px; z-index: 3;
+    margin: 0; padding: 0; border: 0; background: none;
+  }
+  .card.tempered .cfoot > :not(.ctemper) { display: none; }
+  .card .ctemper { font-size: 0.55rem; padding: 0 5px 0 3px; }
+  .card .ctemper .t-mark { width: 10px; height: 10px; }
+}
+
+/* B3 Ember quests: a strip of three chips above the map. */
+.quests { display: flex; gap: 6px; margin: 0 0 6px; flex-wrap: wrap; contain: inline-size; }
+/* QA: at 390x844 the third chip sat past the right edge where nothing could scroll to it
+   (the map panel was wider than the screen; see the phone map block). `contain: inline-size`
+   keeps the strip's own nowrap width (~506px, ~573px at 130% text) from sizing the panel;
+   the chips then WRAP onto a second row when three do not fit, each keeping its full name
+   and reward. */
+.quest {
+  position: relative; flex: 1 1 auto; min-width: min(8.5em, 100%); max-width: 100%; padding: 3px 8px 5px;
+  border: 1px solid rgba(255, 170, 90, 0.35); border-radius: 6px;
+  background: rgba(30, 16, 10, 0.7); font-size: 0.8rem; line-height: 1.2;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.quest .q-name { color: #ffcf8a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quest .q-prog { color: #d8c3ad; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quest .q-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: var(--q, 0%); background: linear-gradient(90deg, #ff7a2f, #ffd27a); }
+.quest.done { border-color: #ffd27a; box-shadow: 0 0 8px rgba(255, 190, 90, 0.35); }
+.quest.done .q-name::before { content: '✦ '; }
+@media (max-height: 480px) {
+  .quests { margin-bottom: 3px; gap: 4px; }
+  .quest { flex-direction: row; gap: 6px; align-items: baseline; padding: 1px 6px 3px; font-size: 0.62rem; }
+}
+@media (max-height: 480px) {
+  /* With the quest strip the 8 floors still fit 412px: nodes give up 4px each, gaps 1px. */
+  .page-map:has(.quests) .map { gap: 3px; }
+  .page-map:has(.quests) .node { min-height: 26px; padding-top: 1px; padding-bottom: 1px; }
+  .page-map:has(.quests) .node .ntype-mark { width: 21px; height: 21px; }
+  .quests { margin-bottom: 2px; }
+}
+
+/* B4 hero select (on the Kindling screen, before the first choice) and Bellows accents. */
+.hero-select { display: flex; gap: 10px; justify-content: center; margin: 4px 0 10px; }
+.hero-pick {
+  display: grid; grid-template-columns: 56px 1fr; grid-template-rows: auto 1fr; column-gap: 10px;
+  align-items: start; text-align: left; max-width: 300px; padding: 6px 10px 6px 6px; cursor: pointer;
+  background: rgba(24, 14, 9, 0.85); border: 1px solid rgba(255, 170, 90, 0.3); border-radius: 8px; color: inherit;
+}
+.hero-pick .hp-face { grid-row: 1 / span 2; width: 56px; height: 64px; position: relative; overflow: hidden; }
+.hero-pick .hp-face .sh { display: none; }
+.hero-pick .hp-face .spr { width: 100%; height: 100%; object-fit: contain; object-position: top; }
+.hero-pick .hp-name { font-weight: 700; color: #ffcf8a; font-size: 0.9rem; }
+.hero-pick .hp-blurb { font-size: 0.72rem; line-height: 1.25; color: #d8c3ad; }
+.hero-pick.on { border-color: var(--gold, #ffd27a); box-shadow: 0 0 0 2px rgba(255, 207, 107, 0.2); }
+.hero-pick.hp-bellows.on { border-color: #7fe3f0; box-shadow: 0 0 0 2px rgba(110, 220, 240, 0.25), 0 0 14px rgba(90, 210, 235, 0.25); }
+.hero-pick.hp-bellows .hp-name { color: #a6eef7; }
+.hero-pick:focus-visible { outline: 2px solid #ffd27a; outline-offset: 2px; }
+.page-combat .hero.is-bellows .hero-name { color: #a6eef7; text-shadow: 0 0 8px rgba(90, 210, 235, 0.45); }
+.stage-combat .hero.is-bellows .fig .spr { filter: drop-shadow(0 0 10px rgba(90, 210, 235, 0.3)); }
+@media (max-height: 480px) {
+  .hero-select { margin: 0 0 4px; gap: 6px; }
+  .hero-pick { grid-template-columns: 34px 1fr; padding: 3px 8px 3px 3px; max-width: 280px; }
+  .hero-pick .hp-face { width: 34px; height: 38px; }
+  .hero-pick .hp-name { font-size: 0.78rem; }
+  .hero-pick .hp-blurb { font-size: 0.6rem; }
+}
+.hero-pick.hp-ironclad .hp-face .spr { object-position: center; transform: scale(1.25); }
+/* QA: on 360-412px phones, and above all with 130% text, the two hero cards stacked
+   (name + blurb each) and the Kindling boons, the actual choice on this screen, fell
+   below the fold (360x780 at 130%: the boons started at y=669). On narrow screens the
+   picker becomes one compact row: a small face and the name. The blurb stays in the
+   accessible name (visually hidden, not removed) and in the tooltip. The forge plate
+   above it gives up height on this screen only. */
+@media (max-width: 620px) {
+  .hero-select { flex-wrap: nowrap; gap: 6px; margin: 0 0 4px; width: 100%; }
+  .hero-pick {
+    flex: 1 1 0; min-width: 0; max-width: 200px; grid-template-columns: 30px minmax(0, 1fr);
+    grid-template-rows: auto; align-items: center; column-gap: 6px; padding: 3px 8px 3px 3px;
+  }
+  .hero-pick .hp-face { grid-row: auto; width: 30px; height: 34px; }
+  .hero-pick .hp-name { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hero-pick .hp-blurb {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .kindling:has(.hero-select) .scene-illus img { height: clamp(64px, 13vh, 120px); }
+}
+
+/* B5 The Cinder Mines: painted backdrop (pre-darkened), a cooler floor line, biome picker. */
+.page-combat .backdrop .mines-bg {
+  position: absolute; inset: 0; background: #0b0908;
+  filter: brightness(0.8) saturate(0.95);
+}
+/* An <img> in the markup, not a stylesheet fetch (check-surface-art forbids those). */
+.page-combat .backdrop .mines-img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 40%;
+}
+.page-combat .backdrop .mines-bg::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 55% at 50% 72%, rgba(0, 0, 0, 0) 0%, rgba(8, 5, 4, 0.55) 100%),
+    linear-gradient(180deg, rgba(8, 5, 4, 0.35) 0%, rgba(8, 5, 4, 0) 30%, rgba(8, 5, 4, 0.55) 100%);
+}
+.page-combat .backdrop .mines-floor {
+  position: absolute; left: 0; right: 0; bottom: 14%; height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(255, 120, 50, 0.55) 30%, rgba(255, 150, 70, 0.6) 70%, transparent);
+  filter: blur(1px);
+}
+.stage-combat .enemy .fig.is-elite-variant .spr { filter: hue-rotate(-12deg) saturate(1.3) drop-shadow(0 0 12px rgba(190, 120, 255, 0.45)); scale: 1.12; transform-origin: 50% 100%; }
+.stage-combat .enemy .fig .spr-cinder_foreman { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
+.biome-select { display: flex; gap: 6px; justify-content: center; align-items: center; margin: -4px 0 8px; font-size: 0.78rem; }
+.biome-select .bs-label { color: #b9a28c; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.66rem; }
+.biome-pick { padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(255, 170, 90, 0.3); background: rgba(24, 14, 9, 0.85); color: #d8c3ad; cursor: pointer; font: inherit; }
+.biome-pick.on { border-color: var(--gold, #ffd27a); color: #ffcf8a; box-shadow: 0 0 0 2px rgba(255, 207, 107, 0.18); }
+.biome-pick:focus-visible { outline: 2px solid #ffd27a; outline-offset: 2px; }
+@media (max-height: 480px) {
+  .biome-select { margin: -2px 0 4px; font-size: 0.66rem; }
+  .biome-pick { padding: 1px 8px; }
+}
+@media (max-height: 480px) { .stage-combat .enemy .fig.is-elite-variant .spr { scale: 1; } }
+
+/* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
+   than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at
+   768x1024. Cap combat-hand rules at 4 lines; the full sentence stays in the card's
+   aria-label/tooltip and the keyword glossary. */
+.stage-combat .card .cdesc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  min-width: 0;
+}
+@media (max-height: 480px) {
+  .stage-combat .card .cdesc { -webkit-line-clamp: 3; line-height: 1; }
+  .stage-combat .card { gap: 0; }
+}
+
+/* Combat-hand legibility (QA, 390x844; the same breakage at 360-414 portrait, 768x1024 and the
+   two landscape phones). viewport-check measures each of these now.
+   - A card name never breaks inside a word. The Cinzel name was a fixed 0.98rem (0.72rem on
+     short screens) in a card that can be 75px wide, so `overflow-wrap: anywhere` split it
+     ("HAMME RFALL", "HAM MERF ALL" on the tablet). It is now sized to the card's own width
+     (cqi), capped at the old size, so the longest single word in the card list ("Untempered",
+     "Hammerfall") fits on one line. Desktop cards are wide enough that the cap still applies:
+     same size there. The 18px gem clearance is dropped because in combat the name sits below
+     the type band, not beside the gem.
+     The floor is 9px (QA's legibility floor), in px rather than rem so large system text
+     cannot push it past the card width; the layouts below guarantee a card wide enough for
+     a ten-letter word at 9px. min-width: 0 on the name and the rules box keeps a long word
+     from widening the card's grid track (which would clip every line at the card edge). */
+.stage-combat .card .cname {
+  padding-left: 0;
+  overflow-wrap: normal;
+  hyphens: none;
+  min-width: 0;
+  font-size: max(9px, min(0.98rem, 13.5cqi));
+}
+@media (max-height: 480px) {
+  .stage-combat .card .cname { font-size: max(9px, min(0.72rem, 13.5cqi)); }
+}
+/* - The fan stays inside the hand. The hand clips (overflow: hidden), the outer card-wraps sat
+     6px outside it on negative margins, and the 3deg/5deg fan swung their corners further out,
+     so the first and last cards were cut off. Below 1000px wide (where the hand is narrow) the
+     fan is 1.5deg a step, the end margins are zero, and the neighbours overlap 6px instead of
+     12px, which also stops a neighbour covering the end of each rules line. The 4-line rules
+     cap is unchanged. Wide screens keep the full fan.
+   - The same narrow cards (75-105px) give the words the width: a 4px side inset instead of
+     12px on the tablet, the type band lined up with it and starting after the cost gem (it
+     used to run under the gem: "TACK"), and the name set without tracking. */
+@media (max-width: 1000px) {
+  .stage-combat .hand { padding-left: 12px; padding-right: 12px; }
+  .stage-combat .card-wrap { margin: 0 -3px; }
+  .stage-combat .card-wrap:first-child { margin-left: 0; }
+  .stage-combat .card-wrap:last-child { margin-right: 0; }
+  .stage-combat .card {
+    padding-left: 4px;
+    padding-right: 4px;
+    transform: translateY(-8px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 1.5deg));
+  }
+  .stage-combat .card .ctype { margin-left: -4px; margin-right: -4px; padding-left: 18px; padding-right: 4px; gap: 2px; }
+  .stage-combat .card .cname { text-align: center; letter-spacing: 0; font-size: max(9px, min(0.98rem, 14cqi)); }
+}
+@media (max-width: 1000px) and (min-height: 700px) {
+  .stage-combat .card { transform: translateY(-12px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 1.5deg)); }
+}
+@media (max-width: 1000px) and (max-height: 480px) {
+  .stage-combat .card .cname { font-size: max(9px, min(0.72rem, 14cqi)); }
+}
+/* - Portrait phones: ~75px a card. The neighbours overlap by exactly the 4px side padding, so
+     the overlap only ever covers padding, never words. */
+@media (max-width: 620px) {
+  .stage-combat .hand { padding-left: 10px; padding-right: 10px; }
+  .stage-combat .card-wrap { margin: 0 -2px; }
+  .stage-combat .card .cname { font-size: max(9px, min(0.82rem, 14cqi)); }
+}
+/* - 360px phones: 5 cards leave ~60px of text width, under the 62px a ten-letter name needs
+     at 9px. The hand inset drops to 6px (the 1.5deg fan swings the corners ~5px) and the card
+     inset/overlap to 3px, which gives ~63px. */
+@media (max-width: 380px) {
+  .stage-combat .hand { padding-left: 6px; padding-right: 6px; }
+  .stage-combat .card-wrap { margin: 0 -1.5px; }
+  .stage-combat .card { padding-left: 3px; padding-right: 3px; }
+  .stage-combat .card .ctype { margin-left: -3px; margin-right: -3px; }
+}
+/* - Big hands on phones (6 to 10 cards; the kernel caps the hand at 10). Squeezing them into
+     the row took names to 8.4px and cut them ("ATTA", "HAMMERFAL"), and pushed the end cards
+     out of the hand. From 6 cards the hand scrolls sideways instead: every card keeps the
+     5-card width (names whole and >= 9px, 4-line rules cap unchanged), the row starts at the
+     first card, the next card peeks in at the right edge as the cue to swipe, and the fan
+     flattens because rotated tiles in a scroller would clip at its edges. Tap targets and
+     keyboard digits are unchanged. */
+@media (max-width: 620px) {
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 10px;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) > .card-wrap {
+    flex: 0 0 76px;
+    scroll-snap-align: start;
+  }
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) .card { transform: translateY(-8px); }
+}
+@media (max-width: 380px) {
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) > .card-wrap { flex-basis: 72px; }
+}
+/* - Short portrait phones (360x640): the card is capped at 100px, which holds three rules
+     lines, not four, so a fourth was drawn half-cut under the card edge (Anvil Blow's
+     "Apply 2"). Three lines ending in an ellipsis instead; the full sentence stays in the
+     card's aria-label/tooltip and the glossary, as with the 4-line cap. */
+@media (max-width: 700px) and (max-height: 760px) {
+  .stage-combat .card .cdesc { -webkit-line-clamp: 3; }
+}
+/* - Tall-narrow phones at large text (#28: 360x780 with 130% text). Between 700 and 780px
+     tall the fight is capped at 348px and the figures are 36-42vh (210-260px), so the hero
+     and enemy columns (figure + name + HP + intent) are the fight's floor. 130% text grows
+     the name, HP and intent lines and the dock, and the page scrolled 7px (17px with a
+     10-card hand; 61-72px on older bases, see #28). Shorter figures on portrait phones in
+     that band let the fight give the room back. At 100% text the fight keeps its height;
+     only the sprites are drawn smaller. */
+@media (max-width: 620px) and (min-height: 700px) and (max-height: 780px) {
+  .stage-combat .fig,
+  .stage-combat .hero .fig { height: min(160px, 26vh); }
+}
+/* - The HUD hero name comes back from 381px up: the pills give back 2px a side each and the
+     name truncates with an ellipsis rather than widening the row. Below 381px it stays dropped
+     (the max-width: 620px rule near the top) because the 360px row has no room. */
+@media (min-width: 381px) and (max-width: 620px) {
+  .hud-char {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-2);
+  }
+  #hud .stat { padding-left: 4px; padding-right: 4px; }
+  .hud-step { padding-left: 5px; padding-right: 5px; }
+}
+
+/* ==========================================================================================
+   RUN LEDGER, MARKS AND UNLOCKS — end-of-run screen (UX-SPEC-run-history.md S1).
+   Forge-lit woodcut: an iron ledger plate with a brass keyline, numbers in tabular Barlow
+   Condensed, labels in Alegreya Sans, headings in Cinzel. Ember stays the single accent
+   (unlock head only). Paint and type only; the combat layout is untouched.
+   AC-7.4: a hollow run's total stays --fs-4 / --dim; only `.is-earned` gets --fs-5 / --ink.
+   ========================================================================================== */
+.run-ledger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(3.2em, auto);
+  column-gap: var(--sp-3);
+  row-gap: 2px;
+  width: min(100%, 360px);
+  margin: var(--sp-3) auto var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(0, 0, 0, 0.18)), var(--iron);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.22), inset 0 -10px 18px rgba(0, 0, 0, 0.35);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.ledger-line, .ledger-total { display: contents; }
+.ledger-label { color: var(--dim); font-family: var(--text); font-size: var(--fs-3); line-height: 1.45; }
+.ledger-math { color: var(--faint); font-family: var(--num); font-size: var(--fs-3); text-align: right; white-space: nowrap; }
+.ledger-points { color: var(--ink); font-family: var(--num); font-size: var(--fs-3); text-align: right; white-space: nowrap; }
+.ledger-rule {
+  grid-column: 1 / -1;
+  height: 1px;
+  margin: 4px 0 3px;
+  background: linear-gradient(90deg, rgba(185, 138, 82, 0) 0%, var(--brass) 55%, rgba(185, 138, 82, 0.6) 100%);
+}
+.ledger-total-label {
+  grid-column: 1 / 3;
+  color: var(--dim);
+  font-family: var(--display);
+  font-size: var(--fs-2);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  align-self: center;
+}
+.ledger-total-value { color: var(--dim); font-family: var(--num); font-size: var(--fs-4); font-weight: 600; text-align: right; }
+.ledger-total.is-earned .ledger-total-label { color: var(--brass); }
+.ledger-total.is-earned .ledger-total-value { color: var(--ink); font-size: var(--fs-5); }
+.ledger-note { margin: var(--sp-1) auto 0; color: var(--faint); font-size: var(--fs-2); font-style: italic; }
+.recognition {
+  margin: var(--sp-2) auto;
+  max-width: 520px;
+  color: var(--dim);
+  font-family: var(--rules);
+  font-size: var(--fs-3);
+  line-height: 1.5;
+}
+.save-failed {
+  margin: var(--sp-2) auto;
+  max-width: 460px;
+  padding: 6px 10px;
+  color: var(--loss);
+  font-size: var(--fs-2);
+  border-left: 2px solid var(--loss);
+  background: rgba(255, 90, 60, 0.07);
+  text-align: left;
+}
+.marks { list-style: none; margin: 0 auto; padding: 0; max-width: 420px; display: grid; gap: 4px; }
+.mark-item { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px var(--sp-2); }
+.mark-name { color: var(--brass); font-family: var(--display); font-size: var(--fs-3); letter-spacing: 0.06em; }
+.mark-cond { color: var(--dim); font-size: var(--fs-2); }
+.unlock-block {
+  margin: var(--sp-3) auto var(--sp-2);
+  max-width: 460px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--edge);
+  border-top: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: radial-gradient(120% 80% at 50% 0%, rgba(255, 140, 50, 0.1), rgba(255, 140, 50, 0) 70%), var(--iron);
+  box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.18);
+}
+.unlock-head {
+  margin: 0;
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: var(--fs-3);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.unlock-head:not(:first-child) { margin-top: var(--sp-2); }
+.unlock-that { margin: 0; color: var(--ink); font-family: var(--num); font-size: var(--fs-2); letter-spacing: 0.04em; }
+.unlock-line { margin: 0; color: var(--dim); font-family: var(--rules); font-size: var(--fs-3); line-height: 1.45; }
+.unlock-pool { margin: var(--sp-1) 0 0; color: var(--dim); font-family: var(--num); font-size: var(--fs-2); }
+.unlock-limit { margin: var(--sp-1) 0 0; color: var(--faint); font-size: var(--fs-2); font-style: italic; }
