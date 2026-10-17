@@ -67,6 +67,26 @@ function resolveInsideRoot(urlPath) {
   return abs;
 }
 
+/**
+ * Where a directory request without its trailing slash should be redirected, or null
+ * when the PATH already ends in `/`. The slash goes on the path, BEFORE the query.
+ *
+ * WHY: this used to test and append to the whole `req.url`, query included. So
+ * `/web/?seed=11` (path already ending in `/`) was still "missing" its slash and was
+ * redirected to `/web/?seed=11/`, where `Number("11/")` is NaN and the page silently
+ * fell back to a random seed. That is the "instrument was lying" root cause recorded in
+ * LAYOUT-ACCEPTANCE.md §1. `/web?seed=11` now goes to `/web/?seed=11`.
+ * @param {string} url request target: path plus optional `?query`
+ * @returns {string|null}
+ */
+function directoryRedirect(url) {
+  const q = url.indexOf('?');
+  const path = q === -1 ? url : url.slice(0, q);
+  const query = q === -1 ? '' : url.slice(q);
+  if (path.endsWith('/')) return null;
+  return `${path}/${query}`;
+}
+
 const server = createServer((req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -92,8 +112,9 @@ const server = createServer((req, res) => {
     return;
   }
   if (stat.isDirectory()) {
-    if (!file.endsWith(sep) && !(req.url ?? '').endsWith('/')) {
-      res.writeHead(301, { Location: `${req.url}/` });
+    const location = directoryRedirect(req.url ?? '/');
+    if (location !== null) {
+      res.writeHead(301, { Location: location });
       res.end();
       return;
     }
