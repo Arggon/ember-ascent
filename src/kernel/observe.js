@@ -16,7 +16,7 @@ import { defaultContent } from './content.js';
 import { actions as legalActions } from './actions.js';
 import { intentLabel, intentDamage, REST_HEAL } from './rules/act.js';
 import { BOONS } from './rules/kindling.js';
-import { TEMPERS } from './rules/tempers.js';
+import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -123,6 +123,22 @@ function defOf(card) {
 }
 
 /**
+ * B2: the definition a tempered instance actually plays — the same card with the effect
+ * list the kernel resolves (rules/tempers.js temperEffects), so every rendering of it
+ * (CLI hand line, GUI sentence, compact summary) shows the tempered numbers. An
+ * untempered instance, or a run without tempers, gets the shared definition untouched.
+ * @param {any} state
+ * @param {any} card hand instance
+ * @param {any} def its content definition
+ * @returns {{def: any, temper: string | null}}
+ */
+export function temperedView(state, card, def) {
+  const temper = state.tempers?.[card.uid] ?? null;
+  if (!temper || !TEMPERS[temper]) return { def, temper: null };
+  return { def: { ...def, effects: temperEffects(def.effects, temper) }, temper };
+}
+
+/**
  * The R4 state dump. Shape fixed by the requirement:
  *   T3 | HP 42/60 | EN 3/3 | BLK 0 | draw5 disc3 | PWR2 VULN1
  *   HAND
@@ -176,8 +192,11 @@ function combatBody(state, opts) {
   const lines = ['HAND'];
   if (state.combat.hand.length === 0) lines.push(' (empty)');
   state.combat.hand.forEach((card, i) => {
-    const def = defOf(card);
-    lines.push(` ${i + 1} ${pad(def.name, 12)} ${effectSummary(def)}`);
+    const view = temperedView(state, card, defOf(card));
+    // A tempered card shows the numbers it really plays plus its temper tag, e.g.
+    // ` 1 Hammerfall   A9 [RH]`. Untempered lines are byte-identical to before.
+    const tag = view.temper ? ` [${TEMPERS[view.temper].label}]` : '';
+    lines.push(` ${i + 1} ${pad(view.def.name, 12)} ${effectSummary(view.def)}${tag}`);
   });
   lines.push('ENEMY');
   const live = state.combat.enemies.filter((e) => !e.dead);
@@ -362,7 +381,8 @@ export function snapshot(state) {
   const pick = new Map(legal.filter((a) => a.kind === 'pick').map((a) => [a.cardId, a.id]));
 
   const hand = (state.combat?.hand ?? []).map((card, i) => {
-    const def = cardDef(card.cardId);
+    const { def, temper } = temperedView(state, card, cardDef(card.cardId));
+    const hpCost = temperHpCost(temper);
     const slot = `p${i + 1}`;
     const playable = playableSlots.has(slot);
     const targets = targetsBySlot.get(slot) ?? [];
@@ -375,13 +395,15 @@ export function snapshot(state) {
       type: def.type,
       rarity: def.rarity,
       // B2: the instance's temper (null when untempered or the run has none).
-      temper: state.tempers?.[card.uid] ?? null,
-      temperText: state.tempers?.[card.uid] ? TEMPERS[state.tempers[card.uid]].text : '',
+      temper,
+      temperName: temper ? TEMPERS[temper].name : '',
+      temperText: temper ? TEMPERS[temper].text : '',
       // Same card, second rendering. `summary` stays the CLI's compact form (frozen by
       // tests/budget.test.js); `description` is the sentence a human reads instead.
       typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
+      // Both read the TEMPERED definition, so a Red-hot Hammerfall says "Deal 9 damage."
       summary: effectSummary(def),
-      description: describeCard(def, card),
+      description: describeCard(def, card) + (hpCost > 0 ? ` Lose ${hpCost} HP when played.` : ''),
       playable,
       // The engine's own answer to "may this card be aimed?" — so a renderer never has to
       // infer it from the card type (Defend is type 'skill', Bash is 'attack', but the
