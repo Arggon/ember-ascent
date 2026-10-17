@@ -1,7 +1,7 @@
 # TARGETING-UI-STATUS.md
 
 Frontend Engineer working log for **enemy targeting in the browser game**.
-Scope: `web/**` only. `src/kernel/**` and `bin/dlb` are owned by a sibling agent and were
+Scope: `src/web/**` only. `src/kernel/**` and `bin/dlb` are owned by a sibling agent and were
 read for evidence but **never edited** by me.
 
 ---
@@ -10,7 +10,7 @@ read for evidence but **never edited** by me.
 
 ### Capability verified, not assumed
 ```
-$ mkdir -p web tools/dev && echo "CANARY_WRITE_OK $(date -u +%FT%TZ)" > web/.canary.txt && cat web/.canary.txt \
+$ mkdir -p web scripts/dev && echo "CANARY_WRITE_OK $(date -u +%FT%TZ)" > src/web/.canary.txt && cat src/web/.canary.txt \
     && node -e "console.log('CANARY_EXEC_OK', process.version)"
 CANARY_WRITE_OK 2026-10-12T18:59:30Z
 CANARY_EXEC_OK v24.20.0
@@ -22,15 +22,15 @@ again so it cannot ship. No fabricated progress.
 ```
 $ node --test 'tests/**/*.test.js'
 ℹ tests 75   ℹ pass 75   ℹ fail 0
-$ node tools/check-architecture.mjs
+$ node scripts/check-architecture.mjs
 check-architecture: scanned 26 files under src/
 OK — no R1/R3 violations            (exit 0)
-$ node tools/check-surface-art.mjs
+$ node scripts/check-surface-art.mjs
   · classes: 94 emitted by app.js, 129 present in style.css
   · top-level selectors: 191, distinct 191
 OK — no missing class rules, no duplicate selectors, no external assets   (exit 0)
-$ grep -rniE 'https?://|cdn|@import|googleapis|\.woff' web/     -> (no output)
-$ grep -rn 'prefers-reduced-motion' web/                        -> web/style.css:1013
+$ grep -rniE 'https?://|cdn|@import|googleapis|\.woff' src/web/     -> (no output)
+$ grep -rn 'prefers-reduced-motion' src/web/                        -> src/web/style.css:1013
 ```
 
 ### CONTRACT FINDINGS — I cannot build a legal target id, and the reason is in the engine

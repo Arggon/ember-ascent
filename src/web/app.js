@@ -1,4 +1,4 @@
-// web/app.js — the browser surface: a pure VIEW on the kernel.
+// src/web/app.js — the browser surface: a pure VIEW on the kernel.
 //
 // It imports the SAME DOM-free controller the CLI-equivalence test drives
 // (src/surface/gui/controller.js), reads controller.snapshot() (a value model the
@@ -16,12 +16,12 @@
 // intent does nothing (intent is information), clicking a map node travels, and the
 // End Turn button is always present. Keyboard shortcuts exist but are never required.
 
-import { createController } from '../src/surface/gui/controller.js';
+import { createController } from '../surface/gui/controller.js';
 import { cardArtMarkup } from './card-art.js';
 import { attackTier, backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, intentGlyph } from './stage-art.js';
 // The ONE public kernel entry point (package.json `exports` is exactly this file, and it
 // is browser-safe by construction: no `node:*`, no clock, no unseeded randomness, all
-// enforced by tools/check-architecture.mjs). Every number the history screens show is
+// enforced by scripts/check-architecture.mjs). Every number the history screens show is
 // read from here or from a record this module built with `buildRunRecord` — the renderer
 // composes no game fact, it only chooses layout and words.
 import {
@@ -40,7 +40,7 @@ import {
   fullyUnlockedProfile,
   pruneRuns,
   scoreRun,
-} from '../src/kernel/index.js';
+} from '../kernel/index.js';
 
 const hudEl = document.getElementById('hud');
 const stageEl = document.getElementById('stage');
@@ -138,7 +138,7 @@ let flashGen = 0;
  * from one that just landed (see `freshStatusKeys`).
  *
  * This was assigned but never declared, and it is declared HERE because the omission broke the
- * real page: `web/app.js` is an ES module, modules are strict mode, and a strict-mode
+ * real page: `src/web/app.js` is an ES module, modules are strict mode, and a strict-mode
  * assignment to an undeclared name throws. Every `render()` therefore died with
  * `ReferenceError: lastPlayerStatuses is not defined` at the assignment in `render()`, and the
  * browser surface stopped repainting after the first action — the stage kept whatever the
@@ -273,7 +273,7 @@ let enteringIds = new Set();
 //
 // `card.target` is the engine's own answer to "does this card need a target?". While the
 // snapshot omits that field the renderer falls back to the card's TYPE, which is an
-// INFERENCE, not a rule: see TARGETING-UI-STATUS.md. The fallback never overrides an
+// INFERENCE, not a rule: see docs/status/TARGETING-UI-STATUS.md. The fallback never overrides an
 // explicit `card.target`.
 
 /** The hand slot ('p3') of the card currently waiting for a target, or null. */
@@ -506,7 +506,7 @@ function toast(msg, kind = 'warn') {
 //     interpolated into it, which is what makes innerHTML safe here;
 //   * the <svg> element carries no `xmlns` attribute, because the HTML parser places
 //     it in the SVG namespace on its own. That keeps this file free of any URL-shaped
-//     string at all, so an "no external asset" grep over web/ can be trusted.
+//     string at all, so an "no external asset" grep over src/web/ can be trusted.
 // Anything unknown falls back to a rune, so a new enemy or node type in the kernel
 // renders as a generic shape rather than an empty box.
 
@@ -1877,7 +1877,7 @@ function cardTile(card, opts = {}) {
   tile.append(gem);
 
   // The head plate is the illustration window: one woodcut drawing per card id
-  // (web/card-art.js), decorative and aria-hidden. The type mark + word stay on top, so
+  // (src/web/card-art.js), decorative and aria-hidden. The type mark + word stay on top, so
   // type is still carried by hue, mark and word. Unknown ids fall back to the type mark.
   const head = el('span', { cls: 'ctype' },
     glyphBox(TYPE_GLYPH[card.type] || 'rune', 'c-type-mark'),

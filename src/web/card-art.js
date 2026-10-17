@@ -1,4 +1,4 @@
-// web/card-art.js — one woodcut illustration per card id (42), drawn in the same
+// src/web/card-art.js — one woodcut illustration per card id (42), drawn in the same
 // three-layer system as the enemies: `.b` iron body, `.r` rim line (currentColor =
 // card-type hue), `.g` ember glow, `.gc` glowing crack. viewBox 0 0 60 40.
 // Constant markup only: no kernel value or user input is ever interpolated, so it is

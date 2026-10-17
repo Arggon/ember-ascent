@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- Positive control for the spillPx gate. NOT a product file: it exists only so
-     tools/dev/viewport-check.mjs can be pointed at a layout that MUST clip, via --base.
+     scripts/dev/viewport-check.mjs can be pointed at a layout that MUST clip, via --base.
      It reproduces the exact structure the metric traverses:
        #stage (overflow: hidden) > .page-combat (flex: 1 1 auto; min-height: 0) > .hand
      and makes .hand 900px tall, which #stage must swallow. -->

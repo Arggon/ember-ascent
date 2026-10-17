@@ -1,6 +1,6 @@
-// web/stage-art.js — original woodcut figures for the combat stage.
+// src/web/stage-art.js — original woodcut figures for the combat stage.
 //
-// Figures are illustrated woodcut sprites (local WebP in web/assets/sprites/, no
+// Figures are illustrated woodcut sprites (local WebP in src/web/assets/sprites/, no
 // network). The backdrop and intent glyphs stay SVG with `.b` iron / `.r` rim / `.g`
 // ember classes. Constant markup only: no kernel value is interpolated, so innerHTML
 // stays safe. No ids, no xmlns, no external asset. Decoration only.
@@ -10,7 +10,7 @@ const svg = (body, box = '0 0 120 160') =>
 
 const shadow = (rx = 34, cx = 60) => `<ellipse class="sh" cx="${cx}" cy="152" rx="${rx}" ry="5.5"/>`;
 
-/* Illustrated sprites (local WebP under web/assets/sprites/, keyed by stable encounter
+/* Illustrated sprites (local WebP under src/web/assets/sprites/, keyed by stable encounter
    id). Constant markup only: the id is looked up in a fixed table, never interpolated
    raw, so innerHTML stays safe. Decoration only (alt=""). */
 const SPRITES = {

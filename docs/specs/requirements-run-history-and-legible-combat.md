@@ -16,9 +16,9 @@ Evidence tiers: **[FETCHED]** page read this run · **[SNIPPET]** search result 
 
 **Pain.** Two distinct pains, one per half of the owner's ask.
 
-1. *Nothing accumulates.* A finished run leaves **no trace anywhere in the browser**. `unlock`, `potion`, `shop`, `upgrade`, `removeCard`, `event`, `act2` all return **zero matches** across `src/` and `web/` **[MEASURED — `rg -rniE` over `src/ web/ bin/ tools/`]**. The only thing the browser persists is that the help panel was seen (`web/app.js:877,1058`). The headless surface already appends `runs.jsonl` (`src/surface/sim.js:315`), so the recording machinery exists but is CLI-only and player-invisible. A loss is therefore not a lesson and not a memory — it is a tab you close.
+1. *Nothing accumulates.* A finished run leaves **no trace anywhere in the browser**. `unlock`, `potion`, `shop`, `upgrade`, `removeCard`, `event`, `act2` all return **zero matches** across `src/` and `src/web/` **[MEASURED — `rg -rniE` over `src/ src/web/ bin/ scripts/`]**. The only thing the browser persists is that the help panel was seen (`src/web/app.js:877,1058`). The headless surface already appends `runs.jsonl` (`src/surface/sim.js:315`), so the recording machinery exists but is CLI-only and player-invisible. A loss is therefore not a lesson and not a memory — it is a tab you close.
 
-2. *The fights are asserted, not seen.* The project has 52 `animation:`/`transition:` declarations and 32 `@keyframes` in `web/style.css` **[MEASURED]**, and per-enemy intent telegraphing already renders (`web/app.js:1382-1391`). But **every visual claim in this project carried the same disclaimer**: *"I can prove the classes, keyframes and nodes are present and attached; I cannot prove the animations look right"* (`JUICE-STATUS.md`), *"asserted from source, never observed"* (`ART-PASS-STATUS.md`). Until this run nobody had ever looked at this game. **§2.1 fixes that — and the act of looking moved the scope (§2.1.1, §2.1.2).**
+2. *The fights are asserted, not seen.* The project has 52 `animation:`/`transition:` declarations and 32 `@keyframes` in `src/web/style.css` **[MEASURED]**, and per-enemy intent telegraphing already renders (`src/web/app.js:1382-1391`). But **every visual claim in this project carried the same disclaimer**: *"I can prove the classes, keyframes and nodes are present and attached; I cannot prove the animations look right"* (`../status/JUICE-STATUS.md`), *"asserted from source, never observed"* (`../status/ART-PASS-STATUS.md`). Until this run nobody had ever looked at this game. **§2.1 fixes that — and the act of looking moved the scope (§2.1.1, §2.1.2).**
 
 **Current workaround.** None. The player closes the tab; the developer reads CSS and reasons about easing.
 
@@ -32,15 +32,15 @@ Three findings from this run's research invalidate parts of the previous status 
 
 ### 2.1 A real browser exists here, and has all along
 
-**`chromium 152.0.7977.82` and `firefox` are on PATH; `tools/dev/shoot.mjs` already drives Chromium over CDP with zero dependencies** (Node 24's global `WebSocket`), and headless screen capture is **verified working this run** (`chromium --headless --screenshot` wrote a valid PNG, exit 0) **[MEASURED]**. 301 PNGs already exist under `shots/` **[MEASURED]**.
+**`chromium 152.0.7977.82` and `firefox` are on PATH; `scripts/dev/shoot.mjs` already drives Chromium over CDP with zero dependencies** (Node 24's global `WebSocket`), and headless screen capture is **verified working this run** (`chromium --headless --screenshot` wrote a valid PNG, exit 0) **[MEASURED]**. 301 PNGs already exist under `shots/` **[MEASURED]**.
 
-**Consequence — this is the load-bearing change.** Every "could not verify — no browser in this environment" limitation in `ART-PASS-STATUS.md`, `JUICE-STATUS.md`, `LAYOUT-STATUS.md` and `ITCH-UPLOAD.md` is **stale**. "Does it look right" is now a **falsifiable** question with photographic evidence, not a matter of source-reading. Therefore, in this increment, **no visual claim is acceptable without a captured frame attached** (§5, §6). The method of capture is the System Architect's call; the existence of the harness is an established fact.
+**Consequence — this is the load-bearing change.** Every "could not verify — no browser in this environment" limitation in `../status/ART-PASS-STATUS.md`, `../status/JUICE-STATUS.md`, `../status/LAYOUT-STATUS.md` and `../guides/ITCH-UPLOAD.md` is **stale**. "Does it look right" is now a **falsifiable** question with photographic evidence, not a matter of source-reading. Therefore, in this increment, **no visual claim is acceptable without a captured frame attached** (§5, §6). The method of capture is the System Architect's call; the existence of the harness is an established fact.
 
 **I then used it, because a requirement that mandates frames should not rest on an unrun harness.** A zero-dependency server was started and the existing capture tool run against the real game:
 
 ```
-node tools/serve.mjs    → open http://localhost:5175/web/
-node tools/dev/shoot.mjs --out ...
+node scripts/serve.mjs    → open http://localhost:5175/web/
+node scripts/dev/shoot.mjs --out ...
   OK  first-run-help   map, 0 enemies
   OK  map              map, 0 enemies
   OK  combat           combat, 2 enemies
@@ -67,7 +67,7 @@ The captured combat frame was **inspected against AC-4.1–AC-4.3**, not eyeball
 
 **This re-scopes US-4, and it is the most consequential finding in this revision.** The intent layer is **not missing** — it is present, simultaneous and readable, so per L1 the genre's highest-leverage feature is **already implemented**. Rebuilding it would spend the increment's P0 budget reproducing working code. What the frames exposed as genuinely weak is different from what the brief assumed:
 
-1. **Cryptic abbreviations survive on the cards.** The frame shows `PWR2`, `A6`, `B5`. A prior pass (`UX-FIX-STATUS.md`) reworded card *effects* into plain English, but the compact codes remain in the corner of every card and intent. A stranger cannot decode `B5`.
+1. **Cryptic abbreviations survive on the cards.** The frame shows `PWR2`, `A6`, `B5`. A prior pass (`../status/UX-FIX-STATUS.md`) reworded card *effects* into plain English, but the compact codes remain in the corner of every card and intent. A stranger cannot decode `B5`.
 2. **Low-contrast secondary text.** The section labels (`THE FIGHT`, `ENEMIES`, `YOUR HAND`, `DRAW 5`, `DISCARD 0`), the bottom instruction line, and the hotkey digits above the cards are low-contrast grey on a dark field. At the smallest supported viewport this is the first thing to disappear.
 3. **Competing number systems on one card** — cost, hotkey digit and the `A6`/`B5` tag are three small numerals in one visual region.
 4. **Large unanchored empty regions** — the vertical gaps above and below the enemy row leave the fight area sparse, with no player presence to anchor it.
@@ -76,13 +76,13 @@ The captured combat frame was **inspected against AC-4.1–AC-4.3**, not eyeball
 
 ### 2.1.2 The frames also falsified Revision 1's "structurally blocked" death beat
 
-`JUICE-STATUS.md` states the death beat cannot be built because a dead enemy leaves the snapshot. **Revision 1 of this document repeated that as an established structural constraint. That was wrong.** The mechanism is **already implemented**:
+`../status/JUICE-STATUS.md` states the death beat cannot be built because a dead enemy leaves the snapshot. **Revision 1 of this document repeated that as an established structural constraint. That was wrong.** The mechanism is **already implemented**:
 
-- `web/app.js:636-639` — each departure is derived by diffing the before/after snapshots and pushed as a `{ kind: 'death', enemy, name, side, boss }` burst; the comment reads *"Each departure becomes a `death` burst, which the next paint draws as an inert ghost card that collapses."*
-- `web/app.js:1244-1255` — the next paint draws `.enemy.is-dying.side-*` with a `DOWN` / `BOSS DOWN` label.
-- `web/style.css:1506` — `.enemy.is-dying` exists, with a reduced-motion variant at `:1681`.
-- `prevEnemies` (`web/app.js:127`) is written at `:1077` and reset at `:734` but **never read** — the fix landed by snapshot-diff instead. That variable is dead code.
-- `JUICE-STATUS.md` task #5 ("P2: death fade-out") is marked **DONE**, which agrees with the code and contradicts its own "exact next step #1".
+- `src/web/app.js:636-639` — each departure is derived by diffing the before/after snapshots and pushed as a `{ kind: 'death', enemy, name, side, boss }` burst; the comment reads *"Each departure becomes a `death` burst, which the next paint draws as an inert ghost card that collapses."*
+- `src/web/app.js:1244-1255` — the next paint draws `.enemy.is-dying.side-*` with a `DOWN` / `BOSS DOWN` label.
+- `src/web/style.css:1506` — `.enemy.is-dying` exists, with a reduced-motion variant at `:1681`.
+- `prevEnemies` (`src/web/app.js:127`) is written at `:1077` and reset at `:734` but **never read** — the fix landed by snapshot-diff instead. That variable is dead code.
+- `../status/JUICE-STATUS.md` task #5 ("P2: death fade-out") is marked **DONE**, which agrees with the code and contradicts its own "exact next step #1".
 
 **But no death has ever been photographed.** `ls -R shots/` contains **no** death or dying frame **[MEASURED]**. Honest status: **mechanism present, behaviour unverified.**
 
@@ -115,7 +115,7 @@ Using the deterministic method in §12 the capture auto-froze the first death it
 
 **So: fade + a brief swell + tilt + downward drift, over 500 ms.** Two seeks to the same time produced **byte-identical pixels** — determinism confirmed at the screenshot level, not just asserted.
 
-**But the run's climax is a blank screen — DEF-6.** Photographing the death beat exposed a second, worse defect at the moment the game should be most alive. On a **terminal** kill (the last enemy, including the boss), `web/app.js:1026-1038` sets `endHeld`, calls `stageEl.replaceChildren(el('div', {cls:'ended-hold'}))`, and **returns before the `switch` at `:1041`** — which is the **only** path that ever draws a ghost (`combatView`, `app.js:1244`). The result, measured by per-frame logging:
+**But the run's climax is a blank screen — DEF-6.** Photographing the death beat exposed a second, worse defect at the moment the game should be most alive. On a **terminal** kill (the last enemy, including the boss), `src/web/app.js:1026-1038` sets `endHeld`, calls `stageEl.replaceChildren(el('div', {cls:'ended-hold'}))`, and **returns before the `switch` at `:1041`** — which is the **only** path that ever draws a ghost (`combatView`, `app.js:1244`). The result, measured by per-frame logging:
 
 - **29 consecutive animation frames** had `.ended-hold` present with `stageKids: 1` and **`stageText: ""`** — an empty 40vh div. That is a **~480 ms blank screen** (`END_DELAY_MS`) on defeat, and **~1150 ms** (`BOSS_DEATH_MS`) on a **boss victory** — the single most dramatic moment in the game.
 - The code's own comment at `:1024-1025` states the intent: *"an arriving victory waits for a boss collapse (which the ghost card is drawing below)."* **It is not drawing it.** The comment describes a mechanism the control flow prevents. The wait happens; the collapse it waits for does not.
@@ -128,7 +128,7 @@ The good news, and it narrows the defect precisely: **ordinary deaths do render*
 The System Architect verified three defects **in my acceptance criteria**, not in the code. All three are confirmed by my own commands.
 
 1. **AC-4.1 was unsatisfiable.** It required *"three or more living enemies."* **The maximum is two.** All 9 encounters, read from `src/kernel/rules/encounters.js:85-93`, hold either 1 or 2 enemies; the largest is `['red_louse','acid_louse']`. Content is frozen (D2), so no engineering closes this gap. **Correction: the criterion is restated at the true bound of 2**, exactly as the earlier frame already verified PASS — there was never a 3-enemy case to fail.
-2. **AC-4.7 had no threshold.** It required meeting *"the project's stated minimum contrast"* — **no such statement exists.** The only numeric accessibility standard anywhere in `web/` is WCAG 2.5.8's 44 px touch target (`style.css:1911`). A criterion with an undefined threshold can neither pass nor fail. **Correction: the threshold is frozen at WCAG AA 4.5:1 for body text and 3:1 for large text**, measured from rendered pixels.
+2. **AC-4.7 had no threshold.** It required meeting *"the project's stated minimum contrast"* — **no such statement exists.** The only numeric accessibility standard anywhere in `src/web/` is WCAG 2.5.8's 44 px touch target (`style.css:1911`). A criterion with an undefined threshold can neither pass nor fail. **Correction: the threshold is frozen at WCAG AA 4.5:1 for body text and 3:1 for large text**, measured from rendered pixels.
 3. **AC-4.6, as written, would have broken the headless surface.** I asked that cryptic tags not be the only description. The architect found that `A6`/`B5`/`PWR2` are `effectSummary()`'s output — labelled in the source as *"Compact form (what the CLI prints)"* (`describe.js:557`) and deliberately locked by `tests/ux/descriptions.test.js`, because the frozen R4/R5 token ceilings depend on that vocabulary. Deleting them would break the agent surface. **Correction: AC-4.6 keeps its allowed path** — the tag stays as a *secondary, labelled* affordance with plain English present (which the renderer already does at `app.js:1422`); the defect to fix is that the tags are **unexplained to a newcomer**, not that they exist.
 
 ### 2.2 The state of the build, measured rather than quoted
@@ -138,10 +138,10 @@ The System Architect verified three defects **in my acceptance criteria**, not i
 | Tests | `npm test` | **93 pass / 0 fail**, exit 0, ~1.7 s |
 | Architecture gate | `npm run gate` | `scanned 26 files under src/` · `OK — no R1/R3 violations` |
 | Self-play | `npm run sim` | 200 runs, win 13 (6.5%), boss reached 116/200, exit 0 |
-| Release artifact | `sha256sum release.zip` | `4a6621…d0db` — **matches** `ITCH-UPLOAD.md` exactly |
+| Release artifact | `sha256sum release.zip` | `4a6621…d0db` — **matches** `../guides/ITCH-UPLOAD.md` exactly |
 | Screenshots | `ls shots/` | 301 PNGs, incl. a 1260×1000 cover |
 
-All **[MEASURED]**. **`PHASE5-STATUS.md` is stale** — it claims 50 tests / 22 files (actual 93 / 26). `RELEASE-NOTES.md` already flags the "40-card planning target vs 42 shipped" discrepancy in its own text; the planning docs are the wrong side of that, not the release notes.
+All **[MEASURED]**. **`../status/PHASE5-STATUS.md` is stale** — it claims 50 tests / 22 files (actual 93 / 26). `../RELEASE-NOTES.md` already flags the "40-card planning target vs 42 shipped" discrepancy in its own text; the planning docs are the wrong side of that, not the release notes.
 
 ### 2.3 Cross-run progression: the honest, exhaustive negative
 
@@ -151,15 +151,15 @@ Every row below was searched for and **not found**. This is negative-capable evi
 |---|---|---|
 | Meta-progression / carry-over | **ABSENT** | no match: `metaprog\|bank\|gold\|currency\|score` |
 | Unlocks | **ABSENT** | `unlock` → **NO MATCH** |
-| Ascension / difficulty tiers | **ABSENT · inert** | `ascension` NO MATCH; `difficulty` is plumbed (`src/kernel/index.js:86,95,151`) but **read by no rule** — echoed only in `observe.js:446`, the CLI, and a HUD badge (`web/app.js:756`) |
+| Ascension / difficulty tiers | **ABSENT · inert** | `ascension` NO MATCH; `difficulty` is plumbed (`src/kernel/index.js:86,95,151`) but **read by no rule** — echoed only in `observe.js:446`, the CLI, and a HUD badge (`src/web/app.js:756`) |
 | Relics | **ABSENT as a system** | one hardcoded `RELIC_HEAL = 6` (`src/kernel/rules/act.js:22`); no inventory |
 | Potions · Shops · Events | **ABSENT** | `potion` NO MATCH · `shop\|merchant` NO MATCH · no event node type |
 | Card upgrades · Card removal | **ABSENT** | `upgrade\|smite` NO MATCH · `removeCard\|purge` NO MATCH |
 | Campfire/rest — as a rest node | **PRESENT** | `map.js:15`, `REST_HEAL = 8`, heal-or-leave only; **no upgrade option** |
-| Save / resume | **ABSENT** | no save path in `web/`; only `localStorage` write is `dlb.helpSeen.v1` |
+| Save / resume | **ABSENT** | no save path in `src/web/`; only `localStorage` write is `dlb.helpSeen.v1` |
 | Run history (browser) | **ABSENT** | no history UI; seed shown at `app.js:792,1618`, never logged |
 | Run history (headless) | **PRESENT** | `src/surface/sim.js:315` appends `runs.jsonl` (150 records: seed, policy, steps, outcome, floor, hp, deck, hash) |
-| Difficulty control | **PRESENT but inert** | HUD badge renders at `web/app.js:756` (`diff ${snap.difficulty}`); the **only** `difficulty` occurrence anywhere under `src/kernel/rules/` is a comment (`encounters.js:82`) — no rule reads it |
+| Difficulty control | **PRESENT but inert** | HUD badge renders at `src/web/app.js:756` (`diff ${snap.difficulty}`); the **only** `difficulty` occurrence anywhere under `src/kernel/rules/` is a comment (`encounters.js:82`) — no rule reads it |
 
 ---
 
@@ -196,7 +196,7 @@ Decisions D1–D4 are the owner's, recorded verbatim in intent: **D1** = run rec
 | I1 | **Frame-captured verification of combat.** Every feel claim carries a captured frame sequence from the existing headless-capture harness. | §2.1: a browser exists. This converts an untestable class of claim into a testable one, and it is the only route to the owner's stated outcome "visible fights." |
 | I2 | **Enemy death beat, verified rather than built.** A dying enemy is seen dying in an intermediate frame. | §2.1.2: the mechanism already exists (`app.js:639`, `style.css:1506`) but **has never been photographed**. A fight whose deaths are unverified is not yet a demonstrated visible fight. |
 | I3 | **Intent legibility audit**, per L1 and §2.1.1: lethal distinguishable without reading the number, explicit multi-hit notation, cryptic code tags decoded, contrast raised. **Narrowed by evidence — no rebuild.** | §2.1.1: telegraphing already PASSes AC-4.1. Rebuilding it would spend the P0 budget re-creating working code. |
-| I4 | **Reward / rest / map travel beats.** Small motion where the game currently cuts instantly. | Cheapest remaining source of "the game is alive." Explicitly queued in `JUICE-STATUS.md` next-steps 2 and 3. |
+| I4 | **Reward / rest / map travel beats.** Small motion where the game currently cuts instantly. | Cheapest remaining source of "the game is alive." Explicitly queued in `../status/JUICE-STATUS.md` next-steps 2 and 3. |
 | I5 | **Run record persistence** in the browser: every completed run is stored and viewable, survives closing the tab, with no network call and no account. | Half of D1. Today: literally nothing persists (§1, §2.3). |
 | I6 | **Score + badges** on the run summary and in history, with a published itemised formula (L4). | Makes a run *legible after the fact*; the mechanism StS1 uses to give a loss a story. |
 | I7 | **Seed visibility and re-entry** from history. | Reuses R3 determinism, which is already a frozen guarantee — near-free, and the source of "what if" replay. |
@@ -247,7 +247,7 @@ Story form: *As \<actor\>, I want \<capability\>, so that \<outcome\>.* Every cr
 - **AC-4.4** Given the status-effect layer is on screen, when a telegraph renders, then per L2 **no effect, animation, or overlay obscures any enemy's intent or the player's HP**. *Observed by:* frame captures taken **mid-animation** at several timestamps through a full turn, each inspected for occlusion.
 - **AC-4.5** Given a tester who has never seen the game, when shown a mid-combat frame and asked what each enemy is about to do, then they answer correctly for **all** living enemies. *Observed by:* the scripted Gate B question (§8), target ≥4 of 5 testers.
 - **AC-4.6** *(raised from frame evidence in Revision 2; corrected in Revision 3)* Given any card or intent tag, when it renders, then **no compact code is the only description of its effect**: plain English is present, and the code is a secondary, labelled affordance. The codes themselves are the kernel's agent-facing vocabulary (`effectSummary()`, `describe.js:557`) and are **locked by the frozen R4/R5 token ceilings and `tests/ux/descriptions.test.js`** — they must **not** be deleted or changed. *Observed by:* frame capture plus a first-time-reader check; a player who has never seen the game must be able to state a card's effect without decoding its tag.
-- **AC-4.7** *(raised from frame evidence in Revision 2; threshold added in Revision 3)* Given the smallest supported viewport, when a combat frame is captured, then every section label, instruction line and gameplay-relevant numeral meets **WCAG AA contrast — ≥ 4.5:1 for text under 18.66px (or under 24px non-bold), and ≥ 3:1 for larger text — against its own rendered background**. *Observed by:* pixel contrast measurement over a captured frame at 360×640. **Revision 3: Revision 2 said "the project's stated minimum contrast", which was never stated anywhere — the only numeric a11y standard in `web/` is the 44px touch target (`style.css:1911`). The threshold is now fixed, per §12.**
+- **AC-4.7** *(raised from frame evidence in Revision 2; threshold added in Revision 3)* Given the smallest supported viewport, when a combat frame is captured, then every section label, instruction line and gameplay-relevant numeral meets **WCAG AA contrast — ≥ 4.5:1 for text under 18.66px (or under 24px non-bold), and ≥ 3:1 for larger text — against its own rendered background**. *Observed by:* pixel contrast measurement over a captured frame at 360×640. **Revision 3: Revision 2 said "the project's stated minimum contrast", which was never stated anywhere — the only numeric a11y standard in `src/web/` is the 44px touch target (`style.css:1911`). The threshold is now fixed, per §12.**
 - **AC-4.8** *(new in Revision 2)* Given a card in hand, when it renders, then its **cost is the only numeral competing for attention at that size**, and hotkey or code decorations are visually subordinate to it. *Observed by:* frame capture; a reader asked for a card's cost must not be able to confuse it with a hotkey digit or a tag.
 
 ### US-5 — A fight you can see happening
@@ -315,7 +315,7 @@ Story form: *As \<actor\>, I want \<capability\>, so that \<outcome\>.* Every cr
 
 *As a player, I want no control that lies to me, so that I can trust the ones that are there.*
 
-- **AC-11.1** Given `difficulty` is currently echoed in the HUD (`web/app.js:756`) but **read by no rule** **[MEASURED]**, when this increment ships, then either the control **changes the game** and is covered by a test proving it does, or it is **not presented to the player**. *Observed by:* grep for readers of `difficulty` in `src/kernel/rules/**` returning a real reader, or a captured frame showing the control gone.
+- **AC-11.1** Given `difficulty` is currently echoed in the HUD (`src/web/app.js:756`) but **read by no rule** **[MEASURED]**, when this increment ships, then either the control **changes the game** and is covered by a test proving it does, or it is **not presented to the player**. *Observed by:* grep for readers of `difficulty` in `src/kernel/rules/**` returning a real reader, or a captured frame showing the control gone.
 - **AC-11.2** Given the previous revision's status docs disagree with the build (§2.2), when this increment ships, then the **contradicting claims are corrected or struck**, including the 42/40 card count, the 50/93 test count, and every "no browser in this environment" limitation that §2.1 has now falsified. *Observed by:* the stale sentences gone from the named files.
 
 ---
@@ -345,11 +345,11 @@ Story form: *As \<actor\>, I want \<capability\>, so that \<outcome\>.* Every cr
 |---|---|---|---|
 | DEF-1 | Adding a card fails the suite: `tests/cards/cards.test.js:123` asserts `ids.length === 42`; `tests/budget.test.js:49` asserts `linesMeasured >= 42` | **[MEASURED]** | Any content work, now or later, from any agent, trips this. It is a trap laid for the next person. |
 | DEF-2 | `difficulty` is plumbed end-to-end and **read by nothing** | **[MEASURED]** — no reader in `src/kernel/rules/**`, only `observe.js:446`, CLI, HUD badge | A visible control that does nothing is a lie to the player, and it will be mistaken for a working feature in every future balance conversation. |
-| DEF-3 | Stale status docs: `PHASE5-STATUS.md` says 50 tests / 22 files (actual **93 / 26**), and its evidence block at `PHASE5-STATUS.md:50` prints `scanned 22 files under src/`; four files carry a "no browser here" limitation that §2.1 falsifies; `JUICE-STATUS.md` states the death beat is unbuilt while `app.js:639` implements it **and its own task #5 says DONE**; the 40 vs 42 card count is unreconciled | **[MEASURED]** | Every future agent reads status docs first. This is how the project's record starts lying to it — and in this instance it very nearly cost us a working feature. |
-| DEF-5 | `prevEnemies` (`web/app.js:127`) is written at `:1077` and reset at `:734` but **never read** — residue of the superseded approach | **[MEASURED]** | Not user-visible. Listed so it is removed deliberately rather than rediscovered later and mistaken for the death-beat fix. |
-| **DEF-6** | **The terminal kill shows a blank stage.** `web/app.js:1026-1038` wipes the stage to a bare `.ended-hold` div and returns before the `switch`, bypassing the only drawer of enemies and ghosts (`combatView`, `:1244`, gated on `snap.enemies.length > 0`). Measured: **29 consecutive frames with an empty stage** — **~480 ms on defeat, ~1150 ms on boss victory** | **[MEASURED]** — per-frame logging + `climax-hold.png` | **The game's climax is the emptiest moment in it.** The code's own comment at `:1024-1025` says a boss collapse is being drawn; it is not. **Highest-value item in the increment. NOT FIXED as of Revision 4** — see §13.1: diagnosis complete, fix designed, no edit made. |
-| **DEF-7** | **Our own art gate has a blind spot for concatenated class strings.** `tools/check-surface-art.mjs:41` extracts classes with `/\bcls:\s*(`[^`]*`|'[^']*'|"[^"]*")/g`, which **stops at the closing backtick**. So `web/app.js:1248`'s `` `enemy is-dying side-${d.side}` + (d.boss ? ' boss-down' : '') `` yields `is-dying`/`side-` but **never `boss-down`** — and `boss-down` **has no CSS rule anywhere**, while the gate reports `OK` | **[MEASURED]** — regex read + `rg -n 'boss-down'` on both `web/app.js` and `web/style.css` | Not player-visible today (the class is inert), but **the gate cannot be trusted for any class added by concatenation**, and this increment adds several. A checker that reports OK while a rule is missing is worse than none. |
-| **DEF-8** | **A source comment contradicts shipped behaviour, and the code is right.** `web/style.css:1685-1687` claims that under reduced motion *"a dying enemy is simply gone, as before this pass"*. **False.** The ghost is still rendered: `.enemy.is-dying` has no base `opacity`, so with `animation: none` it paints at full opacity | **[MEASURED]** — synthetic `.enemy.is-dying` node injected into the real page under emulated `prefers-reduced-motion: reduce`: `display:block`, `opacity:1`, `260×171`, `visible:true` | `web/app.js:1240-1241`'s opposite claim (*"the ghost is STILL drawn"*) is **correct**. Low severity, high trap value: precisely the comment a future agent trusts and acts on — as happened twice already (§13). |
+| DEF-3 | Stale status docs: `../status/PHASE5-STATUS.md` says 50 tests / 22 files (actual **93 / 26**), and its evidence block at `../status/PHASE5-STATUS.md:50` prints `scanned 22 files under src/`; four files carry a "no browser here" limitation that §2.1 falsifies; `../status/JUICE-STATUS.md` states the death beat is unbuilt while `app.js:639` implements it **and its own task #5 says DONE**; the 40 vs 42 card count is unreconciled | **[MEASURED]** | Every future agent reads status docs first. This is how the project's record starts lying to it — and in this instance it very nearly cost us a working feature. |
+| DEF-5 | `prevEnemies` (`src/web/app.js:127`) is written at `:1077` and reset at `:734` but **never read** — residue of the superseded approach | **[MEASURED]** | Not user-visible. Listed so it is removed deliberately rather than rediscovered later and mistaken for the death-beat fix. |
+| **DEF-6** | **The terminal kill shows a blank stage.** `src/web/app.js:1026-1038` wipes the stage to a bare `.ended-hold` div and returns before the `switch`, bypassing the only drawer of enemies and ghosts (`combatView`, `:1244`, gated on `snap.enemies.length > 0`). Measured: **29 consecutive frames with an empty stage** — **~480 ms on defeat, ~1150 ms on boss victory** | **[MEASURED]** — per-frame logging + `climax-hold.png` | **The game's climax is the emptiest moment in it.** The code's own comment at `:1024-1025` says a boss collapse is being drawn; it is not. **Highest-value item in the increment. NOT FIXED as of Revision 4** — see §13.1: diagnosis complete, fix designed, no edit made. |
+| **DEF-7** | **Our own art gate has a blind spot for concatenated class strings.** `scripts/check-surface-art.mjs:41` extracts classes with `/\bcls:\s*(`[^`]*`|'[^']*'|"[^"]*")/g`, which **stops at the closing backtick**. So `src/web/app.js:1248`'s `` `enemy is-dying side-${d.side}` + (d.boss ? ' boss-down' : '') `` yields `is-dying`/`side-` but **never `boss-down`** — and `boss-down` **has no CSS rule anywhere**, while the gate reports `OK` | **[MEASURED]** — regex read + `rg -n 'boss-down'` on both `src/web/app.js` and `src/web/style.css` | Not player-visible today (the class is inert), but **the gate cannot be trusted for any class added by concatenation**, and this increment adds several. A checker that reports OK while a rule is missing is worse than none. |
+| **DEF-8** | **A source comment contradicts shipped behaviour, and the code is right.** `src/web/style.css:1685-1687` claims that under reduced motion *"a dying enemy is simply gone, as before this pass"*. **False.** The ghost is still rendered: `.enemy.is-dying` has no base `opacity`, so with `animation: none` it paints at full opacity | **[MEASURED]** — synthetic `.enemy.is-dying` node injected into the real page under emulated `prefers-reduced-motion: reduce`: `display:block`, `opacity:1`, `260×171`, `visible:true` | `src/web/app.js:1240-1241`'s opposite claim (*"the ghost is STILL drawn"*) is **correct**. Low severity, high trap value: precisely the comment a future agent trusts and acts on — as happened twice already (§13). |
 | DEF-4 | Import-order trap: `loadContent()` called directly from `content.js` throws on 11 cards; handler registration is a side effect of importing `index.js` first | **[MEASURED]** — `registeredEffects()` returns 0 | Documented at `tests/content/bundle-drift.test.js:17-19`, so it is *known* and not currently a defect — but it is a loaded gun for anyone touching content or the history subsystem. Verify it stays documented. |
 
 ---
@@ -424,7 +424,7 @@ The Tech Lead is right that §5 required an itemised published score and never s
 3. At least **one card per effect verb** in the vocabulary is present, so no mechanic is invisible on run one.
 4. Every remaining slot is filled with **common** before **uncommon**, never **rare** — so the rare tier is the visible prize of unlocking, which is what makes progress felt.
 
-**Stated limitation, which must appear in the player-facing docs and in `RELEASE-NOTES.md`:** because content is frozen (D2), unlocking **re-orders and gates existing cards**. It does not add new ones. The copy must say that plainly rather than implying a growing pool. This is the honest version of D1 and I will not dress it up.
+**Stated limitation, which must appear in the player-facing docs and in `../RELEASE-NOTES.md`:** because content is frozen (D2), unlocking **re-orders and gates existing cards**. It does not add new ones. The copy must say that plainly rather than implying a growing pool. This is the honest version of D1 and I will not dress it up.
 
 ### 11.3 AC-9.6 "no measurable gap" — the number, and who decides
 
@@ -445,7 +445,7 @@ The Tech Lead is right that §5 required an itemised published score and never s
 ### 11.7 Accepted corrections and one deferred question
 
 - **C-1 accepted** (death beat already built) — folded into §2.1.2, US-5, AC-5.1, I2, DEF-3, DEF-5.
-- **C-2 accepted** (`PHASE5-STATUS.md:50` also stale) — folded into DEF-3.
+- **C-2 accepted** (`../status/PHASE5-STATUS.md:50` also stale) — folded into DEF-3.
 - **Revision 1's cross-reference error accepted and fixed** (§2.1 cited "AC-H*", which does not exist).
 - **One question I am deliberately NOT answering here:** whether the capture harness proves a mid-animation frame by deterministic animation seeking or by wall-clock sleeps. That is a **technical** decision with a correctness consequence (the Tech Lead notes `shoot.mjs` sleeps 60–140 ms under headless load, which is nondeterministic), so it belongs to the System Architect, not to me. **It is recorded as an open item because it gates the credibility of every frame in §6.**
 
@@ -483,7 +483,7 @@ The architect confirmed the plan is feasible and raised four flags. All four are
 I do not own these, but I record acceptance so the team is unblocked, and note where a decision touches product:
 
 - **DR-1 — record schema + builder move to a browser-safe kernel module (`src/kernel/record.js`); repository in `src/surface/runs.js`; `sim.js` delegates.** Accepted. It makes AC-6.5 true *by construction* rather than by promise, which is the R1 spirit.
-- **DR-2 — the gate gains a mechanical rule: zero `node:*` specifiers in `web/**` or `src/kernel/**`.** Accepted, and it is the right kind of control: it turns the property we depend on into a build failure instead of a review convention.
+- **DR-2 — the gate gains a mechanical rule: zero `node:*` specifiers in `src/web/**` or `src/kernel/**`.** Accepted, and it is the right kind of control: it turns the property we depend on into a build failure instead of a review convention.
 - **DR-3 — `runs.jsonl` stays backward-readable; `id` = the existing state hash; newest-100 retention with cumulative aggregates.** Accepted. `stats --from` keeps working, which was my §11.4 tightening.
 - **DR-4 — unlock evaluation is a pure function in `src/kernel/unlocks.js`; no rule may read the profile.** Accepted. This makes AC-9.3 (options, never power) *structural* rather than a promise, and the "card-definition object identity" assertion is a genuinely strong form of the negative.
 - **DR-5 — tester flag is `?pool=full` plus CLI `--pool full`, recorded as `profile`.** Accepted, including the honest tradeoff: it is discoverable, but it is an **anti-bias** measure, not anti-cheat, and since unlocks grant options and never power it confers no advantage.
@@ -529,7 +529,7 @@ The spec is accepted as the basis for the history surfaces. Answers below; where
 3. **Cause of death / damage taken in the record? — adopted.** Omit. DR-7's principle applied to facts, not only scores: never show a number the record cannot support.
 4. **Who defines the badge list? — adopted.** **Ship zero badges and no Marks block rather than a placeholder.** A placeholder mark would be exactly the hollow number AC-7.4 forbids. Badges are a later increment with their own definition.
 5. **The `--faint` token change is handed to the Frontend Engineer and I accept it as in-scope** — it is a global token, so it is changed once and affected frames re-captured, not patched per component. **I verified the arithmetic myself: `#656e88` on `#0a0c12` = 3.85:1 (the designer said 3.86) and the proposed `#767f9a` = 4.91:1, both against my own computation.** A measured 3.85:1 across every section label on every screen is a real AC-4.7 failure, quantified rather than asserted. **This one finding justifies the AC-4.7 threshold I was pushed to fix in §12.2.**
-6. **`RELEASE-NOTES.md` contradiction — confirmed and routed.** It currently promises *"No meta-progression… No unlocks"* and *"no run persistence at all"*. This increment falsifies both. **That is a truth defect in a shipped document, not a wording preference** — the Technical Writer updates it, and it is now a hard release condition, not a nicety. Note it **already** requires a fix regardless: `PHASE5-STATUS.md`'s stale test count is DEF-3, and the "no browser in this environment" limitation is falsified by §2.1.
+6. **`../RELEASE-NOTES.md` contradiction — confirmed and routed.** It currently promises *"No meta-progression… No unlocks"* and *"no run persistence at all"*. This increment falsifies both. **That is a truth defect in a shipped document, not a wording preference** — the Technical Writer updates it, and it is now a hard release condition, not a nicety. Note it **already** requires a fix regardless: `../status/PHASE5-STATUS.md`'s stale test count is DEF-3, and the "no browser in this environment" limitation is falsified by §2.1.
 
 ### 13.3 The UX spec's two judgements — both accepted
 
@@ -540,7 +540,7 @@ The spec is accepted as the basis for the history surfaces. Answers below; where
 
 ### 13.4 New defects found while probing (both now tracked)
 
-- **DEF-7 — our own art gate has a blind spot.** `tools/check-surface-art.mjs:41`'s class extractor stops at the closing backtick, so concatenated classes are invisible to it. `boss-down` (`app.js:1248`) is emitted, **has no CSS rule**, and the gate reports `OK`. **This matters more than the missing rule:** the gate is the mechanism that has been keeping "every emitted class has a rule" true, and this increment adds classes. **Fix DEF-7 before or with the DEF-6 work**, since DEF-6 adds markup.
+- **DEF-7 — our own art gate has a blind spot.** `scripts/check-surface-art.mjs:41`'s class extractor stops at the closing backtick, so concatenated classes are invisible to it. `boss-down` (`app.js:1248`) is emitted, **has no CSS rule**, and the gate reports `OK`. **This matters more than the missing rule:** the gate is the mechanism that has been keeping "every emitted class has a rule" true, and this increment adds classes. **Fix DEF-7 before or with the DEF-6 work**, since DEF-6 adds markup.
 - **DEF-8 — a comment contradicts shipped behaviour.** `style.css:1685-1687` says a dying enemy is *"simply gone"* under reduced motion; I measured the opposite (ghost at full opacity, 260×171, `display:block`). `app.js:1240-1241` is correct. Low severity, **high trap value** — this is exactly the comment class that misled two revisions already, so it is corrected rather than ignored.
 
 ---

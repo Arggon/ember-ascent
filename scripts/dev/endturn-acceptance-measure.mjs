@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// tools/dev/endturn-acceptance-measure.mjs — an INDEPENDENT measurement of one acceptance
+// scripts/dev/endturn-acceptance-measure.mjs — an INDEPENDENT measurement of one acceptance
 // question at four viewports:
 //
 //   At load of the combat screen, is the End Turn control fully visible AND clickable,
@@ -40,8 +40,8 @@
 //
 // READ-ONLY: writes nothing but its own report under shots/acceptance/.
 //
-// Usage: node tools/dev/endturn-acceptance-measure.mjs [URL]
-//        default URL http://localhost:5173/web/?seed=11   (dev server: node tools/serve.mjs)
+// Usage: node scripts/dev/endturn-acceptance-measure.mjs [URL]
+//        default URL http://localhost:5173/src/web/?seed=11   (dev server: node scripts/serve.mjs)
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
@@ -65,17 +65,17 @@ const FLAG_VALUES = new Set([flagValue('--passes'), ONLY].filter((v) => v !== nu
 // harnesses use). The dev server 301-redirects a directory request without a trailing slash
 // to one WITH a trailing slash, and it appends that slash to the QUERY, not the path:
 //
-//   GET /web/?seed=11  ->  301  Location: /web/?seed=11/
+//   GET /src/web/?seed=11  ->  301  Location: /src/web/?seed=11/
 //
 // so the page's own `location.search` becomes `?seed=11/`, `Number("11/")` is NaN, and
-// `seedFromUrl()` (web/app.js:86-91) falls through to `Math.floor(Math.random()*1000000)`.
+// `seedFromUrl()` (src/web/app.js:86-91) falls through to `Math.floor(Math.random()*1000000)`.
 // The page then runs a DIFFERENT RANDOM RUN on every navigation, and the seed in the URL
-// silently does nothing. Measured directly: three navigations to /web/?seed=11 reported
+// silently does nothing. Measured directly: three navigations to /src/web/?seed=11 reported
 // "New run (seed 348027)", "(seed 953098)", "(seed 317344)" — three different runs — while
-// four navigations to /web/index.html?seed=11 all reported "New run (seed 11)" and the same
+// four navigations to /src/web/index.html?seed=11 all reported "New run (seed 11)" and the same
 // encounter. Every pass below asserts the seed the page ITSELF reports, so a random run
 // can never be mistaken for this viewport again.
-const SEED_URL = argv.find((a) => !a.startsWith('--') && !FLAG_VALUES.has(a)) || 'http://localhost:5173/web/index.html?seed=11';
+const SEED_URL = argv.find((a) => !a.startsWith('--') && !FLAG_VALUES.has(a)) || 'http://localhost:5173/src/web/index.html?seed=11';
 const REQUESTED_SEED = new URL(SEED_URL).searchParams.get('seed');
 
 // The four viewports under question, in the order the acceptance question lists them.
@@ -481,7 +481,7 @@ for (const [w, h, label] of SIZES) {
     const phaseBeforeTravel = await ev(`String((document.querySelector('.hud-step')||{}).textContent||'')`);
     const helpSeen = await ev(`!!document.querySelector('.modal-back')`);
     // THE CONTROL: the seed the page itself reports, read from the New Run button's title
-    // (web/app.js:792). If this does not match the requested seed, the run is random and
+    // (src/web/app.js:792). If this does not match the requested seed, the run is random and
     // nothing else measured in this pass is a measurement of the requested seed.
     const seedShown = await ev(`(() => {
       const b = [...document.querySelectorAll('button')].find(x => /new run/i.test(x.textContent || ''));

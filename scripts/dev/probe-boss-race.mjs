@@ -1,7 +1,7 @@
 // Dev-only probe (NOT shipped): measure what each policy DOES inside the boss fight,
 // so a diagnosis is measured rather than guessed. Reads only public kernel output.
 //
-// Run: node tools/dev/probe-boss-race.mjs <policy> <seedStart> <runs>
+// Run: node scripts/dev/probe-boss-race.mjs <policy> <seedStart> <runs>
 import { begin, submit, legal, view } from '../../src/surface/session.js';
 import { makePolicy } from '../../src/surface/policies.js';
 

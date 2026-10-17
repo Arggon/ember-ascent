@@ -9,33 +9,33 @@ this file records what I independently confirmed or falsified.
 ## 1. Two defects in the project's own record, found this session
 
 ### PM-1 — The browser page was genuinely broken, and `npm test` cannot see it
-`lastPlayerStatuses` was **assigned but never declared** in `web/app.js`. Because `app.js`
+`lastPlayerStatuses` was **assigned but never declared** in `src/web/app.js`. Because `app.js`
 is an ES module it runs in **strict mode**, so every `render()` threw
 `ReferenceError: lastPlayerStatuses is not defined` — the page repainted once and then
 died. **A green `npm test` (93 pass / 0 fail) coexisted with a broken game**, because the
 test harness evaluates `app.js` through `new Function()`, whose body is **sloppy** mode:
 the same assignment silently creates a global in tests and throws in the real page.
 
-- Fixed by the Frontend Engineer (`web/app.js:93` declaration, `:743` reset, `:1265` reader).
-- **PM confirmed the page is alive after the fix:** `node tools/dev/shoot.mjs --base http://localhost:5188/web/index.html --out /tmp/verify-after` → **8/8 frames captured**, including `combat.png` with 2 enemies.
+- Fixed by the Frontend Engineer (`src/web/app.js:93` declaration, `:743` reset, `:1265` reader).
+- **PM confirmed the page is alive after the fix:** `node scripts/dev/shoot.mjs --base http://localhost:5188/web/index.html --out /tmp/verify-after` → **8/8 frames captured**, including `combat.png` with 2 enemies.
 - **Consequence for the project:** the surface has no test that would catch this class of
   error. This is an open gap, recorded here rather than fixed (it is `tests/**`, and out of
   my lane as PM).
 
 ### PM-2 — My own reproduction URL was wrong
-`http://localhost:5173/web/?seed=13` **does not reach seed 13**. `tools/serve.mjs` answers
-that request with **301 → `/web/?seed=13/`** (it appends a slash to the whole URL including
+`http://localhost:5173/web/?seed=13` **does not reach seed 13**. `scripts/serve.mjs` answers
+that request with **301 → `/src/web/?seed=13/`** (it appends a slash to the whole URL including
 the query), and `seedFromUrl()` then computes `Number('13/')` → `NaN`, yielding a **random**
 seed.
 - Measured: `curl -s -o /dev/null -w "%{http_code} %{redirect_url}" http://localhost:5188/web/?seed=13` → `301 http://localhost:5188/web/?seed=13/`.
-- Correct form: **`/web/index.html?seed=13`** → `200`.
+- Correct form: **`/src/web/index.html?seed=13`** → `200`.
 - I gave the wrong URL to two agents. Recorded so the next person does not repeat it.
 
 ---
 
 ## 2. DEF-6 (blank climax) — **VERIFIED FIXED**
 
-The defect: on the terminal kill, `web/app.js` wiped the stage to a bare `.ended-hold` div
+The defect: on the terminal kill, `src/web/app.js` wiped the stage to a bare `.ended-hold` div
 and returned before the `switch`, bypassing the only code that draws enemies or the death
 ghost. Measured before the fix: **29 consecutive animation frames with the stage empty**
 (~480 ms on defeat, ~1150 ms on boss victory).
@@ -85,9 +85,9 @@ That gave `fresh` the 39-card pool and the default the 21-card pool — **exactl
 
 ## 4. DR-2 — implemented AND its bite is now proven
 
-Both agents were told to *add* the rule that the kernel and `web/**` may import no `node:*`.
-**It was already there.** I read the gate: line 85 walks `src/` **and** `web/`; line 91
-defines `isSurface`; **line 116** rejects `node:*` in `web/**`; **line 131** rejects it in
+Both agents were told to *add* the rule that the kernel and `src/web/**` may import no `node:*`.
+**It was already there.** I read the gate: line 85 walks `src/` **and** `src/web/`; line 91
+defines `isSurface`; **line 116** rejects `node:*` in `src/web/**`; **line 131** rejects it in
 `src/kernel/**`.
 
 **I then proved it actually fails**, which nobody had done:
@@ -117,7 +117,7 @@ confirmed clean. DR-2 is **complete and closed**.
 **93** and **29**. The Technical Writer correctly marked these **STALE** and refused to plant
 numbers it could not re-measure (its run had no shell), naming the command instead. I
 confirmed the real values myself. The false *"no browser in this environment"* limitation is
-**withdrawn with a dated correction** in `ART-PASS-STATUS.md`, `ITCH-UPLOAD.md`,
+**withdrawn with a dated correction** in `ART-PASS-STATUS.md`, `../guides/ITCH-UPLOAD.md`,
 `JUICE-STATUS.md` and `LAYOUT-STATUS.md`. `JUICE-STATUS.md`'s claim that the death beat is
 unbuilt is corrected, and `prevEnemies` is now recorded as the dead code it is.
 
@@ -130,7 +130,7 @@ unbuilt is corrected, and `prevEnemies` is now recorded as the dead code it is.
 3. **DEF-1** — `tests/cards/cards.test.js:123` and `tests/budget.test.js:49` still hardcode `42`. Not started.
 4. **All new tests** — determinism (AC-7.2), the AC-9.3 two-layer power-creep negative, AC-6.5 record agreement, backward compatibility on the 150 legacy records, retention. **Zero exist.**
 5. **The history CLI** — `--pool full|fresh` and a `history` read command. `historyView()` is currently reachable only from tests.
-6. **The history UI** — the Ledger, run summary, unlock narration and empty state per `UX-SPEC-run-history.md`; plus the `--faint` contrast fix (measured 3.85:1 today against a frozen 4.5:1 floor) and the AC-4.6 explanatory treatment.
+6. **The history UI** — the Ledger, run summary, unlock narration and empty state per `../specs/UX-SPEC-run-history.md`; plus the `--faint` contrast fix (measured 3.85:1 today against a frozen 4.5:1 floor) and the AC-4.6 explanatory treatment.
 7. **A strict-mode or real-browser smoke in the gate** — so PM-1's class of bug cannot pass unnoticed again.
 8. **Rebuild `release/` and `release.zip`** and re-verify byte-reproducibility.
 9. **The fun gate (Gate B)** — owner 10 runs + one independent tester 5 runs, with the `?pool=full` flag and no briefing. Unstarted by design; it is the last step and it is not mine to pass alone.

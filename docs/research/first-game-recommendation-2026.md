@@ -199,7 +199,7 @@ Only the ones that change scope, each with the default I would ship with:
 | Will you do the **weekly devlog/clip work** yourself? | **Yes** — this is the only free acquisition lever, and 7 of 11 low-budget winners relied on creator attention |
 | **Full-time or evenings?** | **Full-time** — the 3–4 month estimate assumes it; part-time makes it 8–12 months |
 | Steam **$100 now or after itch validation?** | **After** — keeps pre-revenue cash at $0 |
-| Is a **web/portal build** acceptable in parallel? | **Yes** — free extra channel; note CrazyGames Basic Launch pays nothing |
+| Is a **src/web/portal build** acceptable in parallel? | **Yes** — free extra channel; note CrazyGames Basic Launch pays nothing |
 | Have you shipped a commercial game before? | **No** — if yes, tighten the timeline and skip itch validation |
 
 ## 7. The strongest argument against this recommendation

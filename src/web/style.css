@@ -1,4 +1,4 @@
-/* web/style.css — the browser surface's whole visual layer.
+/* src/web/style.css — the browser surface's whole visual layer.
  *
  * No image files, no external fonts, no network requests: every mark is CSS or inline
  * SVG painted by app.js, and every hue comes from the palette declared below. The
@@ -144,7 +144,7 @@ html, body {
   border-radius: 999px;
   border: 1px solid transparent;
   background: rgba(0, 0, 0, 0.28);
-  /* Second instance of the same truncation artifact (found by tools/dev/css-parse-probe.mjs
+  /* Second instance of the same truncation artifact (found by scripts/dev/css-parse-probe.mjs
      once the #hud one above was repaired). Same shape: `font-size: var(--fs-2)` with no
      terminating semicolon, followed by a line of declarations, so the parser dropped
      `font-size: var(--fs-2) display: inline-flex;` and read the rest as .stat's own. Repair
@@ -1711,7 +1711,7 @@ html, body {
      as a border change (no geometry moves); an absorbed hit still reads in the block
      line. The dying enemy is NOT "simply gone": the `animation: none` above removes the
      collapse, not the card, so the ghost is still painted — statically, at its resting
-     opacity, carrying the enemy's name and its DOWN line. See `dyingRow()` in web/app.js,
+     opacity, carrying the enemy's name and its DOWN line. See `dyingRow()` in src/web/app.js,
      which draws it on this path deliberately. */
   #fx-layer { display: none; }
   .enemy.damaged { border-color: #8d3b3b; }
@@ -1733,7 +1733,7 @@ html, body {
 /* ============================================================ P3 — run-level beats ==
    The CSS half of the P3 pass. app.js was edited first and this half was lost to a budget
    cut, so for a while the renderer referenced classes with no rules — which is exactly the
-   "style ships invisible" defect `tools/check-surface-art.mjs` exists to catch. Every rule
+   "style ships invisible" defect `scripts/check-surface-art.mjs` exists to catch. Every rule
    below is paired with a reduced-motion override so no FACT is carried by motion alone. */
 
 /* ---- Boss entrance: a banner word plus a ring that opens outward ---- */
@@ -2185,7 +2185,7 @@ html, body {
    `max-height: 830px` so 1280x1000 (which passes with 58px to spare) stays OUT of it.
    830px = 800 (the tallest gated laptop height) + headroom for browser chrome heights;
    anything taller than 830px keeps the untouched desktop layout. This tier intentionally
-   does NOT use !important — the lesson recorded in LAYOUT-ACCEPTANCE.md is that a height
+   does NOT use !important — the lesson recorded in docs/specs/LAYOUT-ACCEPTANCE.md is that a height
    fix must be scoped, monotone (it only ever FREES height), and verifiable per seed.
 
    BEWARE ITS OVERLAP WITH SHORT LANDSCAPE (915x412, 1200x450): this tier is gated on
@@ -2237,7 +2237,7 @@ html, body {
      Cost, measured across seeds 1/3/7/11: the button grows 40 -> 44px, so End Turn clearance
      drops by 1-2px and nothing else moves -- 1366x768 68/52/52/66px (was 69/53/53/67),
      1280x800 72/59/59/75px (was 73/60/60/76), body scroll 0, stage spill unchanged. Still
-     6-9x the 8px threshold LAYOUT-ACCEPTANCE.md S1/S3 requires. */
+     6-9x the 8px threshold docs/specs/LAYOUT-ACCEPTANCE.md S1/S3 requires. */
   #stage .btn { min-height: 44px; }
   .hint { margin-top: 0; }
 }
@@ -2295,7 +2295,7 @@ html, body {
 
 /* ============================================================ HEIGHT STRATEGY ======= --
 
-   PROBLEM (measured, `tools/dev/space-check.mjs`): the combat screen was content-height and
+   PROBLEM (measured, `scripts/dev/space-check.mjs`): the combat screen was content-height and
    glued to the top of `#stage`, so every viewport taller than the content simply had blank
    ground under it — 261px (29%) on the owner's 412x915 phone, 343px (38%) at 414x896.
    Neither `#app` nor `#stage` was at fault: both already stretch to the viewport
@@ -2489,9 +2489,9 @@ html, body {
    EMBER THEME — art pass 2 (2026-10-16).
    Presentation only: colours, surfaces, borders, glows and CSS-painted fire. No sizing,
    spacing or layout values change here, so the frozen viewport contract
-   (LAYOUT-ACCEPTANCE.md) is untouched. No images, fonts or network requests.
+   (docs/specs/LAYOUT-ACCEPTANCE.md) is untouched. No images, fonts or network requests.
    Wrapped in `@media screen` on purpose: it is a single late layer that wins the cascade
-   without re-declaring any top-level selector (tools/check-surface-art.mjs rule 2).
+   without re-declaring any top-level selector (scripts/check-surface-art.mjs rule 2).
    Idea: you climb out of a furnace. Heat rises from the bottom of the screen, embers drift
    up, and the one warm accent is now ember orange instead of gold. Block / skill stay cool
    blue: fire vs. ice keeps "damage vs. defence" readable at a glance.
@@ -2691,8 +2691,8 @@ html, body {
 /* ==========================================================================================
    ART DIRECTION PROTOTYPE — "Forge-lit woodcut" (branch art-direction, phase 1 mockups)
    One late layer, like the ember theme above. Paint, type and decoration only: no box in
-   the combat layout changes width/height (LAYOUT-ACCEPTANCE.md). Fonts come from
-   web/fonts/fonts.css (local, OFL). The single accent stays ember orange.
+   the combat layout changes width/height (docs/specs/LAYOUT-ACCEPTANCE.md). Fonts come from
+   assets/fonts/fonts.css (local, OFL). The single accent stays ember orange.
    ========================================================================================== */
 @media screen {
   :root {

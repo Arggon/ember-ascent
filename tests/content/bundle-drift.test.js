@@ -5,7 +5,7 @@
 // generated ES module src/kernel/content/cards.bundle.js instead. This test is the
 // ONLY thing standing between "two copies" and "one source of truth": it re-reads
 // the JSON in Node and deep-compares against the bundled object, so any edit to the
-// JSON without re-running `node tools/gen-content.mjs` fails here.
+// JSON without re-running `node scripts/gen-content.mjs` fails here.
 //
 // It also proves the kernel's default content really comes from the bundle — not from
 // a stray disk read that would resurrect node:fs.
@@ -25,7 +25,7 @@ const JSON_PATH = resolve(REPO, 'src', 'kernel', 'content', 'cards.json');
 
 test('cards.bundle.js deep-equals cards.json (the bundle is not stale)', () => {
   const fromDisk = JSON.parse(readFileSync(JSON_PATH, 'utf8'));
-  assert.deepEqual(cardsBundle, fromDisk, 'regenerate with: node tools/gen-content.mjs');
+  assert.deepEqual(cardsBundle, fromDisk, 'regenerate with: node scripts/gen-content.mjs');
 });
 
 test('the JSON file is the bundle reformatted, field-for-field, for every card', () => {

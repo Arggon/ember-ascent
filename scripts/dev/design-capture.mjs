@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// tools/dev/design-capture.mjs — capture every screen at MOBILE size for the design pass.
+// scripts/dev/design-capture.mjs — capture every screen at MOBILE size for the design pass.
 //
 // The owner wants the UX Designer to redesign the whole game around the new cards, with
 // MOBILE as the primary target. Design critique needs to see the real screens at the real
 // size, so this walks a full run at 390x844 (iPhone 14) and captures every screen, plus the
 // help modal, at DPR 2 for detail.
 //
-// Usage: node tools/dev/design-capture.mjs [--seed N] [--out DIR]
+// Usage: node scripts/dev/design-capture.mjs [--seed N] [--out DIR]
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
@@ -20,7 +20,7 @@ const SEED = arg('--seed', '11');
 const OUT = resolve(ROOT, arg('--out', 'shots/design/mobile'));
 mkdirSync(OUT, { recursive: true });
 const PORT = 9351, PROFILE = '/tmp/dlb-design';
-const BASE = `http://localhost:5173/web/?seed=${SEED}`;
+const BASE = `http://localhost:5173/src/web/?seed=${SEED}`;
 
 let id = 1;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

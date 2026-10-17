@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// tools/dev/probe-app-box.mjs — does #app actually fill the viewport on each device?
+// scripts/dev/probe-app-box.mjs — does #app actually fill the viewport on each device?
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 const PORT = 9340 + (process.pid % 100), PROFILE = '/tmp/dlb-probe-appbox-' + process.pid;
-const BASE = process.argv[2] || 'http://localhost:5173/web/?seed=11';
+const BASE = process.argv[2] || 'http://localhost:5173/src/web/?seed=11';
 const SIZES = [[412, 915, 'galaxy'],[390, 844, 'iphone14'],[360, 640, 'small'],[414, 896, 'large'],[768, 1024, 'tablet'],[1280, 800, 'desktop'],[1280, 1000, 'desktop-tall']];
 let id = 1; const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 if (existsSync(PROFILE)) rmSync(PROFILE, { recursive: true, force: true });

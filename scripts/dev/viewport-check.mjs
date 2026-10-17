@@ -1,28 +1,28 @@
 #!/usr/bin/env node
-// tools/dev/viewport-check.mjs — acceptance instrument for LAYOUT-ACCEPTANCE.md (frozen).
+// scripts/dev/viewport-check.mjs — acceptance instrument for LAYOUT-ACCEPTANCE.md (frozen).
 //
 // Renders the combat screen at each release-bar size in real Chromium, evaluates the
 // contract thresholds per viewport × seed row, and EXITS 1 if any row fails, 0 if all pass.
 // A red run finally looks red.
 //
-// Seed pinning: this harness requests /web/index.html?seed=N directly. tools/serve.mjs
+// Seed pinning: this harness requests /src/web/index.html?seed=N directly. scripts/serve.mjs
 // 301-redirects /web/?seed=N to /web/?seed=N/ (slash appended INSIDE the query), which makes
-// web/app.js seedFromUrl() compute Number("11/") = NaN and fall back to a random seed. After
+// src/web/app.js seedFromUrl() compute Number("11/") = NaN and fall back to a random seed. After
 // load the harness reads the seed the app itself reports from the "New Run" button title
-// ("New run (seed NNNNNN) — keyboard: n", see web/app.js) and fails the row when it does not
+// ("New run (seed NNNNNN) — keyboard: n", see src/web/app.js) and fails the row when it does not
 // equal the requested seed.
 //
 // Usage:
-//   node tools/dev/viewport-check.mjs                          # default matrix, seed 11
-//   node tools/dev/viewport-check.mjs --seeds 1-12             # seed range
-//   node tools/dev/viewport-check.mjs --seeds 3,7,11           # seed list (ranges may mix)
-//   node tools/dev/viewport-check.mjs --sizes 1366x768,915x412 # subset of SIZES
-//   node tools/dev/viewport-check.mjs --sizes 360x640@130,412x915@130 # large-font rows (text-scale.mjs)
-//   node tools/dev/viewport-check.mjs --port 9400                # own DevTools port + profile
-//   node tools/dev/viewport-check.mjs --base 'http://localhost:5173/web/index.html?seed={seed}'
-//   node tools/dev/viewport-check.mjs --diag                   # + per-block height dump
+//   node scripts/dev/viewport-check.mjs                          # default matrix, seed 11
+//   node scripts/dev/viewport-check.mjs --seeds 1-12             # seed range
+//   node scripts/dev/viewport-check.mjs --seeds 3,7,11           # seed list (ranges may mix)
+//   node scripts/dev/viewport-check.mjs --sizes 1366x768,915x412 # subset of SIZES
+//   node scripts/dev/viewport-check.mjs --sizes 360x640@130,412x915@130 # large-font rows (text-scale.mjs)
+//   node scripts/dev/viewport-check.mjs --port 9400                # own DevTools port + profile
+//   node scripts/dev/viewport-check.mjs --base 'http://localhost:5173/src/web/index.html?seed={seed}'
+//   node scripts/dev/viewport-check.mjs --diag                   # + per-block height dump
 // The old positional BASE argument still works:
-//   node tools/dev/viewport-check.mjs http://localhost:5173/web/index.html?seed=11
+//   node scripts/dev/viewport-check.mjs http://localhost:5173/src/web/index.html?seed=11
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
@@ -120,7 +120,7 @@ const HAND_SIZES = [
   [414, 896, 'phone-large-hand10', MAX_HAND],
 ];
 // Rows are [w, h, label, textScale, handN]: every 100% row, then the large-font rows
-// (tools/dev/text-scale.mjs: Gonzalo's rule, every build at 360-412dp with 130% text), then
+// (scripts/dev/text-scale.mjs: Gonzalo's rule, every build at 360-412dp with 130% text), then
 // the 10-card hand at every phone size, at 100% and at 130%. --sizes takes "360x640",
 // "360x640@130", "360x640+hand10" and "360x640@130+hand10".
 const MATRIX = [
@@ -135,7 +135,7 @@ const SIZES_SEL = sizesArg
   : MATRIX;
 // Grows the rendered hand to `n` tiles by cloning the app's own .card-wrap markup (so every
 // class and rule is the real one), re-indexes the fan (--i on each wrap, --n on the hand, as
-// web/app.js sets them) and puts the longest-word card names on them, longest first.
+// src/web/app.js sets them) and puts the longest-word card names on them, longest first.
 const LONG_NAMES = ['Hammerfall', 'Untempered', 'Overtemper', 'Returning Brand', 'Forgeclap',
   'Climbing Heat', 'Unbroken', 'Twin Hammers', 'Ash Embrace', 'Ash Harvest'];
 const HAND_FIXTURE = (n) => `(() => {
@@ -154,7 +154,7 @@ const HAND_FIXTURE = (n) => `(() => {
 })()`;
 if (!SIZES_SEL.length) { console.error('no sizes matched --sizes ' + sizesArg); process.exit(2); }
 
-const DEFAULT_BASE = 'http://localhost:5173/web/index.html?seed={seed}';
+const DEFAULT_BASE = 'http://localhost:5173/src/web/index.html?seed={seed}';
 const BASE_TEMPLATE = baseArg || DEFAULT_BASE;
 const SEED_IN_URL = BASE_TEMPLATE.includes('{seed}') || /([?&])seed=/.test(BASE_TEMPLATE);
 function urlFor(seed) {
@@ -246,7 +246,7 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
       const cards = [...document.querySelectorAll('.card')];
       const stage = document.querySelector('#stage');
       const endTurn = [...document.querySelectorAll('button')].find(b => /end turn/i.test(b.textContent||''));
-      // The seed the app itself reports (web/app.js sets this title from snap.seed).
+      // The seed the app itself reports (src/web/app.js sets this title from snap.seed).
       const newRun = [...document.querySelectorAll('button')].find(b => /New run \\(seed \\d+\\)/.test(b.title||''));
       const seedMatch = newRun ? /seed (\\d+)/.exec(newRun.title) : null;
       const seedReported = seedMatch ? Number(seedMatch[1]) : null;
@@ -264,7 +264,7 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
       // --- S2/S3, the real stage-clip metric: DESCENDANT SPILL -------------------------
       // max over the .page-combat subtree of (descendant rect.bottom - #stage rect.bottom).
       // A positive value means content extends past the bottom edge #stage clips at.
-      // Excluded: anything inside #fx-layer (a SIBLING of #stage per web/index.html, never
+      // Excluded: anything inside #fx-layer (a SIBLING of #stage per src/web/index.html, never
       // rebuilt by render()), and position: fixed elements (not clipped by an ancestor's
       // overflow). Elements with no box (display: none) contribute nothing.
       const spill = (() => {
@@ -430,7 +430,7 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
         cardsClipped: cards.filter(c => c.getBoundingClientRect().right > (hand ? hand.getBoundingClientRect().right + 1 : vw)).length,
         lastCardBottom: last ? Math.round(last.getBoundingClientRect().bottom) : null,
         stageBottom: stage ? Math.round(stage.getBoundingClientRect().bottom) : null,
-        // S2/S3: #stage is overflow: hidden (web/style.css:210), so content taller than the
+        // S2/S3: #stage is overflow: hidden (src/web/style.css:210), so content taller than the
         // stage is clipped INVISIBLY -- the page can still fit while the stage swallows a card
         // row. Nothing else in this harness compares these two numbers.
         stageClipPx: stage ? stage.scrollHeight - stage.clientHeight : null,

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// tools/dev/probe-nesting.mjs — what is #stage's child chain, and did the bands apply?
+// scripts/dev/probe-nesting.mjs — what is #stage's child chain, and did the bands apply?
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 const PORT = 9340 + (process.pid % 100), PROFILE = '/tmp/dlb-probe-nest-' + process.pid;
-const BASE = process.argv[2] || 'http://localhost:5173/web/?seed=11';
+const BASE = process.argv[2] || 'http://localhost:5173/src/web/?seed=11';
 const SIZES = [[412, 915, 'galaxy'],[360, 640, 'small'],[768, 1024, 'tablet'],[1280, 800, 'desktop']];
 let id = 1; const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 if (existsSync(PROFILE)) rmSync(PROFILE, { recursive: true, force: true });

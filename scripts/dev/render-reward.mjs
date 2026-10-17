@@ -18,7 +18,7 @@ globalThis.requestAnimationFrame=(f)=>f();
 globalThis.URLSearchParams=URLSearchParams;
 
 const fs=await import('node:fs');
-let src=fs.readFileSync(new URL('../../web/app.js', import.meta.url),'utf8').replace(/^import .*$/gm,'').replace(/\bboot\(\)\s*;?\s*$/,'');
+let src=fs.readFileSync(new URL('../../src/web/app.js', import.meta.url),'utf8').replace(/^import .*$/gm,'').replace(/\bboot\(\)\s*;?\s*$/,'');
 const ctlMod=await import('../../src/surface/gui/controller.js');
 
 // drive to a reward screen

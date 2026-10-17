@@ -4,7 +4,7 @@
 // works." Targeting mode appears and highlights enemies; a click on an enemy produces the
 // "Target cancelled — nothing was played" toast, which only cancelTargeting() emits.
 //
-// This drives the REAL web/app.js against a fake DOM with bubbling and closest(), then
+// This drives the REAL src/web/app.js against a fake DOM with bubbling and closest(), then
 // dispatches a click the way a browser would — including the realistic case where the
 // innermost element under the pointer is a child of the enemy button, not the button.
 import { readFileSync } from 'node:fs';
@@ -82,7 +82,7 @@ globalThis.requestAnimationFrame = (f) => f();
 globalThis.URLSearchParams = URLSearchParams;
 
 const toasts = [];
-let src = readFileSync(new URL('../../web/app.js', import.meta.url), 'utf8')
+let src = readFileSync(new URL('../../src/web/app.js', import.meta.url), 'utf8')
   .replace(/^import .*$/gm, '')
   .replace(/\bboot\(\)\s*;?\s*$/, '');
 // Record every toast, and expose the internals we need to inspect.

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// tools/gen-content.mjs — regenerate src/kernel/content/cards.bundle.js.
+// scripts/gen-content.mjs — regenerate src/kernel/content/cards.bundle.js.
 //
 // cards.json stays the SINGLE SOURCE OF TRUTH for card data. The kernel cannot read
 // it with node:fs (it must run in a browser), so this tool embeds the parsed object
 // as an ES module. The bundle is DERIVED, never hand-edited: run
-//   node tools/gen-content.mjs
+//   node scripts/gen-content.mjs
 // after any content change. tests/content/bundle-drift.test.js re-reads cards.json in
 // Node and deep-compares the two, so a stale bundle is a test failure, not a mystery.
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -26,7 +26,7 @@ if (!Array.isArray(parsed.cards) || parsed.cards.length === 0) {
   throw new Error(`cards.json has no cards array`);
 }
 
-const banner = `// GENERATED FILE — do not edit by hand. Run: node tools/gen-content.mjs
+const banner = `// GENERATED FILE — do not edit by hand. Run: node scripts/gen-content.mjs
 //
 // Source of truth: src/kernel/content/cards.json (the single source of card data).
 // This module exists so the kernel can carry NO node:* builtin and therefore run

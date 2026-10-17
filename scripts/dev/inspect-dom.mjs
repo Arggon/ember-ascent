@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-// tools/dev/inspect-dom.mjs — ask the REAL browser for measured facts.
+// scripts/dev/inspect-dom.mjs — ask the REAL browser for measured facts.
 //
 // The project's visual claims had been verified only by static proxy ("no layout-affecting
 // property is animated") because no browser was reachable. Chromium renders headlessly here,
 // so geometry and accessibility facts can be MEASURED instead of assumed. This uses the same
-// zero-dependency CDP approach as tools/dev/shoot.mjs (Node 24 ships WebSocket).
+// zero-dependency CDP approach as scripts/dev/shoot.mjs (Node 24 ships WebSocket).
 //
-// Usage: node tools/dev/inspect-dom.mjs [--base URL]
+// Usage: node scripts/dev/inspect-dom.mjs [--base URL]
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 
 const args = process.argv.slice(2);
 const i = args.indexOf('--base');
-const BASE = i === -1 ? 'http://localhost:5173/web/' : args[i + 1];
+const BASE = i === -1 ? 'http://localhost:5173/src/web/' : args[i + 1];
 const PORT = 9334;
 const PROFILE = '/tmp/dlb-inspect-profile';
 

@@ -16,13 +16,13 @@ Work top to bottom. Checked boxes are things already done and verified in this r
 - [x] **`release.zip`** exists in this workspace root. That is the artifact.
 - [x] Zip SHA-256 `4a6621600c69f409aa83b2733dd9d0374fe591a2badceb45e5a830c6f48ed0db`
       — 25 entries, **123,283 bytes**. Rebuilt 2026-10-15 after the screen-size layout fix;
-      regenerates byte-for-byte with `node tools/build-release.mjs` (verified: two runs, same SHA).
+      regenerates byte-for-byte with `node scripts/build-release.mjs` (verified: two runs, same SHA).
 
 > **Note on earlier hashes.** This file previously recorded `b86764e4…`/101,861 B and
-> `RELEASE-NOTES.md` recorded `72d1dc63…`/104,895 B. Neither matched the zip on disk, which was
+> `../RELEASE-NOTES.md` recorded `72d1dc63…`/104,895 B. Neither matched the zip on disk, which was
 > itself `f629b29c…`/119,618 B and predated the layout fix. All three are now superseded by the
 > hash above, which is the artifact you should upload.
-- [x] **`index.html` is at the zip root** (not nested inside `web/`). Verified against
+- [x] **`index.html` is at the zip root** (not nested inside `src/web/`). Verified against
       itch.io's rule that the ZIP must contain `index.html` as the entry point.
 - [x] No file path in the zip exceeds 240 characters; the longest is 34.
 - [x] 25 extracted files, far below itch.io's 1,000-file limit.
@@ -137,7 +137,7 @@ Dimensions below are itch.io's own published guidance, not guesses:
 ## Step 7 — Page text
 
 A description that answers "what is this, how long, how hard, what do I press".
-`RELEASE-NOTES.md` is the source: copy the "What this demo IS", the controls line, and
+`../RELEASE-NOTES.md` is the source: copy the "What this demo IS", the controls line, and
 the "is NOT" list across. Be upfront that it is one act and that it is hard — a player
 who feels misled writes a worse comment than one who was warned.
 
@@ -153,7 +153,7 @@ who feels misled writes a worse comment than one who was warned.
    confirm it loads, that a card can be played, and that the console is clean. ~~This is
    the one check nobody here could perform, because there is no browser.~~
    **CORRECTED 2026-10-16: the struck reason was false — a browser IS present** (`chromium
-   152.0.7977.82`/`firefox` on PATH; `tools/dev/shoot.mjs` drives headless Chromium over CDP,
+   152.0.7977.82`/`firefox` on PATH; `scripts/dev/shoot.mjs` drives headless Chromium over CDP,
    zero dependencies). The game **has** been rendered and screenshotted here; see the
    screenshots section above and `shots/`. **What is still owner-only is narrower and real:**
    playing through *itch.io's own embed*, and confirming **itch.io accepts and sizes** the frame.
@@ -166,9 +166,9 @@ who feels misled writes a worse comment than one who was warned.
 ## Step 9 — After publishing
 
 - [ ] Re-check the page in a **logged-out** browser window, to see a stranger's view.
-- [ ] If anyone reports a bug, `RELEASE-NOTES.md` is the reference for whether the
+- [ ] If anyone reports a bug, `../RELEASE-NOTES.md` is the reference for whether the
       behaviour is intended scope or a real defect.
-- [ ] To ship a fix: edit the code, run `node tools/build-release.mjs`, then upload the
+- [ ] To ship a fix: edit the code, run `node scripts/build-release.mjs`, then upload the
       new `release.zip` on the same project page and delete the old file.
 
 ---
@@ -190,7 +190,7 @@ who feels misled writes a worse comment than one who was warned.
 > **Correction — 2026-10-16 (Technical Writer, DEF-3).** Two rows above were false. This file said
 > *"no display server here"* and that screenshots were *"NOT producible here"* and an **owner
 > blocker**. **A browser is present:** `chromium 152.0.7977.82` and `firefox` are on PATH, and
-> `tools/dev/shoot.mjs` renders and captures the real game headlessly over CDP with zero
+> `scripts/dev/shoot.mjs` renders and captures the real game headlessly over CDP with zero
 > dependencies. `shots/` holds **301 PNGs**, counted 2026-10-16, including the 1260×1000 cover. So
 > the blocker is gone and the screenshot tasks below are no longer blocked. The rows that stay
 > **NOT verified** are the ones only a live itch.io page can settle — the embed's sizing, and the
@@ -203,7 +203,7 @@ who feels misled writes a worse comment than one who was warned.
 ## Embed options — measured recommendations
 
 These were measured by rendering the game in real headless Chromium at each viewport
-(`node tools/dev/viewport-check.mjs`), not guessed.
+(`node scripts/dev/viewport-check.mjs`), not guessed.
 
 | itch.io field | Set it to | Why |
 |---|---|---|

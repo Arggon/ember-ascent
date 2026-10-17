@@ -13,7 +13,7 @@
 // is reported even in a file that would never execute in CI.
 //
 // Exit 0 clean, 2 violations. `--json` prints the machine form. Usage:
-//   node tools/check-architecture.mjs [--root <dir>] [--json]
+//   node scripts/check-architecture.mjs [--root <dir>] [--json]
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +30,7 @@ const { values } = parseArgs({
 if (values.help) {
   process.stdout.write(`check-architecture — import-graph gate for R1/R3
 
-usage: node tools/check-architecture.mjs [--root <dir>] [--json]
+usage: node scripts/check-architecture.mjs [--root <dir>] [--json]
 
 rules enforced
   R1a  surface/** must not import kernel/rules/**
@@ -82,13 +82,13 @@ function resolveSpec(fromFile, spec) {
   return relative(root, abs);
 }
 
-const files = [...walk(SRC), ...(existsSync(join(root, 'web')) ? walk(join(root, 'web')) : [])];
+const files = walk(SRC); // the browser surface lives under src/web/ since the repo remap
 const violations = [];
 const warnings = [];
 
 // A surface is anything outside the kernel: the CLI controller layer AND the
-// browser renderer under web/. Both receive data only and may hold no rule.
-const isSurface = (rel) => rel.startsWith('src/surface/') || rel.startsWith('web/');
+// browser renderer under src/web/. Both receive data only and may hold no rule.
+const isSurface = (rel) => rel.startsWith('src/surface/') || rel.startsWith('src/web/');
 const isRules = (rel) => rel.startsWith('src/kernel/rules/');
 const isKernel = (rel) => rel.startsWith('src/kernel/');
 
@@ -113,7 +113,7 @@ for (const file of files) {
     }
 
     // Web renderer is browser code: it may not reach for a Node builtin or the disk.
-    if (rel.startsWith('web/') && isNodeBuiltin(spec)) {
+    if (rel.startsWith('src/web/') && isNodeBuiltin(spec)) {
       violations.push({ rule: 'R1a', file: rel, detail: `web renderer imports node builtin "${spec}"` });
     }
 

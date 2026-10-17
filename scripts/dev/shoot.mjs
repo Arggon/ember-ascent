@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// tools/dev/shoot.mjs — drive the real browser over CDP and capture real screenshots.
+// scripts/dev/shoot.mjs — drive the real browser over CDP and capture real screenshots.
 //
 // WHY THIS EXISTS: the browser tool refuses localhost (`browser_private_target_denied`) and
 // there is no display server, so every visual claim in this project had been checked only by
@@ -11,7 +11,7 @@
 // ZERO dependencies: Chromium's DevTools Protocol is a WebSocket, and Node 24 ships a global
 // WebSocket. No Playwright, no Puppeteer, no npm install.
 //
-// Usage: node tools/dev/shoot.mjs [--base URL] [--out DIR] [--only NAME]
+// Usage: node scripts/dev/shoot.mjs [--base URL] [--out DIR] [--only NAME]
 import { spawn } from 'node:child_process';
 import { mkdirSync, existsSync, rmSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
@@ -24,7 +24,7 @@ const arg = (name, dflt) => {
   const i = args.indexOf(name);
   return i === -1 ? dflt : args[i + 1];
 };
-const BASE = arg('--base', 'http://localhost:5173/web/');
+const BASE = arg('--base', 'http://localhost:5173/src/web/');
 const OUT = resolve(ROOT, arg('--out', 'shots'));
 const ONLY = arg('--only', null);
 // `--size WxH` captures at a phone or tablet viewport instead of the desktop default.

@@ -7,11 +7,11 @@ effects, animations to make the game a live feeling."
 
 | Check | Result |
 |---|---|
-| `node --check web/app.js` / `tokens.js` | clean |
+| `node --check src/web/app.js` / `tokens.js` | clean |
 | `node --test 'tests/**/*.test.js'` | **93 pass / 0 fail** *(as measured at this checkpoint; the suite has grown since — re-run `npm test`, do not quote this as current)* |
-| `node tools/check-architecture.mjs` | OK, exit 0 |
-| `node tools/check-surface-art.mjs` | OK — 99 emitted classes all have CSS rules, 209 distinct top-level selectors, no external assets **[CORRECTED 2026-10-16: these counts are STALE — the checker now reports 126 emitted / 316 distinct. See the correction under §"WHAT I VERIFIED" below. Re-run `node tools/check-surface-art.mjs`.]** |
-| `grep -rniE 'https?://\|cdn\|@import\|googleapis\|\.woff' web/` | **empty** |
+| `node scripts/check-architecture.mjs` | OK, exit 0 |
+| `node scripts/check-surface-art.mjs` | OK — 99 emitted classes all have CSS rules, 209 distinct top-level selectors, no external assets **[CORRECTED 2026-10-16: these counts are STALE — the checker now reports 126 emitted / 316 distinct. See the correction under §"WHAT I VERIFIED" below. Re-run `node scripts/check-surface-art.mjs`.]** |
+| `grep -rniE 'https?://\|cdn\|@import\|googleapis\|\.woff' src/web/` | **empty** |
 
 ---
 
@@ -85,7 +85,7 @@ or `−0`.
 | 1 | Strategy decision, checkpoint file, DOM-shim proof harness | **DONE + verified** |
 | 2 | CSS: keyframes, tokens, all effect rules, reduced-motion coverage | **DONE + verified** |
 | 3 | `index.html`: the two persistent layers | **DONE + verified** |
-| 4 | `web/app.js`: flash generation, bursts, floater/slash builders, render wiring | **DONE + verified** |
+| 4 | `src/web/app.js`: flash generation, bursts, floater/slash builders, render wiring | **DONE + verified** |
 | 5 | P2: death fade-out, enemy entrance, player vignette, HP jolt | **DONE + verified** |
 | 6 | Status pill kind-shapes (vulnerable/weak/strength/dexterity) | **DONE + verified** |
 | 7 | Turn transition (deferred paint, reduced-motion guarded) | **DONE + verified** |
@@ -103,14 +103,14 @@ claims above as claims, and re-run the commands rather than relying on a paste t
 
 - `node --check` on both modules — clean.
 - `node --test 'tests/**/＊.test.js'` — 93 pass / 0 fail, unchanged count.
-- `node tools/check-architecture.mjs` — OK, exit 0. No game rules entered `web/`.
-- `node tools/check-surface-art.mjs` — OK. Every emitted class has a CSS rule, no duplicate
+- `node scripts/check-architecture.mjs` — OK, exit 0. No game rules entered `src/web/`.
+- `node scripts/check-surface-art.mjs` — OK. Every emitted class has a CSS rule, no duplicate
   top-level selectors, no external assets.
-- No `https?://`, `cdn`, `@import`, `googleapis`, `.woff` anywhere under `web/`.
+- No `https?://`, `cdn`, `@import`, `googleapis`, `.woff` anywhere under `src/web/`.
 - Reduced motion: `prefers-reduced-motion` block present, and the new animations are listed
   in it.
-- **The repaint problem, in a real DOM shim running the real `web/app.js`**
-  (`tools/dev/juice-effects.mjs`): after an action the floater node exists, is attached
+- **The repaint problem, in a real DOM shim running the real `src/web/app.js`**
+  (`scripts/dev/juice-effects.mjs`): after an action the floater node exists, is attached
   inside `.enemies`, and carries the *hit enemy's* `data-enemy-idx`; with a reduced-motion
   flag the same action produces **zero** floaters and no `damaged` class.
 - **No layout shift from the hit reaction**: `.damaged` animates `filter`, and the class
@@ -119,21 +119,21 @@ claims above as claims, and re-run the commands rather than relying on a paste t
 **Could not verify — for a reason that was FALSE and is now withdrawn:**
 
 > **CORRECTION 2026-10-16.** This heading read *"no browser exists in this environment."* **It
-> does.** `chromium 152.0.7977.82` and `firefox` are on PATH, `tools/dev/shoot.mjs` drives
+> does.** `chromium 152.0.7977.82` and `firefox` are on PATH, `scripts/dev/shoot.mjs` drives
 > headless Chromium over CDP with **zero dependencies**, and `node --headless --screenshot` was
 > verified working this run. This disclaimer actively suppressed verification of a class of claim
 > that **is** verifiable, so it has been removed as a reason. The *gaps* below were real; the
 > *explanation* was not. The question is "was it captured?", not "is it possible to capture?"
 
 - **The animations *look* right.** *Not captured.* **Method:** capture a frame sequence with
-  `node tools/dev/shoot.mjs` (the worked example is the death beat now photographed at
+  `node scripts/dev/shoot.mjs` (the worked example is the death beat now photographed at
   `shots/pm-verify/death/death-000ms.png` … `-450ms.png`). **Still not provable from frames — and
   this caveat is kept:** whether the easing *reads well*, and the compositor frame rate. Frames
   prove the visual change exists and is in the right place; they do not prove taste or fps. An
   honest fps number needs a media-timing trace, which has not been run.
 - **Real `getBoundingClientRect()` geometry.** *Closable, and was not closed.* The DOM shim has no
   layout engine, but **real Chromium does** — that is exactly what the harness runs. **Method:**
-  read `getBoundingClientRect()` inside `tools/dev/shoot.mjs`'s CDP session, which is a
+  read `getBoundingClientRect()` inside `scripts/dev/shoot.mjs`'s CDP session, which is a
   *measurement* rather than the static proxy ("no layout/transform-affecting property is
   animated") used here.
 - **`prefers-reduced-motion` as a live media query.** *Not captured.* The shim injects a flag
@@ -158,16 +158,16 @@ P3 only, in this order — each is independent and small:
    NOT the fix.** The text below said a dead enemy "cannot" be animated because `snap.enemies`
    drops it, and that `prevEnemies` is "the one piece of state to add". **Both statements are
    wrong, verified against the source and against captured frames:**
-   - **The mechanism is present and shipped.** `web/app.js:636-639` pushes a `death` burst when an
-     enemy leaves the snapshot; `web/app.js:1244` draws it as `.enemy.is-dying` after the
-     `switch`; `web/style.css:1506` styles it (`animation: juice-shatter 0.5s ease-in both`).
+   - **The mechanism is present and shipped.** `src/web/app.js:636-639` pushes a `death` burst when an
+     enemy leaves the snapshot; `src/web/app.js:1244` draws it as `.enemy.is-dying` after the
+     `switch`; `src/web/style.css:1506` styles it (`animation: juice-shatter 0.5s ease-in both`).
    - **The behaviour is now VERIFIED BY FRAME, not merely present in source.** A real collapse was
      captured and the frames are at `shots/pm-verify/death/` — `death-000ms.png`, `death-150ms.png`,
      `death-300ms.png`, `death-450ms.png`, plus `death-context-300ms.png`. This is the "capture a
      frame sequence" method above, applied.
    - **The fix landed by snapshot-diff, not by `prevEnemies`.** The renderer computes departures by
      diffing before/after in `act()` (`.filter((e) => !after.enemies.some(...))`).
-   - **`prevEnemies` is DEAD CODE.** Declared `web/app.js:127`, reset `:734`, assigned `:1077`, and
+   - **`prevEnemies` is DEAD CODE.** Declared `src/web/app.js:127`, reset `:734`, assigned `:1077`, and
      **never read** — grep for `prevEnemies` returns only those three sites. It is residue of the
      superseded approach and should be deleted deliberately, so no future agent mistakes it for
      the death-beat fix.

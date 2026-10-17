@@ -1,4 +1,4 @@
-// web/tokens.js — measure the observation's payload tokens for the on-screen badge.
+// src/web/tokens.js — measure the observation's payload tokens for the on-screen badge.
 //
 // This exists so a human can SEE the product claim ("the agent-facing observation is
 // cheap") next to the game: the same number tests/golden/budget.test.js enforces.
@@ -18,7 +18,7 @@ let cache = null;
 export async function measure(text) {
   try {
     if (cache === null) {
-      const mod = await import('../src/surface/tokens.js');
+      const mod = await import('../surface/tokens.js');
       cache = mod.countWorst;
     }
     if (typeof cache !== 'function') return null;

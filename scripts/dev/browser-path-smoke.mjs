@@ -1,4 +1,4 @@
-// Replicates what web/app.js does: controller -> snapshot -> dispatch
+// Replicates what src/web/app.js does: controller -> snapshot -> dispatch
 const { createController } = await import('./src/surface/gui/controller.js');
 const ctl = createController({ run: { seed: 42 } });
 let steps = 0;

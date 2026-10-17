@@ -6,10 +6,10 @@
 # the interactive loop: show state, list actions, read one choice, repeat.
 #
 # usage:
-#   ./play.sh                 start a new game at a random-ish seed
-#   ./play.sh --seed 42       start at a specific seed (seeds are reproducible)
-#   ./play.sh --auto          play itself, first legal action every turn (zero typing)
-#   ./play.sh --character ironclad --difficulty 0
+#   ./scripts/play.sh                 start a new game at a random-ish seed
+#   ./scripts/play.sh --seed 42       start at a specific seed (seeds are reproducible)
+#   ./scripts/play.sh --auto          play itself, first legal action every turn (zero typing)
+#   ./scripts/play.sh --character ironclad --difficulty 0
 #
 # Inside a game:
 #   type an action id (p1, e1, c, s2, n1) and press Enter
@@ -61,7 +61,7 @@ start_new() {
   else
     # No seed given: pick one from the clock so runs vary, then print it so it can be replayed.
     SEED=$(( (RANDOM << 15 | RANDOM) % 100000000 ))
-    echo "seed $SEED  (replay this run with: ./play.sh --seed $SEED)"
+    echo "seed $SEED  (replay this run with: ./scripts/play.sh --seed $SEED)"
     $DLB new --seed "$SEED" --character "$CHARACTER" --difficulty "$DIFFICULTY" --run "$RUN_FILE"
   fi
 }
@@ -92,7 +92,7 @@ while : ; do
     else
       # The slice does not write an action log on `play` yet, so do not promise one.
       echo "=== run finished ==="
-      echo "    reproducible from its seed:  ./play.sh --seed ${SEED:-<seed printed above>}"
+      echo "    reproducible from its seed:  ./scripts/play.sh --seed ${SEED:-<seed printed above>}"
     fi
     break
   fi

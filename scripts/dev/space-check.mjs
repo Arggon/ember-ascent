@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// tools/dev/space-check.mjs — measure UNUSED space on the pages players actually see.
+// scripts/dev/space-check.mjs — measure UNUSED space on the pages players actually see.
 //
 // The owner reported "a lot of black space at the bottom" on a tall phone (Galaxy S25+,
 // 412x915). The layout is content-height and top-aligned, so on a tall viewport everything
@@ -11,21 +11,21 @@
 // past the fold / the page must scroll). This harness EXITS 1 when any row has negative
 // wastePx, 0 otherwise. It does not invent any other threshold.
 //
-// Seed pinning: this harness requests /web/index.html?seed=N directly. tools/serve.mjs
+// Seed pinning: this harness requests /src/web/index.html?seed=N directly. scripts/serve.mjs
 // 301-redirects /web/?seed=N to /web/?seed=N/ (slash appended INSIDE the query), which makes
-// web/app.js seedFromUrl() compute Number("11/") = NaN and fall back to a random seed. After
+// src/web/app.js seedFromUrl() compute Number("11/") = NaN and fall back to a random seed. After
 // load the harness reads the seed the app itself reports from the "New Run" button title
-// ("New run (seed NNNNNN) — keyboard: n", see web/app.js) and fails the row when it does not
+// ("New run (seed NNNNNN) — keyboard: n", see src/web/app.js) and fails the row when it does not
 // equal the requested seed.
 //
 // Usage:
-//   node tools/dev/space-check.mjs                          # default matrix, seed 11
-//   node tools/dev/space-check.mjs --seeds 1-12             # seed range
-//   node tools/dev/space-check.mjs --seeds 3,7,11           # seed list (ranges may mix)
-//   node tools/dev/space-check.mjs --sizes 1366x768,915x412 # subset of SIZES
-//   node tools/dev/space-check.mjs --sizes 360x640@130,412x915@130 # large-font rows (text-scale.mjs)
-//   node tools/dev/space-check.mjs --port 9400                # own DevTools port + profile
-//   node tools/dev/space-check.mjs --base 'http://localhost:5173/web/index.html?seed={seed}'
+//   node scripts/dev/space-check.mjs                          # default matrix, seed 11
+//   node scripts/dev/space-check.mjs --seeds 1-12             # seed range
+//   node scripts/dev/space-check.mjs --seeds 3,7,11           # seed list (ranges may mix)
+//   node scripts/dev/space-check.mjs --sizes 1366x768,915x412 # subset of SIZES
+//   node scripts/dev/space-check.mjs --sizes 360x640@130,412x915@130 # large-font rows (text-scale.mjs)
+//   node scripts/dev/space-check.mjs --port 9400                # own DevTools port + profile
+//   node scripts/dev/space-check.mjs --base 'http://localhost:5173/src/web/index.html?seed={seed}'
 // The old --base override still works (a base containing seed= is re-seeded per seed).
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync, mkdirSync } from 'node:fs';
@@ -84,7 +84,7 @@ const SIZES = [
   [844, 390, 'iphone-14-landscape'],
   [1200, 450, 'short-window'],
 ];
-// Every 100% row, then the large-font rows (tools/dev/text-scale.mjs: Gonzalo's rule, every
+// Every 100% row, then the large-font rows (scripts/dev/text-scale.mjs: Gonzalo's rule, every
 // build at 360-412dp with 130% text). --sizes takes "360x640" for 100% and "360x640@130".
 const MATRIX = [...SIZES.map(([w, h, label]) => [w, h, label, 1]), ...LARGE_FONT_SIZES];
 const SIZES_SEL = sizesArg
@@ -92,7 +92,7 @@ const SIZES_SEL = sizesArg
   : MATRIX;
 if (!SIZES_SEL.length) { console.error('no sizes matched --sizes ' + sizesArg); process.exit(2); }
 
-const DEFAULT_BASE = 'http://localhost:5173/web/index.html?seed={seed}';
+const DEFAULT_BASE = 'http://localhost:5173/src/web/index.html?seed={seed}';
 const BASE_TEMPLATE = baseArg || DEFAULT_BASE;
 const SEED_IN_URL = BASE_TEMPLATE.includes('{seed}') || /([?&])seed=/.test(BASE_TEMPLATE);
 function urlFor(seed) {
@@ -184,7 +184,7 @@ for (const [w, h, label, scale] of SIZES_SEL) {
       const rEnemies = rect(document.querySelector('.enemies'));
       const rHandTop = rect(document.querySelector('.hand'));
       const gap = (rEnemies && rHandTop) ? Math.round(rHandTop.top - rEnemies.bottom) : null;
-      // The seed the app itself reports (web/app.js sets this title from snap.seed).
+      // The seed the app itself reports (src/web/app.js sets this title from snap.seed).
       const newRun = [...document.querySelectorAll('button')].find(b => /New run \\(seed \\d+\\)/.test(b.title||''));
       const seedMatch = newRun ? /seed (\\d+)/.exec(newRun.title) : null;
       const seedReported = seedMatch ? Number(seedMatch[1]) : null;

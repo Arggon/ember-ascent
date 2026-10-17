@@ -23,7 +23,7 @@
 // CLI splits it out of argv, and JSONL logs must not depend on shell quoting. It costs
 // no interface tokens either way — measured with the repo's own countWorst, `p2 1` and
 // `p2_1` are both 4 tokens, over the full census:
-//   $ node tools/dev/measure-action-shapes.mjs
+//   $ node scripts/dev/measure-action-shapes.mjs
 //   7 PASS "p10 sword_boomerang"   <- current single-enemy line, unchanged
 //   ...
 //

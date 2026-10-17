@@ -1,4 +1,4 @@
-// tools/dev/targeting-smoke.mjs — drive web/app.js against a tiny fake DOM and PROVE the
+// scripts/dev/targeting-smoke.mjs — drive src/web/app.js against a tiny fake DOM and PROVE the
 // targeting states, without a browser.
 //
 // There is no browser in this environment, so this is the closest thing to evidence that
@@ -8,7 +8,7 @@
 // before the player has chosen an enemy, and that a one-enemy fight asks for no target.
 //
 // The pattern (fake DOM + `new Function` over a stripped app.js) is copied from
-// tools/dev/render-reward.mjs, with a real selector engine so assertions mean something.
+// scripts/dev/render-reward.mjs, with a real selector engine so assertions mean something.
 import { readFileSync } from 'node:fs';
 
 /* ------------------------------------------------------------------ a fake DOM */
@@ -120,12 +120,12 @@ globalThis.URLSearchParams = URLSearchParams;
 /* ------------------------------------------------------------- the app under test */
 
 const HERE = new URL('../../', import.meta.url);
-const src = readFileSync(new URL('web/app.js', HERE), 'utf8')
+const src = readFileSync(new URL('src/web/app.js', HERE), 'utf8')
   .replace(/^import .*$/gm, '');
 const ctlMod = await import(new URL('src/surface/gui/controller.js', HERE));
 
 /**
- * Build a fresh instance of web/app.js driving `ctl`.
+ * Build a fresh instance of src/web/app.js driving `ctl`.
  * The tokenizer import is stripped with the rest of the imports, so a stub stands in for
  * it: token measurement is not what this test is about.
  *
@@ -428,7 +428,7 @@ if (A0) {
     // This is the blocked-on-the-sibling path. The UI did its part; the engine in the tree
     // does not accept `p<N> <k>` yet. Assert only what is mine: no damage is claimed, and
     // no enemy is shown as hit.
-    check('the engine rejects "<slot> <target>" (see TARGETING-UI-STATUS.md — the two-arg form is not in the kernel yet)', true,
+    check('the engine rejects "<slot> <target>" (see docs/status/TARGETING-UI-STATUS.md — the two-arg form is not in the kernel yet)', true,
       'illegal_action');
     check('the UI does not claim damage that did not happen',
       damaged.length === 0 && !/Dealt /.test(byId.get('toast').textContent),

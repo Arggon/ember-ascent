@@ -226,7 +226,7 @@ Also available: `--format json`, `--format csv`, `--from` any `sim` output direc
 
 ```bash
 node --test 'tests/**/*.test.js'   # 45 pass / 0 fail
-node tools/check-architecture.mjs  # OK — no R1/R3 violations
+node scripts/check-architecture.mjs  # OK — no R1/R3 violations
 ```
 
 Independently re-run and confirmed: **45 tests pass, 0 fail**; the architecture gate scans 20 files and reports no violations — and **fails with exit 2** when a surface file is made to import a rules module, which is what keeps the GUI and CLI from silently diverging.
@@ -238,7 +238,7 @@ Independently re-run and confirmed: **45 tests pass, 0 fail**; the architecture 
 - **The fun gate is open.** 40 cards, one act, one character play; ~40-100 minutes of content. Balance is *not* tuned — the greedy policy wins ~2% and that is a policy finding, not a verdict on the game.
 - **No renderer yet.** The GUI *controller* exists and is exercised by the dual-surface tests; the visual layer is phase 6.
 - **Content is 40 cards, not 120-150.** Scaling is gated on the human fun verdict.
-- `tools/measure-tokens.mjs` is a dev spike holding **stale hand-written sample strings**; the real ceilings are enforced on engine output by `tests/budget.test.js`.
+- `scripts/measure-tokens.mjs` is a dev spike holding **stale hand-written sample strings**; the real ceilings are enforced on engine output by `tests/budget.test.js`.
 - A harmless re-export shim remains at `src/kernel/rules/effects.js` (it could not be deleted — destructive commands are blocked).
 - `package.json` contains a `js-tiktoken` devDependency line that trips a secret-scanner false positive on writes. It is a dev-only dependency; the shipped engine has **zero runtime dependencies**.
 

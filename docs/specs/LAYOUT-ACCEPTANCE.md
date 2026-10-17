@@ -1,8 +1,8 @@
 # LAYOUT-ACCEPTANCE — viewport fit contract (frozen)
 
 **Owner:** Product Manager. **Status:** frozen — changes require a PM revision.
-**Date:** 2026-10-14. **Supersedes:** the informal goal in `LAYOUT-STATUS.md` §2–§4.
-**Scope boundary:** `web/` and `tools/dev/` only. No `src/`, no balance, no CLI output changes.
+**Date:** 2026-10-14. **Supersedes:** the informal goal in `../status/LAYOUT-STATUS.md` §2–§4.
+**Scope boundary:** `src/web/` and `scripts/dev/` only. No `src/`, no balance, no CLI output changes.
 
 This exists because the previous attempt had no acceptance contract and no failing gate, so it
 chased its own tail: a fix for one viewport produced a regression at another, and the
@@ -13,7 +13,7 @@ instrument that was supposed to say "pass" could not say "fail".
 ## 1. Problem
 
 **Actor.** A player who opens the combat screen. Three real cases are in play, all measured this
-run with the page's seed genuinely pinned (`/web/index.html?seed=11`, Chromium
+run with the page's seed genuinely pinned (`/src/web/index.html?seed=11`, Chromium
 `Chrome/152.0.7977.82`, dpr 1, `--hide-scrollbars`):
 
 | viewport | End Turn rect (top→bottom) | page scroll | hand rows | `#stage` clipped |
@@ -35,8 +35,8 @@ is `@media (max-width: 620px), (max-height: 480px)` and the five media blocks a 
 unclosed have since been closed — so the file is syntactically sound and the phone case is real.
 
 **Root cause of the thrash (this is the load-bearing finding).** The instrument was lying. Both
-harnesses navigate to `http://localhost:5173/web/?seed=11`; `tools/serve.mjs` 301-redirects that
-to `/web/?seed=11/`, appending the slash to the **query**, so `web/app.js` does
+harnesses navigate to `http://localhost:5173/src/web/?seed=11`; `scripts/serve.mjs` 301-redirects that
+to `/src/web/?seed=11/`, appending the slash to the **query**, so `src/web/app.js` does
 `Number("11/") → NaN`, fails `Number.isInteger`, and falls back to
 `Math.floor(Math.random() * 1000000)`. Measured: four consecutive loads reported seeds
 777695 / 413864 / 977312 / 571239; pointed at `index.html?seed=11` they all reported seed 11.
@@ -64,7 +64,7 @@ at load, with no page scroll, at every seed in the tested range. Measured by a h
   acceptance condition fails. *Reason: without this, "fixed" is unfalsifiable and the same
   argument repeats. This is the acceptance instrument for everything else in this list.*
 - A recorded rollback point for every file changed (there is no git repo here; the workspace
-  practice is a copy on disk, as in `ux-fix-backup/`). *Reason: the last attempt was abandoned
+  practice is a copy on disk, as in `archive/ux-fix-backup/`). *Reason: the last attempt was abandoned
   mid-edit with no way back.*
 
 **Out**
@@ -218,7 +218,7 @@ Each with the default I would ship without an answer.
    "short height", not "narrow width". *Default: the shortest-height-safe change that passes all
    four viewports plus the seed range — engineer's call, not mine. I only fix the observable.*
 2. **Harness-only seed fix, or also harden `seedFromUrl()`?** *Default: harness requests
-   `web/index.html?seed=…` directly (test-only, no product code touched) and the app-side
+   `src/web/index.html?seed=…` directly (test-only, no product code touched) and the app-side
    tolerance is deferred.*
 3. **Should the 360×640 in-card clip block this release?** *Default: no — deferred, since its
    axis is still unverified and it is a different defect class.*
@@ -234,7 +234,7 @@ Each with the default I would ship without an answer.
 
 - **2026-10-16 — v2/1 scene illustrations (owner-approved layout change).** Reward and rest
   screens gain a header illustration (`.scene-illus`). The combat contract above is unchanged
-  and `tools/dev/viewport-check.mjs` still reports ALL PASS (9 rows). New, non-gated expectation
+  and `scripts/dev/viewport-check.mjs` still reports ALL PASS (9 rows). New, non-gated expectation
   for those two screens: at 1440×900 and 915×412 with a pinned seed, the whole reward and rest
   panel fits the window with no page scroll. At `max-height: 480px` the illustration is a
   64px banner, the rest screen's ember ring and section title are dropped, and its spacing is

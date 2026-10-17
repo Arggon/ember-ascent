@@ -1,6 +1,6 @@
-// tools/measure-tokens.mjs — dev-only payload-token measurement (R9a).
+// scripts/measure-tokens.mjs — dev-only payload-token measurement (R9a).
 // Measures the WORST of o200k_base and cl100k_base for a payload. Never run by the game.
-// Usage: node tools/measure-tokens.mjs            -> spike (phase-3 format validation)
+// Usage: node scripts/measure-tokens.mjs            -> spike (phase-3 format validation)
 //        import { countWorst } from this file      -> tests/golden budgets use it directly.
 import { Tiktoken } from 'js-tiktoken/lite';
 import o200k from 'js-tiktoken/ranks/o200k_base';

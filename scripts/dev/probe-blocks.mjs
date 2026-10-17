@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// tools/dev/probe-blocks.mjs — where does the vertical space actually go?
+// scripts/dev/probe-blocks.mjs — where does the vertical space actually go?
 // Prints the height of each combat-screen block at several viewports so the strategy
 // for spending spare height is chosen from measurements, not from taste.
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 
 const PORT = 9340 + (process.pid % 100), PROFILE = '/tmp/dlb-probe-blocks-' + process.pid;
-const BASE = process.argv[2] || 'http://localhost:5173/web/?seed=11';
+const BASE = process.argv[2] || 'http://localhost:5173/src/web/?seed=11';
 const SIZES = [
   [412, 915, 'galaxy-s25plus'],
   [360, 640, 'phone-small'],

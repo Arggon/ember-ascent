@@ -1,7 +1,7 @@
 # 915x412 / 844x390 fix — precise edit + verification report
 
-Scope: `web/style.css` only. No `src/`, no harness thresholds, no `layout-fix-backup/`,
-no `LAYOUT-ACCEPTANCE.md`. No JS, no HTML, no `!important` added, one scoped media query.
+Scope: `src/web/style.css` only. No `src/`, no harness thresholds, no `archive/layout-fix-backup/`,
+no `../specs/LAYOUT-ACCEPTANCE.md`. No JS, no HTML, no `!important` added, one scoped media query.
 
 ---
 
@@ -13,7 +13,7 @@ End Turn DOWN rather than up." **That model is wrong, and the fix depends on kno
 Two corrections, both measured:
 
 **1a. There is no `margin-bottom: auto` elastic band.** `grep -n "margin-bottom: auto"
-web/style.css` returns nothing on a rule — the only hit is prose inside the HEIGHT STRATEGY
+src/web/style.css` returns nothing on a rule — the only hit is prose inside the HEIGHT STRATEGY
 comment (line ~2202). The actual DISTRIBUTE lever is:
 
 ```css
@@ -73,11 +73,11 @@ kids: enemies=102 hand=151 controls=40  docH=433 scroll=21
 line touched. Both changes are inside the comment style already used in this file, and extend
 the existing comment blocks rather than adding detached prose.
 
-### Hunk 1 — `web/style.css` lines 2146-2156 (comment only, inside the laptop-tier block)
+### Hunk 1 — `src/web/style.css` lines 2146-2156 (comment only, inside the laptop-tier block)
 Extends the existing `min-width: 901px / max-height: 830px` header to record the overlap:
 10 lines of comment added, **zero declarations changed**. The at-rule itself is untouched.
 
-### Hunk 2 — `web/style.css` lines 2186-2234 (replaces the old band; adds the fix)
+### Hunk 2 — `src/web/style.css` lines 2186-2234 (replaces the old band; adds the fix)
 ```diff
 -@media (max-height: 500px) {
 -  #app { padding-bottom: 8px; }
@@ -110,7 +110,7 @@ those same values) for the short case only. No new typography, no `!important`, 
 
 ### Loop 1 (the loop) — exit 0
 ```
-node tools/dev/viewport-check.mjs --sizes 1366x768,1280x800,915x412,1200x450,844x390 --seeds 1,3,7,11
+node scripts/dev/viewport-check.mjs --sizes 1366x768,1280x800,915x412,1200x450,844x390 --seeds 1,3,7,11
 ```
 ```
 size         label            seed  reported  eTbot/vh  clear  scrollPx  handRows  onTop  result
@@ -142,7 +142,7 @@ Zero FAIL lines. Every row ≥ 8px clearance, 0 scroll.
 
 ### Loop 2 (no-regress, rest of matrix) — exit 0
 ```
-node tools/dev/viewport-check.mjs --sizes 360x640,390x844,414x896,768x1024 --seeds 1,3,7,11
+node scripts/dev/viewport-check.mjs --sizes 360x640,390x844,414x896,768x1024 --seeds 1,3,7,11
 ```
 ```
 360x640  seeds 1,3,7,11 -> 626/640 clear 14, scroll 0, 1 row  pass
@@ -156,7 +156,7 @@ EXIT=0
 
 ### Loop 3 (space check) — exit 0
 ```
-node tools/dev/space-check.mjs --seeds 11
+node scripts/dev/space-check.mjs --seeds 11
 ```
 ```
 412x915    waste  24px  3%    pass        915x412    waste 14px  3%  pass
@@ -219,12 +219,12 @@ mechanism, so the result is seed-independent rather than tuned to a lucky draw.
 | in-file comment style extended | ✔ both comment blocks extended in place |
 | `src/` untouched | ✔ not opened |
 | harness thresholds untouched | ✔ `viewport-check.mjs` / `space-check.mjs` unmodified |
-| `layout-fix-backup/`, `LAYOUT-ACCEPTANCE.md` untouched | ✔ not opened |
+| `archive/layout-fix-backup/`, `../specs/LAYOUT-ACCEPTANCE.md` untouched | ✔ not opened |
 | no full `--seeds 1-12` sweep | ✔ used `--seeds 1,3,7,11` (plus a 6-seed spot check) |
 
 Sanity checks run: brace balance `final depth 0`; `!important` count unchanged in the regions
-I touched. `tools/dev/css-parse-probe.mjs` still reports one pre-existing parse error at
-`web/style.css:118:18` (`column-gap: 8px` missing a semicolon). **This is not mine** — the byte
+I touched. `scripts/dev/css-parse-probe.mjs` still reports one pre-existing parse error at
+`src/web/style.css:118:18` (`column-gap: 8px` missing a semicolon). **This is not mine** — the byte
 offset and line are identical in the pre-edit backup (`/tmp/style.css.orig`, md5 `fe8b56ac…`),
 and it is ~2000 lines from anything I changed.
 
@@ -232,11 +232,11 @@ and it is ~2000 lines from anything I changed.
 
 ## 6. Open items for whoever owns them
 
-1. **Leftover temp probe not deleted.** I added `tools/dev/probe-eleven.mjs` (diagnostic only,
-   read-only w.r.t. `web/style.css`). My `rm` was blocked by the safety guard
+1. **Leftover temp probe not deleted.** I added `scripts/dev/probe-eleven.mjs` (diagnostic only,
+   read-only w.r.t. `src/web/style.css`). My `rm` was blocked by the safety guard
    (`File delete command` requires owner approval), so it is still on disk. It is not imported
    by anything. Please delete it, or approve the removal.
-2. **Pre-existing parse error at `web/style.css:118`** (missing semicolon after
+2. **Pre-existing parse error at `src/web/style.css:118`** (missing semicolon after
    `column-gap: 8px`) is real and unrelated; worth a separate one-character fix, but it is out
    of this task's scope.
 3. **QA owns the full sweep.** I did not run `--seeds 1-12` or screenshots beyond what the two

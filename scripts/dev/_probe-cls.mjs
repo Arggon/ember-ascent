@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const appSrc = readFileSync(join(ROOT, 'web/app.js'), 'utf8');
-const cssSrc = readFileSync(join(ROOT, 'web/style.css'), 'utf8');
+const appSrc = readFileSync(join(ROOT, 'src/web/app.js'), 'utf8');
+const cssSrc = readFileSync(join(ROOT, 'src/web/style.css'), 'utf8');
 
 // The cls VALUE: from just after `cls:` up to the first bracket at depth 0 (the `}` that
 // closes the options object, or the `,` that ends the argument).

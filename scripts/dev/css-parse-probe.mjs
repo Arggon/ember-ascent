@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// tools/dev/css-parse-probe.mjs — does web/style.css actually parse, and is the tail intact?
+// scripts/dev/css-parse-probe.mjs — does src/web/style.css actually parse, and is the tail intact?
 import { readFileSync } from 'node:fs';
 import postcss from 'postcss';
-const css = readFileSync(new URL('../../web/style.css', import.meta.url), 'utf8');
+const css = readFileSync(new URL('../../src/web/style.css', import.meta.url), 'utf8');
 console.log('bytes:', css.length, 'lines:', css.split('\n').length);
 let root;
 try {
-  root = postcss.parse(css, { from: 'web/style.css' });
+  root = postcss.parse(css, { from: 'src/web/style.css' });
   console.log('parsed OK');
 } catch (e) {
   console.log('PARSE ERROR:', e.message);

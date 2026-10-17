@@ -1,4 +1,4 @@
-// tools/dev/measure-action-shapes.mjs — dev-only spike measuring candidate R5 action-line
+// scripts/dev/measure-action-shapes.mjs — dev-only spike measuring candidate R5 action-line
 // shapes for targeted plays against the FROZEN 8-token action-line ceiling (R9a).
 //
 // Why this exists: the frozen interface change wants `p2 1` for the multi-enemy case, but

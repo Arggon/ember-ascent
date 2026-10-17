@@ -1,37 +1,37 @@
 #!/usr/bin/env node
-// tools/build-release.mjs — regenerate the itch.io HTML5 release artifact.
+// scripts/build-release.mjs — regenerate the itch.io HTML5 release artifact.
 //
 // ZERO dependencies (node:fs, node:path, node:zlib only), Node 24, DETERMINISTIC:
 // running it twice from the same checkout produces byte-identical output and the
-// same file count / total size. It never writes inside web/ or src/.
+// same file count / total size. It never writes inside src/web/ or src/.
 //
 // WHAT IT PRODUCES (default: ../release/, overridable with OUT=...):
 //
 //   release/                        <- the artifact directory
-//     index.html                    <- web/index.html, FLATTENED to the artifact root
-//     app.js                        <- web/app.js, one import path rewritten (see below)
-//     style.css                     <- web/style.css, verbatim
-//     tokens.js                     <- web/tokens.js, verbatim
+//     index.html                    <- src/web/index.html, FLATTENED to the artifact root
+//     app.js                        <- src/web/app.js, one import path rewritten (see below)
+//     style.css                     <- src/web/style.css, verbatim
+//     tokens.js                     <- src/web/tokens.js, verbatim
 //     src/...                       <- the rest of the import closure, verbatim
-//     tools/serve.mjs               <- copy for the documented run-locally command
+//     tools/serve.mjs               <- copy of scripts/serve.mjs for the documented run-locally command
 //     HOW-TO-RUN-LOCALLY.txt        <- generated
 //   deckbuilder-demo.zip            <- the exact file the owner uploads to itch.io
 //
 // WHY THE FLATTEN: itch.io's HTML5 player serves the zip root as the game's web
-// root, so the entry must be at the top level, not nested under web/.
+// root, so the entry must be at the top level, not nested under src/web/.
 //
-// WHY app.js IS THE ONE REWRITTEN FILE: web/app.js imports '../src/surface/gui/
-// controller.js'. From web/ that resolves to <repo>/src/...; once app.js sits at the
+// WHY app.js IS REWRITTEN: src/web/app.js imports '../surface/gui/
+// controller.js'. From src/web/ that resolves to <repo>/src/...; once app.js sits at the
 // artifact root the same text would resolve OUTSIDE the artifact and 404. The copy
 // rewrites that one specifier to './src/surface/gui/controller.js'. The original
-// under web/ is never touched.
+// under src/web/ is never touched.
 //
-// WHY src/surface/tokens.js IS SHIPPED EVEN THOUGH IT IS OPTIONAL: web/tokens.js
+// WHY src/surface/tokens.js IS SHIPPED EVEN THOUGH IT IS OPTIONAL: src/web/tokens.js
 // does `await import('../src/surface/tokens.js')` inside a try/catch for the on-screen
 // token badge. In a browser that module then fails on its own bare 'js-tiktoken'
 // specifier, the catch swallows it, and the badge shows its no-encoder state. Shipping
 // the file means the failure is the intended, tested "no encoder in this host" path
-// instead of an unexpected 404, and it is what web/app.js unconditionally names. 3 KB.
+// instead of an unexpected 404, and it is what src/web/app.js unconditionally names. 3 KB.
 //
 // WHY src/surface/gui/renderer.js IS *NOT* SHIPPED: controller.js resolves it with
 // `await import('./renderer.js')` inside a try/catch. The file does not exist anywhere
@@ -42,8 +42,8 @@
 // upload file can be regenerated and its hash checked on any machine with Node.
 //
 // Usage:
-//   node tools/build-release.mjs                  # -> ./release + ./deckbuilder-demo.zip
-//   OUT=/tmp/foo node tools/build-release.mjs     # -> /tmp/foo + /tmp/foo.zip
+//   node scripts/build-release.mjs                  # -> ./release + ./deckbuilder-demo.zip
+//   OUT=/tmp/foo node scripts/build-release.mjs     # -> /tmp/foo + /tmp/foo.zip
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
@@ -56,15 +56,15 @@ const ZIP = OUT.endsWith('.zip') ? OUT : `${OUT}.zip`;
 
 // ---------------------------------------------------------------------------
 // The import closure (Task 1). Derived by following every static and dynamic
-// ES module specifier from web/index.html; the method and the raw scan output
+// ES module specifier from src/web/index.html; the method and the raw scan output
 // are recorded in RELEASE-STATUS.md. Sources are repo-relative, destinations
 // artifact-relative.
 // ---------------------------------------------------------------------------
 const CLOSURE = Object.freeze([
-  ['web/index.html', 'index.html'],
-  ['web/app.js', 'app.js'],
-  ['web/style.css', 'style.css'],
-  ['web/tokens.js', 'tokens.js'],
+  ['src/web/index.html', 'index.html'],
+  ['src/web/app.js', 'app.js'],
+  ['src/web/style.css', 'style.css'],
+  ['src/web/tokens.js', 'tokens.js'],
   ['src/surface/gui/controller.js', 'src/surface/gui/controller.js'],
   ['src/surface/session.js', 'src/surface/session.js'],
   ['src/surface/tokens.js', 'src/surface/tokens.js'],
@@ -86,18 +86,24 @@ const CLOSURE = Object.freeze([
   ['src/kernel/rules/effects/index.js', 'src/kernel/rules/effects/index.js'],
 ]);
 
-// The only content rewrite in the whole build: one specifier, in one file.
+// The only content rewrites in the whole build: import specifiers in app.js and tokens.js.
 const REWRITES = Object.freeze([
-  { dest: 'app.js', from: "'../src/surface/gui/controller.js'", to: "'./src/surface/gui/controller.js'" },
+  { dest: 'app.js', from: "'../surface/gui/controller.js'", to: "'./src/surface/gui/controller.js'" },
+  // Since the repo remap, src/web/ is a sibling of src/kernel and src/surface, so the
+  // source specifiers are '../kernel/...' / '../surface/...'. Map them back to the exact
+  // strings the artifact has always shipped so release/ stays byte-identical.
+  { dest: 'app.js', from: "'../kernel/index.js'", to: "'../src/kernel/index.js'" },
+  { dest: 'index.html', from: 'href="../../assets/fonts/fonts.css"', to: 'href="./fonts/fonts.css"' },
+  { dest: 'tokens.js', from: "'../surface/tokens.js'", to: "'../src/surface/tokens.js'" },
 ]);
 
 // serve.mjs derives its doc root from `new URL('..')`, so it must sit one level
-// down in the artifact. Its printed banner says "/web/"; once flattened it must say
-// "/" or the note points at a 404. Source under tools/ is not modified.
-const SERVE_DEST = 'tools/serve.mjs';
+// down in the artifact. Its printed banner says "/src/web/"; once flattened it must say
+// "/" or the note points at a 404. Source under scripts/ is not modified.
+const SERVE_DEST = 'tools/serve.mjs'; // path INSIDE the artifact (unchanged); source is scripts/serve.mjs
 const SERVE_REWRITES = Object.freeze([
-  ['${base}/web/', '${base}/'],
-  ['/web/   ·', '/   ·'],
+  ['${base}/src/web/', '${base}/'],
+  ['/src/web/   ·', '/   ·'],
 ]);
 
 const RUN_LOCALLY = `HOW TO RUN THIS GAME LOCALLY
@@ -258,7 +264,7 @@ function main() {
     put(destRel, Buffer.from(text, 'utf8'));
   }
 
-  const serveSrc = readFileSync(join(REPO, 'tools', 'serve.mjs'), 'utf8');
+  const serveSrc = readFileSync(join(REPO, 'scripts', 'serve.mjs'), 'utf8');
   put(SERVE_DEST, Buffer.from(SERVE_REWRITES.reduce((s, [a, b]) => s.split(a).join(b), serveSrc), 'utf8'));
 
   put('HOW-TO-RUN-LOCALLY.txt', Buffer.from(RUN_LOCALLY, 'utf8'));

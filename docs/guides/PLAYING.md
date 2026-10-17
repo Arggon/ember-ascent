@@ -3,7 +3,7 @@
 **Open this in your browser:**
 
 ```
-http://localhost:5173/web/
+http://localhost:5173/src/web/
 ```
 
 A server is already running. If it has stopped, restart it with:
@@ -13,7 +13,7 @@ cd <project root>
 npm run serve          # prints the URL to open
 ```
 
-Add `?seed=42` to the URL for a reproducible run: `http://localhost:5173/web/?seed=42`
+Add `?seed=42` to the URL for a reproducible run: `http://localhost:5173/src/web/?seed=42`
 
 > **Correction 2026-10-16:** this file says **40 cards** below. The shipped build has **42 card
 > definitions** (`src/kernel/content/cards.json`); 40 was the planning target. The text is left as
@@ -114,7 +114,7 @@ The same engine core powers both surfaces, and a golden-state test asserts they 
 ### 1. Browser (for humans) — what you're doing now
 
 ```bash
-npm run serve            # http://localhost:5173/web/
+npm run serve            # http://localhost:5173/src/web/
 ```
 
 ### 2. Headless CLI (for agents and scripts)
@@ -139,7 +139,7 @@ node bin/dlb stats --from ./sim-out --by-card --format table
 
 ~310 games per second. The balance report labels its provenance, because these numbers describe the heuristic policy — **not** human players.
 
-There is also a terminal wrapper (`./play.sh --seed 42`) if you ever want to play without a browser. It works, but it is not the intended way for a human.
+There is also a terminal wrapper (`./scripts/play.sh --seed 42`) if you ever want to play without a browser. It works, but it is not the intended way for a human.
 
 ---
 
@@ -147,7 +147,7 @@ There is also a terminal wrapper (`./play.sh --seed 42`) if you ever want to pla
 
 ```bash
 node --test 'tests/**/*.test.js'    # 60 pass, 0 fail
-node tools/check-architecture.mjs   # OK — no violations
+node scripts/check-architecture.mjs   # OK — no violations
 ```
 
 The architecture gate is what keeps the browser and CLI from drifting apart. It fails if a surface file reaches into game rules, or if the game kernel imports a Node-only module — which is why the browser build cannot silently rot. The card wording is covered by `tests/ux/descriptions.test.js`, which fails if any card ends up with a placeholder or an unexplained abbreviation — so this defect cannot come back.
@@ -162,7 +162,7 @@ The architecture gate is what keeps the browser and CLI from drifting apart. It 
 | Page loads, nothing happens | Hard-reload (`Ctrl-Shift-R`) — a cached old module. |
 | Clicks do nothing on a card | You can't afford it — the card says "needs more Energy". Check the cost badge vs your energy. |
 | Not sure what something means | Click **Help** (top right). Every code is in the glossary. |
-| Port already in use | `node tools/serve.mjs --port 5174` |
+| Port already in use | `node scripts/serve.mjs --port 5174` |
 | Stuck at the end screen | Click **Restart**. |
 
 Nothing is served outside the project directory, and the game makes **no network requests** — no CDN, no telemetry, no external fonts.

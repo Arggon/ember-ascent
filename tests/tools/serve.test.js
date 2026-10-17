@@ -1,4 +1,4 @@
-// tools/serve.mjs — the directory redirect must keep the query string intact.
+// scripts/serve.mjs — the directory redirect must keep the query string intact.
 //
 // THE BUG THIS PINS: the trailing-slash redirect was decided on, and appended to, the whole
 // request target, query included. `/web/?seed=11` (whose PATH already ends in `/`) was
@@ -12,7 +12,7 @@ import { createServer } from 'node:net';
 import { request } from 'node:http';
 import { fileURLToPath } from 'node:url';
 
-const SERVE = fileURLToPath(new URL('../../tools/serve.mjs', import.meta.url));
+const SERVE = fileURLToPath(new URL('../../scripts/serve.mjs', import.meta.url));
 let child;
 let base;
 
@@ -64,69 +64,69 @@ function assertSameOrigin(location, input) {
   assert.equal(new URL(location, base).host, new URL(base).host, `${input}: Location leaves the origin: ${location}`);
 }
 
-test('/web/?seed=11 is served directly: no redirect, so the seed survives', async () => {
-  const r = await get('/web/?seed=11');
+test('/src/web/?seed=11 is served directly: no redirect, so the seed survives', async () => {
+  const r = await get('/src/web/?seed=11');
   assert.equal(r.status, 200, `expected 200, got ${r.status} -> ${r.headers.get('location')}`);
   assert.match(r.headers.get('content-type'), /text\/html/);
   await r.body?.cancel();
 });
 
-test('/web?seed=11 redirects to /web/?seed=11 (slash on the path, query kept as-is)', async () => {
-  const r = await get('/web?seed=11');
+test('/src/web?seed=11 redirects to /src/web/?seed=11 (slash on the path, query kept as-is)', async () => {
+  const r = await get('/src/web?seed=11');
   assert.equal(r.status, 301);
-  assert.equal(r.headers.get('location'), '/web/?seed=11');
+  assert.equal(r.headers.get('location'), '/src/web/?seed=11');
   const seed = new URL(r.headers.get('location'), base).searchParams.get('seed');
   assert.equal(Number.isInteger(Number(seed)), true, `seed must still parse as an integer, got "${seed}"`);
 });
 
 test('a multi-parameter query is kept intact through the redirect', async () => {
-  const r = await get('/web?seed=7&pool=full');
+  const r = await get('/src/web?seed=7&pool=full');
   assert.equal(r.status, 301);
-  assert.equal(r.headers.get('location'), '/web/?seed=7&pool=full');
+  assert.equal(r.headers.get('location'), '/src/web/?seed=7&pool=full');
 });
 
 test('a bare directory still gets its trailing slash, and files are untouched', async () => {
-  const r = await get('/web');
+  const r = await get('/src/web');
   assert.equal(r.status, 301);
-  assert.equal(r.headers.get('location'), '/web/');
-  const f = await get('/web/index.html?seed=11');
+  assert.equal(r.headers.get('location'), '/src/web/');
+  const f = await get('/src/web/index.html?seed=11');
   assert.equal(f.status, 200);
   await f.body?.cancel();
 });
 
 // THE BUG THIS PINS (open redirect): the Location was the raw request path plus '/'.
-// `//evil.com/../web` resolves to web/, so it took the redirect branch and answered
-// `Location: //evil.com/../web/` — a protocol-relative URL that sends the browser to
-// evil.com. Browsers treat `\` as `/`, so `/\evil.com/../web` was the same hole.
-for (const input of ['//evil.com/../web', '///evil.com/../web', '/\\evil.com/../web']) {
-  test(`${input} redirects to the same-origin /web/, never off-site`, async () => {
+// `//evil.com/../src/web` resolves to web/, so it took the redirect branch and answered
+// `Location: //evil.com/../src/web/` — a protocol-relative URL that sends the browser to
+// evil.com. Browsers treat `\` as `/`, so `/\evil.com/../src/web` was the same hole.
+for (const input of ['//evil.com/../src/web', '///evil.com/../src/web', '/\\evil.com/../src/web']) {
+  test(`${input} redirects to the same-origin /src/web/, never off-site`, async () => {
     const r = await rawGet(input);
     assert.equal(r.status, 301);
     assertSameOrigin(r.location, input);
-    assert.equal(r.location, '/web/');
+    assert.equal(r.location, '/src/web/');
   });
 }
 
-test('the query survives the hardened redirect: //evil.com/../web?seed=11 -> /web/?seed=11', async () => {
-  const r = await rawGet('//evil.com/../web?seed=11');
+test('the query survives the hardened redirect: //evil.com/../src/web?seed=11 -> /src/web/?seed=11', async () => {
+  const r = await rawGet('//evil.com/../src/web?seed=11');
   assert.equal(r.status, 301);
-  assertSameOrigin(r.location, '//evil.com/../web?seed=11');
-  assert.equal(r.location, '/web/?seed=11');
+  assertSameOrigin(r.location, '//evil.com/../src/web?seed=11');
+  assert.equal(r.location, '/src/web/?seed=11');
 });
 
 test('a nested directory redirects to its normalized path', async () => {
-  const r = await rawGet('/web/./assets/../assets');
+  const r = await rawGet('/src/web/./assets/../assets');
   assert.equal(r.status, 301);
-  assert.equal(r.location, '/web/assets/');
+  assert.equal(r.location, '/src/web/assets/');
 });
 
 // THE BUG THIS PINS: a malformed %-escape made decodeURIComponent throw a URIError inside
-// the request handler, uncaught, so one bad request (`GET /web%`) took the server down.
-for (const input of ['/web%', '/%E0%A4%A', '/web/%zz']) {
+// the request handler, uncaught, so one bad request (`GET /src/web%`) took the server down.
+for (const input of ['/src/web%', '/%E0%A4%A', '/src/web/%zz']) {
   test(`${input} is a 400, and the server keeps serving`, async () => {
     const r = await rawGet(input);
     assert.equal(r.status, 400);
-    const ok = await get('/web/?seed=11');
+    const ok = await get('/src/web/?seed=11');
     assert.equal(ok.status, 200, 'the server is still up after the bad request');
     await ok.body?.cancel();
   });

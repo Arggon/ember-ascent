@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// tools/dev/probe-stage-space.mjs — is there free space INSIDE #stage, and who could use it?
+// scripts/dev/probe-stage-space.mjs — is there free space INSIDE #stage, and who could use it?
 // Answers, per viewport: stage box vs stage content vs .stage-combat, i.e. how much slack the
 // stage already has, and how wide a card would be if five shared the hand row.
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 
 const PORT = 9340 + (process.pid % 100), PROFILE = '/tmp/dlb-probe-stage-' + process.pid;
-const BASE = process.argv[2] || 'http://localhost:5173/web/?seed=11';
+const BASE = process.argv[2] || 'http://localhost:5173/src/web/?seed=11';
 const SIZES = [
   [412, 915, 'galaxy-s25plus'], [390, 844, 'iphone-14'], [360, 640, 'phone-small'],
   [414, 896, 'phone-large'], [768, 1024, 'tablet'], [1280, 800, 'desktop'],

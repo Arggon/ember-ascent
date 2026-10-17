@@ -3,7 +3,7 @@
 // WHY THIS IS A SURFACE, NOT KERNEL CODE: the kernel may not import a `node:*` builtin,
 // because it has to run unmodified in a browser. Reading and writing `runs.jsonl` is
 // exactly that kind of host work, so it lives here and the kernel only ever sees plain
-// objects handed to it. `tools/check-architecture.mjs` fails the build if that line is
+// objects handed to it. `scripts/check-architecture.mjs` fails the build if that line is
 // ever crossed in the other direction.
 //
 // THE ONE INVARIANT THIS FILE EXISTS TO PROTECT (DR-3):

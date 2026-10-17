@@ -2,8 +2,8 @@
 
 **Owner's report:** combat screen did not fit on some screen sizes (Galaxy S25 Ultra landscape
 915×412; reproduced in Firefox devtools; follow-ups at 1200×450 and 1366×768).
-**Contract:** `LAYOUT-ACCEPTANCE.md` (frozen; stories S1–S7).
-**Scope:** `web/style.css` + `tools/dev/` harnesses. **No `src/` changes, no CLI output changes.**
+**Contract:** `../specs/LAYOUT-ACCEPTANCE.md` (frozen; stories S1–S7).
+**Scope:** `src/web/style.css` + `scripts/dev/` harnesses. **No `src/` changes, no CLI output changes.**
 **Status: GREEN** — full matrix, seeds 1–12, both harnesses: 0 failures, exit 0.
 
 ---
@@ -14,8 +14,8 @@ The fix was not the hard part. **The instrument was.** Two defects made every ve
 earlier thread untrustworthy:
 
 1. **The seed was never actually pinned.** Both harnesses loaded
-   `http://localhost:5173/web/?seed=11`; `tools/serve.mjs` 301-redirects that to
-   `/web/?seed=11/` — the slash lands *inside* the query — so `web/app.js` computed
+   `http://localhost:5173/web/?seed=11`; `scripts/serve.mjs` 301-redirects that to
+   `/src/web/?seed=11/` — the slash lands *inside* the query — so `src/web/app.js` computed
    `Number("11/") → NaN`, failed `Number.isInteger`, and fell back to
    `Math.floor(Math.random() * 1000000)`. Measured across four consecutive loads:
    seeds `777695 / 413864 / 977312 / 571239`. Requesting `index.html?seed=11` directly
@@ -66,20 +66,20 @@ A `max-height: 500px` padding band built on the wrong model was reverted.
 
 ## 2. Verification (final artifact)
 
-Artifact hashes at gate time: `web/style.css` `a494dff926dac4e25482d865e89a187f343cdd7e11c9dfbf59ec4b000ca579f9`,
-`tools/dev/viewport-check.mjs` `9e83358c…`, `tools/dev/space-check.mjs` `5fed9125…`.
+Artifact hashes at gate time: `src/web/style.css` `a494dff926dac4e25482d865e89a187f343cdd7e11c9dfbf59ec4b000ca579f9`,
+`scripts/dev/viewport-check.mjs` `9e83358c…`, `scripts/dev/space-check.mjs` `5fed9125…`.
 
 ```
-$ node tools/dev/viewport-check.mjs --seeds 1-12
+$ node scripts/dev/viewport-check.mjs --seeds 1-12
 ALL PASS (108 rows)   exit 0   FAIL lines: 0
 
-$ node tools/dev/viewport-check.mjs
+$ node scripts/dev/viewport-check.mjs
 ALL PASS (9 rows)     exit 0
 
-$ node tools/dev/space-check.mjs
+$ node scripts/dev/space-check.mjs
 ALL PASS (11 rows)    exit 0
 
-$ node tools/dev/css-parse-probe.mjs
+$ node scripts/dev/css-parse-probe.mjs
 parsed OK             exit 0
 ```
 
@@ -113,7 +113,7 @@ size         label            seed  reported  eTbot/vh  clear  scrollPx  handRow
    declaration would have been worse (37px, because the 44px rule lives in a `max-height: 480px`
    tier desktops never match); restating it at 44px fixes all nine viewports. Cost: 1–2px of
    clearance, against a 53px margin. Now `btn: 44` everywhere.
-2. **Two CSS truncation artifacts.** `web/style.css:118` (`#hud`) and the `.stat` rule each had a
+2. **Two CSS truncation artifacts.** `src/web/style.css:118` (`#hud`) and the `.stat` rule each had a
    missing semicolon, so the parser folded the next line into one invalid declaration and dropped
    it. Pre-existing (byte-identical in the backup), not caused by this work; both repaired, parse
    now clean.
@@ -133,11 +133,11 @@ size         label            seed  reported  eTbot/vh  clear  scrollPx  handRow
 
 > **Note added 2026-10-16 (Technical Writer, DEF-3).** This section's headings are accurate —
 > nothing below is claimed as verified. One clarification, because a sibling document
-> (`requirements-run-history-and-legible-combat.md` §2.1) lists this file among those carrying a
+> (`../specs/requirements-run-history-and-legible-combat.md` §2.1) lists this file among those carrying a
 > *"no browser in this environment"* limitation: **this file contains no such claim**, and this
-> harness **did** run against real headless Chromium (`node tools/dev/viewport-check.mjs`). "UNVERIFIED"
+> harness **did** run against real headless Chromium (`node scripts/dev/viewport-check.mjs`). "UNVERIFIED"
 > in this file means **not measured yet**, never **unmeasurable**. A browser and a zero-dependency
-> capture harness (`tools/dev/shoot.mjs`, CDP) are present, so any of the open items below can be
+> capture harness (`scripts/dev/shoot.mjs`, CDP) are present, so any of the open items below can be
 > settled with a captured frame or a `getBoundingClientRect()` read inside the CDP session.
 
 **Verified by measurement:** every number in §1–§3; full matrix × seeds 1–12 (108 + 132 rows);
@@ -164,15 +164,15 @@ at the five target viewports; spill baseline.
 
 ## 5. Rollback (no git repo — disk copies)
 
-`layout-fix-backup/` holds all restore points. **Restore by copying the file back over its
+`archive/layout-fix-backup/` holds all restore points. **Restore by copying the file back over its
 original path.** Baselines are *cumulative*, so pick the one matching what you want to undo:
 
 | restore point | sha256 | what restoring it undoes |
 |---|---|---|
-| `layout-fix-backup/style.css` | `be3db6a6…` | **everything** — state before any layout work |
-| `layout-fix-backup/style.css.pre-layout-fix` | `521910b0…` | the laptop/desktop tiers (undoes the 1366×768 + 1280×800 fix) |
-| `layout-fix-backup/style.css.known-good` | `620c974f…` | the touch-target, typography, parse and spill-gate work (keeps the viewport fix) |
-| `layout-fix-backup/style.css.pre-touch-fix` | `8f346ee5…` | only the 44px touch-target fix |
+| `archive/layout-fix-backup/style.css` | `be3db6a6…` | **everything** — state before any layout work |
+| `archive/layout-fix-backup/style.css.pre-layout-fix` | `521910b0…` | the laptop/desktop tiers (undoes the 1366×768 + 1280×800 fix) |
+| `archive/layout-fix-backup/style.css.known-good` | `620c974f…` | the touch-target, typography, parse and spill-gate work (keeps the viewport fix) |
+| `archive/layout-fix-backup/style.css.pre-touch-fix` | `8f346ee5…` | only the 44px touch-target fix |
 | `view.../viewport-check.mjs`, `space-check.mjs` | see `MANIFEST.md` | the harness upgrades (seed pinning, thresholds, gates, exit codes) |
 
 **Correcting an earlier false claim (S7):** the manifest originally recorded only
@@ -186,10 +186,10 @@ The safety guard blocks headless deletion, so these temporary diagnostics remain
 imports them (verified by grep); none affects the shipped page.
 
 ```
-tools/dev/probe-eleven.mjs            (8497 B, diagnostic)
-tools/dev/scratch-fix-probe.mjs       (8803 B, diagnostic)
-tools/dev/_tmp-touch-audit.mjs        (8731 B, diagnostic)
-tools/dev/_tmp-spill-control/         (scratch page used as the gate's positive control)
+scripts/dev/probe-eleven.mjs            (8497 B, diagnostic)
+scripts/dev/scratch-fix-probe.mjs       (8803 B, diagnostic)
+scripts/dev/_tmp-touch-audit.mjs        (8731 B, diagnostic)
+scripts/dev/_tmp-spill-control/         (scratch page used as the gate's positive control)
 ```
 
 ## 7. Contract status

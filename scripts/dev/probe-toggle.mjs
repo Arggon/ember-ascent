@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// tools/dev/probe-toggle.mjs — isolate WHICH new declaration changes the 1280x800 desktop doc.
+// scripts/dev/probe-toggle.mjs — isolate WHICH new declaration changes the 1280x800 desktop doc.
 // Toggles each piece of the height strategy off at runtime and reports document/block heights.
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 const PORT = 9340 + (process.pid % 100), PROFILE = '/tmp/dlb-probe-toggle-' + process.pid;
-const BASE = process.argv[2] || 'http://localhost:5173/web/?seed=11';
+const BASE = process.argv[2] || 'http://localhost:5173/src/web/?seed=11';
 const SIZES = [[1280, 800, 'desktop-1280x800'], [1280, 1000, 'desktop-tall'], [412, 915, 'galaxy']];
 let id = 1; const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 if (existsSync(PROFILE)) rmSync(PROFILE, { recursive: true, force: true });

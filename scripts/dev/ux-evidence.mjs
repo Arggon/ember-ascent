@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// tools/dev/ux-evidence.mjs — capture every game surface for a design review.
+// scripts/dev/ux-evidence.mjs — capture every game surface for a design review.
 //
 // The card redesign succeeded by working from real 4x screenshots rather than descriptions.
 // This captures EVERY surface at the two viewports that matter (mobile 412x915, desktop
 // 1280x900), at high device pixel ratio, plus measured anatomy of the HUD and the enemy card
 // so a designer can critique against numbers.
 //
-// Usage: node tools/dev/ux-evidence.mjs [--base URL]
+// Usage: node scripts/dev/ux-evidence.mjs [--base URL]
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
@@ -19,7 +19,7 @@ mkdirSync(OUT, { recursive: true });
 const PORT = 9351, PROFILE = '/tmp/dlb-ux';
 const args = process.argv.slice(2);
 const bi = args.indexOf('--base');
-const BASE = bi === -1 ? 'http://localhost:5173/web/?seed=11' : args[bi + 1];
+const BASE = bi === -1 ? 'http://localhost:5173/src/web/?seed=11' : args[bi + 1];
 
 let id = 1;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

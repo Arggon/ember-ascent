@@ -1,5 +1,5 @@
 // Biome balance probe: win rate / floor reached for greedy+smart over N seeds, every biome in the kernel BIOMES table.
-// Usage: node tools/dev/biome-balance.mjs [N=200]
+// Usage: node scripts/dev/biome-balance.mjs [N=200]
 import { playRun } from '../../src/surface/sim.js';
 import { BIOMES, DEFAULT_BIOME } from '../../src/kernel/index.js';
 const N = +process.argv[2] || 200; const out = {};

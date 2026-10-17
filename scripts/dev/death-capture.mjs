@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// tools/dev/death-capture.mjs — capture the END-OF-RUN moment with a FROZEN clock.
+// scripts/dev/death-capture.mjs — capture the END-OF-RUN moment with a FROZEN clock.
 //
 // WHY THIS EXISTS. The blank-climax bug (DEF-6) lived in a window between two paints, so
 // every screenshot that did not land inside it reported the feature as fine, and every
@@ -33,7 +33,7 @@
 // marker is gone after one. The PNGs are a by-product of the same frames, for a human.
 //
 // Usage:
-//   node tools/dev/death-capture.mjs [--base URL] [--out DIR] [--tag after] [--seeds 13,1,2]
+//   node scripts/dev/death-capture.mjs [--base URL] [--out DIR] [--tag after] [--seeds 13,1,2]
 //                                    [--quantum 50] [--horizon 900] [--no-frames] [--port 9334]
 import { spawn } from 'node:child_process';
 import { mkdirSync, existsSync, rmSync } from 'node:fs';
@@ -45,7 +45,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);
 const arg = (name, dflt) => { const i = args.indexOf(name); return i === -1 ? dflt : args[i + 1]; };
 
-const BASE = arg('--base', 'http://localhost:5173/web/');
+const BASE = arg('--base', 'http://localhost:5173/src/web/');
 const OUT = resolve(ROOT, arg('--out', 'shots/pm-verify/death'));
 const TAG = arg('--tag', 'after');
 const QUANTUM = Number(arg('--quantum', '50'));
@@ -272,8 +272,8 @@ async function main() {
   /**
    * Wait for the page to be genuinely ready, rather than for a wall-clock sleep to elapse.
    *
-   * Why this is not paranoia: `tools/serve.mjs` answers `/web/?seed=13` with a 301 to
-   * `/web/?seed=13/` (it appends a slash to the path it is given, query string included),
+   * Why this is not paranoia: `scripts/serve.mjs` answers `/src/web/?seed=13` with a 301 to
+   * `/src/web/?seed=13/` (it appends a slash to the path it is given, query string included),
    * and the extra navigation hop means the document can still be mid-parse when a fixed
    * sleep ends. Evaluating then reads an empty body and reports `no-controller` for a page
    * that is a moment away from working — which is exactly what it did.

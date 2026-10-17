@@ -5,22 +5,22 @@ Items 1–4 DONE. Item 5 (deterministic capture) in progress.
 Workspace: `/home/arggon/.config/AutoClaw-oversea-official/accounts/94e66e684ead817e330e9c30239face9889db0c1f9f662f8f569582a5b6e3380/projects/Default`
 
 ## Task list
-- [x] Item 1 — DEF-7: widen `tools/check-surface-art.mjs` class extractor; resolve emitted-but-unstyled classes.
+- [x] Item 1 — DEF-7: widen `scripts/check-surface-art.mjs` class extractor; resolve emitted-but-unstyled classes.
 - [x] Item 2 — DEF-6: shared `dyingRow()`; hold paints it; hold tightened + clamped to 500 ms.
 - [x] Item 3 — DEF-2: inert `diff N` badge removed (plumbing kept); orphan `.diff` rules dropped.
 - [x] Item 4 — DEF-8: false reduced-motion comment corrected.
 - [ ] Item 5 — Evidence: deterministic CDP capture under `shots/pm-verify/death/`; win AND defeat.
 
 ## What changed (file:line)
-- `tools/check-surface-art.mjs:39-72` new `clsValue()` scanner; `:74-104` `classesFromOptions()` now
+- `scripts/check-surface-art.mjs:39-72` new `clsValue()` scanner; `:74-104` `classesFromOptions()` now
   reads the WHOLE `cls:` value and every quoted fragment of it (was: first quoted literal only).
-- `web/app.js:940-957` `BOSS_DEATH_MS` (1150) replaced by `COLLAPSE_MS` (500); `END_DELAY_MS` kept.
-- `web/app.js:1024-1073` hold branch rewritten: holds ONLY when there is something to show, paints
+- `src/web/app.js:940-957` `BOSS_DEATH_MS` (1150) replaced by `COLLAPSE_MS` (500); `END_DELAY_MS` kept.
+- `src/web/app.js:1024-1073` hold branch rewritten: holds ONLY when there is something to show, paints
   `dyingRow()` (or `combatView()` when the player died on a live row) + the `.ended-hold` spacer,
   and waits `min(END_DELAY_MS, COLLAPSE_MS)`. The release at the end of the branch is unchanged.
-- `web/app.js:1230-1264` new `dyingRow(dying, row?)`; `:1266-1280` `combineView()` calls it.
-- `web/app.js:757` `diff N` badge removed; `difficulty` plumbing untouched.
-- `web/style.css` added rules for `sc-targeting`, `boss-down`, `reveal`; removed the two orphan
+- `src/web/app.js:1230-1264` new `dyingRow(dying, row?)`; `:1266-1280` `combineView()` calls it.
+- `src/web/app.js:757` `diff N` badge removed; `difficulty` plumbing untouched.
+- `src/web/style.css` added rules for `sc-targeting`, `boss-down`, `reveal`; removed the two orphan
   `.hud-char .diff` rules; corrected the false reduced-motion comment (`~:1695`).
 
 ## Item 1 — resolution decision (asked for)
@@ -35,7 +35,7 @@ the same arrival beat its tiles already have).
 ## Baselines (measured after all edits)
 - `npm test` = **93 pass / 0 fail** (exact baseline).
 - `npm run gate` exit 0 — "scanned 29 files under src/", OK.
-- `node tools/check-surface-art.mjs` exit 0 — 137 emitted / 195 declared, no dupes, no external.
+- `node scripts/check-surface-art.mjs` exit 0 — 137 emitted / 195 declared, no dupes, no external.
 
 ## Progress log
 - Item 1 extractor widened: gate went 126 → 138 classes and FAILED with

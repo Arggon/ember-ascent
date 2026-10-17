@@ -57,7 +57,7 @@ deliberate design property, not a coincidence, and it is what makes runs shareab
 > **Open action — owner: Technical Writer.** Before the next release, re-verify every claim in this
 > section against the actual build, rewrite it to match, then delete this notice. **Do not delete
 > the notice without doing the re-verification** — that is exactly the failure mode recorded as
-> `DEF-3` in `requirements-run-history-and-legible-combat.md`, and it is how a status document
+> `DEF-3` in `specs/requirements-run-history-and-legible-combat.md`, and it is how a status document
 > starts lying to the project. **[Inferred:** the specific claim→change mapping above is taken from
 > that requirements document's in-flight scope; I did not measure the revision's behaviour myself.**]**
 
@@ -119,7 +119,7 @@ Honest list. These are the things most likely to look like bugs.
 From a clean checkout, on Node 24:
 
 ```bash
-node tools/build-release.mjs
+node scripts/build-release.mjs
 ```
 
 This regenerates:
@@ -129,12 +129,12 @@ This regenerates:
 
 The build has **zero dependencies** (`node:fs`, `node:path`, `node:zlib`, `node:crypto`
 only) and is **byte-reproducible**: three consecutive runs produced the same zip SHA-256.
-Override the output location with `OUT=/some/dir node tools/build-release.mjs`.
+Override the output location with `OUT=/some/dir node scripts/build-release.mjs`.
 
 To run the artifact locally:
 
 ```bash
-cd release && node tools/serve.mjs
+cd release && node scripts/serve.mjs
 # then open http://localhost:5173/
 ```
 
@@ -146,7 +146,7 @@ cd release && node tools/serve.mjs
 | Total size | **361,806 bytes (353.3 KiB)** |
 | Zip size | **123,283 bytes (120.4 KiB)** |
 | Zip SHA-256 | `4a6621600c69f409aa83b2733dd9d0374fe591a2badceb45e5a830c6f48ed0db` |
-| Zip root | `index.html`, `app.js`, `style.css`, `tokens.js`, `HOW-TO-RUN-LOCALLY.txt`, `src/`, `tools/` |
+| Zip root | `index.html`, `app.js`, `style.css`, `tokens.js`, `HOW-TO-RUN-LOCALLY.txt`, `src/`, `scripts/` |
 | External requests at runtime | **0** |
 
 The zip contains 25 entries, well inside itch.io's limits (1,000 files, 500 MB
@@ -155,9 +155,9 @@ includes the screen-size layout fix; two consecutive runs produced the identical
 
 One deliberate transformation to note: the build rewrites exactly one import path in `app.js`
 (`'../src/surface/gui/controller.js'` → `'./src/surface/gui/controller.js'`) because the file
-moves from `web/` to the zip root. That is why the `app.js` inside the zip is 84,797 bytes while
-`web/app.js` is 84,798 — the 1-byte difference is that path, and it is documented in
-`tools/build-release.mjs`. It is not a stale-file problem.
+moves from `src/web/` to the zip root. That is why the `app.js` inside the zip is 84,797 bytes while
+`src/web/app.js` is 84,798 — the 1-byte difference is that path, and it is documented in
+`scripts/build-release.mjs`. It is not a stale-file problem.
 
 ---
 
@@ -176,7 +176,7 @@ count 42.
 > **How 42 was verified (independent of both documents):** counted the shipped card definitions
 > directly in `src/kernel/content/cards.json` — **42 entries, one `"id"` per card**, breaking down
 > as **20 attack / 16 skill / 6 power**, which matches the Cards row of the table at the top of this
-> file. The content bundle `cards.bundle.js` is generated from that JSON by `tools/gen-content.mjs`
+> file. The content bundle `cards.bundle.js` is generated from that JSON by `scripts/gen-content.mjs`
 > and guarded against drift by `tests/content/bundle-drift.test.js`, so the JSON is the source of
 > truth and the bundle follows it.
 >

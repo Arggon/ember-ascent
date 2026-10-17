@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// tools/dev/card-closeup.mjs — capture a large, clear view of the cards for design work.
+// scripts/dev/card-closeup.mjs — capture a large, clear view of the cards for design work.
 //
 // "Cards are ugly" is a design judgement, and it needs to be made against a real, big image
 // rather than a 412px phone screenshot. This renders the combat screen at high device pixel
@@ -7,7 +7,7 @@
 // footer chip) can be critiqued at detail. Also captures a single card in isolation and the
 // reward screen, which uses the same tile.
 //
-// Usage: node tools/dev/card-closeup.mjs [--base URL]
+// Usage: node scripts/dev/card-closeup.mjs [--base URL]
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
@@ -20,7 +20,7 @@ mkdirSync(OUT, { recursive: true });
 const PORT = 9347, PROFILE = '/tmp/dlb-cardclose';
 const args = process.argv.slice(2);
 const bi = args.indexOf('--base');
-const BASE = bi === -1 ? 'http://localhost:5173/web/?seed=11' : args[bi + 1];
+const BASE = bi === -1 ? 'http://localhost:5173/src/web/?seed=11' : args[bi + 1];
 
 let id = 1;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

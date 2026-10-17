@@ -38,5 +38,5 @@ Predecessor created `src/kernel/record.js` + `src/kernel/unlocks.js` and died be
 10. [ ] Final `npm test` + `npm run gate`, then the required report.
 
 ## Scope guard
-Allowed: `src/kernel/**`, `src/surface/**`, `tests/**`. Forbidden: `web/**`, `tools/dev/**`, `*.md`
-(other than this status file), `tools/check-architecture.mjs`, `release/`, `release.zip`.
+Allowed: `src/kernel/**`, `src/surface/**`, `tests/**`. Forbidden: `src/web/**`, `scripts/dev/**`, `*.md`
+(other than this status file), `scripts/check-architecture.mjs`, `release/`, `release.zip`.

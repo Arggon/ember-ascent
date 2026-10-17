@@ -30,7 +30,7 @@ repo's own `countWorst` (worst of o200k_base / cl100k_base), over the full 42-ca
   4 PASS "p2 1"                         action id alone     (<= 8)  <-- contract holds
   9 FAIL "p2 1 sword_boomerang"         action id + card id breaches the frozen ceiling
 ```
-Evidence: `tools/dev/measure-action-shapes.mjs`. Every possible separator was tried
+Evidence: `scripts/dev/measure-action-shapes.mjs`. Every possible separator was tried
 (`''`, `' '`, `'_'`, `'-'`, `'.'`, `':'`, `'/'`, `'#'`, `'@'`, ... 31 candidates): only the
 empty separator keeps the line inside the ceiling, and the empty separator is
 indistinguishable from the hand `p10` form, so it is unsafe.
@@ -53,7 +53,7 @@ This is what keeps the action line bounded by construction as content grows.
 ## Constraints being honoured
 
 - No card numbers / effects / enemy or boss stats touched. Boss HP 110 untouched.
-- `web/` untouched (`grep` over `web/` for action ids / targeting: no matches).
+- `src/web/` untouched (`grep` over `src/web/` for action ids / targeting: no matches).
 - `src/kernel/rules/effects.js` untouched (re-export shim).
 - Ceilings 250 (dump) / 8 (action line) frozen; `tests/budget.test.js` must stay green.
 - Zero runtime deps, offline, $0.

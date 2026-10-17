@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 
 const PORT = 9340 + (process.pid % 100), PROFILE = '/tmp/dlb-scratch-' + process.pid;
-const BASE = process.argv[2] || 'http://localhost:5173/web/index.html?seed=11';
+const BASE = process.argv[2] || 'http://localhost:5173/src/web/index.html?seed=11';
 const SIZES = [
   [1366, 768, 'laptop'],
   [1280, 800, 'desktop'],

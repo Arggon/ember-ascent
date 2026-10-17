@@ -14,11 +14,11 @@ Evidence tiers: **[FETCHED]** page read this run · **[SNIPPET]** search result 
 >
 > **How 42 was verified:** counted the shipped definitions in `src/kernel/content/cards.json`
 > directly — **42 card entries (20 attack / 16 skill / 6 power)**. The browser bundle derives from
-> that JSON via `tools/gen-content.mjs` under `tests/content/bundle-drift.test.js`, so the JSON is the
+> that JSON via `scripts/gen-content.mjs` under `tests/content/bundle-drift.test.js`, so the JSON is the
 > source of truth. **Caveat on method:** the verifying agent had no shell this Run, so this is a
 > count by inspection of the file read in full, **not an executed command**; `grep -c '"id"'
 > src/kernel/content/cards.json` should return 42 and is the check to run. Full reconciliation note:
-> `RELEASE-NOTES.md` → "A note on the card count".
+> `../RELEASE-NOTES.md` → "A note on the card count".
 >
 > **What this does not change:** every acceptance criterion here is about the *loop* (R1–R10), not the
 > count. The planning target remains the correct planning target; only the shipped number differs.
@@ -160,7 +160,7 @@ Multiplayer/netcode, modding API, localization, console/mobile ports, paid DLC, 
 
 > **CORRECTED 2026-10-16 (Technical Writer, DEF-3) — this answer is superseded by events.** The
 > GUI **has shipped**, and earlier than this table planned: it landed as **Phase 5**
-> (`PHASE5-STATUS.md` — "Phase 5 — Browser-playable deckbuilder (same kernel)") rather than phase 6,
+> (`../status/PHASE5-STATUS.md` — "Phase 5 — Browser-playable deckbuilder (same kernel)") rather than phase 6,
 > and it is in the delivered artifact (`release.zip`, 25 files, `index.html` at the root,
 > `sha256 4a6621…d0db`). `shots/` holds **301 rendered PNGs** of it. The original text is kept above
 > because it records the plan; **do not read "No" as current state.** The R1 single-core/two-surfaces
@@ -218,7 +218,7 @@ The System Architect returned six ADRs and three feasibility flags that change *
 **Accepted.** The shipped game makes no network calls and holds no API keys, so it *cannot* observe an LLM session's input/output tokens. R9 is therefore split:
 
 - **R9a (shipped, mandatory):** every run summary and every `sim` reports the game's own **payload tokens** (state dump, action list, observation stream). This is the number that is actually controlled by the interface design, which is what R9 was for.
-- **R9b (dev-only, manual):** total LLM session tokens come from `tools/eval-llm.mjs`, run by a developer, never shipped.
+- **R9b (dev-only, manual):** total LLM session tokens come from `scripts/eval-llm.mjs`, run by a developer, never shipped.
 
 **Rationale:** R9 exists to prove that *interface shape* controls cost — not to audit an API bill. [INFERRED] The 98.7% and 84% savings findings are both about what crosses the context boundary, which is exactly R9a. A network call for token accounting would violate the no-keys constraint for no decision-making benefit.
 

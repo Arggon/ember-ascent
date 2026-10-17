@@ -82,7 +82,7 @@ must report `n/a`, not a ratio — is a reporting fix, not a policy fix.
   malformed 0/2479 (0.0%)
   payload tokens: dump worst 116/250 PASS | action line worst 5/8 PASS (307 lines measured)
   ```
-- Architecture gate (`tools/check-architecture.mjs`) forbids `src/surface/**` from
+- Architecture gate (`scripts/check-architecture.mjs`) forbids `src/surface/**` from
   importing `src/kernel/rules/**`. Consequence for T1: the policy may not read `ENEMIES`
   or the custom-effect handler implementations; it may read effect data from
   `loadContent()` (as `greedy` already does) and the hostile-intent numbers from the

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// tools/check-surface-art.mjs — static checks for the browser surface's presentation.
+// scripts/check-surface-art.mjs — static checks for the browser surface's presentation.
 //
 // WHY THIS EXISTS: the art pass makes three claims that a browser would normally verify
 // and a headless run cannot: (1) every class app.js emits has a rule in style.css, so no
@@ -9,7 +9,7 @@
 //
 // It is read-only and dependency-free: node:fs only, no execution of the page.
 //
-// Usage: node tools/check-surface-art.mjs [--json]
+// Usage: node scripts/check-surface-art.mjs [--json]
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,8 +17,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const json = process.argv.includes('--json');
 
-const appSrc = readFileSync(join(ROOT, 'web/app.js'), 'utf8');
-const cssSrc = readFileSync(join(ROOT, 'web/style.css'), 'utf8');
+const appSrc = readFileSync(join(ROOT, 'src/web/app.js'), 'utf8');
+const cssSrc = readFileSync(join(ROOT, 'src/web/style.css'), 'utf8');
 
 const problems = [];
 const notes = [];
@@ -30,7 +30,7 @@ const notes = [];
  *
  * WHY A SCANNER RATHER THAN A REGEX: the previous pattern
  * (`/\bcls:\s*(`[^`]*`|'[^']*'|"[^"]*")/g`) matched ONE complete quoted literal and then
- * stopped, so it was blind to a class assembled from several pieces. `web/app.js` emits the
+ * stopped, so it was blind to a class assembled from several pieces. `src/web/app.js` emits the
  * dying-enemy ghost as `` `enemy is-dying side-${d.side}` + (d.boss ? ' boss-down' : '') ``,
  * and `boss-down` — a class with no rule anywhere in style.css — lived in the second piece,
  * invisible to the checker, which therefore reported OK. This walks the whole value instead.
@@ -240,7 +240,7 @@ notes.push(`top-level selectors: ${sels.length}, distinct ${seen.size}`);
 /* --------------------------------------------------------------- 3. external assets */
 
 const external = [];
-for (const [file, src] of [['web/index.html', readFileSync(join(ROOT, 'web/index.html'), 'utf8')], ['web/app.js', appSrc], ['web/style.css', cssSrc]]) {
+for (const [file, src] of [['src/web/index.html', readFileSync(join(ROOT, 'src/web/index.html'), 'utf8')], ['src/web/app.js', appSrc], ['src/web/style.css', cssSrc]]) {
   for (const re of [/https?:\/\//gi, /\bcdn\b/gi, /@import/gi, /googleapis/gi, /\.woff2?\b/gi]) {
     const m = src.match(re);
     if (m) external.push(`${file}: ${re} matched ${JSON.stringify(m.slice(0, 3))}`);
@@ -260,7 +260,7 @@ if (external.length > 0) problems.push(`external-asset reference(s) found: ${ext
 if (json) {
   process.stdout.write(`${JSON.stringify({ ok: problems.length === 0, notes, problems, missing, dupes }, null, 2)}\n`);
 } else {
-  process.stdout.write('check-surface-art: static presentation checks over web/\n');
+  process.stdout.write('check-surface-art: static presentation checks over src/web/\n');
   for (const n of notes) process.stdout.write(`  · ${n}\n`);
   if (problems.length === 0) process.stdout.write('OK — no missing class rules, no duplicate selectors, no external assets\n');
   else for (const p of problems) process.stdout.write(`  FAIL  ${p}\n`);

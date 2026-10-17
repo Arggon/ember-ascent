@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// tools/serve.mjs — a zero-dependency static server for the browser surface.
+// scripts/serve.mjs — a zero-dependency static server for the browser surface.
 //
 // WHY THIS EXISTS: ES modules do not load over file:// in Chrome (the origin is
-// opaque and module fetching is blocked), so `web/index.html` needs a real HTTP
+// opaque and module fetching is blocked), so `src/web/index.html` needs a real HTTP
 // origin. One shim (--import src/surface/tokens.js) is not an option here.
 //
 // It is deliberately tiny and dependency-free — node:http and node:fs only — so it
 // costs nothing and cannot become a supply-chain surface. It serves the PROJECT ROOT
 // only; anything that resolves outside it is refused (path traversal).
 //
-// Usage:  node tools/serve.mjs [--port 5173]
+// Usage:  node scripts/serve.mjs [--port 5173]
 import { createServer } from 'node:http';
 import { createReadStream, statSync } from 'node:fs';
 import { extname, join, resolve, normalize, relative, sep } from 'node:path';
@@ -24,7 +24,7 @@ const { values } = parseArgs({
 });
 
 if (values.help) {
-  process.stdout.write('usage: node tools/serve.mjs [--port 5173]\n');
+  process.stdout.write('usage: node scripts/serve.mjs [--port 5173]\n');
   process.exit(0);
 }
 
@@ -123,7 +123,7 @@ const server = createServer((req, res) => {
   }
 
   // A directory (or the bare root) serves its index.html; a request for the root is
-  // redirected to /web/ so a human lands on the game, not a listing.
+  // redirected to /src/web/ so a human lands on the game, not a listing.
   let stat;
   try {
     stat = statSync(file);
@@ -179,8 +179,8 @@ server.on('error', (e) => {
 server.listen(port, '127.0.0.1', () => {
   const base = `http://localhost:${port}`;
   process.stdout.write(`serving ${ROOT}\n`);
-  process.stdout.write(`\n  open ${base}/web/\n\n`);
-  process.stdout.write(`  (game:      ${base}/web/   · seed via ?seed=N)\n`);
+  process.stdout.write(`\n  open ${base}/src/web/\n\n`);
+  process.stdout.write(`  (game:      ${base}/src/web/   · seed via ?seed=N)\n`);
   process.stdout.write(`  (ctrl-c to stop)\n`);
 });
 

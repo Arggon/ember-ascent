@@ -1,4 +1,4 @@
-// tools/dev/juice-effects.mjs — does an action's feedback actually reach the rendered tree?
+// scripts/dev/juice-effects.mjs — does an action's feedback actually reach the rendered tree?
 //
 // THE CLAIM UNDER TEST. `render()` calls `stageEl.replaceChildren()` after every action, so
 // every element is a NEW node. The juice pass claims that an action's feedback (a floating
@@ -6,11 +6,11 @@
 // the hand) is nevertheless present in the tree the player then sees — and that under
 // `prefers-reduced-motion` it is NOT, while every FACT is still carried statically.
 //
-// There is no browser in this environment, so this drives the REAL web/app.js against a
+// There is no browser in this environment, so this drives the REAL src/web/app.js against a
 // fake DOM with bubbling and closest() (the same shim the targeting repro uses), then
 // inspects the tree the app built.
 //
-// Usage: node tools/dev/juice-effects.mjs
+// Usage: node scripts/dev/juice-effects.mjs
 import { readFileSync } from 'node:fs';
 
 let uid = 0;
@@ -72,8 +72,8 @@ function m(n, sel) {
   return n.tag === sel;
 }
 
-const APP = readFileSync(new URL('../../web/app.js', import.meta.url), 'utf8');
-const CSS = readFileSync(new URL('../../web/style.css', import.meta.url), 'utf8');
+const APP = readFileSync(new URL('../../src/web/app.js', import.meta.url), 'utf8');
+const CSS = readFileSync(new URL('../../src/web/style.css', import.meta.url), 'utf8');
 
 /**
  * Boot the real app.js under a chosen motion preference and return handles.

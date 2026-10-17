@@ -15,7 +15,7 @@ is stopped, per the brief.**
 
 **Hard constraints — all held (verified):** no card/enemy/boss numbers changed; compact
 CLI output untouched; `greedy` byte-identical; suite **93 pass / 0 fail**; gate **OK**;
-`web/` never touched.
+`src/web/` never touched.
 
 ---
 
@@ -68,7 +68,7 @@ the boss *more* often and kills it *half as fast*.
 
 ## Diagnosis — MEASURED, not assumed
 
-Instrument: `tools/dev/probe-boss-race.mjs` (reads only public kernel output; one full
+Instrument: `scripts/dev/probe-boss-race.mjs` (reads only public kernel output; one full
 run per seed, aggregates only the boss fight).
 
 ```
@@ -90,7 +90,7 @@ reached-counts → **49.2 vs 54.4 per fight**). Both halves of the brief's diagn
 confirmed: **over-valued Block that cannot be spent, and under-valued throughput that ends
 the fight.**
 
-Reward-table bias, instrumented in `tools/dev/probe-reward-bias.mjs`:
+Reward-table bias, instrumented in `scripts/dev/probe-reward-bias.mjs`:
 
 ```
 starter deck: 10 cards, blockPoints 20 (2.0/card), damagePoints 38 (3.8/card)
@@ -241,9 +241,9 @@ targeting is exposed but unread; `Number('p1_2'.slice(1))` is NaN.
 - Production change (one attempt, kept): `src/surface/policies.js` — `W.throughput`,
   `W.raceDangerTurns`, `W.raceDamage`, `W.raceBlock`, `combatContext` race branch,
   `scoreSmartCard` race branch.
-- Evidence instruments (dev-only): `tools/dev/probe-boss-race.mjs`,
-  `tools/dev/probe-reward-bias.mjs`.
-- Raw sim output: `sim-evidence/before-greedy.txt`, `before-smart.txt`,
+- Evidence instruments (dev-only): `scripts/dev/probe-boss-race.mjs`,
+  `scripts/dev/probe-reward-bias.mjs`.
+- Raw sim output: `docs/evidence/sim/before-greedy.txt`, `before-smart.txt`,
   `after-smart.txt`, `after-greedy.txt`.
 
 ## Next step

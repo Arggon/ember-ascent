@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// tools/dev/probe-eleven.mjs — TEMPORARY diagnostic for the 915x412 / 844x390 rows.
-// Read-only w.r.t. web/style.css: it only measures, and its A/B arm injects a throwaway
+// scripts/dev/probe-eleven.mjs — TEMPORARY diagnostic for the 915x412 / 844x390 rows.
+// Read-only w.r.t. src/web/style.css: it only measures, and its A/B arm injects a throwaway
 // <style> into the live document to test whether the bottom-padding band moves End Turn
 // up or down. Deleted after use; not part of the deliverable.
 import { spawn } from 'node:child_process';
@@ -100,7 +100,7 @@ const CAND = process.env.CAND || '';
 for (const [w, h] of SIZES) {
   await S('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w <= 500 });
   for (const seed of SEEDS) {
-    await cycle(`http://localhost:5173/web/index.html?seed=${seed}`);
+    await cycle(`http://localhost:5173/src/web/index.html?seed=${seed}`);
     const asIs = await ev(MEASURE);
     // A/B: revert ONLY the max-height:500px band in the live document, and re-measure.
     const noBand = await ev(`(() => {

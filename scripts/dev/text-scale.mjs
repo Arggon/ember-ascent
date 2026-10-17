@@ -1,4 +1,4 @@
-// tools/dev/text-scale.mjs — large-font (Android "Large", 130%) rows for the layout harnesses.
+// scripts/dev/text-scale.mjs — large-font (Android "Large", 130%) rows for the layout harnesses.
 //
 // Gonzalo's rule: every build is tested at 360-412dp with large fonts (130%). viewport-check
 // and space-check append LARGE_FONT_SIZES to their default matrix.
@@ -13,7 +13,7 @@
 //   and 1.3), and CDP has no text-zoom command. Page.setFontSizes only changes the `medium`
 //   default, which this game overrides with `html, body { font-size: 15px }`, so it does nothing.
 // - So the harness scales the root: the html and body font-size the stylesheet resolved, x1.3
-//   (15px -> 19.5px). In web/style.css 160 of 162 font-size declarations are
+//   (15px -> 19.5px). In src/web/style.css 160 of 162 font-size declarations are
 //   rem / var(--fs-*) / clamp(rem), one is em and one is the 15px root itself, so every piece of
 //   text grows by exactly 1.3 while px widths, px paddings and the 44px touch floor stay put.
 //   That is the same "text bigger, boxes not" result as the Android factor, and the same

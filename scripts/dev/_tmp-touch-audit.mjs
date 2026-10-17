@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// tools/dev/_tmp-touch-audit.mjs — TEMPORARY diagnostic (deleted at the end of this run).
+// scripts/dev/_tmp-touch-audit.mjs — TEMPORARY diagnostic (deleted at the end of this run).
 //
 // Purpose: decide the exact shape of the FIX 1 CSS change, and independently reproduce the
 // spill baseline + spill positive-control that FIX 2's new gate needs.
 //
-// It is READ-ONLY with respect to web/style.css. The two candidate edits are SIMULATED by
+// It is READ-ONLY with respect to src/web/style.css. The two candidate edits are SIMULATED by
 // injecting a throwaway <style> into the live document AFTER the app's final render, which is
 // cascade-equivalent to editing the single declaration:
 //   asis  -> nothing injected (the file exactly as it is now)
 //   del44 -> `#stage .btn { min-height: auto }`: what "delete that one declaration" produces
 //   set44 -> `#stage .btn { min-height: 44px }`: the project's shipped 44px minimum
 //
-// usage: node tools/dev/_tmp-touch-audit.mjs [sizes] [seeds]
+// usage: node scripts/dev/_tmp-touch-audit.mjs [sizes] [seeds]
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 
@@ -52,7 +52,7 @@ const ev = async (e) => {
 };
 
 async function cycle(seed) {
-  const url = `http://localhost:5173/web/index.html?seed=${seed}`;
+  const url = `http://localhost:5173/src/web/index.html?seed=${seed}`;
   await S('Page.navigate', { url }); await sleep(1250);
   await ev(`(()=>{const b=[...document.querySelectorAll('button')].find(x=>/got it/i.test(x.textContent||''));if(b)b.click();try{localStorage.setItem('dlb.helpSeen.v1','1')}catch{};return 1})()`);
   await S('Page.navigate', { url }); await sleep(1150);

@@ -35,17 +35,17 @@ Semantics verified by reading the handlers, not guessed:
 
 ## Rollback manifest (no git repo in this workspace — copies on disk, hashes recorded)
 
-Backups live in `ux-fix-backup/`. Restore by copying the file back over its original path.
+Backups live in `archive/ux-fix-backup/`. Restore by copying the file back over its original path.
 
 | original | backup | sha256 (pre-change) |
 |---|---|---|
-| src/kernel/observe.js | ux-fix-backup/observe.js | _filled in step 2 below_ |
-| src/kernel/index.js | ux-fix-backup/kernel-index.js | |
-| src/surface/session.js | ux-fix-backup/session.js | |
-| src/surface/gui/controller.js | ux-fix-backup/controller.js | |
-| web/app.js | ux-fix-backup/app.js | |
-| web/style.css | ux-fix-backup/style.css | |
-| web/index.html | ux-fix-backup/index.html | |
+| src/kernel/observe.js | archive/ux-fix-backup/observe.js | _filled in step 2 below_ |
+| src/kernel/index.js | archive/ux-fix-backup/kernel-index.js | |
+| src/surface/session.js | archive/ux-fix-backup/session.js | |
+| src/surface/gui/controller.js | archive/ux-fix-backup/controller.js | |
+| src/web/app.js | archive/ux-fix-backup/app.js | |
+| src/web/style.css | archive/ux-fix-backup/style.css | |
+| src/web/index.html | archive/ux-fix-backup/index.html | |
 
 ## Task ledger
 
@@ -87,7 +87,7 @@ of 35-odd golden logs through both surfaces) — the CLI output did not move.
 ℹ fail 0
 ```
 
-`node tools/check-architecture.mjs` ->
+`node scripts/check-architecture.mjs` ->
 
 ```
 check-architecture: scanned 25 files under src/
