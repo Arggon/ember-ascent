@@ -54,6 +54,11 @@ export function createController(opts = {}) {
       return session.state;
     },
 
+    /** The submitted action log of this run (read-only view; the run record counts it). */
+    get submitted() {
+      return session.submitted;
+    },
+
     /** Attach a renderer after construction; null is a valid (headless) value. */
     attach(rendererImpl) {
       renderer = rendererImpl;
