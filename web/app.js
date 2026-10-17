@@ -932,7 +932,7 @@ function renderHud() {
     cls: 'btn ghost',
     text: 'New Run',
     attrs: { type: 'button', title: `New run (seed ${snap.seed}) — keyboard: n` },
-    on: { click: newGame },
+    on: { click: () => newGame() },
   }));
 }
 
@@ -1024,7 +1024,7 @@ function helpPanel() {
       cls: 'btn secondary',
       text: 'New Run',
       attrs: { type: 'button', title: 'Discard this run and start a new one (keyboard: n)' },
-      on: { click: newGame },
+      on: { click: () => newGame() },
     }),
   ));
 
