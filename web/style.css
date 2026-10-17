@@ -3557,3 +3557,94 @@ html, body {
   .stage-combat .card .cdesc { -webkit-line-clamp: 3; line-height: 1; }
   .stage-combat .card { gap: 0; }
 }
+
+/* ==========================================================================================
+   RUN LEDGER, MARKS AND UNLOCKS — end-of-run screen (UX-SPEC-run-history.md S1).
+   Forge-lit woodcut: an iron ledger plate with a brass keyline, numbers in tabular Barlow
+   Condensed, labels in Alegreya Sans, headings in Cinzel. Ember stays the single accent
+   (unlock head only). Paint and type only; the combat layout is untouched.
+   AC-7.4: a hollow run's total stays --fs-4 / --dim; only `.is-earned` gets --fs-5 / --ink.
+   ========================================================================================== */
+.run-ledger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(3.2em, auto);
+  column-gap: var(--sp-3);
+  row-gap: 2px;
+  width: min(100%, 360px);
+  margin: var(--sp-3) auto var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(0, 0, 0, 0.18)), var(--iron);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.22), inset 0 -10px 18px rgba(0, 0, 0, 0.35);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.ledger-line, .ledger-total { display: contents; }
+.ledger-label { color: var(--dim); font-family: var(--text); font-size: var(--fs-3); line-height: 1.45; }
+.ledger-math { color: var(--faint); font-family: var(--num); font-size: var(--fs-3); text-align: right; white-space: nowrap; }
+.ledger-points { color: var(--ink); font-family: var(--num); font-size: var(--fs-3); text-align: right; white-space: nowrap; }
+.ledger-rule {
+  grid-column: 1 / -1;
+  height: 1px;
+  margin: 4px 0 3px;
+  background: linear-gradient(90deg, rgba(185, 138, 82, 0) 0%, var(--brass) 55%, rgba(185, 138, 82, 0.6) 100%);
+}
+.ledger-total-label {
+  grid-column: 1 / 3;
+  color: var(--dim);
+  font-family: var(--display);
+  font-size: var(--fs-2);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  align-self: center;
+}
+.ledger-total-value { color: var(--dim); font-family: var(--num); font-size: var(--fs-4); font-weight: 600; text-align: right; }
+.ledger-total.is-earned .ledger-total-label { color: var(--brass); }
+.ledger-total.is-earned .ledger-total-value { color: var(--ink); font-size: var(--fs-5); }
+.ledger-note { margin: var(--sp-1) auto 0; color: var(--faint); font-size: var(--fs-2); font-style: italic; }
+.recognition {
+  margin: var(--sp-2) auto;
+  max-width: 520px;
+  color: var(--dim);
+  font-family: var(--rules);
+  font-size: var(--fs-3);
+  line-height: 1.5;
+}
+.save-failed {
+  margin: var(--sp-2) auto;
+  max-width: 460px;
+  padding: 6px 10px;
+  color: var(--loss);
+  font-size: var(--fs-2);
+  border-left: 2px solid var(--loss);
+  background: rgba(255, 90, 60, 0.07);
+  text-align: left;
+}
+.marks { list-style: none; margin: 0 auto; padding: 0; max-width: 420px; display: grid; gap: 4px; }
+.mark-item { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px var(--sp-2); }
+.mark-name { color: var(--brass); font-family: var(--display); font-size: var(--fs-3); letter-spacing: 0.06em; }
+.mark-cond { color: var(--dim); font-size: var(--fs-2); }
+.unlock-block {
+  margin: var(--sp-3) auto var(--sp-2);
+  max-width: 460px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--edge);
+  border-top: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: radial-gradient(120% 80% at 50% 0%, rgba(255, 140, 50, 0.1), rgba(255, 140, 50, 0) 70%), var(--iron);
+  box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.18);
+}
+.unlock-head {
+  margin: 0;
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: var(--fs-3);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.unlock-head:not(:first-child) { margin-top: var(--sp-2); }
+.unlock-that { margin: 0; color: var(--ink); font-family: var(--num); font-size: var(--fs-2); letter-spacing: 0.04em; }
+.unlock-line { margin: 0; color: var(--dim); font-family: var(--rules); font-size: var(--fs-3); line-height: 1.45; }
+.unlock-pool { margin: var(--sp-1) 0 0; color: var(--dim); font-family: var(--num); font-size: var(--fs-2); }
+.unlock-limit { margin: var(--sp-1) 0 0; color: var(--faint); font-size: var(--fs-2); font-style: italic; }

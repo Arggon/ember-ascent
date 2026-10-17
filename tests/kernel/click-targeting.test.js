@@ -28,10 +28,20 @@ class N {
   }
   set className(v) { this._cls = String(v); }
   get className() { return this._cls; }
-  get classList() { return { contains: (c) => this._cls.split(/\s+/).includes(c) }; }
+  get classList() {
+    const list = () => this._cls.split(/\s+/).filter(Boolean);
+    const set = (a) => { this._cls = a.join(' '); };
+    return {
+      contains: (c) => list().includes(c),
+      add: (...cs) => set([...new Set([...list(), ...cs])]),
+      remove: (...cs) => set(list().filter((x) => !cs.includes(x))),
+      toggle: (c, force) => { const on = force ?? !list().includes(c); if (on) set([...new Set([...list(), c])]); else set(list().filter((x) => x !== c)); return on; },
+    };
+  }
   set textContent(v) { this.txt = String(v); this.kids = []; }
   get textContent() { return this.txt; }
-  append(...c) { for (const x of c) if (x != null) { x.parent = this; this.kids.push(x); } }
+  append(...c) { for (let x of c) if (x != null) { if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); x = t; } x.parent = this; this.kids.push(x); } }
+  prepend(...c) { const add = c.filter((x) => x != null); for (const x of add) x.parent = this; this.kids.unshift(...add); }
   appendChild(c) { c.parent = this; this.kids.push(c); return c; }
   replaceChildren(...c) { this.kids = []; this.append(...c); }
   setAttribute(k, v) { this.attrs[k] = String(v); }
@@ -100,8 +110,25 @@ const origRAF = globalThis.requestAnimationFrame;
 globalThis.requestAnimationFrame = () => 0;
 
 const toasts = [];
-let src = readFileSync(new URL('../../web/app.js', import.meta.url), 'utf8')
-  .replace(/^import .*$/gm, '')
+const appUrl = new URL('../../web/app.js', import.meta.url);
+const rawSrc = readFileSync(appUrl, 'utf8');
+// app.js's named imports (single- or multi-line) are re-bound from the real modules,
+// except createController, which the factory below stubs with the test controller.
+const IMPORT_RE = /^import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"];?[ \t]*$/gm;
+const importPrelude = [];
+const importedModules = [];
+for (const [, names, spec] of rawSrc.matchAll(IMPORT_RE)) {
+  const bound = names.split(',').map((n) => n.trim()).filter(Boolean)
+    .map((n) => { const [orig, local = orig] = n.split(/\s+as\s+/); return [orig, local]; })
+    .filter(([, local]) => local !== 'createController');
+  if (!bound.length) continue;
+  const mod = await import(new URL(spec, appUrl));
+  importPrelude.push(`const { ${bound.map(([o, l]) => (o === l ? o : `${o}: ${l}`)).join(', ')} } = __mods[${importedModules.length}];`);
+  importedModules.push(mod);
+}
+let src = rawSrc
+  // Strip every static import, including multi-line `import {\n ... \n} from '...';`.
+  .replace(/^import\b[\s\S]*?\bfrom\s*['"][^'"]+['"];?[ \t]*$|^import\s*['"][^'"]+['"];?[ \t]*$/gm, '')
   .replace(/\bboot\(\)\s*;?\s*$/, '');
 // Record every toast, and expose the internals we need to inspect.
 src = src.replace('function toast(msg, kind = \'warn\') {', 'function toast(msg, kind = \'warn\') { __toasts.push(msg);');
@@ -112,11 +139,12 @@ const ctlMod = await import('../../src/surface/gui/controller.js');
 const ctl = ctlMod.createController({ run: { seed: 11 } });
 ctl.dispatch('n1');
 
-const factory = new Function('__ctl', '__toasts', `
+const factory = new Function('__ctl', '__toasts', '__mods', `
   function createController(){ return __ctl; }
+  ${importPrelude.join('\n')}
   ${src}
 `);
-const api = factory(ctl, toasts);
+const api = factory(ctl, toasts, importedModules);
 
 test('clicking a card then an enemy resolves the attack (hotkeys are not required)', () => {
 api.render();
@@ -154,7 +182,7 @@ assert.ok(dmg[1] > 0, `clicking enemy 2 must damage enemy 2 (damage was ${JSON.s
 test('clicking a card ENTERS targeting rather than cancelling itself', () => {
   const c = ctlMod.createController({ run: { seed: 11 } });
   c.dispatch('n1');
-  const api2 = factory(c, []);
+  const api2 = factory(c, [], importedModules);
   toasts.length = 0;
   api2.render();
   const cardBtn2 = byId.stage.querySelector('[data-slot="p1"]');

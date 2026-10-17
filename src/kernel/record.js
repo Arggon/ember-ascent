@@ -95,7 +95,8 @@ export function deriveCounts(record) {
     if (ev === null || typeof ev !== 'object') continue;
     if (ev.t === 'combat_start') {
       combatSeq += 1;
-      seenDead.clear();
+      // No clear(): the `${combatSeq}:${target}` key already separates combats, and
+      // clearing here dropped every earlier combat's kills (AC-7.1 / DR-6).
       const enc = typeof ev.encounter === 'string' ? ENCOUNTERS[ev.encounter] : null;
       isElite = Boolean(enc?.elite);
       isBoss = Boolean(enc?.boss);
