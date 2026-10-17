@@ -3193,6 +3193,8 @@ html, body {
   overflow: hidden;
   transform: translateY(-8px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 3deg));
   transform-origin: 50% 100%;
+  /* Query container for the name size (cqi), see "Combat-hand legibility" below. */
+  container-type: inline-size;
 }
 .stage-combat .card-wrap:hover:not(.is-disabled) .card,
 .stage-combat .card-wrap:focus-within:not(.is-disabled) .card,
@@ -3494,6 +3496,76 @@ html, body {
 @media (max-height: 480px) {
   .stage-combat .card .cdesc { -webkit-line-clamp: 3; line-height: 1; }
   .stage-combat .card { gap: 0; }
+}
+
+/* Combat-hand legibility (QA, 390x844; the same breakage at 360-414 portrait, 768x1024 and the
+   two landscape phones). viewport-check measures each of these now.
+   - A card name never breaks inside a word. The Cinzel name was a fixed 0.98rem (0.72rem on
+     short screens) in a card that can be 75px wide, so `overflow-wrap: anywhere` split it
+     ("HAMME RFALL", "HAM MERF ALL" on the tablet). It is now sized to the card's own width
+     (cqi), capped at the old size, so the longest single word in the card list ("Untempered",
+     "Hammerfall") fits on one line. Desktop cards are wide enough that the cap still applies:
+     same size there. The 18px gem clearance is dropped because in combat the name sits below
+     the type band, not beside the gem. */
+.stage-combat .card .cname {
+  padding-left: 0;
+  overflow-wrap: normal;
+  hyphens: none;
+  font-size: clamp(0.56rem, 13.5cqi, 0.98rem);
+}
+@media (max-height: 480px) {
+  .stage-combat .card .cname { font-size: clamp(0.56rem, 13.5cqi, 0.72rem); }
+}
+/* - The fan stays inside the hand. The hand clips (overflow: hidden), the outer card-wraps sat
+     6px outside it on negative margins, and the 3deg/5deg fan swung their corners further out,
+     so the first and last cards were cut off. Below 1000px wide (where the hand is narrow) the
+     fan is 1.5deg a step, the end margins are zero, and the neighbours overlap 6px instead of
+     12px, which also stops a neighbour covering the end of each rules line. The 4-line rules
+     cap is unchanged. Wide screens keep the full fan.
+   - The same narrow cards (75-105px) give the words the width: a 4px side inset instead of
+     12px on the tablet, the type band lined up with it and starting after the cost gem (it
+     used to run under the gem: "TACK"), and the name set without tracking. */
+@media (max-width: 1000px) {
+  .stage-combat .hand { padding-left: 12px; padding-right: 12px; }
+  .stage-combat .card-wrap { margin: 0 -3px; }
+  .stage-combat .card-wrap:first-child { margin-left: 0; }
+  .stage-combat .card-wrap:last-child { margin-right: 0; }
+  .stage-combat .card {
+    padding-left: 4px;
+    padding-right: 4px;
+    transform: translateY(-8px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 1.5deg));
+  }
+  .stage-combat .card .ctype { margin-left: -4px; margin-right: -4px; padding-left: 18px; padding-right: 4px; gap: 2px; }
+  .stage-combat .card .cname { text-align: center; letter-spacing: 0; font-size: clamp(0.56rem, 14cqi, 0.98rem); }
+}
+@media (max-width: 1000px) and (min-height: 700px) {
+  .stage-combat .card { transform: translateY(-12px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 1.5deg)); }
+}
+@media (max-width: 1000px) and (max-height: 480px) {
+  .stage-combat .card .cname { font-size: clamp(0.56rem, 14cqi, 0.72rem); }
+}
+/* - Portrait phones: ~75px a card. The neighbours overlap by exactly the 4px side padding, so
+     the overlap only ever covers padding, never words. */
+@media (max-width: 620px) {
+  .stage-combat .hand { padding-left: 10px; padding-right: 10px; }
+  .stage-combat .card-wrap { margin: 0 -2px; }
+  .stage-combat .card .cname { font-size: clamp(0.56rem, 14cqi, 0.82rem); }
+}
+/* - The HUD hero name comes back from 381px up: the pills give back 2px a side each and the
+     name truncates with an ellipsis rather than widening the row. Below 381px it stays dropped
+     (the max-width: 620px rule near the top) because the 360px row has no room. */
+@media (min-width: 381px) and (max-width: 620px) {
+  .hud-char {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-2);
+  }
+  #hud .stat { padding-left: 4px; padding-right: 4px; }
+  .hud-step { padding-left: 5px; padding-right: 5px; }
 }
 
 /* ==========================================================================================

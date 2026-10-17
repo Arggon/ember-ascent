@@ -49,6 +49,14 @@ const STAGE_CLIP_ALLOW_PX = 1;    // #stage scrollHeight <= clientHeight + this 
 // border/rounding drift that the 44px button fix introduces (content grows downward INSIDE the
 // stage; it does not spill), while still catching any real 1px+ of clipped content.
 const STAGE_SPILL_ALLOW_PX = 2;   // max descendant spill past #stage's bottom <= this (S2/S3)
+// Hand legibility (S2). Added after a 390x844 QA bug that every check above passed: card
+// names broken mid-word, the fanned hand cut off at its left edge, rules text hidden under the
+// next card, and the HUD hero name gone. Each is a hard fail; there is no tolerance to tune
+// beyond the 1px rounding allowance in the measurement itself.
+const NAME_MIDWORD_BREAKS_MAX = 0;  // no card-name word may lay out on more than one line
+const CARDS_OUTSIDE_HAND_MAX = 0;   // every hand card inside the hand's visible box and viewport
+const DESC_OCCLUDED_MAX = 0;        // both ends of every visible rules line must be on its card
+const HERO_NAME_MIN_WIDTH = 381;    // from this width up the HUD shows the full hero name
 // -------------------------------------------------------------------------------------------
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -215,6 +223,79 @@ for (const [w, h, label] of SIZES_SEL) {
         };
         return { px: worst === null ? null : Math.round(worst), worst: path(worstEl) };
       })();
+      // S2 legibility of the hand itself (added after the 390x844 QA bug: names broken
+      // mid-word, the fan clipped at the hand's left edge, rules text hidden under the next
+      // card, and the HUD hero name dropped -- while every metric above still passed).
+      // handBox is what the hand actually shows: its own rect when it clips (overflow:
+      // hidden), clamped to the viewport.
+      const handBox = (() => {
+        if (!hand) return [0, vw];
+        const r = hand.getBoundingClientRect();
+        const clips = getComputedStyle(hand).overflowX !== 'visible';
+        return clips ? [Math.max(0, r.left), Math.min(vw, r.right)] : [0, vw];
+      })();
+      const handCards = hand ? [...hand.querySelectorAll('.card')] : [];
+      const cardName = (c) => ((c.querySelector('.cname') || {}).textContent || '?').trim();
+      const textNodes = (el) => {
+        const out = []; const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let t;
+        while ((t = tw.nextNode())) out.push(t);
+        return out;
+      };
+      // A card outside the hand box is cut off on screen (rotation included: the bounding
+      // rect of a transformed card covers its swung corners).
+      const cardsOutside = handCards.map((c) => {
+        const r = c.getBoundingClientRect();
+        return cardName(c) + '[' + Math.round(r.left) + ',' + Math.round(r.right) + ']';
+      }).filter((s, i) => {
+        const r = handCards[i].getBoundingClientRect();
+        return r.left < handBox[0] - 1 || r.right > handBox[1] + 1;
+      });
+      // A single word of a card name that lays out as more than one line fragment was broken
+      // mid-word (overflow-wrap: anywhere / break-word kicks in only when the word cannot fit).
+      const nameBreaks = [];
+      for (const c of handCards) {
+        const n = c.querySelector('.cname'); if (!n) continue;
+        for (const t of textNodes(n)) {
+          const re = /\\S+/g; let mm;
+          while ((mm = re.exec(t.data))) {
+            const rg = document.createRange();
+            rg.setStart(t, mm.index); rg.setEnd(t, mm.index + mm[0].length);
+            const frags = [...rg.getClientRects()].filter((x) => x.width > 0.5).length;
+            if (frags > 1) nameBreaks.push(cardName(c) + ': "' + mm[0] + '" on ' + frags + ' lines');
+          }
+        }
+      }
+      // Rules text must be visible: for every rendered line inside the (line-clamped) rules
+      // box, both ends of the line must hit this card (not a neighbour, not off-screen).
+      const descOccluded = [];
+      for (const c of handCards) {
+        const d = c.querySelector('.cdesc'); if (!d) continue;
+        const wrap = c.closest('.card-wrap') || c;
+        const box = d.getBoundingClientRect();
+        let bad = 0;
+        for (const t of textNodes(d)) {
+          if (!t.data.trim()) continue;
+          const rg = document.createRange(); rg.selectNodeContents(t);
+          for (const x of rg.getClientRects()) {
+            const y = (x.top + x.bottom) / 2;
+            if (x.width < 1 || y < box.top || y > box.bottom) continue; // clamped-away line
+            for (const px of [x.left + 1.5, x.right - 1.5]) {
+              const hit = (px >= 0 && px <= vw && y >= 0 && y <= vh) ? document.elementFromPoint(px, y) : null;
+              // A bare .card-wrap or the hand itself is transparent (a neighbour's unrotated
+              // hit box); anything inside ANOTHER card, or outside the hand, hides the text.
+              const other = hit && hit.closest('.card');
+              const ok = hit && (wrap.contains(hit) || (!other && hit.closest('.hand')));
+              if (!ok) bad++;
+            }
+          }
+        }
+        if (bad) descOccluded.push(cardName(c) + ' (' + bad + ' line end(s) hidden)');
+      }
+      // The HUD hero name: dropped by design only below 381px wide (no room at 360px).
+      const heroEl = document.querySelector('.hud-char');
+      const heroName = !heroEl ? 'missing'
+        : !heroEl.getClientRects().length ? 'hidden'
+        : heroEl.scrollWidth > heroEl.clientWidth + 1 ? 'truncated' : 'shown';
       return {
         viewport: [vw, vh],
         seedReported,
@@ -229,6 +310,11 @@ for (const [w, h, label] of SIZES_SEL) {
         cards: cards.length,
         handScrollW: hand ? hand.scrollWidth : null,
         handClientW: hand ? hand.clientWidth : null,
+        cardsOutside,
+        nameBreaks,
+        descOccluded,
+        heroName,
+        handBox: handBox.map(Math.round),
         cardsClipped: cards.filter(c => c.getBoundingClientRect().right > (hand ? hand.getBoundingClientRect().right + 1 : vw)).length,
         lastCardBottom: last ? Math.round(last.getBoundingClientRect().bottom) : null,
         stageBottom: stage ? Math.round(stage.getBoundingClientRect().bottom) : null,
@@ -349,6 +435,18 @@ function evaluateRow(m) {
   } else if (m.spillPx > STAGE_SPILL_ALLOW_PX) {
     fails.push(`stageSpillPx: #stage clips content: descendant spill=${m.spillPx}px > ${STAGE_SPILL_ALLOW_PX}px (deepest: ${m.spillWorst}; #stage is overflow: hidden and swallows it)`);
   }
+  if (m.nameBreaks.length > NAME_MIDWORD_BREAKS_MAX) {
+    fails.push(`card name broken mid-word: ${m.nameBreaks.join('; ')}`);
+  }
+  if (m.cardsOutside.length > CARDS_OUTSIDE_HAND_MAX) {
+    fails.push(`hand card(s) cut off outside the visible hand box [${m.handBox.join(',')}]: ${m.cardsOutside.join(' ')}`);
+  }
+  if (m.descOccluded.length > DESC_OCCLUDED_MAX) {
+    fails.push(`rules text hidden (covered or off-screen): ${m.descOccluded.join('; ')}`);
+  }
+  if (m.viewport[0] >= HERO_NAME_MIN_WIDTH && m.heroName !== 'shown') {
+    fails.push(`HUD hero name ${m.heroName} at ${m.viewport[0]}px wide (must be shown in full from ${HERO_NAME_MIN_WIDTH}px)`);
+  }
   return fails;
 }
 
@@ -361,6 +459,10 @@ console.log('thresholds: EndTurn bottom <= innerHeight - ' + END_TURN_CLEARANCE_
   + ' | stageClipPx <= ' + STAGE_CLIP_ALLOW_PX
   + ' | spillPx <= ' + STAGE_SPILL_ALLOW_PX
   + ' | EndTurn topmost at centre: ' + END_TURN_MUST_BE_ON_TOP
+  + ' | name mid-word breaks <= ' + NAME_MIDWORD_BREAKS_MAX
+  + ' | cards outside hand <= ' + CARDS_OUTSIDE_HAND_MAX
+  + ' | rules lines hidden <= ' + DESC_OCCLUDED_MAX
+  + ' | hero name shown from ' + HERO_NAME_MIN_WIDTH + 'px'
   + ' | seed pinned: ' + (SEED_IN_URL ? 'yes' : 'no'));
 console.log('base: ' + BASE_TEMPLATE + '  seeds: ' + SEEDS.join(','));
 console.log('');
