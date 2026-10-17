@@ -3602,6 +3602,31 @@ html, body {
   .card .ctemper .t-mark { width: 10px; height: 10px; }
 }
 
+/* B3 Ember quests: a strip of three chips above the map. */
+.quests { display: flex; gap: 6px; margin: 0 0 6px; flex-wrap: wrap; }
+.quest {
+  position: relative; flex: 1 1 0; min-width: 0; padding: 3px 8px 5px;
+  border: 1px solid rgba(255, 170, 90, 0.35); border-radius: 6px;
+  background: rgba(30, 16, 10, 0.7); font-size: 0.8rem; line-height: 1.2;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.quest .q-name { color: #ffcf8a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quest .q-prog { color: #d8c3ad; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quest .q-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: var(--q, 0%); background: linear-gradient(90deg, #ff7a2f, #ffd27a); }
+.quest.done { border-color: #ffd27a; box-shadow: 0 0 8px rgba(255, 190, 90, 0.35); }
+.quest.done .q-name::before { content: '✦ '; }
+@media (max-height: 480px) {
+  .quests { margin-bottom: 3px; gap: 4px; }
+  .quest { flex-direction: row; gap: 6px; align-items: baseline; padding: 1px 6px 3px; font-size: 0.62rem; }
+}
+@media (max-height: 480px) {
+  /* With the quest strip the 8 floors still fit 412px: nodes give up 4px each, gaps 1px. */
+  .page-map:has(.quests) .map { gap: 3px; }
+  .page-map:has(.quests) .node { min-height: 26px; padding-top: 1px; padding-bottom: 1px; }
+  .page-map:has(.quests) .node .ntype-mark { width: 21px; height: 21px; }
+  .quests { margin-bottom: 2px; }
+}
+
 /* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
    than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at
    768x1024. Cap combat-hand rules at 4 lines; the full sentence stays in the card's

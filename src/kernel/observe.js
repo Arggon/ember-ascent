@@ -17,6 +17,7 @@ import { actions as legalActions } from './actions.js';
 import { intentLabel, intentDamage, REST_HEAL } from './rules/act.js';
 import { BOONS } from './rules/kindling.js';
 import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
+import { QUESTS } from './rules/quests.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -247,7 +248,9 @@ function kindlingBody(state) {
 }
 
 function mapBody(state, opts) {
-  const lines = [`MAP — floor ${state.floor + 1}/${state.map.rows.length}`, 'NEXT'];
+  const lines = [`MAP — floor ${state.floor + 1}/${state.map.rows.length}`];
+  if (state.quests) lines.push(`QUESTS ${state.quests.map((q) => `${q.id} ${q.done ? 'DONE' : `${q.progress}/${QUESTS[q.id].goal}`}`).join(' | ')}`);
+  lines.push('NEXT');
   availableNodes(state).forEach((n, i) => {
     lines.push(` n${i + 1} ${NODE_TYPES[n.type].label}`);
   });
@@ -537,6 +540,9 @@ export function snapshot(state) {
     } : null,
     kindling: state.phase === 'kindling'
       ? { boons: state.kindling.offers.map((id, i) => ({ id, name: BOONS[id].name, text: BOONS[id].text, label: BOONS[id].label, actionId: `k${i + 1}` })) }
+      : null,
+    quests: state.quests
+      ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))
       : null,
     ended: state.phase === 'ended' ? { outcome: state.outcome, floor: state.floor + 1, steps: state.stepIndex } : null,
     // The plain-English layer, computed from this same state. A human surface paints
