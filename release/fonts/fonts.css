@@ -1,0 +1,8 @@
+/* assets/fonts/fonts.css — locally bundled typefaces. Same origin only; no network.
+ * All SIL Open Font License 1.1 (texts in OFL-*.txt, inventory in LICENSES.md). */
+@font-face { font-family: "Cinzel"; src: url("./cinzel.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
+@font-face { font-family: "Cinzel Decorative"; src: url("./cinzel-decorative-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Alegreya"; src: url("./alegreya.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("./alegreya-sans-400.woff2") format("woff2"); font-weight: 400 500; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url("./alegreya-sans-700.woff2") format("woff2"); font-weight: 600 900; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("./barlow-condensed-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }

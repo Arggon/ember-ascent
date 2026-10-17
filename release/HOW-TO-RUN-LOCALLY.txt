@@ -20,5 +20,12 @@ NOTHING ELSE IS NEEDED. No install, no build, no node_modules, and no network
 access at runtime: every asset the game uses is in this folder and is loaded from
 this same origin. No analytics, no telemetry, no external font, no CDN.
 
-Layout: index.html is the entry point; app.js, style.css and tokens.js are the
-page; src/ is the game engine that app.js imports.
+Layout:
+  index.html            the entry point (open http://localhost:5173/)
+  app.js, stage-art.js, card-art.js, tokens.js, style.css
+                        the page and its modules
+  assets/               sprites and backdrops (WebP)
+  fonts/                the web fonts and their OFL licence texts
+  src/                  the game engine (kernel, surface) that app.js imports
+  tools/serve.mjs       the local server used above
+  HOW-TO-RUN-LOCALLY.txt this file

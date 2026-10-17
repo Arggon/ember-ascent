@@ -49,11 +49,11 @@ export const LOG_VERSION = 1;
 
 /**
  * Begin a fresh run.
- * @param {{seed?: number, character?: string, difficulty?: number}} opts
- * @returns {{state: any, submitted: Array<{act: string}|{reject: string}>}}
+ * @param {{seed?: number, character?: string, difficulty?: number, content?: any}} opts
+ * @returns {{state: any, submitted: Array<{act: string}|{reject: string}>, events: any[]}}
  */
 export function begin(opts = {}) {
-  return { state: newRun(opts), submitted: [] };
+  return { state: newRun(opts), submitted: [], events: [] };
 }
 
 /**
@@ -62,6 +62,14 @@ export function begin(opts = {}) {
  * R6: an illegal or unknown id is a legal NO-OP carrying a structured error; it is
  * recorded as a rejection so the malformed rate stays measurable on replay. It is
  * never retried and never throws.
+ *
+ * DR-6 — THE EVENT STREAM IS ACCUMULATED HERE, AND THIS IS THE ONLY PLACE IT CAN BE.
+ * The run record's score needs kill / elite / boss counts, and `snapshot()` carries no
+ * such counters: they exist only in the per-step `events` this function receives. A
+ * caller that keeps the actions but drops the events produces a record that scores zero
+ * kills while looking perfectly well-formed, so the stream is kept alongside them, in
+ * the same order, with no filtering — including the `rejected` event of a no-op, which
+ * a later reader can use to reconcile `steps` against `actions`.
  * @param {any} session
  * @param {unknown} raw
  * @returns {{session: any, error: any, events: any[], changed: boolean}}
@@ -70,12 +78,26 @@ export function submit(session, raw) {
   const id = typeof raw === 'string' ? raw : String(raw);
   const res = step(session.state, id);
   const entry = res.error ? { reject: id } : { act: id };
+  const seen = Array.isArray(res.events) ? res.events : [];
   return {
-    session: { state: res.state, submitted: [...session.submitted, entry] },
+    session: {
+      state: res.state,
+      submitted: [...session.submitted, entry],
+      events: [...(session.events ?? []), ...seen],
+    },
     error: res.error,
     events: res.events,
     changed: res.error === null,
   };
+}
+
+/**
+ * The accumulated kernel event stream (DR-6), for a caller building a run record.
+ * @param {any} session
+ * @returns {any[]}
+ */
+export function eventsOf(session) {
+  return Array.isArray(session?.events) ? session.events : [];
 }
 
 /** Legal action descriptors for the current state. */
@@ -175,7 +197,10 @@ export function loadObject(raw) {
     }
   }
   if (problems.length > 0) return { ok: false, problems };
-  return { ok: true, session: { state: raw.state, submitted: raw.actions.slice() } };
+  // A save file carries the actions but never the event stream (the save format is
+  // frozen), so a restored session starts with an empty one. That is honest: a run
+  // restored mid-play cannot report kills it did not observe after the restore.
+  return { ok: true, session: { state: raw.state, submitted: raw.actions.slice(), events: [] } };
 }
 
 /** Log header line object for a session's originating run. */
@@ -189,6 +214,11 @@ export function logHeader(session) {
     // without these two, and they change none of the specified fields.
     character: session.state.character,
     difficulty: session.state.difficulty,
+    // Additive (B1): only present for an opted-in Kindling run, so old headers are unchanged.
+    ...(session.state.kindling ? { kindling: true } : {}),
+    ...(session.state.tempers ? { tempers: true } : {}),
+    ...(session.state.quests ? { quests: true } : {}),
+    ...(session.state.biome ? { biome: session.state.biome } : {}),
   };
 }
 
@@ -207,6 +237,10 @@ export function replay(header, entries) {
     seed: header.seed,
     character: header.character ?? 'ironclad',
     difficulty: header.difficulty ?? 0,
+    kindling: header.kindling === true,
+    tempers: header.tempers === true,
+    quests: header.quests === true,
+    ...(header.biome ? { biome: header.biome } : {}),
   });
   const steps = [];
   for (const [i, entry] of entries.entries()) {
