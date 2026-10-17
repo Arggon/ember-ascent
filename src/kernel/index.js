@@ -455,7 +455,9 @@ function playCard(state, action, content) {
   // we settle victory immediately rather than making the player press end turn.
   if (next.combat.active && next.combat.enemies.every((e) => e.dead)) {
     const won = resolveVictory(next, content.cards);
-    return { state: won.state, events: [...events, ...won.events] };
+    // Same event shape as the end-turn path (rules/act.js): a combat won by a card must
+    // also emit `combat_won`, or elite/boss points are never awarded (DR-6).
+    return { state: won.state, events: [...events, { t: 'combat_won' }, ...won.events] };
   }
   if (next.combat.enemies.some((e) => e.dead)) {
     next = { ...next, combat: { ...next.combat, enemies: next.combat.enemies.map((e) => (e.dead ? e : { ...e, index: e.index })) } };

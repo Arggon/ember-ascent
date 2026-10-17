@@ -62,9 +62,9 @@ test('log header carries the flag and replay matches the golden hash', () => {
   const s = drive({ seed: 1, quests: true }, 120);
   const parsed = parseLog(renderLog(s));
   assert.equal(parsed.header.quests, true);
-  assert.equal(s.events.filter((e) => e.t === 'quest_done').length, 2, 'the golden run finishes two quests');
+  assert.equal(s.events.filter((e) => e.t === 'quest_done').length, 3, 'the golden run finishes three quests (Elite Hunter completes since the DR-6 combat_won fix)');
   assert.equal(assertReplay(parsed).ok, true);
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:bd85d0a3673e021a0756905c2c4d112306974009eabc5509fe10640d72eaac33';
+const GOLDEN = 'sha256:d402ef4c9b98dd9a30e62926955853d9b4f847b37e81bfad039a3f2b1d788e49';
