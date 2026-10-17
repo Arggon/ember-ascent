@@ -1690,7 +1690,7 @@ function combatView() {
 
   const fight = el('div', { cls: 'fight' });
   const backdrop = el('div', { cls: 'backdrop', attrs: { 'aria-hidden': 'true' } });
-  backdrop.innerHTML = backdropMarkup(snap.biome);
+  backdrop.innerHTML = backdropMarkup((BIOMES[snap.biome] ?? BIOMES[DEFAULT_BIOME]).backdrop);
   // Empty foundry floor fast-forwards the feel queue. Cards, enemies and buttons sit above it.
   backdrop.addEventListener('pointerdown', () => skipAnim());
   fight.append(backdrop);

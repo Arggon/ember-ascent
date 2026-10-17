@@ -165,17 +165,20 @@ export const ENCOUNTERS = {
 
 /**
  * Biomes (B5): the ONE list of biomes. 'foundry' is the default act; 'mines' is the opt-in
- * alternate. `byType` is the encounter pool per node type. newRun validates against this
+ * alternate. `byType` is the encounter pool per node type;
+ * `backdrop` is the art key web/stage-art.js draws behind the stage. newRun validates against this
  * table, the snapshot names the biome from it, and the GUI picker, Act I card and CLI read
  * it through the public entry, so a new biome is one row here.
  */
 export const BIOMES = Object.freeze({
   foundry: {
     name: 'The Foundry',
+    backdrop: 'forge',
     byType: { combat_weak: ['weak_1', 'weak_2', 'weak_3', 'weak_4'], combat_strong: ['strong_1', 'strong_2', 'strong_3'], elite: ['elite_1'], boss: ['boss_1'] },
   },
   mines: {
     name: 'The Cinder Mines',
+    backdrop: 'tunnel',
     byType: { combat_weak: ['mines_weak_1', 'mines_weak_2', 'mines_weak_3'], combat_strong: ['mines_strong_1', 'mines_strong_2'], elite: ['mines_elite_1'], boss: ['mines_boss_1'] },
   },
 });
