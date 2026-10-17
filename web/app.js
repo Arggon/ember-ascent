@@ -1567,8 +1567,7 @@ function intentBadge(e) {
   });
   badge.innerHTML = intentGlyph(which);
   if (kind === 'attack') {
-    // `damage` is the intent's TOTAL (all hits); the badge reads per-hit × hits, as the label does.
-    const n = e.intent.hits > 1 ? `${Math.round(e.intent.damage / e.intent.hits)}×${e.intent.hits}` : String(e.intent.damage ?? '');
+    const n = e.intent.hits > 1 ? `${e.intent.damage}×${e.intent.hits}` : String(e.intent.damage ?? '');
     badge.append(el('b', { cls: 'intent-num', text: n }));
   }
   return badge;
