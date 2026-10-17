@@ -17,7 +17,7 @@
 // stream is the only source of kill counts), DR-7 (no derivable score => null).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { REPO, loadVocabulary } from '../helpers/harness.mjs';
@@ -398,8 +398,18 @@ test('§11.2 [TODO — real defect]: poolSelection must actually return FRESH_SI
 // DR-3 — the 150 legacy lines keep loading, and yield no score
 // ---------------------------------------------------------------------------
 
-test('DR-3: every legacy line loads without error, and yields NO score', () => {
-  const runsFile = resolve(REPO, 'sim-out', 'runs.jsonl');
+// The legacy fixture lives in `sim-out/runs.jsonl`, which is gitignored (`sim-out*/`) and so
+// is absent from a fresh clone and from CI. Without it this case cannot run at all, so it is
+// SKIPPED with a visible reason rather than failing on ENOENT. Where the fixture exists (a
+// dev box with the 150 legacy lines) the case runs exactly as before. Tracked as the known
+// DR-3 fixture gap: commit a small legacy fixture under tests/ to make it run everywhere.
+const LEGACY_RUNS = resolve(REPO, 'sim-out', 'runs.jsonl');
+const DR3_SKIP = existsSync(LEGACY_RUNS)
+  ? false
+  : 'known DR-3 fixture gap: sim-out/runs.jsonl (150 legacy lines) is gitignored and missing here';
+
+test('DR-3: every legacy line loads without error, and yields NO score', { skip: DR3_SKIP }, () => {
+  const runsFile = LEGACY_RUNS;
   const lines = readFileSync(runsFile, 'utf8').split('\n').filter((l) => l.trim() !== '');
   assert.ok(lines.length >= 150, `the legacy fixture must still hold >=150 lines, holds ${lines.length}`);
 
