@@ -14,7 +14,7 @@
 //     src/...                       <- the import closure outside src/web/, verbatim
 //     tools/serve.mjs               <- copy of scripts/serve.mjs for the documented run-locally command
 //     HOW-TO-RUN-LOCALLY.txt        <- generated
-//   deckbuilder-demo.zip            <- the exact file the owner uploads to itch.io
+//   release.zip                     <- the exact file the owner uploads to itch.io (<OUT>.zip)
 //
 // WHY THE FLATTEN: itch.io's HTML5 player serves the zip root as the game's web
 // root, so the entry must be at the top level, not nested under src/web/.
@@ -40,7 +40,7 @@
 // upload file can be regenerated and its hash checked on any machine with Node.
 //
 // Usage:
-//   node scripts/build-release.mjs                  # -> ./release + ./deckbuilder-demo.zip
+//   node scripts/build-release.mjs                  # -> ./release + ./release.zip
 //   OUT=/tmp/foo node scripts/build-release.mjs     # -> /tmp/foo + /tmp/foo.zip
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -79,11 +79,11 @@ function rewriteWebSpecifiers(text) {
   return text.replace(/(['"])\.\.\/((?:kernel|surface)\/[^'"]+)\1/g, (_m, q, rest) => `${q}./src/${rest}${q}`);
 }
 
-// The only non-JS rewrite: the font stylesheet link in index.html.
 // Designed 404s: specifiers a module resolves inside try/catch for a file that does not
 // exist on purpose (see the header). Skipped by the closure walk, allowed by the test.
 export const OPTIONAL_MISSING = Object.freeze(['src/surface/gui/renderer.js']);
 
+// The only non-JS rewrite: the font stylesheet link in index.html.
 const FONT_LINK = ['href="../../assets/fonts/fonts.css"', 'href="./fonts/fonts.css"'];
 
 // serve.mjs derives its doc root from `new URL('..')`, so it must sit one level
@@ -119,8 +119,15 @@ NOTHING ELSE IS NEEDED. No install, no build, no node_modules, and no network
 access at runtime: every asset the game uses is in this folder and is loaded from
 this same origin. No analytics, no telemetry, no external font, no CDN.
 
-Layout: index.html is the entry point; app.js, style.css and tokens.js are the
-page; src/ is the game engine that app.js imports.
+Layout:
+  index.html            the entry point (open http://localhost:5173/)
+  app.js, stage-art.js, card-art.js, tokens.js, style.css
+                        the page and its modules
+  assets/               sprites and backdrops (WebP)
+  fonts/                the web fonts and their OFL licence texts
+  src/                  the game engine (kernel, surface) that app.js imports
+  tools/serve.mjs       the local server used above
+  HOW-TO-RUN-LOCALLY.txt this file
 `;
 
 // ---------------------------------------------------------------------------

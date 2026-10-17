@@ -98,6 +98,23 @@ function directoryRedirect(url, file) {
   return `${p}${query}`;
 }
 
+/**
+ * Where a request under the old /web/ tree should go, or null when it is not one.
+ * @param {string} url request target: path plus optional `?query`
+ * @param {string} file absolute path inside ROOT that `url` resolved to
+ * @returns {string|null}
+ */
+function legacyWebRedirect(url, file) {
+  const parts = relative(ROOT, file).split(sep).filter(Boolean);
+  if (parts[0] !== 'web') return null;
+  const q = url.indexOf('?');
+  const path = q === -1 ? url : url.slice(0, q);
+  const query = q === -1 ? '' : url.slice(q);
+  const rest = parts.slice(1).map(encodeURIComponent).join('/');
+  const slash = rest === '' || path.endsWith('/') ? '/' : '';
+  return `/src/web/${rest}${rest ? slash : ''}${query}`;
+}
+
 const server = createServer((req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -119,6 +136,18 @@ const server = createServer((req, res) => {
   if (file === null) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('forbidden: path escapes the project root\n');
+    return;
+  }
+
+  // Legacy URLs (#46): the game moved from /web/ to /src/web/. Old bookmarks and harness
+  // commands (/web, /web/, /web?seed=N, /web/index.html?seed=N) get a 302 to the same file
+  // under /src/web/, query kept. Like directoryRedirect, the Location is built from the
+  // RESOLVED path (already checked to be inside ROOT, after the 400 for bad escapes), never
+  // from the raw request path, so `//evil.com/../web` still lands on same-origin /src/web/.
+  const legacy = legacyWebRedirect(req.url ?? '/', file);
+  if (legacy !== null) {
+    res.writeHead(302, { Location: legacy });
+    res.end();
     return;
   }
 

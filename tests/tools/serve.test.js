@@ -131,3 +131,42 @@ for (const input of ['/src/web%', '/%E0%A4%A', '/src/web/%zz']) {
     await ok.body?.cancel();
   });
 }
+
+// #46 moved the game from /web/ to /src/web/. Old URLs (bookmarks, harness commands) get a
+// 302 to the same file under /src/web/ with the query kept, built from the resolved path.
+for (const [input, want] of [
+  ['/web', '/src/web/'],
+  ['/web/', '/src/web/'],
+  ['/web?seed=11', '/src/web/?seed=11'],
+  ['/web/?seed=11', '/src/web/?seed=11'],
+  ['/web/index.html?seed=11', '/src/web/index.html?seed=11'],
+  ['/web/assets/sprites/hero.webp', '/src/web/assets/sprites/hero.webp'],
+  ['/web/?seed=7&pool=full', '/src/web/?seed=7&pool=full'],
+]) {
+  test(`legacy ${input} -> 302 ${want}`, async () => {
+    const r = await rawGet(input);
+    assert.equal(r.status, 302, `${input}: status`);
+    assertSameOrigin(r.location, input);
+    assert.equal(r.location, want);
+  });
+}
+
+for (const input of ['//evil.com/../web?seed=11', '///evil.com/../web/', '/\\evil.com/../web/index.html?seed=3']) {
+  test(`legacy ${input} stays same-origin`, async () => {
+    const r = await rawGet(input);
+    assert.equal(r.status, 302);
+    assertSameOrigin(r.location, input);
+    assert.match(r.location, /^\/src\/web\//);
+  });
+}
+
+test('the legacy redirect target actually serves the game with the seed', async () => {
+  const r = await rawGet('/web/index.html?seed=11');
+  const f = await get(r.location);
+  assert.equal(f.status, 200);
+});
+
+test('a malformed escape under /web is still a 400, not a redirect', async () => {
+  const r = await rawGet('/web/%zz');
+  assert.equal(r.status, 400);
+});
