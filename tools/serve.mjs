@@ -12,7 +12,7 @@
 // Usage:  node tools/serve.mjs [--port 5173]
 import { createServer } from 'node:http';
 import { createReadStream, statSync } from 'node:fs';
-import { extname, join, resolve, normalize, sep } from 'node:path';
+import { extname, join, resolve, normalize, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -67,6 +67,36 @@ function resolveInsideRoot(urlPath) {
   return abs;
 }
 
+/**
+ * Where a directory request without its trailing slash should be redirected, or null
+ * when the PATH already ends in `/`. The slash goes on the path, BEFORE the query.
+ *
+ * WHY: this used to test and append to the whole `req.url`, query included. So
+ * `/web/?seed=11` (path already ending in `/`) was still "missing" its slash and was
+ * redirected to `/web/?seed=11/`, where `Number("11/")` is NaN and the page silently
+ * fell back to a random seed. That is the "instrument was lying" root cause recorded in
+ * LAYOUT-ACCEPTANCE.md §1. `/web?seed=11` now goes to `/web/?seed=11`.
+ *
+ * The Location is built from the RESOLVED directory (`file`, already checked to be inside
+ * ROOT), never from the raw request path, and its leading slashes are collapsed to one. So
+ * it is always a same-origin `/...` path. Copying the raw path was an open redirect:
+ * `GET //evil.com/../web` resolves to the web/ directory, but answered
+ * `Location: //evil.com/../web/`, which a browser reads as a protocol-relative URL to
+ * evil.com (likewise `/\evil.com/...`, since browsers treat `\` as `/`).
+ * @param {string} url request target: path plus optional `?query`
+ * @param {string} file absolute directory path inside ROOT that `url` resolved to
+ * @returns {string|null}
+ */
+function directoryRedirect(url, file) {
+  const q = url.indexOf('?');
+  const path = q === -1 ? url : url.slice(0, q);
+  const query = q === -1 ? '' : url.slice(q);
+  if (path.endsWith('/')) return null;
+  const rel = relative(ROOT, file).split(sep).filter(Boolean).map(encodeURIComponent).join('/');
+  const p = `/${rel}/`.replace(/^\/+/, '/');
+  return `${p}${query}`;
+}
+
 const server = createServer((req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -92,8 +122,9 @@ const server = createServer((req, res) => {
     return;
   }
   if (stat.isDirectory()) {
-    if (!file.endsWith(sep) && !(req.url ?? '').endsWith('/')) {
-      res.writeHead(301, { Location: `${req.url}/` });
+    const location = directoryRedirect(req.url ?? '/', file);
+    if (location !== null) {
+      res.writeHead(301, { Location: location });
       res.end();
       return;
     }
