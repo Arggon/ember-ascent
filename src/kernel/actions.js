@@ -4,6 +4,7 @@
 // without importing the entry point (which would be a cycle). The action-id scheme
 // is frozen by the requirements:
 //   p<n> play hand slot n · e1 end turn · c continue · s<n> reward pick · n<n> map node
+//   k<n> kindling boon (opt-in runs only; additive, no existing id changes)
 //
 // TARGETED PLAYS (PM Document revision 5). A card whose content declares
 // `target: "enemy"` must be aimed by the player when the choice is real, i.e. when
@@ -105,6 +106,10 @@ export function actions(state) {
     case 'rest': {
       out.push({ id: 'c', kind: 'rest_heal' });
       out.push({ id: 'e1', kind: 'rest_leave' });
+      break;
+    }
+    case 'kindling': {
+      state.kindling.offers.forEach((boon, i) => out.push({ id: `k${i + 1}`, kind: 'boon', boon }));
       break;
     }
     case 'ended':

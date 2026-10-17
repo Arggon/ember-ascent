@@ -157,7 +157,7 @@ function seedFromUrl() {
   return Number.isInteger(n) && n >= 0 ? n : Math.floor(Math.random() * 1000000);
 }
 
-let ctl = createController({ run: { seed: seedFromUrl() } });
+let ctl = createController({ run: { seed: seedFromUrl(), kindling: true } });
 let snap = ctl.snapshot();
 /** Kernel events of the current run, accumulated for the run-history record (reset in newGame). */
 let runEvents = [];
@@ -467,7 +467,7 @@ function keywordText(node, text) {
   const str = String(text ?? '');
   if (terms.size === 0) { node.textContent = str; return node; }
   const words = [...terms.keys()].sort((a, b) => b.length - a.length).join('|');
-  const re = new RegExp(`(Lose \\d+ HP)|\\b(${words})\\b`, 'gi');
+  const re = new RegExp(`(Lose \\d+ (?:max )?HP)|\\b(${words})\\b`, 'gi');
   let at = 0;
   for (const m of str.matchAll(re)) {
     if (m.index > at) node.append(str.slice(at, m.index));
@@ -848,7 +848,7 @@ function newGame(seed = null) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
   // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
-  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()) } });
+  ctl = createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), kindling: true } });
   snap = ctl.snapshot();
   // The event stream is per-RUN, so it dies with the run. It is the only source of the kill
   // / elite / boss counts the score needs, which is why it is accumulated rather than
@@ -1213,6 +1213,7 @@ function render() {
     case 'combat': stageEl.append(combatView()); break;
     case 'reward': stageEl.append(rewardView()); break;
     case 'rest': stageEl.append(restView()); break;
+    case 'kindling': stageEl.append(kindlingView()); break;
     case 'ended': stageEl.append(endView()); break;
     default: stageEl.append(el('p', { text: `phase ${snap.phase}` }));
   }
@@ -1278,7 +1279,7 @@ function render() {
  */
 function sceneBeat(from, to) {
   if (from === null) {
-    if (to === 'map' && !(snap.map && snap.map.floor > 0)) {
+    if ((to === 'kindling' || to === 'map') && !(snap.map && snap.map.floor > 0)) {
       fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
         el('span', { cls: 'fx-act-num', text: 'Act I' }),
         el('span', { cls: 'fx-act-name', text: 'The Foundry' }),
@@ -2075,6 +2076,27 @@ function rewardView() {
   controls.append(el('span', { cls: 'hint', text: 'Click a card to add it to your deck' }));
   wrap.append(controls);
   return page('reward', 'III — The Spoils', 'star', 'panel', [wrap]);
+}
+
+/* ------------------------------------------------------------------ KINDLING */
+
+/** B1: the act-start boon choice. Every word comes from the kernel snapshot. */
+function kindlingView() {
+  const wrap = el('div', { cls: 'kindling' });
+  wrap.append(sceneIllus('event'));
+  wrap.append(el('div', { cls: 'big-title kindling-head', text: 'The forge offers a kindling' }));
+  wrap.append(el('p', { cls: 'kindling-note', text: 'Take one. Each gift has a price.' }));
+  const list = el('div', { cls: 'boon-list' });
+  for (const b of snap.kindling.boons) {
+    list.append(el('button', {
+      cls: 'boon', attrs: { type: 'button', 'data-action': b.actionId, 'aria-label': `${b.name}: ${b.text}` },
+      on: { click: () => act(b.actionId) },
+    },
+    el('span', { cls: 'boon-name', text: b.name }),
+    keywordText(el('span', { cls: 'boon-text' }), b.text)));
+  }
+  wrap.append(list);
+  return page('kindling', '0 — The Kindling', 'flame', 'panel', [wrap]);
 }
 
 /* --------------------------------------------------------------------- REST */

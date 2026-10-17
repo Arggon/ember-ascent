@@ -207,13 +207,19 @@ async function waitFor(expr, timeoutMs = 15000) {
   return false;
 }
 const MAP_READY = `!!(document.querySelector('.node.available') || [...document.querySelectorAll('button')].some(x => /got it/i.test(x.textContent || '')))`;
+const MAP_OR_KINDLING = `!!(document.querySelector('.node.available, .kindling .boon') || [...document.querySelectorAll('button')].some(x => /got it/i.test(x.textContent || '')))`;
 const FIGHT_READY = `!!([...document.querySelectorAll('button')].some(b => /end turn/i.test(b.textContent || '')) && document.querySelector('.hand .card'))`;
 async function cycle(url) {
   await S('Page.navigate', { url });
-  await waitFor(MAP_READY);
+  await waitFor(MAP_OR_KINDLING);
   await sleep(300);
   await ev(`(()=>{const b=[...document.querySelectorAll('button')].find(x=>/got it/i.test(x.textContent||''));if(b)b.click();try{localStorage.setItem('dlb.helpSeen.v1','1')}catch{};return 1})()`);
   await S('Page.navigate', { url });
+  await waitFor(MAP_OR_KINDLING);
+  await sleep(300);
+  // Kindling (v2/2): runs open on the act-start boon choice. Take the first boon (taking
+  // one is mandatory; every boon keeps the 5-card opening hand) to reach the map.
+  await ev(`(()=>{const b=document.querySelector('.kindling .boon');if(b)b.click();return 1})()`);
   await waitFor(MAP_READY);
   await sleep(300);
   // Travel into the first fight: the densest screen.

@@ -28,6 +28,7 @@ import {
   REWARD_CHOICES,
 } from './rules/act.js';
 import { fireHook } from './rules/powers.js';
+import { offerBoons, applyBoon } from './rules/kindling.js';
 import './rules/effects/index.js'; // registers the exotic handlers exactly once
 import { observe as observeState, observeActions, snapshot as snapshotState } from './observe.js';
 import {
@@ -253,6 +254,16 @@ export function newRun(opts = {}) {
     reward: null,
   };
 
+  // B1 Kindling (opt-in). Only an opted-in run gains the extra fields and draws, so the
+  // default state — and every existing golden hash — is byte-identical to before.
+  if (opts.kindling === true) {
+    const offer = offerBoons(seed, state.rngDraws);
+    state.rngDraws += offer.draws;
+    state.phase = 'kindling';
+    state.kindling = { offers: offer.ids, taken: null };
+    state.relicOff = false;
+  }
+
   return freezeDeep(state);
 }
 
@@ -306,6 +317,9 @@ export function step(state, id) {
       };
       break;
     }
+    case 'boon':
+      result = applyBoon(bumped, match.boon);
+      break;
     case 'rest_leave':
       result = { state: { ...bumped, phase: 'map' }, events: [{ t: 'rest_left' }] };
       break;

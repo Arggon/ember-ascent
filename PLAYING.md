@@ -81,6 +81,8 @@ Cards you **cannot afford** are visually disabled — if it won't play, you don'
 
 You have **3 energy per turn**, and cards cost 1–2, so you'll typically play 2–3 cards. **Block disappears at the start of your turn** — it only reduces damage *this* turn, so block based on the enemy's shown intent. Your deck cycles: when the draw pile empties, the discard pile is shuffled back in.
 
+**The Kindling.** In the browser, every run opens at the forge: it offers three boons and you must take one. Each has an upside *and* a price (for example *Bellows Breath*: +1 Energy every turn, −12 max HP). Choose for your plan, not for the bigger number.
+
 Killing a low-HP enemy outright is usually better than blocking, because a dead enemy deals no damage next turn.
 
 You are going to lose. A lot. That's the genre — the run ends with `GAME OVER — DEFEAT` and tells you how far you got.
@@ -117,6 +119,8 @@ node bin/dlb state   --run run.json     # compact text observation: ~116 tokens
 node bin/dlb actions --run run.json     # 5-token action ids
 node bin/dlb play p1 --run run.json
 ```
+
+Add `--kindling` to `new` to open on the act-start boon choice the browser uses: the state shows `KINDLING` and the actions are `k1`–`k3` (no skip). Without the flag a run is byte-identical to earlier builds, so old seeds, logs and golden hashes still match. A Kindling run's log header records `"kindling":true`, so `replay` reproduces it.
 
 **Batch balance testing costs zero API tokens:**
 
