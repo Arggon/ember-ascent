@@ -3683,6 +3683,26 @@ html, body {
   .hero-pick .hp-blurb { font-size: 0.6rem; }
 }
 .hero-pick.hp-ironclad .hp-face .spr { object-position: center; transform: scale(1.25); }
+/* QA: on 360-412px phones, and above all with 130% text, the two hero cards stacked
+   (name + blurb each) and the Kindling boons, the actual choice on this screen, fell
+   below the fold (360x780 at 130%: the boons started at y=669). On narrow screens the
+   picker becomes one compact row: a small face and the name. The blurb stays in the
+   accessible name (visually hidden, not removed) and in the tooltip. The forge plate
+   above it gives up height on this screen only. */
+@media (max-width: 620px) {
+  .hero-select { flex-wrap: nowrap; gap: 6px; margin: 0 0 4px; width: 100%; }
+  .hero-pick {
+    flex: 1 1 0; min-width: 0; max-width: 200px; grid-template-columns: 30px minmax(0, 1fr);
+    grid-template-rows: auto; align-items: center; column-gap: 6px; padding: 3px 8px 3px 3px;
+  }
+  .hero-pick .hp-face { grid-row: auto; width: 30px; height: 34px; }
+  .hero-pick .hp-name { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hero-pick .hp-blurb {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .kindling:has(.hero-select) .scene-illus img { height: clamp(64px, 13vh, 120px); }
+}
 
 /* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
    than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at

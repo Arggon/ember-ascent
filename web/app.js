@@ -859,7 +859,12 @@ function positionClass(index, after, before = null, explicit = null) {
 
 const sumEnemyHp = (s) => s.enemies.reduce((n, e) => n + e.hp, 0);
 
-function newGame(seed = null) {
+/**
+ * @param {number|null} [seed]
+ * @param {{quiet?: boolean}} [opts] quiet: a hero switch on the Kindling screen, which must
+ *   not replay the act title card
+ */
+function newGame(seed = null, opts = {}) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
   // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
@@ -883,6 +888,7 @@ function newGame(seed = null) {
   dyingThisPaint = [];
   lastPlayerStatuses = [];
   paintedPhase = null;
+  quietIntro = opts.quiet === true;
   // A new run must animate its own entrance and its own victory/defeat, so every one-shot
   // presentation flag is cleared with the timers that would have released it.
   prevEnemies = [];
@@ -1284,6 +1290,9 @@ function render() {
 // No geometry is measured anywhere, so no effect can misplace itself after a repaint.
 */
 
+/** Set by a hero switch: the next first paint is the same screen, so no act title card. */
+let quietIntro = false;
+
 /** Put a node on the persistent screen layer. Null-safe: the test harness has no layer. */
 /**
  * Scene transitions (presentation only, skipped under reduced motion by fxAdd): the very
@@ -1294,6 +1303,9 @@ function render() {
  */
 function sceneBeat(from, to) {
   if (from === null) {
+    const quiet = quietIntro;
+    quietIntro = false;
+    if (quiet) return;
     if ((to === 'kindling' || to === 'map') && !(snap.map && snap.map.floor > 0)) {
       fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
         el('span', { cls: 'fx-act-num', text: 'Act I' }),
@@ -2139,6 +2151,20 @@ function heroFace(id) {
   return face;
 }
 
+/**
+ * B4: rebuild the run, same seed, for another hero. It is the SAME screen with a different
+ * hero, not a new act: the Act I title card is not replayed. Focus follows the selection,
+ * so the arrow keys keep working after the repaint.
+ * @param {string} id hero id from HEROES
+ */
+function switchHero(id) {
+  if (id === (snap.character ?? 'ironclad')) return;
+  heroChoice = id;
+  newGame(snap.seed, { quiet: true });
+  const picked = document.querySelector('.hero-pick.on');
+  if (picked && typeof picked.focus === 'function') picked.focus();
+}
+
 /** B1: the act-start boon choice. Every word comes from the kernel snapshot. */
 function kindlingView() {
   const wrap = el('div', { cls: 'kindling' });
@@ -2146,13 +2172,32 @@ function kindlingView() {
   // B4 hero select: only before the first choice of a run. Switching rebuilds the run
   // with the same seed for the other hero, so nothing about the climb is rerolled by hand.
   if (snap.stepIndex === 0) {
-    const heroes = el('div', { cls: 'hero-select', attrs: { role: 'radiogroup', 'aria-label': 'Choose your hero' } });
+    // Radio-group semantics (WAI-ARIA APG): one tab stop (the checked hero), and the arrow
+    // keys move the selection, wrapping; Home/End jump to the ends. Selecting IS switching.
+    const current = snap.character ?? 'ironclad';
+    const at = Math.max(0, HEROES.findIndex((h) => h.id === current));
+    const heroes = el('div', {
+      cls: 'hero-select',
+      attrs: { role: 'radiogroup', 'aria-label': 'Choose your hero' },
+      on: {
+        keydown: (ev) => {
+          const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+          let to = null;
+          if (step) to = (at + step + HEROES.length) % HEROES.length;
+          else if (ev.key === 'Home') to = 0;
+          else if (ev.key === 'End') to = HEROES.length - 1;
+          if (to === null) return;
+          ev.preventDefault();
+          switchHero(HEROES[to].id);
+        },
+      },
+    });
     for (const h of HEROES) {
-      const on = (snap.character ?? 'ironclad') === h.id;
+      const on = current === h.id;
       heroes.append(el('button', {
         cls: `hero-pick${on ? ' on' : ''} hp-${h.id}`,
-        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', title: h.blurb },
-        on: { click: () => { if (on) return; heroChoice = h.id; newGame(snap.seed); } },
+        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1', title: h.blurb },
+        on: { click: () => switchHero(h.id) },
       },
       heroFace(h.id),
       el('span', { cls: 'hp-name', text: h.name }),
