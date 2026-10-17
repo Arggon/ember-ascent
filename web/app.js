@@ -25,6 +25,8 @@ import { attackTier, backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, inte
 // read from here or from a record this module built with `buildRunRecord` — the renderer
 // composes no game fact, it only chooses layout and words.
 import {
+  BIOMES,
+  DEFAULT_BIOME,
   RETAIN,
   SCORE_TABLE,
   SHIPPED_CARDS,
@@ -162,12 +164,9 @@ const HEROES = [
   { id: 'ironclad', name: 'Ashwright', blurb: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.' },
   { id: 'bellows', name: 'Bellows Keeper', blurb: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.' },
 ];
-/** B5: the chosen biome ('foundry' or 'mines'); `?biome=mines` seeds it. */
-const BIOMES = [
-  { id: 'foundry', name: 'The Foundry' },
-  { id: 'mines', name: 'The Cinder Mines' },
-];
-let biomeChoice = new URLSearchParams(location.search).get('biome') === 'mines' ? 'mines' : 'foundry';
+/** B5: the chosen biome (an id from the kernel BIOMES table); `?biome=` seeds it. */
+const biomeParam = new URLSearchParams(location.search).get('biome');
+let biomeChoice = biomeParam && Object.hasOwn(BIOMES, biomeParam) ? biomeParam : DEFAULT_BIOME;
 let heroChoice = HEROES.some((h) => h.id === new URLSearchParams(location.search).get('hero')) ? new URLSearchParams(location.search).get('hero') : 'ironclad';
 
 let ctl = createController({ run: { seed: seedFromUrl(), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } });
@@ -1295,7 +1294,7 @@ function sceneBeat(from, to) {
     if ((to === 'kindling' || to === 'map') && !(snap.map && snap.map.floor > 0)) {
       fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
         el('span', { cls: 'fx-act-num', text: 'Act I' }),
-        el('span', { cls: 'fx-act-name', text: 'The Foundry' }),
+        el('span', { cls: 'fx-act-name', text: snap.biomeName ?? BIOMES[DEFAULT_BIOME].name }),
         el('span', { cls: 'fx-act-rule' })), 2300);
     }
     return;
@@ -2148,8 +2147,8 @@ function kindlingView() {
     wrap.append(heroes);
     const paths = el('div', { cls: 'biome-select', attrs: { role: 'radiogroup', 'aria-label': 'Choose the path' } });
     paths.append(el('span', { cls: 'bs-label', text: 'Path' }));
-    for (const b of BIOMES) {
-      const on = (snap.biome ?? 'foundry') === b.id;
+    for (const b of snap.biomes ?? []) {
+      const on = (snap.biome ?? DEFAULT_BIOME) === b.id;
       paths.append(el('button', {
         cls: `biome-pick${on ? ' on' : ''} bp-${b.id}`, text: b.name,
         attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false' },

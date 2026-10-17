@@ -26,6 +26,7 @@ import {
   EXIT,
 } from './session.js';
 import { measureRun, CEILINGS } from './tokens.js';
+import { DEFAULT_BIOME } from '../kernel/index.js';
 
 /** Common flags accepted by every subcommand. */
 export const COMMON = {
@@ -37,7 +38,7 @@ export const COMMON = {
 
 /** Per-subcommand flag specs. Types and defaults are printed by --help. */
 export const SPECS = {
-  new: { ...COMMON, '--seed': { type: 'int', default: 0 }, '--character': { type: 'string', default: 'ironclad' }, '--difficulty': { type: 'int', default: 0 }, '--kindling': { type: 'bool', default: false }, '--tempers': { type: 'bool', default: false }, '--quests': { type: 'bool', default: false }, '--biome': { type: 'string', default: 'foundry' } },
+  new: { ...COMMON, '--seed': { type: 'int', default: 0 }, '--character': { type: 'string', default: 'ironclad' }, '--difficulty': { type: 'int', default: 0 }, '--kindling': { type: 'bool', default: false }, '--tempers': { type: 'bool', default: false }, '--quests': { type: 'bool', default: false }, '--biome': { type: 'string', default: DEFAULT_BIOME } },
   state: { ...COMMON, '--brief': { type: 'bool', default: false }, '--verbose': { type: 'bool', default: false }, '--tokens': { type: 'bool', default: false } },
   actions: { ...COMMON },
   play: { ...COMMON },

@@ -10,7 +10,7 @@
 //
 // Budget: the dump is designed to stay under 250 tokens (worst of o200k/cl100k) and
 // every action line under 8 — enforced by tests/golden/budget.test.js on measured counts.
-import { ENEMIES } from './rules/encounters.js';
+import { ENEMIES, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { availableNodes, NODE_TYPES } from './rules/map.js';
 import { defaultContent } from './content.js';
 import { actions as legalActions } from './actions.js';
@@ -483,7 +483,9 @@ export function snapshot(state) {
     turn: state.combat?.turn ?? 0,
     energyPerTurn: state.energyPerTurn ?? 3,
     character: state.character,
-    biome: state.biome ?? 'foundry',
+    biome: state.biome ?? DEFAULT_BIOME,
+    biomeName: BIOMES[state.biome ?? DEFAULT_BIOME].name,
+    biomes: Object.entries(BIOMES).map(([id, b]) => ({ id, name: b.name })),
     characterName: defaultContent().characters.get(state.character)?.name ?? state.character,
     relicName: defaultContent().characters.get(state.character)?.relicName ?? '',
     difficulty: state.difficulty,

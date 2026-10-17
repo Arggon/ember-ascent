@@ -13,7 +13,7 @@ import { loadContent, defaultContent, draftPoolFrom } from './content.js';
 // Imported as a VALUE as well as re-exported below: `contentForProfile` calls it.
 import { poolSelection } from './unlocks.js';
 import { generateMap, availableNodes, findNode, NODE_TYPES, ROWS } from './rules/map.js';
-import { ENCOUNTERS, ENEMIES } from './rules/encounters.js';
+import { ENCOUNTERS, ENEMIES, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { VOCABULARY } from './rules/vocabulary.js';
 import { DEFAULT_RELIC } from './rules/relics.js';
 import { intAt, shuffleAt, pickAt } from './rng.js';
@@ -53,6 +53,8 @@ import {
 _setCardDefs(defaultContent().cards);
 
 export { hashState as hash, canonical };
+// B5: the one biome table, for surfaces (GUI picker, Act I card, CLI).
+export { BIOMES, DEFAULT_BIOME };
 export { observeState as observe, observeActions, snapshotState as snapshot };
 // The plain-English layer (R4's second rendering). Exported so every surface reaches it
 // through the ONE public entry point; a surface may not import kernel internals (R1).
@@ -140,21 +142,6 @@ export function contentForProfile(profile = null) {
   );
 }
 
-/** Encounter ids that may spawn at a given node type (excluding the boss). */
-const ENCOUNTER_BY_TYPE = {
-  combat_weak: ['weak_1', 'weak_2', 'weak_3', 'weak_4'],
-  combat_strong: ['strong_1', 'strong_2', 'strong_3'],
-  elite: ['elite_1'],
-  boss: ['boss_1'],
-};
-/** B5: the Cinder Mines' encounter pools (opt-in with `biome: 'mines'`). */
-const MINES_BY_TYPE = {
-  combat_weak: ['mines_weak_1', 'mines_weak_2', 'mines_weak_3'],
-  combat_strong: ['mines_strong_1', 'mines_strong_2'],
-  elite: ['mines_elite_1'],
-  boss: ['mines_boss_1'],
-};
-
 /**
  * Start a run.
  * @param {{seed?: number, character?: string, difficulty?: number, content?: any}} [opts]
@@ -165,11 +152,11 @@ export function newRun(opts = {}) {
   const seed = opts.seed ?? 0;
   const characterId = opts.character ?? 'ironclad';
   const difficulty = opts.difficulty ?? 0;
-  const biome = opts.biome ?? 'foundry';
-  if (biome !== 'foundry' && biome !== 'mines') {
-    throw Object.assign(new Error(`unknown biome "${biome}"`), { code: 3 });
+  const biome = opts.biome ?? DEFAULT_BIOME;
+  if (!Object.hasOwn(BIOMES, biome)) {
+    throw Object.assign(new Error(`unknown biome "${biome}" (known: ${Object.keys(BIOMES).join(', ')})`), { code: 3 });
   }
-  const byType = biome === 'mines' ? MINES_BY_TYPE : ENCOUNTER_BY_TYPE;
+  const byType = BIOMES[biome].byType;
 
   if (!Number.isInteger(seed) || seed < 0 || seed > 2 ** 32) {
     throw Object.assign(new Error(`seed must be an integer in [0, 2^32], got ${opts.seed}`), { code: 3 });
@@ -271,7 +258,7 @@ export function newRun(opts = {}) {
   };
 
   // B5 alternate biome: recorded only when not the default, so foundry hashes are unchanged.
-  if (biome !== 'foundry') state.biome = biome;
+  if (biome !== DEFAULT_BIOME) state.biome = biome;
   // B4 second hero: a character whose relic is not the Kindled Heart records it, so the
   // default (Ashwright) state keeps no new field and every existing hash is unchanged.
   if (character.startingRelic && character.startingRelic !== DEFAULT_RELIC) state.relic = character.startingRelic;

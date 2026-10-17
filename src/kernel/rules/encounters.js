@@ -163,11 +163,25 @@ export const ENCOUNTERS = {
   mines_boss_1: { id: 'mines_boss_1', name: 'Cinder Foreman', tier: 4, boss: true, enemies: ['cinder_foreman'] },
 };
 
-/** Biomes (B5). 'foundry' is the default act; 'mines' is the opt-in alternate. */
+/**
+ * Biomes (B5): the ONE list of biomes. 'foundry' is the default act; 'mines' is the opt-in
+ * alternate. `byType` is the encounter pool per node type. newRun validates against this
+ * table, the snapshot names the biome from it, and the GUI picker, Act I card and CLI read
+ * it through the public entry, so a new biome is one row here.
+ */
 export const BIOMES = Object.freeze({
-  foundry: { name: 'The Foundry' },
-  mines: { name: 'The Cinder Mines' },
+  foundry: {
+    name: 'The Foundry',
+    byType: { combat_weak: ['weak_1', 'weak_2', 'weak_3', 'weak_4'], combat_strong: ['strong_1', 'strong_2', 'strong_3'], elite: ['elite_1'], boss: ['boss_1'] },
+  },
+  mines: {
+    name: 'The Cinder Mines',
+    byType: { combat_weak: ['mines_weak_1', 'mines_weak_2', 'mines_weak_3'], combat_strong: ['mines_strong_1', 'mines_strong_2'], elite: ['mines_elite_1'], boss: ['mines_boss_1'] },
+  },
 });
+
+/** The biome a run without `biome` plays (its state carries no `biome` field). */
+export const DEFAULT_BIOME = 'foundry';
 
 /**
  * Choose the next intent for one enemy. Deterministic, and avoids repeating the
