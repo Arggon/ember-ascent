@@ -1520,8 +1520,9 @@ function heroFigure() {
   const p = snap.player;
   const ratio = p.maxHp > 0 ? p.hp / p.maxHp : 1;
   const pose = heroPose();
+  const isBellows = snap.character === 'bellows';
   const node = el('div', {
-    cls: 'hero' + (ratio <= 0.35 ? ' is-low' : '') + (snap.character === 'bellows' ? ' is-bellows' : ''),
+    cls: 'hero' + (ratio <= 0.35 ? ' is-low' : '') + (isBellows ? ' is-bellows' : ''),
     attrs: { role: 'group', 'aria-label': `${snap.characterName || 'Ashwright'}, ${p.hp} of ${p.maxHp} HP, block ${p.block}` },
   });
   const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
@@ -2111,7 +2112,6 @@ function rewardView() {
 
 /* ------------------------------------------------------------------ KINDLING */
 
-/** B1: the act-start boon choice. Every word comes from the kernel snapshot. */
 /** A hero portrait for the select buttons (constant markup from a fixed table). */
 function heroFace(id) {
   const face = el('span', { cls: 'hp-face', attrs: { 'aria-hidden': 'true' } });
@@ -2119,6 +2119,7 @@ function heroFace(id) {
   return face;
 }
 
+/** B1: the act-start boon choice. Every word comes from the kernel snapshot. */
 function kindlingView() {
   const wrap = el('div', { cls: 'kindling' });
   wrap.append(sceneIllus('event'));
