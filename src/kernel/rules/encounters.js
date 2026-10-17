@@ -166,7 +166,7 @@ export const ENCOUNTERS = {
 /**
  * Biomes (B5): the ONE list of biomes. 'foundry' is the default act; 'mines' is the opt-in
  * alternate. `byType` is the encounter pool per node type;
- * `backdrop` is the art key web/stage-art.js draws behind the stage. newRun validates against this
+ * `backdrop` is the art key src/web/stage-art.js draws behind the stage. newRun validates against this
  * table, the snapshot names the biome from it, and the GUI picker, Act I card and CLI read
  * it through the public entry, so a new biome is one row here.
  */

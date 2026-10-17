@@ -5,7 +5,7 @@
 // first paint of a run plays it), and the arrow keys did nothing although the group is
 // role=radiogroup. The Act I card also has to name the run's own biome.
 //
-// Drives the REAL web/app.js against the fake DOM from hero-select / click-targeting tests,
+// Drives the REAL src/web/app.js against the fake DOM from hero-select / click-targeting tests,
 // with real controllers, so a switch really rebuilds the run on the other path.
 import { readFileSync } from 'node:fs';
 
@@ -104,7 +104,7 @@ const fxAdded = [];
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const appUrl = new URL('../../web/app.js', import.meta.url);
+const appUrl = new URL('../../src/web/app.js', import.meta.url);
 const rawSrc = readFileSync(appUrl, 'utf8');
 const IMPORT_RE = /^import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"];?[ \t]*$/gm;
 const importPrelude = [];

@@ -1,8 +1,8 @@
 // tests/history/ledger-render.test.js — the GUI records a finished run and renders its ledger.
 //
-// Regression: web/app.js defined recordRun() but never called it, and recordRun() read an
+// Regression: src/web/app.js defined recordRun() but never called it, and recordRun() read an
 // undeclared `runSubmitted`, so the end screen never showed the ledger, marks or unlocks.
-// Drives the REAL web/app.js against the same fake DOM as tests/kernel/reward-click.test.js.
+// Drives the REAL src/web/app.js against the same fake DOM as tests/kernel/reward-click.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -96,7 +96,7 @@ const origRAF = globalThis.requestAnimationFrame;
 globalThis.requestAnimationFrame = () => 0;
 
 const toasts = [];
-const appUrl = new URL('../../web/app.js', import.meta.url);
+const appUrl = new URL('../../src/web/app.js', import.meta.url);
 const rawSrc = readFileSync(appUrl, 'utf8');
 // app.js's named imports (single- or multi-line) are re-bound from the real modules,
 // except createController, which the factory below stubs with the test controller.

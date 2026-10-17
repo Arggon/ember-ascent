@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// tests/qa-layout-fix/qa-fit-probe.mjs — QA-owned independent probe for the LAYOUT-ACCEPTANCE.md
-// criteria that tools/dev/viewport-check.mjs and tools/dev/space-check.mjs COLLECT but do NOT
+// tests/qa-layout-fix/qa-fit-probe.mjs — QA-owned independent probe for the docs/specs/LAYOUT-ACCEPTANCE.md
+// criteria that scripts/dev/viewport-check.mjs and scripts/dev/space-check.mjs COLLECT but do NOT
 // ASSERT:
 //   S1 criterion 3 : `.hint` bottom <= innerHeight
 //   S2/S3 clip     : #stage scrollHeight === clientHeight (nothing clipped by overflow:hidden)
@@ -22,7 +22,7 @@ const SIZES = [
   [1280, 800, 'desktop'], [1366, 768, 'laptop'], [1200, 450, 'short-desktop-window'],
 ];
 const SEEDS = [1, 3, 7, 11];
-const BASE = 'http://localhost:5173/web/index.html?seed=';
+const BASE = 'http://localhost:5173/src/web/index.html?seed=';
 const NOSCROLLBAR_ISH = true;
 
 let id = 1;

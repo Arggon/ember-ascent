@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// tests/qa-layout-fix/parse-two.mjs — QA scratch. Parses web/style.css with postcss and
+// tests/qa-layout-fix/parse-two.mjs — QA scratch. Parses src/web/style.css with postcss and
 // pinpoints the first parse error with a surrounding line dump, so the claim "missing
-// semicolon after `column-gap: 8px` at web/style.css:118" can be checked on any CSS file.
+// semicolon after `column-gap: 8px` at src/web/style.css:118" can be checked on any CSS file.
 // Read-only: it never writes to the file it inspects.
 import { readFileSync } from 'node:fs';
 import postcss from 'postcss';

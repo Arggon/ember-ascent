@@ -33,9 +33,9 @@ test('the snapshot names the run\'s biome and lists the choices', () => {
 });
 
 test('no other file keeps its own biome list or biome name', () => {
-  const app = src('web/app.js');
-  assert.doesNotMatch(app, /'The Foundry'|'The Cinder Mines'/, 'web/app.js: Act I card and picker read the kernel table');
-  assert.doesNotMatch(app, /===\s*'mines'/, 'web/app.js: ?biome= is checked against the kernel table');
+  const app = src('src/web/app.js');
+  assert.doesNotMatch(app, /'The Foundry'|'The Cinder Mines'/, 'src/web/app.js: Act I card and picker read the kernel table');
+  assert.doesNotMatch(app, /===\s*'mines'/, 'src/web/app.js: ?biome= is checked against the kernel table');
   const index = src('src/kernel/index.js');
   assert.doesNotMatch(index, /MINES_BY_TYPE|'mines'/, 'src/kernel/index.js: pools come from BIOMES');
   assert.doesNotMatch(src('src/surface/cli.js'), /'foundry'/, 'src/surface/cli.js: default comes from DEFAULT_BIOME');

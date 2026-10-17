@@ -16,10 +16,10 @@
   "main": "./src/kernel/index.js",
   "scripts": {
     "test": "node --test 'tests/**/*.test.js'",
-    "gate": "node tools/check-architecture.mjs",
-    "tokens": "node tools/measure-tokens.mjs",
+    "gate": "node scripts/check-architecture.mjs",
+    "tokens": "node scripts/measure-tokens.mjs",
     "sim": "node bin/dlb sim --runs 200 --seed-start 1 --policy greedy --threads 4",
-    "serve": "node tools/serve.mjs"
+    "serve": "node scripts/serve.mjs"
   },
   "devDependencies": {
     "js-tiktoken": "^1.0.21",
