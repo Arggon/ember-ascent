@@ -2778,7 +2778,10 @@ html, body {
     background: radial-gradient(60% 40% at 50% 100%, rgba(255, 110, 40, 0.45), transparent 75%), #0d0705;
     clip-path: polygon(0 100%, 0 40%, 14% 20%, 30% 46%, 46% 18%, 60% 40%, 76% 14%, 90% 38%, 100% 22%, 100% 100%);
   }
-  .page-map.panel > * { position: relative; z-index: 1; }
+  /* `:not(.page-glyph)`: this rule out-specified `.page-glyph { position: absolute }`, so the
+     watermark (an SVG 62% of the panel wide) sat IN FLOW under the hint and made the map
+     page ~550px taller than its content: at 1280x800 the map page scrolled ~470px. */
+  .page-map.panel > *:not(.page-glyph) { position: relative; z-index: 1; }
   .map-row::after { background: none; border-bottom: 1px dashed rgba(255, 157, 58, 0.22); }
   .node { background: rgba(20, 13, 9, 0.82); border-color: #3b261a; backdrop-filter: blur(1px); }
   .node .ntype-mark {
@@ -2909,6 +2912,28 @@ html, body {
     .page-map .map-row { gap: 8px; }
     .page-map .node .nsub { display: none; }
     .page-map .node .ntype { grid-row: 1 / span 2; }
+  }
+  /* Phones (360-412 wide): a floor of three nodes was ~506px of nowrap pills, and that
+     min-content width set the map panel's width, so the panel overflowed <main> (which
+     clips) by ~150px. The right-hand node of a three-wide floor and the third quest chip
+     were off-screen and unreachable. The panel now takes the column's width, and each node
+     stacks its mark ABOVE its name and shares the row equally, so three always fit (also
+     at 130% text). Type stays readable from the name, the mark and the border hue. */
+  @media (max-width: 620px) {
+    .page-map.panel { width: 100%; min-width: 0; }
+    .page-map .map-row { gap: 6px; padding-left: 14px; }
+    .page-map .node {
+      flex: 1 1 0; min-width: 0; max-width: 132px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 1px; padding: 3px 4px 4px; border-radius: 14px; text-align: center;
+    }
+    .page-map .node .ntype-mark { width: 22px; height: 22px; }
+    .page-map .node .ntype-mark svg { width: 13px; height: 13px; }
+    .page-map .node .ntype {
+      max-width: 100%; font-size: 0.72rem; letter-spacing: 0.02em; line-height: 1.1;
+      white-space: normal; overflow: hidden; /* a two-word name wraps at its space, never mid-word */
+    }
+    .page-map .node.available::after { display: none; }
   }
 
   /* --- Motion polish: one beat per action, eased; heat rises. --- */
@@ -3603,9 +3628,14 @@ html, body {
 }
 
 /* B3 Ember quests: a strip of three chips above the map. */
-.quests { display: flex; gap: 6px; margin: 0 0 6px; flex-wrap: wrap; }
+.quests { display: flex; gap: 6px; margin: 0 0 6px; flex-wrap: wrap; contain: inline-size; }
+/* QA: at 390x844 the third chip sat past the right edge where nothing could scroll to it
+   (the map panel was wider than the screen; see the phone map block). `contain: inline-size`
+   keeps the strip's own nowrap width (~506px, ~573px at 130% text) from sizing the panel;
+   the chips then WRAP onto a second row when three do not fit, each keeping its full name
+   and reward. */
 .quest {
-  position: relative; flex: 1 1 0; min-width: 0; padding: 3px 8px 5px;
+  position: relative; flex: 1 1 auto; min-width: min(8.5em, 100%); max-width: 100%; padding: 3px 8px 5px;
   border: 1px solid rgba(255, 170, 90, 0.35); border-radius: 6px;
   background: rgba(30, 16, 10, 0.7); font-size: 0.8rem; line-height: 1.2;
   display: flex; flex-direction: column; overflow: hidden;
