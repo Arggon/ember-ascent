@@ -53,8 +53,9 @@ test('every boon applies its upside and its cost', () => {
   assert.equal(seen.size, 5);
 });
 
-test('Bellows energy reaches combat; Iron Skin switches off the relic heal', () => {
-  const pickBoon = (st, boon) => actions(st).find((a) => a.boon === boon)?.id;
+const pickBoon = (st, boon) => actions(st).find((a) => a.boon === boon)?.id;
+
+test('Bellows energy reaches combat', () => {
   for (let seed = 0; seed < 60; seed += 1) {
     const r = newRun({ seed, kindling: true });
     const id = pickBoon(r, 'bellows');
@@ -65,6 +66,40 @@ test('Bellows energy reaches combat; Iron Skin switches off the relic heal', () 
     return;
   }
   assert.fail('no seed offered bellows');
+});
+
+// The old version of this test only exercised Bellows: removing Iron Skin's relic switch
+// left it green. This one takes Iron Skin through the real kernel, fights the first node to
+// a win while WOUNDED (a heal only shows when there is HP to restore), and checks that the
+// winning step heals nothing. The control replays that same winning step with the relic on,
+// proving the fight would otherwise have healed, so the assertion cannot pass vacuously.
+test('Iron Skin switches off the relic heal', () => {
+  for (let seed = 0; seed < 60; seed += 1) {
+    const r = newRun({ seed, kindling: true });
+    const id = pickBoon(r, 'ironskin');
+    if (!id) continue;
+    let s = step(step(r, id).state, 'n1').state;
+    assert.equal(s.phase, 'combat');
+    assert.equal(s.relicOff, true, 'taking Iron Skin must switch the relic off');
+    for (let n = 0; n < 300 && s.phase === 'combat'; n += 1) {
+      const acts = actions(s);
+      const a = acts.find((x) => x.kind === 'play') ?? acts.find((x) => x.id === 'e1') ?? acts[0];
+      const out = step(s, a.id);
+      if (out.events.some((e) => e.t === 'combat_won')) {
+        assert.ok(s.player.hp < s.player.maxHp, `the test needs a wounded win to mean anything (hp ${s.player.hp}/${s.player.maxHp})`);
+        assert.equal(out.events.some((e) => e.t === 'heal'), false, 'no relic heal event after the fight');
+        assert.equal(out.state.player.hp, s.player.hp, 'HP after the win equals HP before the winning blow');
+        // Control: the identical winning step with the relic on does heal.
+        const control = step({ ...s, relicOff: false }, a.id);
+        assert.equal(control.events.some((e) => e.t === 'heal' && e.source === 'burning_blood'), true, 'control: the relic heals when on');
+        assert.ok(control.state.player.hp > s.player.hp, 'control: HP rises when the relic is on');
+        return;
+      }
+      s = out.state;
+    }
+    assert.fail(`seed ${seed}: the first fight did not end in a win`);
+  }
+  assert.fail('no seed offered ironskin');
 });
 
 test('log header carries the flag and replay matches hash-for-hash (golden)', () => {
