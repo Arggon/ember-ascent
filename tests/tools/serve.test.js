@@ -9,6 +9,7 @@ import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+import { request } from 'node:http';
 import { fileURLToPath } from 'node:url';
 
 const SERVE = fileURLToPath(new URL('../../tools/serve.mjs', import.meta.url));
@@ -39,6 +40,30 @@ after(() => { child?.kill(); });
 
 const get = (path) => fetch(base + path, { redirect: 'manual' });
 
+/**
+ * GET with the request target sent BYTE-FOR-BYTE. fetch() would normalize `//evil.com/../web`
+ * and `\\` before sending, hiding exactly the inputs an attacker's link delivers.
+ */
+function rawGet(path) {
+  const u = new URL(base);
+  return new Promise((res, rej) => {
+    const req = request({ host: u.hostname, port: u.port, path, method: 'GET' }, (r) => {
+      r.resume();
+      r.on('end', () => res({ status: r.statusCode, location: r.headers.location }));
+    });
+    req.on('error', rej);
+    req.end();
+  });
+}
+
+/** A Location that is a same-origin absolute path: one leading '/', no host, no '\\'. */
+function assertSameOrigin(location, input) {
+  assert.equal(typeof location, 'string', `${input}: expected a Location header`);
+  assert.match(location, /^\/(?![\/\\])/, `${input}: Location must start with a single '/', got ${location}`);
+  assert.ok(!location.includes('\\'), `${input}: Location must not contain a backslash, got ${location}`);
+  assert.equal(new URL(location, base).host, new URL(base).host, `${input}: Location leaves the origin: ${location}`);
+}
+
 test('/web/?seed=11 is served directly: no redirect, so the seed survives', async () => {
   const r = await get('/web/?seed=11');
   assert.equal(r.status, 200, `expected 200, got ${r.status} -> ${r.headers.get('location')}`);
@@ -67,4 +92,30 @@ test('a bare directory still gets its trailing slash, and files are untouched', 
   const f = await get('/web/index.html?seed=11');
   assert.equal(f.status, 200);
   await f.body?.cancel();
+});
+
+// THE BUG THIS PINS (open redirect): the Location was the raw request path plus '/'.
+// `//evil.com/../web` resolves to web/, so it took the redirect branch and answered
+// `Location: //evil.com/../web/` — a protocol-relative URL that sends the browser to
+// evil.com. Browsers treat `\` as `/`, so `/\evil.com/../web` was the same hole.
+for (const input of ['//evil.com/../web', '///evil.com/../web', '/\\evil.com/../web']) {
+  test(`${input} redirects to the same-origin /web/, never off-site`, async () => {
+    const r = await rawGet(input);
+    assert.equal(r.status, 301);
+    assertSameOrigin(r.location, input);
+    assert.equal(r.location, '/web/');
+  });
+}
+
+test('the query survives the hardened redirect: //evil.com/../web?seed=11 -> /web/?seed=11', async () => {
+  const r = await rawGet('//evil.com/../web?seed=11');
+  assert.equal(r.status, 301);
+  assertSameOrigin(r.location, '//evil.com/../web?seed=11');
+  assert.equal(r.location, '/web/?seed=11');
+});
+
+test('a nested directory redirects to its normalized path', async () => {
+  const r = await rawGet('/web/./assets/../assets');
+  assert.equal(r.status, 301);
+  assert.equal(r.location, '/web/assets/');
 });
