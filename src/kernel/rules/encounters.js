@@ -87,12 +87,12 @@ export const ENEMIES = {
   slag_crawler: {
     id: 'slag_crawler',
     name: 'Slag Crawler',
-    maxHp: [34, 38],
+    maxHp: [32, 36],
     // A shell that hardens, then a pincer flurry: hit it on the turns it is not armoured.
     moves: [
       { id: 'harden', label: 'B9', kind: 'block', block: 9 },
       { id: 'pincers', label: 'A4x2', kind: 'attack', damage: 4, hits: 2 },
-      { id: 'ram', label: 'A11', kind: 'attack', damage: 11 },
+      { id: 'ram', label: 'A10', kind: 'attack', damage: 10 },
     ],
     noRepeat: 2,
   },
@@ -112,27 +112,27 @@ export const ENEMIES = {
   ash_wraith_elite: {
     id: 'ash_wraith_elite',
     name: 'Ash Matriarch',
-    maxHp: [76, 80],
+    maxHp: [74, 78],
     elite: true,
     // A fixed rhythm the player can learn: shroud, double strike, curse, reap.
     moves: [
       { id: 'shroud', label: 'PWR2 B12', kind: 'buff', strength: 2, block: 12 },
       { id: 'soulfire', label: 'A7x2', kind: 'attack', damage: 7, hits: 2 },
       { id: 'grief', label: 'VULN2 WK2', kind: 'debuff', vulnerable: 2, weak: 2 },
-      { id: 'reap', label: 'A15', kind: 'attack', damage: 15 },
+      { id: 'reap', label: 'A14', kind: 'attack', damage: 14 },
     ],
     script: ['shroud', 'soulfire', 'grief', 'reap', 'shroud', 'soulfire', 'grief', 'reap'],
   },
   cinder_foreman: {
     id: 'cinder_foreman',
     name: 'Cinder Foreman',
-    maxHp: [130, 130],
+    maxHp: [125, 125],
     boss: true,
     // Surveys (armour + Strength), swings twice, then brings the roof down.
     moves: [
       { id: 'survey', label: 'PWR2 B14', kind: 'buff', strength: 2, block: 14 },
       { id: 'pick_swing', label: 'A9x2', kind: 'attack', damage: 9, hits: 2 },
-      { id: 'cave_in', label: 'A28', kind: 'attack', damage: 28 },
+      { id: 'cave_in', label: 'A26', kind: 'attack', damage: 26 },
       { id: 'choke_dust', label: 'WK2 VULN1', kind: 'debuff', weak: 2, vulnerable: 1 },
     ],
     script: ['survey', 'pick_swing', 'choke_dust', 'cave_in', 'survey', 'pick_swing', 'choke_dust', 'cave_in'],

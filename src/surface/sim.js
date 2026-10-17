@@ -44,7 +44,7 @@ export async function playRun(opts) {
   // unlocked (AC-9.3). `full` means the whole shipped pool — no unlock is withheld from
   // an offline batch run, because withholding one is a product decision, not a sim one.
   const content = opts.profile === 'fresh' ? contentForProfile(null) : contentForProfile(fullyUnlockedProfile());
-  let session = begin({ seed: opts.seed, character: opts.character, difficulty: opts.difficulty, content });
+  let session = begin({ seed: opts.seed, character: opts.character, difficulty: opts.difficulty, content, ...(opts.biome ? { biome: opts.biome } : {}) });
   const memory = {};
   const samples = [];
   const offered = [];
