@@ -3545,16 +3545,34 @@ html, body {
 
 /* ---------- Tempers (B2): frame trim per temper + rest-site offers ---------- */
 .card.tempered { position: relative; }
+/* The stamp: a small forged iron tab struck into the plate, notched like a maker's mark,
+   brass keyline inside, the temper's hue on the rim and the mark. --tc is that hue. */
 .card .ctemper {
-  position: absolute; bottom: 30px; right: 6px; z-index: 3; padding: 1px 6px; border-radius: 6px;
-  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #1a0f0a;
+  --tc: #ff9d3a;
+  /* Struck into the footer bar beside the compact code, like a maker's mark, clear of the
+     rules text (which now carries the tempered numbers and can run a line longer). */
+  position: relative; z-index: 3;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px 1px 4px;
+  background: linear-gradient(180deg, #3b261a, #1a120d 70%);
+  border: 1px solid var(--tc);
+  box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 2px 4px rgba(0, 0, 0, 0.7);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 4px 100%, 0 50%);
+  font-family: var(--display, Cinzel, serif);
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #f8eee5; text-shadow: 0 1px 0 #000;
 }
-.card.temper-quenched { box-shadow: 0 0 0 2px #7cc4e8, 0 0 14px rgba(124, 196, 232, 0.45); }
-.card.temper-quenched .ctemper { background: #8fd0f2; }
+.card .ctemper .t-mark { display: inline-flex; width: 12px; height: 12px; color: var(--tc); }
+.card .ctemper .t-mark svg { width: 100%; height: 100%; }
+.card .ctemper .t-mark .m { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.card .ctemper .t-mark .mf { fill: currentColor; }
+.card .ctemper .t-name { line-height: 1.2; }
+.card.temper-quenched { box-shadow: 0 0 0 2px #6fb6e4, 0 0 14px rgba(111, 182, 228, 0.45); }
+.card.temper-quenched .ctemper { --tc: #8fd0f2; }
 .card.temper-redhot { box-shadow: 0 0 0 2px #ff6a2a, 0 0 16px rgba(255, 90, 30, 0.55); }
-.card.temper-redhot .ctemper { background: #ff8a4a; }
+.card.temper-redhot .ctemper { --tc: #ff8a4a; box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 0 8px rgba(255, 106, 42, 0.55); }
 .card.temper-balanced { box-shadow: 0 0 0 2px #e8c45a, 0 0 14px rgba(232, 196, 90, 0.45); }
-.card.temper-balanced .ctemper { background: #f5c542; }
+.card.temper-balanced .ctemper { --tc: #f5c542; }
 .temper-head { margin: 6px 0 0; color: #cbb59e; font-size: 0.85rem; }
 .temper-list .boon { min-height: 64px; }
 .temper-offer.temper-quenched { border-color: #4f7f99; }
@@ -3563,11 +3581,33 @@ html, body {
 @media (max-height: 480px) {
   .rest .rest-calm { display: none; }
   .temper-head { margin: 2px 0 0; font-size: 0.72rem; }
-  .temper-list .boon { min-height: 0; padding: 4px 8px; }
-  .temper-list .boon-text { display: none; }
-  .temper-list .boon-name { font-size: 0.74rem; }
+  /* Short windows: the three offers sit in ONE row, and each keeps its effect AND cost
+     (Red-hot's HP, Balanced's exhaust) in small type instead of hiding them. One row of
+     three is shorter than the two-row wrap of names alone, so nothing is pushed down. */
+  .temper-list { flex-wrap: nowrap; gap: 6px; }
+  .temper-list .boon { flex: 1 1 0; min-width: 0; min-height: 0; padding: 3px 6px; gap: 1px; }
+  .temper-list .boon-text { display: block; font-size: 0.64rem; line-height: 1.2; }
+  .temper-list .boon-name { font-size: 0.66rem; letter-spacing: 0.01em; white-space: nowrap; }
 }
-@media (max-height: 480px) { .card .ctemper { bottom: auto; top: 2px; right: 6px; font-size: 0.55rem; padding: 0 4px; } }
+/* Phones in portrait: with forge offers on the screen, the calm line is the one thing that
+   can go (the heading already says it) so the last offer is not pushed below the fold. */
+@media (max-width: 620px) {
+  .rest.has-tempers .rest-calm { display: none; }
+}
+/* A tile with no footer (none today; defensive) wears the stamp on the plate. */
+.card > .ctemper { position: absolute; bottom: 6px; right: 8px; }
+/* Where the footer bar is dropped (phones, short windows), the tempered card keeps ONLY the
+   stamp, lifted out of flow to the top-right of the plate: no height is added to the card. */
+@media (max-width: 620px), (max-height: 480px) {
+  .card.tempered .cfoot,
+  .stage-combat .card.tempered .cfoot {
+    display: block; position: absolute; top: 2px; right: 6px; z-index: 3;
+    margin: 0; padding: 0; border: 0; background: none;
+  }
+  .card.tempered .cfoot > :not(.ctemper) { display: none; }
+  .card .ctemper { font-size: 0.55rem; padding: 0 5px 0 3px; }
+  .card .ctemper .t-mark { width: 10px; height: 10px; }
+}
 
 /* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
    than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at

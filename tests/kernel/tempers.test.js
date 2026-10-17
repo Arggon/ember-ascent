@@ -74,3 +74,67 @@ test('log header carries the flag and replay matches the golden hash', () => {
 });
 
 const GOLDEN = 'sha256:51ba6d87e88ba5ff74b4a94801a1d04df0b361f717ee104fff74d0fd41258ba6';
+
+// ---------------------------------------------------------------------------
+// Visible tempers: every rendering of a tempered card shows what it really plays.
+// ---------------------------------------------------------------------------
+
+/** Seed-2 opening hand with one Red-hot Hammerfall and one Balanced Quench. */
+function temperedOpening() {
+  const base = newRun({ seed: 2, tempers: true });
+  const strikes = base.deck.filter((c) => c.cardId === 'strike');
+  const defend = base.deck.find((c) => c.cardId === 'defend');
+  const tempers = {};
+  for (const c of strikes) tempers[c.uid] = 'redhot';
+  tempers[defend.uid] = 'balanced';
+  const s = step({ ...base, tempers }, 'n1').state;
+  assert.equal(s.phase, 'combat');
+  return s;
+}
+
+test('CLI HAND dump shows the tempered numbers and a temper tag', () => {
+  const s = temperedOpening();
+  const hand = K.observe(s).split('\n');
+  const lines = s.combat.hand.map((c, i) => hand.find((l) => l.startsWith(` ${i + 1} `)));
+  s.combat.hand.forEach((c, i) => {
+    const t = s.tempers[c.uid];
+    if (c.cardId === 'strike') assert.match(lines[i], /Hammerfall +A9 \[RH\]$/, `a Red-hot Hammerfall reads A9 [RH], got "${lines[i]}"`);
+    else if (t === 'balanced') assert.match(lines[i], /B5 D1 EXH \[BAL\]$/, `a Balanced Quench reads B5 D1 EXH [BAL], got "${lines[i]}"`);
+    else assert.doesNotMatch(lines[i], /\[/, 'an untempered card carries no tag');
+  });
+  assert.ok(lines.some((l) => /\[RH\]/.test(l)), 'the opening hand holds a Red-hot Hammerfall');
+});
+
+test('a default run renders the hand exactly as before (no tags, base numbers)', () => {
+  const s = step(newRun({ seed: 2 }), 'n1').state;
+  const dump = K.observe(s);
+  assert.doesNotMatch(dump, /\[(RH|Q|BAL)\]/);
+  assert.match(dump, /Hammerfall +A6$/m);
+});
+
+test('GUI snapshot: a Red-hot Hammerfall says Deal 9 and names its temper and HP cost', () => {
+  const s = temperedOpening();
+  const hand = K.snapshot(s).hand;
+  const hot = hand.find((c) => c.cardId === 'strike');
+  assert.equal(hot.temper, 'redhot');
+  assert.equal(hot.temperName, 'Red-hot');
+  assert.equal(hot.summary, 'A9');
+  assert.match(hot.description, /Deal 9 damage/);
+  assert.doesNotMatch(hot.description, /Deal 6 damage/);
+  assert.match(hot.description, /Lose 2 HP when played\.$/);
+  const bal = hand.find((c) => c.temper === 'balanced');
+  assert.ok(bal, 'the Balanced Quench is in hand');
+  assert.equal(bal.temperName, 'Balanced');
+  assert.match(bal.description, /Gain 5 Block\. Draw 1 card\. Exhaust/);
+  const plain = hand.find((c) => c.cardId === 'defend' && c.temper === null);
+  if (plain) assert.equal(plain.description, 'Gain 5 Block.');
+});
+
+test('what the card says is what the card does: shown damage equals dealt damage', () => {
+  const s = temperedOpening();
+  const slot = s.combat.hand.findIndex((c) => c.cardId === 'strike');
+  const shown = Number(/Deal (\d+) damage/.exec(K.snapshot(s).hand[slot].description)[1]);
+  const before = s.combat.enemies[0].hp + s.combat.enemies[0].block;
+  const after = step(s, `p${slot + 1}`).state.combat.enemies[0];
+  assert.equal(before - (after.hp + after.block), shown);
+});
