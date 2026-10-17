@@ -124,9 +124,9 @@ function defOf(card) {
  * The R4 state dump. Shape fixed by the requirement:
  *   T3 | HP 42/60 | EN 3/3 | BLK 0 | draw5 disc3 | PWR2 VULN1
  *   HAND
- *    1 Strike      A6
+ *    1 Hammerfall  A6
  *   ENEMY
- *    Jaw Worm  HP 44/44  A12
+ *    Cinder Maw  HP 44/44  A12
  * @param {any} state
  * @param {{verbose?: boolean}} [opts]
  * @returns {string}
@@ -182,7 +182,9 @@ function combatBody(state, opts) {
     const def = ENEMIES[e.id];
     const move = def.moves[e.moveIndex] ?? def.moves[0];
     const st = statusLine(e.statuses);
-    lines.push(` ${e.name}  HP ${e.hp}/${e.maxHp}${e.block > 0 ? ` B${e.block}` : ''}  ${move.label}${st ? ` ${st}` : ''}`);
+    // `def.name` is the player-facing name. `e.name` is the hashed state string.
+    const shown = def?.name || e.name;
+    lines.push(` ${shown}  HP ${e.hp}/${e.maxHp}${e.block > 0 ? ` B${e.block}` : ''}  ${move.label}${st ? ` ${st}` : ''}`);
   }
   if (opts.verbose) {
     lines.push('PILES');
@@ -195,6 +197,7 @@ function combatBody(state, opts) {
 }
 
 const pileNames = (pile) => (pile.length === 0 ? '-' : pile.map((c) => defOf(c).name).join(', '));
+const pileCardNames = (pile) => (pile ?? []).map((c) => defOf(c).name);
 
 function rewardBody(state) {
   const lines = ['REWARD — pick one'];
@@ -347,6 +350,7 @@ export function snapshot(state) {
       slot,
       cardId: card.cardId,
       name: def.name,
+      flavor: typeof def.flavor === 'string' ? def.flavor : '',
       cost: card.cost,
       type: def.type,
       rarity: def.rarity,
@@ -375,7 +379,7 @@ export function snapshot(state) {
       return {
         index: e.index,
         id: e.id,
-        name: e.name,
+        name: def.name,
         hp: e.hp,
         maxHp: e.maxHp,
         block: e.block,
@@ -424,6 +428,7 @@ export function snapshot(state) {
           return {
             cardId: id,
             name: def.name,
+            flavor: typeof def.flavor === 'string' ? def.flavor : '',
             cost: def.cost,
             type: def.type,
             typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
@@ -443,6 +448,8 @@ export function snapshot(state) {
     turn: state.combat?.turn ?? 0,
     energyPerTurn: state.energyPerTurn ?? 3,
     character: state.character,
+    characterName: defaultContent().characters.get(state.character)?.name ?? state.character,
+    relicName: defaultContent().characters.get(state.character)?.relicName ?? '',
     difficulty: state.difficulty,
     seed: state.seed,
     player: {
@@ -466,6 +473,10 @@ export function snapshot(state) {
       draw: state.combat?.draw?.length ?? 0,
       discard: state.combat?.discard?.length ?? 0,
       exhaust: state.combat?.exhaust?.length ?? 0,
+      // Names only, for the pile viewer. Counts above stay the compact facts.
+      drawCards: pileCardNames(state.combat?.draw),
+      discardCards: pileCardNames(state.combat?.discard),
+      exhaustCards: pileCardNames(state.combat?.exhaust),
     },
     enemies,
     map,

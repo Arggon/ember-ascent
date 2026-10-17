@@ -110,10 +110,10 @@ const STATUS_MEANING = {
 
 /** Plain English for one persistent power key. */
 const POWER_MEANING = {
-  combust: { label: 'Combust', per: 'at the end of each turn: deal 1 damage to ALL enemies and lose 1 HP' },
-  dark_embrace: { label: 'Dark Embrace', per: 'whenever a card is exhausted: draw 1 card' },
-  feel_no_pain: { label: 'Feel No Pain', per: 'whenever a card is exhausted: gain 1 Block' },
-  rupture: { label: 'Rupture', per: 'whenever a card makes you lose HP: gain 1 Strength' },
+  combust: { label: 'Banked Coal', per: 'at the end of each turn: deal 1 damage to ALL enemies and lose 1 HP' },
+  dark_embrace: { label: 'Ash Embrace', per: 'whenever a card is exhausted: draw 1 card' },
+  feel_no_pain: { label: 'Cinder Skin', per: 'whenever a card is exhausted: gain 1 Block' },
+  rupture: { label: 'Split Seam', per: 'whenever a card makes you lose HP: gain 1 Strength' },
 };
 
 /** Every power lasts for the rest of the fight, so one shared note says so. */
@@ -289,8 +289,8 @@ function foldRepeatedDamage(effects) {
 /**
  * Plain English description of a card, as a human would read it aloud.
  *
- * `Strike` -> "Deal 6 damage to the enemy."
- * `Bash`   -> "Deal 8 damage to the enemy. Apply 2 Vulnerable to the enemy."
+ * `Hammerfall` -> "Deal 6 damage to the enemy."
+ * `Anvil Blow` -> "Deal 8 damage to the enemy. Apply 2 Vulnerable to the enemy."
  *
  * @param {any} def card definition from content (cards.json shape)
  * @param {{perPlay?: number}} [instance] runtime instance, when one is available:
@@ -426,7 +426,7 @@ export function emittedTokens() {
 /** Whole-card shorthand for shapes no table can derive, seen in CUSTOM_SUMMARY. */
 const SHORTHAND_ENTRIES = [
   glossRow('A x n', 'attack × n', 'Multi-hit attack: the number after "x" is how many times it hits.', 'C'),
-  glossRow('A n + m', 'attack grows by m', 'The attack damage grows by m each time you play the card (Rampage).', 'C'),
+  glossRow('A n + m', 'attack grows by m', 'The attack damage grows by m each time you play the card (Climbing Heat).', 'C'),
   // The composed shapes that really appear in card text. Without these, a reader who sees
   // "VULN+2" has only the bare "+" row, which describes GROWTH — the opposite of what a
   // status stack of 2 means. These rows are what make "VULN+x" readable as "apply x".
@@ -487,7 +487,7 @@ export function glossary() {
     glossRow('VULN', 'Vulnerable', 'Takes 50% more damage from attacks. Wears off by 1 each turn.', 'B'),
     glossRow('WK', 'Weak', 'Attacks deal 25% less damage. Wears off by 1 each turn.', 'B'),
     glossRow('DEX', 'Dexterity', 'Block gained from cards is that much higher. Lasts the whole fight.', 'B'),
-    glossRow('METAL', 'Metallicize', 'Gain that much Block at the end of each turn.', 'B'),
+    glossRow('METAL', 'Metallicize', 'Gain that much Block at the end of each turn. The Scale Up card applies it.', 'B'),
   ];
 
   // Every whole-card shorthand the generators can really emit: the tokens of the
@@ -532,6 +532,7 @@ export function helpTopics() {
     { title: 'Block protects you, then goes away', body: 'Block soaks damage from enemy attacks. Your Block is used up at the start of your next turn, so it only covers you until then.' },
     { title: 'Killing an enemy stops it attacking', body: 'Dead enemies never act again, and their announced intent goes away with them. Attacking the enemy that is about to hit you hardest is often the best move.' },
     { title: 'Read the enemy intent', body: 'The line under each enemy says what it will do on its next turn — for example "Will attack for 11". Plan your Block around it.' },
+    { title: 'Kindled Heart', body: 'After each fight you win, Kindled Heart restores 6 HP. It is the Ashwright starting relic.' },
   ];
 }
 

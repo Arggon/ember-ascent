@@ -10,7 +10,7 @@ export const cardsBundle = {
   "contentVersion": "dlb-0.3.0-act1",
   "characters": {
     "ironclad": {
-      "name": "Ironclad",
+      "name": "Ashwright",
       "maxHp": 60,
       "startingDeck": [
         "strike",
@@ -24,13 +24,14 @@ export const cardsBundle = {
         "defend",
         "bash"
       ],
-      "startingRelic": "burning_blood"
+      "startingRelic": "burning_blood",
+      "relicName": "Kindled Heart"
     }
   },
   "cards": [
     {
       "id": "strike",
-      "name": "Strike",
+      "name": "Hammerfall",
       "cost": 1,
       "type": "attack",
       "rarity": "starter",
@@ -40,11 +41,12 @@ export const cardsBundle = {
           "verb": "damage",
           "amount": 6
         }
-      ]
+      ],
+      "flavor": "The first lesson of the forge: hit it until it yields."
     },
     {
       "id": "defend",
-      "name": "Defend",
+      "name": "Quench",
       "cost": 1,
       "type": "skill",
       "rarity": "starter",
@@ -54,11 +56,12 @@ export const cardsBundle = {
           "verb": "block",
           "amount": 5
         }
-      ]
+      ],
+      "flavor": "Cool iron holds."
     },
     {
       "id": "bash",
-      "name": "Bash",
+      "name": "Anvil Blow",
       "cost": 2,
       "type": "attack",
       "rarity": "starter",
@@ -74,11 +77,12 @@ export const cardsBundle = {
           "amount": 2,
           "to": "enemy"
         }
-      ]
+      ],
+      "flavor": "The anvil answers louder than the hammer."
     },
     {
       "id": "anger",
-      "name": "Anger",
+      "name": "Spark",
       "cost": 0,
       "type": "attack",
       "rarity": "common",
@@ -88,11 +92,12 @@ export const cardsBundle = {
           "verb": "damage",
           "amount": 5
         }
-      ]
+      ],
+      "flavor": "A small heat, spent at once."
     },
     {
       "id": "cleave",
-      "name": "Cleave",
+      "name": "Arc Cut",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -103,11 +108,12 @@ export const cardsBundle = {
           "amount": 4,
           "target": "all_enemies"
         }
-      ]
+      ],
+      "flavor": "One swing, every face in the fire."
     },
     {
       "id": "clothesline",
-      "name": "Clothesline",
+      "name": "Collar Check",
       "cost": 2,
       "type": "attack",
       "rarity": "common",
@@ -123,11 +129,12 @@ export const cardsBundle = {
           "amount": 2,
           "to": "enemy"
         }
-      ]
+      ],
+      "flavor": "The jaw meets the haft."
     },
     {
       "id": "headbutt",
-      "name": "Headbutt",
+      "name": "Brow Strike",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -137,11 +144,12 @@ export const cardsBundle = {
           "verb": "damage",
           "amount": 9
         }
-      ]
+      ],
+      "flavor": "The helm does the talking."
     },
     {
       "id": "ironwave",
-      "name": "Iron Wave",
+      "name": "Slag Surge",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -155,11 +163,12 @@ export const cardsBundle = {
           "verb": "damage",
           "amount": 5
         }
-      ]
+      ],
+      "flavor": "A wall of cooling metal, then the follow-through."
     },
     {
       "id": "pommel",
-      "name": "Pommel Strike",
+      "name": "Haft Jab",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -173,11 +182,12 @@ export const cardsBundle = {
           "verb": "draw",
           "amount": 1
         }
-      ]
+      ],
+      "flavor": "The blunt end still counts."
     },
     {
       "id": "sword_boomerang",
-      "name": "Sword Boomerang",
+      "name": "Returning Brand",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -188,11 +198,12 @@ export const cardsBundle = {
           "amount": 3,
           "target": "all_enemies"
         }
-      ]
+      ],
+      "flavor": "Heat you threw comes back."
     },
     {
       "id": "thunderclap",
-      "name": "Thunderclap",
+      "name": "Forgeclap",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -209,11 +220,12 @@ export const cardsBundle = {
           "amount": 1,
           "to": "enemy"
         }
-      ]
+      ],
+      "flavor": "The whole shop flinches."
     },
     {
       "id": "twin_strike",
-      "name": "Twin Strike",
+      "name": "Twin Hammers",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -227,11 +239,12 @@ export const cardsBundle = {
           "verb": "damage",
           "amount": 5
         }
-      ]
+      ],
+      "flavor": "Left, then right, before the glow fades."
     },
     {
       "id": "wild_strike",
-      "name": "Wild Strike",
+      "name": "Untempered",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -241,11 +254,12 @@ export const cardsBundle = {
           "verb": "damage",
           "amount": 12
         }
-      ]
+      ],
+      "flavor": "No form. All weight."
     },
     {
       "id": "flex",
-      "name": "Flex",
+      "name": "Bellows",
       "cost": 0,
       "type": "skill",
       "rarity": "common",
@@ -257,11 +271,12 @@ export const cardsBundle = {
           "amount": 2,
           "to": "self"
         }
-      ]
+      ],
+      "flavor": "Work the lungs of the forge."
     },
     {
       "id": "shrug",
-      "name": "Shrug It Off",
+      "name": "Cast Aside",
       "cost": 1,
       "type": "skill",
       "rarity": "common",
@@ -275,11 +290,12 @@ export const cardsBundle = {
           "verb": "draw",
           "amount": 1
         }
-      ]
+      ],
+      "flavor": "The blow slides off the pauldron."
     },
     {
       "id": "true_grit",
-      "name": "True Grit",
+      "name": "True Temper",
       "cost": 1,
       "type": "skill",
       "rarity": "common",
@@ -289,11 +305,12 @@ export const cardsBundle = {
           "verb": "block",
           "amount": 7
         }
-      ]
+      ],
+      "flavor": "Hold the heat. Do not flinch."
     },
     {
       "id": "warcry",
-      "name": "Warcry",
+      "name": "Kiln Cry",
       "cost": 0,
       "type": "skill",
       "rarity": "common",
@@ -307,11 +324,12 @@ export const cardsBundle = {
           "verb": "discard",
           "amount": 1
         }
-      ]
+      ],
+      "flavor": "The furnace answers."
     },
     {
       "id": "armaments",
-      "name": "Armaments",
+      "name": "Fit the Plate",
       "cost": 1,
       "type": "skill",
       "rarity": "common",
@@ -321,11 +339,12 @@ export const cardsBundle = {
           "verb": "block",
           "amount": 5
         }
-      ]
+      ],
+      "flavor": "Strap on what the climb still owes you."
     },
     {
       "id": "havoc",
-      "name": "Havoc",
+      "name": "Vent",
       "cost": 1,
       "type": "skill",
       "rarity": "common",
@@ -339,11 +358,12 @@ export const cardsBundle = {
           "verb": "energy",
           "amount": 1
         }
-      ]
+      ],
+      "flavor": "Open the flue. The room fills with work."
     },
     {
       "id": "battle_trance",
-      "name": "Battle Trance",
+      "name": "Heat Trance",
       "cost": 0,
       "type": "skill",
       "rarity": "uncommon",
@@ -353,11 +373,12 @@ export const cardsBundle = {
           "verb": "draw",
           "amount": 3
         }
-      ]
+      ],
+      "flavor": "The world narrows to the next swing."
     },
     {
       "id": "bloodletting",
-      "name": "Bloodletting",
+      "name": "Vein Tap",
       "cost": 0,
       "type": "skill",
       "rarity": "uncommon",
@@ -367,11 +388,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "bloodletting"
         }
-      ]
+      ],
+      "flavor": "Pay in blood. Take the breath back."
     },
     {
       "id": "carnage",
-      "name": "Carnage",
+      "name": "Sunder",
       "cost": 2,
       "type": "attack",
       "rarity": "uncommon",
@@ -381,11 +403,12 @@ export const cardsBundle = {
           "verb": "damage",
           "amount": 20
         }
-      ]
+      ],
+      "flavor": "Too much hammer for one body."
     },
     {
       "id": "combust",
-      "name": "Combust",
+      "name": "Banked Coal",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -395,11 +418,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "combust"
         }
-      ]
+      ],
+      "flavor": "Leave a coal in the grate. It works while you do."
     },
     {
       "id": "dark_embrace",
-      "name": "Dark Embrace",
+      "name": "Ash Embrace",
       "cost": 2,
       "type": "power",
       "rarity": "uncommon",
@@ -409,11 +433,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "dark_embrace"
         }
-      ]
+      ],
+      "flavor": "What burns away still warms the hands."
     },
     {
       "id": "dropkick",
-      "name": "Dropkick",
+      "name": "Heel Drop",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -427,11 +452,12 @@ export const cardsBundle = {
           "verb": "energy",
           "amount": 1
         }
-      ]
+      ],
+      "flavor": "The boot comes down where the hammer cannot."
     },
     {
       "id": "entrench",
-      "name": "Entrench",
+      "name": "Brace",
       "cost": 2,
       "type": "skill",
       "rarity": "uncommon",
@@ -441,11 +467,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "entrench"
         }
-      ]
+      ],
+      "flavor": "Set your feet in the clinker."
     },
     {
       "id": "feel_no_pain",
-      "name": "Feel No Pain",
+      "name": "Cinder Skin",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -455,11 +482,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "feel_no_pain"
         }
-      ]
+      ],
+      "flavor": "The burn stops meaning anything."
     },
     {
       "id": "flame_barrier",
-      "name": "Flame Barrier",
+      "name": "Flame Ward",
       "cost": 2,
       "type": "skill",
       "rarity": "uncommon",
@@ -469,11 +497,12 @@ export const cardsBundle = {
           "verb": "block",
           "amount": 12
         }
-      ]
+      ],
+      "flavor": "A curtain of fire that bites back."
     },
     {
       "id": "ghostly_armor",
-      "name": "Ghostly Armor",
+      "name": "Cinder Shroud",
       "cost": 1,
       "type": "skill",
       "rarity": "uncommon",
@@ -483,11 +512,12 @@ export const cardsBundle = {
           "verb": "block",
           "amount": 10
         }
-      ]
+      ],
+      "flavor": "Ash remembers the shape of armor."
     },
     {
       "id": "hemokinesis",
-      "name": "Hemokinesis",
+      "name": "Blood Hammer",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -497,11 +527,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "hemokinesis"
         }
-      ]
+      ],
+      "flavor": "The swing costs a little of you."
     },
     {
       "id": "inflame",
-      "name": "Inflame",
+      "name": "Stoke",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -513,11 +544,12 @@ export const cardsBundle = {
           "amount": 2,
           "to": "self"
         }
-      ]
+      ],
+      "flavor": "Feed the fire in the arm."
     },
     {
       "id": "metallicize",
-      "name": "Metallicize",
+      "name": "Scale Up",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -529,11 +561,12 @@ export const cardsBundle = {
           "amount": 3,
           "to": "self"
         }
-      ]
+      ],
+      "flavor": "Plates knit between blows."
     },
     {
       "id": "pummel",
-      "name": "Pummel",
+      "name": "Hail of Blows",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -558,11 +591,12 @@ export const cardsBundle = {
         {
           "verb": "exhaust"
         }
-      ]
+      ],
+      "flavor": "Four short strikes, then nothing left."
     },
     {
       "id": "rampage",
-      "name": "Rampage",
+      "name": "Climbing Heat",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -572,11 +606,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "rampage"
         }
-      ]
+      ],
+      "flavor": "Each swing teaches the next."
     },
     {
       "id": "rupture",
-      "name": "Rupture",
+      "name": "Split Seam",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -586,11 +621,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "rupture"
         }
-      ]
+      ],
+      "flavor": "When you bleed, the hammer gets heavier."
     },
     {
       "id": "shockwave",
-      "name": "Shockwave",
+      "name": "Heat Wash",
       "cost": 2,
       "type": "skill",
       "rarity": "uncommon",
@@ -608,11 +644,12 @@ export const cardsBundle = {
           "amount": 3,
           "to": "enemy"
         }
-      ]
+      ],
+      "flavor": "A wave that leaves them open and weak."
     },
     {
       "id": "uppercut",
-      "name": "Uppercut",
+      "name": "Rising Blow",
       "cost": 2,
       "type": "attack",
       "rarity": "uncommon",
@@ -634,11 +671,12 @@ export const cardsBundle = {
           "amount": 1,
           "to": "enemy"
         }
-      ]
+      ],
+      "flavor": "Up from the floor of the furnace."
     },
     {
       "id": "bludgeon",
-      "name": "Bludgeon",
+      "name": "Maul",
       "cost": 3,
       "type": "attack",
       "rarity": "rare",
@@ -648,11 +686,12 @@ export const cardsBundle = {
           "verb": "damage",
           "amount": 32
         }
-      ]
+      ],
+      "flavor": "One stroke. The argument ends."
     },
     {
       "id": "impervious",
-      "name": "Impervious",
+      "name": "Unbroken",
       "cost": 2,
       "type": "skill",
       "rarity": "rare",
@@ -665,11 +704,12 @@ export const cardsBundle = {
         {
           "verb": "exhaust"
         }
-      ]
+      ],
+      "flavor": "Nothing gets through. Then the plate is spent."
     },
     {
       "id": "limit_break",
-      "name": "Limit Break",
+      "name": "Overtemper",
       "cost": 1,
       "type": "skill",
       "rarity": "rare",
@@ -679,11 +719,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "limit_break"
         }
-      ]
+      ],
+      "flavor": "Past the point the metal was meant to hold."
     },
     {
       "id": "offering",
-      "name": "Offering",
+      "name": "Blood Tithe",
       "cost": 0,
       "type": "skill",
       "rarity": "rare",
@@ -693,11 +734,12 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "offering"
         }
-      ]
+      ],
+      "flavor": "Feed the kiln. It pays you back in breath and cards."
     },
     {
       "id": "reaper",
-      "name": "Reaper",
+      "name": "Ash Harvest",
       "cost": 2,
       "type": "attack",
       "rarity": "rare",
@@ -707,7 +749,8 @@ export const cardsBundle = {
           "verb": "custom",
           "handler": "reaper"
         }
-      ]
+      ],
+      "flavor": "What you cut comes back as heat in the chest."
     }
   ],
   "statuses": {

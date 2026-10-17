@@ -40,7 +40,7 @@ class N {
   }
   set textContent(v) { this.txt = String(v); this.kids = []; }
   get textContent() { return this.txt; }
-  append(...c) { for (const x of c) if (x != null) { x.parent = this; this.kids.push(x); } }
+  append(...c) { for (let x of c) if (x != null) { if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); x = t; } x.parent = this; this.kids.push(x); } }
   prepend(...c) { const add = c.filter((x) => x != null); for (const x of add) x.parent = this; this.kids.unshift(...add); }
   appendChild(c) { c.parent = this; this.kids.push(c); return c; }
   replaceChildren(...c) { this.kids = []; this.append(...c); }

@@ -25,7 +25,7 @@ Recon of kernel data used as the art contract (no kernel change needed):
 `intent.text` plain English, `intent.damage`, `intent.hits`. Node types:
 `combat_weak` / `combat_strong` / `elite` / `rest` / `boss` with kernel labels
 `fight` / `fight+` / `elite` / `rest` / `boss`. Enemy names are the six encounter
-definitions (Jaw Worm, Cultist, Red Louse, Acid Slime, Gremlin Nob, The Guardian).
+definitions (Cinder Maw, Ash Cantor, Kiln Mite, Slag Ooze, Cinder Brute, Slag Warden). Ids are unchanged; see `NAMES.md`.
 Statuses and powers are reduced to `label`/`text`/`explain` pairs by the kernel.
 
 ## Task list

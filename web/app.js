@@ -18,6 +18,7 @@
 
 import { createController } from '../src/surface/gui/controller.js';
 import { cardArtMarkup } from './card-art.js';
+import { attackTier, backdropMarkup, enemyMarkup, heroMarkup, intentGlyph } from './stage-art.js';
 // The ONE public kernel entry point (package.json `exports` is exactly this file, and it
 // is browser-safe by construction: no `node:*`, no clock, no unseeded randomness, all
 // enforced by tools/check-architecture.mjs). Every number the history screens show is
@@ -59,6 +60,38 @@ const fxEl = document.getElementById('fx-layer');
 const reducedMotion = typeof matchMedia === 'function'
   ? matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
+
+/** Presentation speed. 1 and 2 scale the feel queue; 0 skips it. Never a rule. */
+const SPEED_KEY = 'ea.animSpeed';
+function readAnimSpeed() {
+  try {
+    const n = Number(localStorage.getItem(SPEED_KEY));
+    if (n === 0 || n === 1 || n === 2) return n;
+  } catch { /* private mode */ }
+  return 1;
+}
+let animSpeed = readAnimSpeed();
+let animGen = 0;
+let pileOpen = null;
+
+function animMs(ms) {
+  if (reducedMotion || animSpeed === 0) return 0;
+  return Math.max(0, Math.round(ms / animSpeed));
+}
+function clearHitstop() {
+  if (stageEl && stageEl.classList) stageEl.classList.remove('hitstop');
+  if (fxEl && fxEl.classList) fxEl.classList.remove('hitstop');
+}
+function revealFloats() {
+  if (!stageEl || !stageEl.querySelectorAll) return;
+  for (const n of stageEl.querySelectorAll('.efloat.is-queued')) n.classList.remove('is-queued');
+}
+/** Drop the rest of the feel queue and show the numbers now. */
+function skipAnim() {
+  animGen += 1;
+  clearHitstop();
+  revealFloats();
+}
 
 /**
  * Every timer the effect layer owns, so a new run can cancel the previous run's pending
@@ -418,6 +451,34 @@ function el(tag, opts = {}, ...kids) {
   return node;
 }
 
+/**
+ * Fill `node` with `text`, wrapping kernel glossary words (Block, Vulnerable, Exhaust…)
+ * in gold keyword spans with the kernel's own meaning as the tooltip, and "Lose N HP"
+ * costs in ember red. Text nodes only: nothing is parsed as HTML. Presentation only.
+ * @param {HTMLElement} node
+ * @param {string} text
+ * @returns {HTMLElement}
+ */
+function keywordText(node, text) {
+  const terms = new Map();
+  for (const row of snap.glossary || []) {
+    if ((row.group === 'A' || row.group === 'B') && /^[A-Z][a-z]+$/.test(row.label || '')) terms.set(row.label.toLowerCase(), row.meaning);
+  }
+  const str = String(text ?? '');
+  if (terms.size === 0) { node.textContent = str; return node; }
+  const words = [...terms.keys()].sort((a, b) => b.length - a.length).join('|');
+  const re = new RegExp(`(Lose \\d+ HP)|\\b(${words})\\b`, 'gi');
+  let at = 0;
+  for (const m of str.matchAll(re)) {
+    if (m.index > at) node.append(str.slice(at, m.index));
+    if (m[1]) node.append(el('span', { cls: 'kw kw-cost', text: m[1] }));
+    else node.append(el('span', { cls: 'kw', text: m[2], attrs: { title: terms.get(m[2].toLowerCase()) || '' } }));
+    at = m.index + m[0].length;
+  }
+  if (at < str.length) node.append(str.slice(at));
+  return node;
+}
+
 function toast(msg, kind = 'warn') {
   toastEl.textContent = msg;
   toastEl.className = kind === 'info' ? 'show info' : 'show';
@@ -517,7 +578,7 @@ const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', rest: 'fl
  *  line states only what the kernel's NODE_TYPES.reward says (card or heal). */
 const NODE_WORDS = {
   weak: ['Skirmish', 'card reward'], strong: ['Hard fight', 'card reward'], elite: ['Elite', 'card reward'],
-  rest: ['Campfire', 'heal'], boss: ['The Guardian', 'final fight'],
+  rest: ['Campfire', 'heal'], boss: ['Slag Warden', 'final fight'],
 };
 
 /**
@@ -526,23 +587,18 @@ const NODE_WORDS = {
  * @param {string} name
  * @returns {{art: string, boss: boolean, elite: boolean, hue: number}}
  */
-function enemyLook(name) {
-  const n = String(name || '');
-  let art = 'e-rune';
-  if (/guardian/i.test(n)) art = 'e-sentinel';
-  else if (/nob/i.test(n)) art = 'e-brute';
-  else if (/worm/i.test(n)) art = 'e-worm';
-  else if (/slime/i.test(n)) art = 'e-slime';
-  else if (/louse|lice/i.test(n)) art = 'e-louse';
-  else if (/cultist/i.test(n)) art = 'e-cultist';
-  let hash = 0;
-  for (let i = 0; i < n.length; i += 1) hash = (hash * 31 + n.charCodeAt(i)) % 5;
-  return {
-    art,
-    boss: /guardian/i.test(n),
-    elite: /nob/i.test(n),
-    hue: hash,
+function enemyLook(id) {
+  const table = {
+    jaw_worm: { art: 'e-worm', hue: 1 },
+    cultist: { art: 'e-cultist', hue: 4 },
+    red_louse: { art: 'e-louse', hue: 1 },
+    acid_slime: { art: 'e-slime', hue: 3 },
+    gremlin_nob: { art: 'e-brute', elite: true, hue: 2 },
+    the_guardian: { art: 'e-sentinel', boss: true, hue: 1 },
   };
+  const hit = table[id];
+  if (hit) return { art: hit.art, boss: Boolean(hit.boss), elite: Boolean(hit.elite), hue: hit.hue };
+  return { art: 'e-rune', boss: false, elite: false, hue: 0 };
 }
 
 /* --------------------------------------------------------- the one dispatch path */
@@ -555,6 +611,7 @@ function enemyLook(name) {
  */
 function act(actionId, targetK = null) {
   if (!actionId) return;
+  pileOpen = null;
   const before = snap;
   // The map the player is standing on BEFORE this action, kept for the travel beat: the
   // node the step started from is gone from the rebuilt map, and this is the only handle on
@@ -593,21 +650,35 @@ function act(actionId, targetK = null) {
     // Player hurt -> a screen pulse. It lives in the layer `render()` cannot clear, so
     // it does not depend on the enemy's HTML surviving the repaint.
     if (playerLost > 0) fx.push({ kind: 'vignette' });
+    // The number is the HP delta between the two kernel snapshots, so it is the damage
+    // that actually landed. Block gained is the same kind of delta.
+    if (playerLost > 0) {
+      fx.push({ kind: 'hero-float', amount: playerLost, tone: 'dmg', tier: playerLost >= 16 ? 3 : playerLost >= 8 ? 2 : 1 });
+    }
+    if (gainedBlock > 0) fx.push({ kind: 'hero-float', amount: gainedBlock, tone: 'block', tier: 1 });
+    if (playerLost > 0 && after.turn !== before.turn) {
+      for (const e of before.enemies) {
+        if (e.intent && e.intent.kind === 'attack') fx.push({ kind: 'enemy-strike', enemy: e.index });
+      }
+    }
 
-    // Per-enemy: the HP TOTAL it is left with (always agreeing with the HP bar), the
-    // MAGNITUDE of the hit as a glyph tier, and whether block ate all of it.
+    // Per-enemy: the damage that landed (HP delta), the glyph tier for that amount, and
+    // whether block ate all of it. The bar still shows the remaining total.
     const beforeByIdx = new Map(before.enemies.map((e) => [e.index, e]));
     let absorbed = false;
     for (const e of after.enemies) {
       const was = beforeByIdx.get(e.index);
       if (!was || e.hp >= was.hp) continue;
-      // `e.intent.damage` is the kernel's own announced damage. It is used only to SIZE
-      // the glyph, never printed as a number: printing pre-block damage would be an
-      // invented figure (nothing in the snapshot promises the enemy's mitigation).
-      const incoming = Math.max(was.hp - e.hp, Math.round(Number(was.intent?.damage) || 0));
-      const tier = incoming >= 16 ? 3 : incoming >= 8 ? 2 : 1;
-      fx.push({ kind: 'float', enemy: e.index, hp: e.hp, maxHp: e.maxHp, tier, defeated: e.hp <= 0 });
+      const dealt = was.hp - e.hp;
+      const tier = dealt >= 16 ? 3 : dealt >= 8 ? 2 : 1;
+      fx.push({ kind: 'float', enemy: e.index, amount: dealt, tone: 'dmg', tier, defeated: e.hp <= 0 });
       if (was.block > 0) fx.push({ kind: 'block-eat', enemy: e.index });
+    }
+    for (const e of after.enemies) {
+      const was = beforeByIdx.get(e.index);
+      if (was && e.block > was.block && e.hp === was.hp) {
+        fx.push({ kind: 'float', enemy: e.index, amount: e.block - was.block, tone: 'block', tier: 1 });
+      }
     }
     // A hit that was FULLY absorbed leaves the enemy's HP untouched, so the loop above
     // never fires. Detected by the enemy's block falling while its HP held — and it says
@@ -682,7 +753,7 @@ function act(actionId, targetK = null) {
       // collapse reads, and nothing else. The victory beat is gated on this below, which is
       // how "the boss dies, THEN the panel arrives" is sequenced without asking the kernel
       // for a new field.
-      boss: enemyLook(e.name).boss,
+      boss: enemyLook(e.id).boss,
     }));
   // Each departure becomes a `death` burst, which the next paint draws as an inert ghost
   // card that collapses. The ghost is positioned by ENEMY ROW ORDER (`side-*`), never by a
@@ -790,6 +861,9 @@ function newGame(seed = null) {
   if (fxEl && fxEl.replaceChildren) fxEl.replaceChildren();
   flash = { hp: false, energy: false, block: false, hits: [], n: 0, blockEat: false };
   bursts = [];
+  pileOpen = null;
+  animGen += 1;
+  clearHitstop();
   dealPending = false;
   dyingThisPaint = [];
   lastPlayerStatuses = [];
@@ -817,7 +891,11 @@ function renderHud() {
   const p = snap.player;
 
   hudEl.append(
-    el('span', { cls: 'hud-char', text: capitalize(snap.character) }),
+    el('span', {
+      cls: 'hud-char',
+      text: snap.characterName || capitalize(snap.character),
+      attrs: { title: snap.relicName ? `${snap.characterName} — relic: ${snap.relicName}` : '' },
+    }),
   );
 
   // DESIGN REV 3 (UX spec): the word label is NOT part of the value text. Emitting `HP 60/60`
@@ -1084,7 +1162,7 @@ function render() {
       if (enteredIds.has(e.id)) continue;
       enteredIds.add(e.id);
       enteringIds.add(e.id);
-      if (enemyLook(e.name).boss) bossWelcomed.push(e.name);
+      if (enemyLook(e.id).boss) bossWelcomed.push(e.name);
     }
   }
   // The boss's arrival is NAMED on screen as well as animated, so the fact ("the boss is
@@ -1142,6 +1220,7 @@ function render() {
   // card play would flash the whole screen.
   if (phaseChanged && stageEl.firstElementChild) {
     stageEl.firstElementChild.classList.add('enter');
+    sceneBeat(paintedPhase, snap.phase);
     paintedPhase = snap.phase;
   }
   // The first-run explanation, shown once. A player who has never seen the game should
@@ -1190,6 +1269,27 @@ function render() {
 */
 
 /** Put a node on the persistent screen layer. Null-safe: the test harness has no layer. */
+/**
+ * Scene transitions (presentation only, skipped under reduced motion by fxAdd): the very
+ * first map of a run gets the act title card; every later phase change gets a short
+ * ember-and-heat wipe. Fixed overlay, pointer-events none, so layout and clicks are untouched.
+ * @param {string|null} from the phase painted before
+ * @param {string} to the phase being painted
+ */
+function sceneBeat(from, to) {
+  if (from === null) {
+    if (to === 'map' && !(snap.map && snap.map.floor > 0)) {
+      fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
+        el('span', { cls: 'fx-act-num', text: 'Act I' }),
+        el('span', { cls: 'fx-act-name', text: 'The Foundry' }),
+        el('span', { cls: 'fx-act-rule' })), 2300);
+    }
+    return;
+  }
+  if (to === 'ended') return;
+  fxAdd(el('div', { cls: `fx-scene to-${to}`, attrs: { 'aria-hidden': 'true' } }), 700);
+}
+
 function fxAdd(node, ms) {
   if (!fxEl || reducedMotion) return;
   fxEl.append(node);
@@ -1224,9 +1324,10 @@ function dispatchFx() {
       case 'card-fly':
         // `b.side` is already my own full lane class (`side-0` / `side-mid` / `side-1` /
         // `side-none`), so it is interpolated directly — prefixing it here produced
-        // `side-side-0`, which no rule matches.
+        // `side-side-0`, which no rule matches. Instant speed skips the flight.
+        if (animSpeed === 0) break;
         fxAdd(el('div', { cls: `fx-card ${b.side || 'side-none'} type-${b.type || 'skill'}` },
-          el('span', { cls: 'fx-card-name', text: b.name || '' })), 460);
+          el('span', { cls: 'fx-card-name', text: b.name || '' })), animMs(460) || 460);
         break;
       default:
         break;
@@ -1235,7 +1336,7 @@ function dispatchFx() {
   // The boss arrives as a BEAT, not a bigger fade: a red wash, a heavier and slower
   // title card, plus a ring that expands out of the enemy row.
   if (welcome) {
-    fxBanner('THE GUARDIAN', 'boss', '', 1350);
+    fxBanner('SLAG WARDEN', 'boss', '', 1350);
     fxAdd(el('div', { cls: 'fx-boss-ring' }), 1100);
   }
   // The run's last two moments, each with its own weight: a bright hold for the win, a
@@ -1248,28 +1349,52 @@ function dispatchFx() {
     fxBanner('DEFEAT', 'defeat', '', 1700);
     fxAdd(el('div', { cls: 'fx-darken' }), 1700);
   }
+  // Feel queue: the card is already in flight. Hold the stage for a short hit-stop,
+  // then let the damage and block numbers rise. A newer action bumps `animGen` and
+  // this wait becomes a no-op. Speed 0 and reduced motion never wait.
+  const gen = ++animGen;
+  if (reducedMotion || animSpeed === 0) {
+    revealFloats();
+    return;
+  }
+  later(() => {
+    if (gen !== animGen) return;
+    if (stageEl && stageEl.classList) stageEl.classList.add('hitstop');
+    if (fxEl && fxEl.classList) fxEl.classList.add('hitstop');
+    later(() => {
+      if (gen !== animGen) return;
+      clearHitstop();
+      revealFloats();
+    }, animMs(70));
+  }, animMs(240));
 }
 
 /**
  * The floating marker for one enemy, appended INSIDE that enemy's own card.
  *
- * What it says, and why: the readable number is the enemy's HP TOTAL, which is the same
- * number the HP bar and the `.ehp` line are showing at that instant, so the floater can
- * never disagree with them. The SIZE OF THE HIT rides on the glyph (`·` chip, `◆` hurt,
- * `✸` hard) and the text size — a second readable number would be a second source of
- * truth, which the brief forbids. A fully absorbed hit says "absorbed" in words, because
- * "0" or "−0" would contradict a bar that deliberately did not move.
+ * The readable number is the damage dealt or the block gained: the HP or block delta
+ * between the two kernel snapshots of this action. The bar still shows the remaining
+ * total. A fully absorbed hit says "absorbed", because a 0 would contradict a bar that
+ * did not move. The glyph (`·` `◆` `✸`) scales with the amount.
  */
+function floatHold() {
+  if (reducedMotion) return '';
+  return animSpeed === 0 ? ' is-static' : ' is-queued';
+}
+
 function floatNode(b) {
   const span = el('span', { cls: 'efloat' });
   if (b.kind === 'absorbed') {
-    span.className = 'efloat efloat-absorbed';
+    span.className = 'efloat efloat-absorbed' + floatHold();
     span.append(el('b', { text: '⛨' }), el('b', { text: 'absorbed' }));
     return span;
   }
-  const glyph = b.tier >= 3 ? '✸' : b.tier >= 2 ? '◆' : '·';
-  span.className = `efloat efloat-g${b.tier}`;
-  span.append(el('b', { text: glyph }), el('b', { text: `−${b.hp}` }));
+  const tier = b.tier || 1;
+  const glyph = tier >= 3 ? '✸' : tier >= 2 ? '◆' : '·';
+  const tone = b.tone === 'block' ? ' efloat-block' : '';
+  span.className = `efloat efloat-g${tier}${tone}` + floatHold();
+  const text = b.tone === 'block' ? `+${b.amount}` : `−${b.amount}`;
+  span.append(el('b', { text: glyph }), el('b', { text }));
   if (b.defeated) span.append(el('b', { text: 'down' }));
   return span;
 }
@@ -1303,6 +1428,16 @@ function efxBox(index) {
   for (const b of bursts) {
     if (b.enemy !== index) continue;
     if (b.kind !== 'float' && b.kind !== 'absorbed') continue;
+    box.append(floatNode(b));
+  }
+  return box;
+}
+
+function heroEfx() {
+  const box = el('span', { cls: 'efx' });
+  if (reducedMotion) return box;
+  for (const b of bursts) {
+    if (b.kind !== 'hero-float') continue;
     box.append(floatNode(b));
   }
   return box;
@@ -1347,46 +1482,174 @@ function freshStatusKeys(list) {
  */
 function dyingRow(dying, row = el('div', { cls: 'enemies' })) {
   for (const d of dying) {
-    const down = enemyLook(d.name).art;
     // A boss says so: its collapse is the biggest single event in the run, and the word is
     // what makes the difference readable with no motion at all (the row is also the only
     // place the boss's name is still on screen, its card having left the snapshot).
     const label = d.boss ? 'BOSS DOWN' : 'DOWN';
-    row.append(el('div', { cls: `enemy is-dying side-${d.side}` + (d.boss ? ' boss-down' : '') },
-      el('div', { cls: 'e-art' }, glyphBox(down, 'e-silhouette')),
-      el('div', { cls: 'ename', text: d.name }),
-      el('div', { cls: 'ehp', text: label }),
-    ));
+    const ghost = el('div', { cls: `enemy is-dying ash side-${d.side}` + (d.boss ? ' boss-down' : '') });
+    const fig = el('div', { cls: 'fig pose-hurt', attrs: { 'aria-hidden': 'true' } });
+    fig.innerHTML = enemyMarkup(d.id);
+    ghost.append(fig);
+    ghost.append(el('div', { cls: 'ename', text: d.name }));
+    ghost.append(el('div', { cls: 'ehp', text: label }));
+    row.append(ghost);
   }
   return row;
 }
 
-function combatView() {
-  const targeting = pendingSlot !== null && snap.enemies.length > 1;
-  const wrap = el('div', { cls: 'stage-combat' + (targeting ? ' sc-targeting' : '') });
+function heroPose() {
+  const p = snap.player;
+  const ratio = p.maxHp > 0 ? p.hp / p.maxHp : 1;
+  if (bursts.some((b) => b.kind === 'hero-float' && b.tone === 'dmg')) return 'hurt';
+  const fly = bursts.find((b) => b.kind === 'card-fly');
+  if (fly && fly.type === 'attack') return 'strike';
+  if (fly && (fly.type === 'skill' || fly.type === 'power')) return 'brace';
+  if (ratio <= 0.35) return 'low';
+  return 'idle';
+}
 
-  if (snap.enemies.length > 0) {
-    wrap.append(el('p', { cls: 'section-title', text: 'Enemies' }));
-    // `position` is the living-enemy slot k the engine's action ids use, so the digit a
-    // player reads on screen is the digit they type — and the same k the state dump prints.
-    const row = el('div', { cls: 'enemies' }, ...snap.enemies.map((e, i) => enemyCard(e, i)));
-    // The ghosts of this action's deaths join that row, drawn by the shared builder above.
-    dyingRow(dyingThisPaint, row);
-    wrap.append(row);
+function heroFigure() {
+  const p = snap.player;
+  const ratio = p.maxHp > 0 ? p.hp / p.maxHp : 1;
+  const pose = heroPose();
+  const node = el('div', {
+    cls: 'hero' + (ratio <= 0.35 ? ' is-low' : ''),
+    attrs: { role: 'group', 'aria-label': `${snap.characterName || 'Ashwright'}, ${p.hp} of ${p.maxHp} HP, block ${p.block}` },
+  });
+  const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
+  fig.innerHTML = heroMarkup();
+  node.append(fig);
+  node.append(el('div', { cls: 'hero-name', text: snap.characterName || 'Ashwright' }));
+  node.append(el('div', { cls: 'ehp', text: `${p.hp}/${p.maxHp}` }));
+  const bar = el('div', { cls: 'hpbar' }, el('i', {}));
+  bar.querySelector('i').style.width = `${Math.max(0, Math.round((p.hp / Math.max(1, p.maxHp)) * 100))}%`;
+  node.append(bar);
+  if (p.block > 0) node.append(el('div', { cls: 'eblock', text: `⛨ ${p.block}` }));
+  node.append(heroEfx());
+  return node;
+}
+
+function enemyPose(e) {
+  if (bursts.some((b) => b.kind === 'enemy-strike' && b.enemy === e.index)) return 'strike';
+  if (flash.hits.includes(e.index)) return 'hurt';
+  if (e.hp / Math.max(1, e.maxHp) <= 0.35) return 'low';
+  if (e.intent && e.intent.kind === 'attack') return 'windup';
+  return 'idle';
+}
+
+function intentBadge(e) {
+  const kind = e.intent.kind;
+  let which = 'buff';
+  let tier = 1;
+  if (kind === 'attack') {
+    tier = attackTier(e.intent.damage);
+    which = tier >= 3 ? 'meteor' : tier >= 2 ? 'axe' : 'dagger';
+  } else if (kind === 'block') which = 'shield';
+  else if (kind === 'debuff') which = 'down';
+  const badge = el('div', {
+    cls: `intent-badge kind-${kind} tier-${tier}`,
+    attrs: { title: e.intent.text || e.intent.label || '', 'aria-hidden': 'true' },
+  });
+  badge.innerHTML = intentGlyph(which);
+  if (kind === 'attack') {
+    const n = e.intent.hits > 1 ? `${e.intent.damage}×${e.intent.hits}` : String(e.intent.damage ?? '');
+    badge.append(el('b', { cls: 'intent-num', text: n }));
   }
+  return badge;
+}
 
-  const piles = `draw ${snap.piles.draw} · discard ${snap.piles.discard}` + (snap.piles.exhaust > 0 ? ` · exhaust ${snap.piles.exhaust}` : '');
-  wrap.append(el('p', { cls: 'section-title', text: `Your Hand — ${piles}` }));
-  // `.deal-in` lands on exactly one paint per hand change (see `dealPending`), so an
-  // incidental repaint — hovering an enemy calls render() — cannot re-deal the hand.
-  wrap.append(el('div', { cls: 'hand' + (dealPending ? ' deal-in' : '') },
-    ...snap.hand.map((c, i) => cardTile(c, { index: i + 1 }))));
+function pileButton(which) {
+  const isDraw = which === 'draw';
+  const count = snap.piles[which] ?? 0;
+  const names = (isDraw ? snap.piles.drawCards : snap.piles.discardCards) || [];
+  const label = isDraw ? 'Draw' : 'Discard';
+  const extra = !isDraw && snap.piles.exhaust > 0 ? `, exhaust ${snap.piles.exhaust}` : '';
+  return el('button', {
+    cls: isDraw ? 'pile pile-draw' : 'pile pile-discard',
+    attrs: {
+      type: 'button',
+      title: names.length ? `${label}: ${names.join(', ')}` : `${label} pile empty`,
+      'aria-label': `${label} pile, ${count} cards${extra}`,
+    },
+    on: {
+      click: (ev) => {
+        consumeClick(ev);
+        pileOpen = pileOpen === which ? null : which;
+        render();
+      },
+    },
+  },
+    el('b', { cls: 'pile-count', text: String(count) }),
+    el('span', { cls: 'pile-name', text: label }),
+  );
+}
 
+function energyOrb() {
+  const n = snap.player.energy;
+  const max = snap.energyPerTurn;
+  return el('div', {
+    cls: 'energy-orb' + (n === 0 ? ' is-empty' : ''),
+    attrs: { title: `Energy ${n} of ${max}`, 'aria-label': `Energy ${n} of ${max}` },
+  },
+    el('b', { cls: 'orb-num', text: String(n) }),
+    el('span', { cls: 'orb-cap', text: `/${max}` }),
+  );
+}
+
+function speedDock() {
+  const dock = el('div', { cls: 'speed-dock', attrs: { role: 'group', 'aria-label': 'Animation speed' } });
+  const add = (speed, text, title) => dock.append(el('button', {
+    cls: 'btn ghost speed-btn' + (animSpeed === speed ? ' is-on' : ''),
+    text,
+    attrs: { type: 'button', title },
+    on: {
+      click: (ev) => {
+        consumeClick(ev);
+        animSpeed = speed;
+        try { localStorage.setItem(SPEED_KEY, String(speed)); } catch { /* private mode */ }
+        if (speed === 0) skipAnim();
+        render();
+      },
+    },
+  }));
+  add(1, '1×', 'Animation speed 1×');
+  add(2, '2×', 'Animation speed 2×');
+  add(0, '»', 'Skip animation');
+  return dock;
+}
+
+function pileModal(which) {
+  const names = (which === 'draw' ? snap.piles.drawCards : snap.piles.discardCards) || [];
+  const title = which === 'draw' ? 'Draw pile' : 'Discard pile';
+  const back = el('div', { cls: 'pile-back', attrs: { role: 'dialog', 'aria-label': title } });
+  back.addEventListener('click', (ev) => {
+    if (ev.target === back) { pileOpen = null; render(); }
+  });
+  const sheet = el('div', { cls: 'pile-sheet' }, el('h2', { text: `${title} (${names.length})` }));
+  if (names.length === 0) sheet.append(el('p', { text: 'Empty.' }));
+  else {
+    const list = el('ul', { cls: 'pile-list' });
+    for (const name of names) list.append(el('li', { text: name }));
+    sheet.append(list);
+  }
+  if (which === 'discard' && snap.piles.exhaust > 0) {
+    const exh = snap.piles.exhaustCards || [];
+    sheet.append(el('p', { cls: 'pile-exh', text: `Exhausted (${snap.piles.exhaust}): ${exh.join(', ') || '—'}` }));
+  }
+  sheet.append(el('button', {
+    cls: 'btn secondary',
+    text: 'Close',
+    attrs: { type: 'button' },
+    on: { click: (ev) => { consumeClick(ev); pileOpen = null; render(); } },
+  }));
+  back.append(sheet);
+  return back;
+}
+
+function combatControls(targeting) {
   const hit = pendingCard();
   const controls = el('div', { cls: 'controls' });
   if (targeting && hit) {
-    // The obvious way out: a labelled Cancel affordance, alongside Escape, a re-click on
-    // the card and a click on empty space.
     controls.append(el('span', { cls: 'target-banner', text: `${hit.name} — choose an enemy target` }));
     controls.append(el('button', {
       cls: 'btn secondary cancel-target',
@@ -1403,10 +1666,43 @@ function combatView() {
       on: { click: () => act(endTurn && endTurn.id) },
     }));
   }
-  wrap.append(controls);
+  return controls;
+}
+
+function combatView() {
+  const targeting = pendingSlot !== null && snap.enemies.length > 1;
+  const wrap = el('div', { cls: 'stage-combat' + (targeting ? ' sc-targeting' : '') });
+
+  const fight = el('div', { cls: 'fight' });
+  const backdrop = el('div', { cls: 'backdrop', attrs: { 'aria-hidden': 'true' } });
+  backdrop.innerHTML = backdropMarkup();
+  // Empty foundry floor fast-forwards the feel queue. Cards, enemies and buttons sit above it.
+  backdrop.addEventListener('pointerdown', () => skipAnim());
+  fight.append(backdrop);
+  fight.append(el('div', { cls: 'ground', attrs: { 'aria-hidden': 'true' } }));
+  fight.append(heroFigure());
+  const row = el('div', { cls: 'enemies' }, ...snap.enemies.map((e, i) => enemyCard(e, i)));
+  dyingRow(dyingThisPaint, row);
+  fight.append(row);
+  fight.append(speedDock());
+  wrap.append(fight);
+
+  const dock = el('div', { cls: 'dock' });
+  dock.append(pileButton('draw'));
+  dock.append(energyOrb());
+  // Fan rotation lives on the inner card (`--i`), never on this wrap, so the hand stays one row.
+  dock.append(el('div', {
+    cls: 'hand' + (dealPending ? ' deal-in' : ''),
+    attrs: { style: `--n:${snap.hand.length}` },
+  }, ...snap.hand.map((c, i) => cardTile(c, { index: i + 1 }))));
+  dock.append(pileButton('discard'));
+  dock.append(combatControls(targeting));
+  wrap.append(dock);
+
   wrap.append(el('p', { cls: 'hint', text: targeting
     ? 'Click a highlighted enemy, or press 1–9 · Esc or click empty space to cancel'
     : 'Click a card to play it · a card that needs a target asks you to pick one' }));
+  if (pileOpen === 'draw' || pileOpen === 'discard') wrap.append(pileModal(pileOpen));
   return page('combat', 'II — The Fight', 'blade', '', [wrap]);
 }
 
@@ -1417,7 +1713,7 @@ function combatView() {
  */
 function enemyCard(e, position) {
   const kind = e.intent.kind;
-  const look = enemyLook(e.name);
+  const look = enemyLook(e.id);
   const targeting = pendingSlot !== null && snap.enemies.length > 1;
   const isAimed = targeting && aimed === position + 1;
   // The damage flash is keyed on the enemy's stable identity (`index`), never on its
@@ -1458,63 +1754,43 @@ function enemyCard(e, position) {
       : {},
   });
 
-  // Portrait plate: an inline-SVG silhouette on a lit alcove. No image file.
-  const art = el('div', { cls: 'e-art' });
-  art.append(glyphBox(look.art, 'e-silhouette'));
-  // The target mark is a SHAPE, not a colour: a slot number in a ring, plus a crosshair
-  // that only the SELECTED enemy shows. Colour alone never carries the state.
+  const pose = enemyPose(e);
+  card.append(intentBadge(e));
+  const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
+  fig.innerHTML = enemyMarkup(e.id);
+  card.append(fig);
+  // The target mark is a SHAPE, not a colour: a slot number, plus a crosshair on the
+  // enemy the player has actually selected.
   if (targeting) {
-    art.append(el('span', { cls: 'target-index', text: String(position + 1), attrs: { 'aria-hidden': 'true' } }));
-    art.append(el('span', { cls: 'target-mark', text: '◎', attrs: { 'aria-hidden': 'true' } }));
+    card.append(el('span', { cls: 'target-index', text: String(position + 1), attrs: { 'aria-hidden': 'true' } }));
+    card.append(el('span', { cls: 'target-mark', text: '◎', attrs: { 'aria-hidden': 'true' } }));
   }
-  card.append(art);
-
-  // UX rev 3: name + HP promoted INTO a full-bleed head plate — the cards' sibling treatment.
-  card.append(el('div', { cls: 'e-head' },
-    el('div', { cls: 'ename', text: e.name }),
-    el('div', { cls: 'ehp', text: `HP ${e.hp}/${e.maxHp}` }),
-  ));
+  card.append(el('div', { cls: 'ename', text: e.name }));
+  card.append(el('div', { cls: 'ehp', text: `${e.hp}/${e.maxHp}` }));
   const bar = el('div', { cls: 'hpbar' }, el('i', {}));
   bar.querySelector('i').style.width = `${Math.max(0, Math.round((e.hp / e.maxHp) * 100))}%`;
   card.append(bar);
   if (e.block > 0) {
-    card.append(el('div', { cls: 'eblock', text: `⛨ block ${e.block}` }));
-    // The block shield flares and is visibly consumed when it actually ate a hit. The
-    // class fires on the paint that follows the absorption, so the bar the player is
-    // watching is the one that reacts.
+    card.append(el('div', { cls: 'eblock', text: `⛨ ${e.block}` }));
     const eaten = flash.blockEat && !reducedMotion;
     const bb = el('div', { cls: 'hpbar block' + (eaten ? ' block-eat' : '') }, el('i', {}));
     bb.querySelector('i').style.width = `${Math.min(100, Math.round((e.block / Math.max(1, e.maxHp)) * 100))}%`;
     card.append(bb);
   }
-  // Statuses. A status that JUST landed is marked so the CSS can give it a treatment by
-  // KIND: Vulnerable fractures, Weak droops, Strength/Dexterity lift. Shape, not colour.
   const fresh = freshStatusKeys(e.statuses);
   const statuses = e.statuses.map((s) => el('span', {
     cls: `pill ${s.key}` + (fresh.has(s.key) ? ' juice-in' : ''),
     text: s.text || `${s.label} ${s.stacks}`,
     attrs: { title: s.explain || '' },
   }));
-  if (statuses.length > 0) card.append(el('div', {}, ...statuses));
-  // The mounting point for this enemy's effects (floater). Absolute and pointer-inert, so
-  // it floats over the card without ever intercepting a click meant for the enemy.
+  if (statuses.length > 0) card.append(el('div', { cls: 'e-statuses' }, ...statuses));
   card.append(efxBox(e.index));
-
-  // Intent: `intent.text` is the kernel's plain-English sentence, `label` the compact
-  // form. The banner's treatment (bar / shield / up chevrons / down chevrons) plus its
-  // glyph distinguishes the four kinds without relying on colour.
+  // The sentence stays readable under the figure. The badge above is the scaled glyph.
   const plain = e.intent.text || `${e.intent.label}`;
-  const sub = (kind === 'attack' && e.intent.hits > 1)
-    ? `${e.intent.hits} hits · ${e.intent.label}`
-    : e.intent.label;
-  const banner = el('div', { cls: `e-intent kind-${kind}` },
-    glyphBox(INTENT_GLYPH[kind] || 'rune', 'intent-glyph'),
-    el('div', { cls: 'intent-body' },
-      el('span', { cls: 'ilabel', text: plain }),
-      el('span', { cls: 'isub', text: sub }),
-    ),
-  );
-  card.append(banner);
+  card.append(el('div', {
+    cls: `e-intent kind-${kind}`,
+    attrs: { title: plain },
+  }, el('span', { cls: 'ilabel', text: plain })));
   return card;
 }
 
@@ -1585,7 +1861,8 @@ function cardTile(card, opts = {}) {
   }
   tile.append(head);
   tile.append(el('span', { cls: 'cname', text: card.name }));
-  tile.append(el('span', { cls: 'cdesc', text: desc }));
+  if (card.flavor) tile.append(el('span', { cls: 'cflavor', text: card.flavor }));
+  tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));
   // The compact code is NOT repeated on a reward tile: the player is choosing a card to
   // keep, not playing one, so the shorthand is noise there.
   if (card.showSummary !== false) {
@@ -1600,6 +1877,7 @@ function cardTile(card, opts = {}) {
   if (!opts.index) return tile;
   const wrap = el('div', {
     cls: 'card-wrap' + (disabled ? ' is-disabled' : '') + (inactive ? ' is-inactive' : '') + (isPending ? ' is-pending' : ''),
+    attrs: opts.index ? { style: `--i:${opts.index - 1}` } : {},
   },
     el('span', { cls: 'hand-index', text: String(opts.index), attrs: { title: `Keyboard shortcut: ${opts.index}` } }),
     // The in-card cue that this card is the one waiting for a target. A shape and a word,
@@ -1714,15 +1992,42 @@ function travelMarker(travel) {
   return mark;
 }
 
+/* Map pins (M5): up to 3 planning marks per run, kept in localStorage under the run's
+   seed and NEVER in run state, so the kernel, replays and hashes are untouched. */
+const PINS_KEY = 'dlb.mapPins.v1';
+const PIN_MAX = 3;
+function mapPins() {
+  const all = storeGet(PINS_KEY);
+  const list = all && Array.isArray(all[String(snap.seed)]) ? all[String(snap.seed)] : [];
+  return list.filter((x) => typeof x === 'string');
+}
+function toggleMapPin(id) {
+  let list = mapPins();
+  list = list.includes(id) ? list.filter((x) => x !== id) : [...list, id].slice(-PIN_MAX);
+  // Only the current seed is kept, so the store never grows across runs.
+  storePut(PINS_KEY, { [String(snap.seed)]: list });
+  announce(list.includes(id) ? 'Pin placed.' : 'Pin removed.');
+}
+
 function mapNode(n) {
   const short = n.type.replace('combat_', '');
   const cls = `node t-${short}` + (n.available ? ' available' : '') + (n.current ? ' current' : '');
   const node = el(n.available ? 'button' : 'span', {
     cls,
     attrs: n.available ? { type: 'button', title: `Travel to ${n.label}`, 'aria-label': `Travel to ${(NODE_WORDS[short] || [n.label])[0]}` } : {},
-    on: n.available && n.actionId ? { click: () => act(n.actionId) } : {},
+    on: {
+      ...(n.available && n.actionId ? { click: () => act(n.actionId) } : {}),
+      // Right-click (long-press on touch) drops or lifts a planning pin. Browser-only state.
+      contextmenu: (ev) => { ev.preventDefault(); toggleMapPin(n.id); render(); },
+    },
   });
+  if (n.available) node.title = `Travel to ${n.label} · right-click to pin`;
+  else node.setAttribute('title', 'Right-click to pin this node');
   node.append(glyphBox(NODE_GLYPH[short] || 'rune', 'ntype-mark'));
+  if (mapPins().includes(n.id)) {
+    node.classList.add('pinned');
+    node.append(el('span', { cls: 'node-pin', attrs: { 'aria-label': 'pinned' } }));
+  }
   const words = NODE_WORDS[short] || [n.label, ''];
   node.append(el('span', { cls: 'ntype', text: words[0] }));
   if (words[1]) node.append(el('span', { cls: 'nsub', text: words[1] }));
@@ -1743,7 +2048,7 @@ function rewardView() {
     // The reward tile's own action: taking a card, not playing one. Marked with `data-action`
     // so the hotkey handler can also reach it.
     const tile = cardTile(
-      { slot: c.actionId, cardId: c.cardId, name: c.name, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, playable: true, showSummary: false },
+      { slot: c.actionId, cardId: c.cardId, name: c.name, flavor: c.flavor, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, playable: true, showSummary: false },
       { actionId: c.actionId, onClick: (ev) => { consumeClick(ev); act(c.actionId); } },
     );
     row.append(tile);
@@ -1804,8 +2109,8 @@ function endView() {
     wrap.append(ledgerBlock(math));
     if (math.earned) {
       wrap.append(el('p', { cls: 'def', text: won
-        ? 'You cleared Act 1 and the boss fell.'
-        : 'The Ironclad falls. Try a different route or a better card pick.' }));
+        ? 'You cleared Act 1 and the Slag Warden fell.'
+        : 'The Ashwright falls. Try a different route or a better card pick.' }));
     } else {
       // AC-7.4 (ANTI-HOLLOW). No elite, no boss, no victory: the total does NOT get display
       // size and no celebratory word is attached to it. The factual recognition below keeps
@@ -1818,8 +2123,8 @@ function endView() {
     // that was reloaded onto a finished run). The screen shows what it has and NO ledger:
     // an itemised block would have to invent every line.
     wrap.append(el('p', { cls: 'def', text: won
-      ? 'You cleared Act 1 and the boss fell.'
-      : 'The Ironclad falls. Try a different route or a better card pick.' }));
+      ? 'You cleared Act 1 and the Slag Warden fell.'
+      : 'The Ashwright falls. Try a different route or a better card pick.' }));
   }
 
   if (!savedOk) {

@@ -483,18 +483,18 @@ const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', rest: 'fl
 function enemyLook(name) {
   const n = String(name || '');
   let art = 'e-rune';
-  if (/guardian/i.test(n)) art = 'e-sentinel';
-  else if (/nob/i.test(n)) art = 'e-brute';
-  else if (/worm/i.test(n)) art = 'e-worm';
-  else if (/slime/i.test(n)) art = 'e-slime';
-  else if (/louse|lice/i.test(n)) art = 'e-louse';
-  else if (/cultist/i.test(n)) art = 'e-cultist';
+  if (/guardian|warden/i.test(n)) art = 'e-sentinel';
+  else if (/nob|brute/i.test(n)) art = 'e-brute';
+  else if (/worm|maw/i.test(n)) art = 'e-worm';
+  else if (/slime|ooze/i.test(n)) art = 'e-slime';
+  else if (/louse|lice|mite/i.test(n)) art = 'e-louse';
+  else if (/cultist|cantor/i.test(n)) art = 'e-cultist';
   let hash = 0;
   for (let i = 0; i < n.length; i += 1) hash = (hash * 31 + n.charCodeAt(i)) % 5;
   return {
     art,
-    boss: /guardian/i.test(n),
-    elite: /nob/i.test(n),
+    boss: /guardian|warden/i.test(n),
+    elite: /nob|brute/i.test(n),
     hue: hash,
   };
 }
@@ -752,7 +752,7 @@ function renderHud() {
   const p = snap.player;
 
   hudEl.append(
-    el('span', { cls: 'hud-char', text: capitalize(snap.character) },
+    el('span', { cls: 'hud-char', text: snap.characterName || capitalize(snap.character) },
       snap.difficulty > 0 ? el('span', { cls: 'diff', text: `diff ${snap.difficulty}` }) : null),
   );
 
@@ -1142,7 +1142,7 @@ function dispatchFx() {
   // The boss arrives as a BEAT, not a bigger fade: a red wash, a heavier and slower
   // title card, plus a ring that expands out of the enemy row.
   if (welcome) {
-    fxBanner('THE GUARDIAN', 'boss', '', 1350);
+    fxBanner('SLAG WARDEN', 'boss', '', 1350);
     fxAdd(el('div', { cls: 'fx-boss-ring' }), 1100);
   }
   // The run's last two moments, each with its own weight: a bright hold for the win, a
@@ -1618,7 +1618,7 @@ function endView() {
   wrap.append(el('p', { cls: 'end-stats', text: `Reached floor ${e.floor} · ${e.steps} steps · seed ${snap.seed}` }));
   wrap.append(el('p', { cls: 'def', text: won
     ? 'You cleared Act 1 and the boss fell.'
-    : 'The Ironclad falls. Try a different route or a better card pick.' }));
+    : 'The Ashwright falls. Try a different route or a better card pick.' }));
   wrap.append(el('div', { cls: 'restart-row' },
     el('button', { cls: 'btn', text: 'Restart  (r)', attrs: { type: 'button' }, on: { click: newGame } }),
   ));
