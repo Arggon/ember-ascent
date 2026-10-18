@@ -2184,6 +2184,23 @@ function switchPath(id) {
   if (picked && typeof picked.focus === 'function') picked.focus();
 }
 
+/**
+ * #40: a boon's price must be as plain as its gift. The kernel sentence is "upside. cost."
+ * (BOONS in rules/kindling.js); the cost gets its own line, labelled and styled as a cost,
+ * so it is never mistaken for part of the upside (Iron Skin's relic-off price had no
+ * 'Lose' keyword, so nothing marked it). Falls back to one line if there is no second sentence.
+ * @param {string} text
+ */
+function boonParts(text) {
+  const cut = text.indexOf('. ');
+  if (cut < 0) return [keywordText(el('span', { cls: 'boon-text' }), text)];
+  const upside = text.slice(0, cut + 1);
+  const cost = text.slice(cut + 2);
+  const costLine = el('span', { cls: 'boon-cost' }, el('span', { cls: 'boon-cost-label', text: 'Cost: ' }));
+  costLine.append(cost);
+  return [keywordText(el('span', { cls: 'boon-text' }), upside), costLine];
+}
+
 /** B1: the act-start boon choice. Every word comes from the kernel snapshot. */
 function kindlingView() {
   const wrap = el('div', { cls: 'kindling' });
@@ -2264,7 +2281,7 @@ function kindlingView() {
       on: { click: () => act(b.actionId) },
     },
     el('span', { cls: 'boon-name', text: b.name }),
-    keywordText(el('span', { cls: 'boon-text' }), b.text)));
+    ...boonParts(b.text)));
   }
   wrap.append(list);
   return page('kindling', '0 — The Kindling', 'flame', 'panel', [wrap]);
