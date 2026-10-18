@@ -3560,6 +3560,9 @@ html, body {
   .kindling-head { font-size: var(--fs-4); }
   .kindling-note { display: none; }
   .boon { min-height: 0; padding: 6px 8px; }
+  /* #52 review: three 200px boons + gaps need 620px and the landscape plate gives 618, so
+     the third wrapped below the fold (Ash Purge at 915x412 / 844x390). 180px fits three. */
+  .kindling .boon { flex-basis: 180px; }
   .boon-text, .boon-cost { font-size: 0.76rem; }
 }
 /* #40: on phones every boon, cost line included, must be on screen before the pick (it
