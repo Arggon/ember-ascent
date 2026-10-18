@@ -429,10 +429,17 @@ test('a tap outside a touch preview only closes it (swallowed), a tap on the pre
     for (const fn of docLs.click || []) fn(ev);
     return stopped;
   };
+  // The REAL order: pointerdown, pointerup, then the click as a later task. (The first version
+  // of this test fired the click straight after pointerdown, so a pointerup timer that
+  // cleared the block never got to run and the test passed while the browser leaked.)
+  const tap = async (target) => {
+    for (const fn of docLs.pointerdown || []) fn({ target, pointerType: 'touch' });
+    for (const fn of docLs.pointerup || []) fn({ target, pointerType: 'touch' });
+    await sleep(0); await sleep(5);
+    return clickStopped();
+  };
   await open();
-  for (const fn of docLs.pointerdown || []) fn({ target: byId.hud });
-  assert.equal(clickStopped(), true, 'the outside tap that closed the preview does nothing else');
+  assert.equal(await tap(byId.hud), true, 'the outside tap that closed the preview does nothing else');
   const t = await open();
-  for (const fn of docLs.pointerdown || []) fn({ target: t });
-  assert.equal(clickStopped(), false, 'tapping the previewed card plays it');
+  assert.equal(await tap(t), false, 'tapping the previewed card plays it');
 });

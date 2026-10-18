@@ -2035,9 +2035,11 @@ if (typeof document.addEventListener === 'function') {
     hidePreview(); // clears any swallow, so the new one is set after it
     if (sticky) swallowUntil = Date.now() + SWALLOW_MS;
   }, true);
-  const unswallow = () => { if (swallowUntil) setTimeout(() => { swallowUntil = 0; }, 0); };
+  // NO pointerup clear: the tap's click arrives as a later task after pointerup, so clearing
+  // there (even with setTimeout 0) let the outside tap act (#53 round 3 P1). The block lives
+  // SWALLOW_MS, is cleared by the click it eats, by pointercancel (the touch became a scroll),
+  // and by the next press.
   document.addEventListener('pointercancel', () => { swallowUntil = 0; }, true);
-  document.addEventListener('pointerup', unswallow, true);
   document.addEventListener('click', (ev) => {
     if (!swallowUntil) return;
     const live = Date.now() < swallowUntil;

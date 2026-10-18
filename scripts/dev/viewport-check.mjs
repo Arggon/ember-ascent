@@ -397,6 +397,56 @@ async function cycle(url) {
   await sleep(1300);
 }
 
+// #53 round 3 P1: with a touch preview open, a tap OUTSIDE it only closes it. Real emulated
+// touches (CDP Input.dispatchTouchEvent), so the browser's own order runs: pointerdown,
+// pointerup, then the click as a later task. Each trial: long-press card A, release (preview
+// stays), then tap another playable card or End Turn with a 30-200ms hold; the turn, energy
+// and hand must not change. Last, a tap on the previewed card itself must still play it.
+const TAP_STATE = `(() => { const s = window.__dlb.snapshot(); return { clicks: window.__tapClicks ? window.__tapClicks.n : -1, turn: s.turn, energy: s.player ? s.player.energy : s.energy, hand: (s.hand || []).length, preview: !!document.querySelector('.card-preview') }; })()`;
+const tapCenter = (sel) => ev(`(() => { const n = ${sel}; if (!n) return null; n.scrollIntoView({ block: 'nearest', inline: 'nearest' }); const r = n.getBoundingClientRect(); return [r.left + r.width / 2, r.top + Math.min(r.height / 2, 40)]; })()`);
+async function touch(xy, holdMs) {
+  await S('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: xy[0], y: xy[1] }] });
+  await sleep(holdMs);
+  await S('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+}
+const HAND_TILE = (i) => `document.querySelectorAll('.stage-combat .hand .card')[${i}]`;
+const PLAYABLE_OTHER = `(() => { const s = window.__dlb.snapshot(); const en = s.player ? s.player.energy : s.energy; const tiles = [...document.querySelectorAll('.stage-combat .hand .card')];
+  const i = (s.hand || []).findIndex((c, k) => k > 0 && (c.cost ?? 0) <= en && !/curse|status/i.test(c.type || '')); return i > 0 ? tiles[i] : null; })()`;
+const END_TURN = `[...document.querySelectorAll('button')].find((b) => /end turn/i.test(b.textContent || ''))`;
+// An empty spot of the play area: the stage's top-left padding, above the fighters.
+const STAGE_SPOT = `(() => { const st = document.querySelector('.stage-combat'); return st ? { scrollIntoView() {}, getBoundingClientRect() { const r = st.getBoundingClientRect(); return { left: r.left + 4, top: r.top + 4, width: 8, height: 8 }; } } : null; })()`;
+// Every click that reaches the document (bubble phase) is counted: a swallowed click never does.
+const CLICK_COUNTER = `(() => { if (!window.__tapClicks) { window.__tapClicks = { n: 0 }; document.addEventListener('click', () => { window.__tapClicks.n++; }); } return window.__tapClicks.n; })()`;
+async function tapOutsideCheck(trials = 8) {
+  const out = { trials: 0, leaks: [], previewMissing: 0, previewedPlays: null };
+  const holds = [30, 60, 120, 200];
+  await ev(CLICK_COUNTER);
+  const targets = [[PLAYABLE_OTHER, 'other card'], [END_TURN, 'End Turn'], [STAGE_SPOT, 'stage']];
+  for (let t = 0; t < trials * 3; t++) {
+    const [target, tname] = targets[t % 3];
+    const a = await tapCenter(HAND_TILE(0)); if (!a) break;
+    await touch(a, 520); await sleep(250);
+    const before = await ev(TAP_STATE);
+    if (!before.preview) { out.previewMissing++; continue; }
+    const b = await tapCenter(target); if (!b) { await ev(`(() => { document.querySelector('.card-preview .cp-close')?.click(); })()`); continue; }
+    await touch(b, holds[t % holds.length]); await sleep(600);
+    const after = await ev(TAP_STATE);
+    out.trials++;
+    if (after.clicks !== before.clicks || after.turn !== before.turn || after.energy !== before.energy || after.hand !== before.hand || after.preview)
+      out.leaks.push(tname + ' ' + JSON.stringify([before, after]));
+  }
+  // The previewed card itself: one tap plays it (or aims it).
+  const a = await tapCenter(HAND_TILE(0));
+  if (a) {
+    await touch(a, 520); await sleep(250);
+    const before = await ev(TAP_STATE);
+    await touch(a, 60); await sleep(600);
+    const after = await ev(`(() => { const s = window.__dlb.snapshot(); return { hand: (s.hand || []).length, energy: s.player ? s.player.energy : s.energy, pending: !!s.pending, target: !!document.querySelector('.targeting, .cancel-target') }; })()`);
+    out.previewedPlays = before.preview && (after.hand < before.hand || after.energy !== before.energy || after.pending || after.target);
+  }
+  return out;
+}
+
 const rows = [];
 for (const [w, h, label, scale, handN] of SIZES_SEL) {
   const isPhone = w <= 500;
@@ -707,6 +757,9 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
     // Phone portrait only (QA #53 item 1: 320x568 / 360x640 at 130%). Landscape and desktop
     // with many statuses still scroll the page -- reported on #53, not fixed here.
     if (w <= 700 && h > w) m.manyStatuses = await ev(STATUS_CHECK);
+    // Touch phones in portrait, normal hand: the tap-outside swallow, with real touches.
+    if (isPhone && h > w && !handN) m.tapOutside = await tapOutsideCheck();
+    if (m.tapOutside) console.log(`tap-outside ${keyOf(w, h, scale, handN)}: ${m.tapOutside.leaks.length}/${m.tapOutside.trials} leaked, previewed card plays: ${m.tapOutside.previewedPlays}`);
     await endTextScale(S, textScaleId);
     rows.push([keyOf(w, h, scale, handN), label, m]);
   }
@@ -721,6 +774,11 @@ function evaluateRow(m) {
   // back LARGER than the device and every other number is measured on a shrunken page.
   if (m.viewport[0] !== m.requested[0] || m.viewport[1] !== m.requested[1]) {
     fails.push(`page wider than the screen: rendered viewport ${m.viewport.join('x')} != device ${m.requested.join('x')} (mobile zooms out to fit)`);
+  }
+  if (m.tapOutside) {
+    if (m.tapOutside.leaks.length) fails.push(`with a touch preview open, ${m.tapOutside.leaks.length}/${m.tapOutside.trials} outside taps also acted: ${m.tapOutside.leaks.slice(0, 2).join(' | ')}`);
+    if (m.tapOutside.trials < 18) fails.push(`tap-outside check ran only ${m.tapOutside.trials} trials (preview missing ${m.tapOutside.previewMissing}x)`);
+    if (m.tapOutside.previewedPlays !== true) fails.push('with a touch preview open, tapping the previewed card did not play it');
   }
   if (m.manyStatuses && (m.manyStatuses.endTurnBottom === null || m.manyStatuses.endTurnBottom > m.manyStatuses.vh - END_TURN_CLEARANCE_PX || m.manyStatuses.pageScroll > PAGE_SCROLL_ALLOW_PX))
     fails.push(`with 4 statuses on every enemy and the hero, End Turn bottom=${m.manyStatuses.endTurnBottom} (viewport ${m.manyStatuses.vh}, page scroll ${m.manyStatuses.pageScroll}px)`);
