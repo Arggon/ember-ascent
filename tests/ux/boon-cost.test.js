@@ -160,3 +160,15 @@ test('no stylesheet rule hides or clips the boon cost line', () => {
   }
   assert.deepEqual(offenders, []);
 });
+
+test('landscape phones (915x412, 844x390): three boons fit one row, so no cost drops below the fold', () => {
+  // The landscape Kindling plate gives the boon list 618px (#52 review). Three boons at their
+  // flex-basis plus two gaps must fit it, or the third wraps under the fold.
+  const css = readFileSync(new URL('../../src/web/style.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = /@media \(max-height: 480px\) \{([\s\S]*?)\n\}/g;
+  let basis = null;
+  for (const m of css.matchAll(block)) { const b = /\.kindling \.boon \{[^}]*flex-basis:\s*(\d+)px/.exec(m[1]); if (b) basis = Number(b[1]); }
+  assert.ok(basis !== null, 'a landscape flex-basis for .kindling .boon exists');
+  const gap = Number(/\.boon-list \{[^}]*gap:\s*(\d+)px/.exec(css)[1]);
+  assert.ok(3 * basis + 2 * gap <= 618, `3 x ${basis}px + 2 x ${gap}px must fit 618px`);
+});
