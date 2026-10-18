@@ -178,14 +178,14 @@ const GEM_CHECK = `(() => {
 // renderer draws each batch (window.__dlb.render) from kernel data (cardFaceLines /
 // describeCard), longest faces first; the first batch is the 'longest' hand.
 const LONGEST_HAND_CHECK = `(async () => {
-  if (!matchMedia('(max-width: 700px) and (max-height: 760px) and (orientation: portrait)').matches) return null;
+  if (!matchMedia('(max-width: 700px) and (orientation: portrait)').matches) return null;
   const dlb = window.__dlb; const snap = dlb && dlb.snapshot();
   const hand0 = document.querySelector('.stage-combat .hand'); if (!hand0 || !snap || !Array.isArray(snap.hand)) return null;
   const cardsNow = () => [...document.querySelectorAll('.stage-combat .hand .card')];
   const vw = innerWidth;
   const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize);
   const k = rootPx / 15; // 1 at 100% text (root 15px), 1.3 at 130%
-  const maxLines = Math.min(vw, screen.width || vw) <= 340 ? 4 : 3; // 320px: 4 only as the fallback
+  const maxLines = 4; // 3 is the aim; 4 is the fallback a few tempered variants use, and it must fit
   const allInViewNow = () => { const hand = document.querySelector('.stage-combat .hand');
     return hand.scrollWidth <= hand.clientWidth + 1 && cardsNow().every((c) => { const r = c.getBoundingClientRect(); return r.left >= -0.5 && r.right <= vw + 0.5; }); };
   const box = () => { const f = document.querySelector('.page-combat .fight').getBoundingClientRect(), h = document.querySelector('.stage-combat .hero .fig'), hr = h ? h.getBoundingClientRect() : { top: 0 };
@@ -195,11 +195,22 @@ const LONGEST_HAND_CHECK = `(async () => {
   const before = box();
   const d = await import(new URL('../kernel/describe.js', location.href));
   const raw = await (await fetch(new URL('../kernel/content/cards.json', location.href))).json();
-  const all = raw.cards.map((c) => ({ id: c.id, name: c.name, cost: c.cost, type: c.type, face: d.cardFaceLines(c), description: d.describeCard(c) }))
-    .sort((a, b) => b.face.length - a.face.length || d.describeCardFace(b).length - d.describeCardFace(a).length);
+  const T = await import(new URL('../kernel/rules/tempers.js', location.href));
+  // Every card AND every legal temper of it (Red-hot only on damage cards): 44 + tempered.
+  const all = [];
+  for (const c of raw.cards) for (const t of [null, ...T.TEMPER_IDS]) {
+    if (t === 'redhot' && !c.effects.some((e) => e.verb === 'damage')) continue;
+    const def = t ? { ...c, effects: T.temperEffects(c.effects, t) } : c; const hp = t ? T.temperHpCost(t) : 0;
+    all.push({ id: c.id + (t ? '+' + t : ''), name: c.name, cost: c.cost, type: c.type, temper: t, temperName: t ? T.TEMPERS[t].name : undefined, temperText: t ? T.TEMPERS[t].text : undefined,
+      face: d.cardFaceLines(def, {}, hp), description: d.describeCard(def) + (hp ? ' Lose ' + hp + ' HP.' : '') });
+  }
+  const rows = (f) => f.filter((l) => !('mark' in l)).length;
+  all.sort((a, b) => rows(b.face) - rows(a.face) || JSON.stringify(b.face).length - JSON.stringify(a.face).length);
   const orig = snap.hand.map((c) => ({ ...c }));
   const n = Math.min(5, snap.hand.length);
   const unfit = []; const moved = []; const over = []; const small = []; const heights = new Set(); const lines = {};
+  const nameOrb = []; const nameClip = []; const orbMark = []; const missing = [];
+  const inter = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
   let fiveInView = null;
   const lineCount = (c) => {
     let total = 0;
@@ -215,7 +226,7 @@ const LONGEST_HAND_CHECK = `(async () => {
   for (let at = 0; at < all.length; at += n) {
     const batch = all.slice(at, at + n);
     while (batch.length < n) batch.push(all[batch.length]);
-    snap.hand = orig.slice(0, n).map((c, i) => ({ ...c, name: batch[i].name, cost: batch[i].cost, type: batch[i].type, description: batch[i].description, face: batch[i].face }));
+    snap.hand = orig.slice(0, n).map((c, i) => ({ ...c, name: batch[i].name, cost: batch[i].cost, type: batch[i].type, typeLabel: batch[i].type[0].toUpperCase() + batch[i].type.slice(1), description: batch[i].description, face: batch[i].face, temper: batch[i].temper, temperName: batch[i].temperName, temperText: batch[i].temperText, playable: true }));
     dlb.render();
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const b = box(); if (b.some((v, i) => Math.abs(v - before[i]) > 1)) moved.push(batch[0].id + ' batch: ' + b.join(','));
@@ -231,6 +242,22 @@ const LONGEST_HAND_CHECK = `(async () => {
       const parts = [...rg.getClientRects(), ...[...face.querySelectorAll('.fg')].map((x) => x.getBoundingClientRect())].filter((q) => q.width > 0.5);
       if (parts.some((q) => q.left < inner.l || q.right > inner.r || q.bottom > inner.b) || c.scrollHeight > c.clientHeight + 1 || /…/.test(face.textContent)) unfit.push(id);
       const lc = lineCount(c); lines[id] = lc;
+      // P1-1: the name is clear of the orb, starts >= 2px below the header and is not cut.
+      const nm = c.querySelector('.cname'), orb = c.querySelector('.cost-gem'), head = c.querySelector('.ctype'), mark = c.querySelector('.ctype > .c-type-mark');
+      if (nm && orb) {
+        const nr = nm.getBoundingClientRect(), or = orb.getBoundingClientRect();
+        const rg2 = document.createRange(); rg2.selectNodeContents(nm);
+        const textBoxes = [...rg2.getClientRects()].filter((q) => q.width > 0.5);
+        if (textBoxes.some((q) => inter(q, or) > 0)) nameOrb.push(id);
+        const hb = head ? head.getBoundingClientRect().bottom : cr.top;
+        if (nm.scrollWidth > nm.clientWidth + 1 || textBoxes.some((q) => q.left < inner.l || q.right > inner.r || q.top < hb + 2 - 0.5)) nameClip.push(id + ' [' + [nr.left, nr.top, nr.right].map(Math.round) + '] header ' + Math.round(hb));
+        if (mark && getComputedStyle(mark).visibility !== 'hidden') { const mr = mark.getBoundingClientRect(); if (mr.width < 12 - 0.5) orbMark.push(id + ' type mark ' + Math.round(mr.width) + 'px'); if (inter(mr, or) > 0) orbMark.push(id + ' orb covers the type mark'); }
+        else orbMark.push(id + ' no type mark');
+      }
+      // Every number of the kernel face is on the drawn face.
+      const txt = face.textContent;
+      for (const l of batch[i].face) if (l.n && !txt.includes(l.n)) missing.push(id + ' ' + l.g + ' ' + l.n);
+      if (batch[i].face.some((l) => l.mark) && !face.querySelector('.fx-mark')) missing.push(id + ' corner exhaust mark');
       if (lc > maxLines) over.push(id + ' ' + lc + ' lines');
       for (const fg of face.querySelectorAll('.fg')) { const r = fg.getBoundingClientRect(); if (Math.min(r.width, r.height) < 16 * k - 0.5) small.push(id + ' glyph ' + Math.round(r.width) + 'px'); }
       for (const t of face.querySelectorAll('.fn, .fall, .fl-t')) { const px = parseFloat(getComputedStyle(t).fontSize); if (px < 12 * k - 0.05) small.push(id + ' text ' + px.toFixed(1) + 'px'); }
@@ -238,7 +265,7 @@ const LONGEST_HAND_CHECK = `(async () => {
   }
   snap.hand = orig; dlb.render();
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  return { before, moved, unfit, over, small: [...new Set(small)], heights: [...heights], allInView, fiveInView, maxLines, lines, checked: all.length };
+  return { before, moved, unfit, over, small: [...new Set(small)], heights: [...heights], allInView, fiveInView, maxLines, lines, checked: all.length, nameOrb, nameClip, orbMark, missing };
 })()`;
 if (!SIZES_SEL.length) { console.error('no sizes matched --sizes ' + sizesArg); process.exit(2); }
 
@@ -498,6 +525,10 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
         seedReported,
         docScroll: [doc.scrollWidth, doc.scrollHeight],
         hOverflow: doc.scrollWidth > vw + 1,
+        // #53 P1-3: the REAL viewport. On a phone a page wider than the screen widens the
+        // layout viewport too, so innerWidth alone hides the overflow; visualViewport and the
+        // device width do not.
+        realViewport: [innerWidth, innerHeight, visualViewport ? Math.round(visualViewport.width) : null, visualViewport ? Math.round(visualViewport.height) : null, screen.width, screen.height],
         pageScrollPx: doc.scrollHeight - vh,
         endTurnFound: !!endTurn,
         endTurnTop: rET ? Math.round(rET.top) : null,
@@ -631,6 +662,11 @@ function evaluateRow(m) {
   if (m.viewport[0] !== m.requested[0] || m.viewport[1] !== m.requested[1]) {
     fails.push(`page wider than the screen: rendered viewport ${m.viewport.join('x')} != device ${m.requested.join('x')} (mobile zooms out to fit)`);
   }
+  if (m.realViewport) {
+    const [iw, ih, vvw, vvh] = m.realViewport; const dw = m.requested[0];
+    const realVw = Math.min(iw, vvw ?? iw, dw);
+    if (m.docScroll[0] > realVw + 1 || iw > dw || (vvw ?? 0) > dw + 1) fails.push(`page wider than the real viewport: scrollWidth=${m.docScroll[0]} innerWidth=${iw} visualViewport=${vvw}x${vvh} device=${dw} (scrollWidth must be <= ${realVw})`);
+  }
   const vh = m.viewport[1];
   if (m.requestedSeed === null) {
     fails.push(`seed check n/a (base URL has no seed param): page reported seed ${m.seedReported}`);
@@ -694,6 +730,10 @@ function evaluateRow(m) {
     if (L.unfit.length) fails.push(`card face clipped or missing (${L.checked} cards checked): ${L.unfit.join('; ')}`);
     if (L.over.length) fails.push(`card face over ${L.maxLines} lines: ${L.over.join('; ')}`);
     if (L.small.length) fails.push(`card-face glyph < 16px or text < 12px (at 100% text): ${L.small.join('; ')}`);
+    if (L.nameOrb && L.nameOrb.length) fails.push(`card name overlaps the cost orb (name ∩ orb must be 0): ${L.nameOrb.join('; ')}`);
+    if (L.nameClip && L.nameClip.length) fails.push(`card name clipped or not >= 2px below the header: ${L.nameClip.join('; ')}`);
+    if (L.orbMark && L.orbMark.length) fails.push(`card type mark missing, under 12px or under the orb: ${[...new Set(L.orbMark)].slice(0, 8).join('; ')}`);
+    if (L.missing && L.missing.length) fails.push(`card face is missing a number or mark: ${L.missing.join('; ')}`);
     if (L.heights.length > 1) fails.push(`hand cards differ in height in the short-portrait layout: ${L.heights.join(', ')}px`);
     if (L.allInView === false || L.fiveInView === false) fails.push('short-portrait hand of 5 cards scrolls sideways or has a card out of view');
   }

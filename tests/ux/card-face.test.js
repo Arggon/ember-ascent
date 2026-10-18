@@ -138,28 +138,81 @@ import { cardFaceLines, describeCard } from '../../src/kernel/describe.js';
 import { TEMPERS, temperEffects, temperHpCost } from '../../src/kernel/rules/tempers.js';
 const CARDS = JSON.parse(readFileSync(new URL('../../src/kernel/content/cards.json', import.meta.url), 'utf8')).cards;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const textOf = (n) => (n ? n.txt + n.kids.map(textOf).join('') : '');
 const nums = (s) => (s.replace(/ — [^.]*/g, '').match(/\d+/g) || []);
-const faceNums = (lines) => lines.flatMap((l) => (('t' in l ? l.t : l.n).match(/\d+/g) || []));
-const RANK = { damage: 0, block: 0, weak: 1, vulnerable: 1, strength: 1, metallicize: 1, hp: 2, energy: 2, draw: 2, discard: 2, exhaust: 3 };
+const faceNums = (lines) => lines.flatMap((l) => (String(l.t ?? l.n ?? '').match(/\d+/g) || []));
+const RANK = { damage: 0, block: 0, weak: 1, vulnerable: 1, strength: 1, metallicize: 1, hp: 2, energy: 2, draw: 2, discard: 2 };
+const rowsOf = (face) => face.filter((l) => !('mark' in l));
+const TRIGGERS = ['Turn end:', 'Exhaust:', 'HP lost:', 'Each play:'];
+/** Every legal (card, temper) pair: Red-hot only on cards that deal damage. */
+const VARIANTS = CARDS.flatMap((def) => [null, ...Object.keys(TEMPERS)]
+  .filter((t) => t !== 'redhot' || def.effects.some((e) => e.verb === 'damage'))
+  .map((t) => ({ def, t, d: t ? { ...def, effects: temperEffects(def.effects, t) } : def, hp: t ? temperHpCost(t) : 0 })));
 
-test('every number of the full sentence is on the card face, plain and tempered', () => {
+test('every number of the full sentence is on the card face; tempered totals are summed right', () => {
   assert.equal(CARDS.length, 44);
   for (const def of CARDS) {
-    const variants = [[def, 0, 'plain']];
-    for (const t of Object.keys(TEMPERS)) variants.push([{ ...def, effects: temperEffects(def.effects, t) }, temperHpCost(t), t]);
-    for (const [d, hp, tag] of variants) {
-      const full = describeCard(d) + (hp ? ` Lose ${hp} HP when played.` : '');
-      const face = cardFaceLines(d, {}, hp);
-      const have = faceNums(face);
-      for (const n of nums(full)) assert.ok(have.includes(n), `${def.id} (${tag}): ${n} from "${full}" missing on face ${JSON.stringify(face)}`);
-      assert.ok(face.length >= 1, `${def.id}: empty face`);
+    const full = describeCard(def);
+    const have = faceNums(cardFaceLines(def));
+    for (const n of nums(full)) assert.ok(have.includes(n), `${def.id}: ${n} from "${full}" missing on face`);
+  }
+  // Tempered: a repeated glyph is ONE line carrying the summed number (Draw 3 + Draw 1 = +4).
+  for (const { def, t, d, hp } of VARIANTS) {
+    const face = cardFaceLines(d, {}, hp);
+    const now = face.filter((l) => 'g' in l && !l.under);
+    const sum = (verb, key) => d.effects.filter((e) => e.verb === verb && (!key || e.status === key)).reduce((a, e) => a + e.amount, 0);
+    const val = (g) => now.filter((x) => x.g === g && /^[+-]?\d+$/.test(x.n)).reduce((a, l) => a + Math.abs(Number(l.n)), 0);
+    if (d.effects.some((e) => e.verb === 'custom')) continue; // custom handlers: numbers checked on the plain face
+    for (const v of ['block', 'draw', 'energy', 'discard']) if (sum(v)) assert.equal(val(v), sum(v), `${def.id}+${t}: ${v} total on ${JSON.stringify(face)}`);
+    for (const st of ['weak', 'vulnerable', 'strength', 'metallicize']) if (sum('status', st)) assert.equal(val(st), sum('status', st), `${def.id}+${t}: ${st}`);
+    if (hp) assert.ok(now.some((l) => l.g === 'hp' && l.n === `-${hp}`), `${def.id}+${t}: HP cost on the face`);
+    for (const e of d.effects.filter((x) => x.verb === 'damage')) assert.ok(faceNums(face).includes(String(e.amount)), `${def.id}+${t}: damage ${e.amount}`);
+  }
+});
+
+test('EVERY card x temper: <= 4 rows, no repeated glyph, play effects first, triggers last, self-exhaust is a corner mark', () => {
+  let over3 = 0;
+  for (const { def, t, d, hp } of VARIANTS) {
+    const tag = `${def.id}${t ? '+' + t : ''}`;
+    const face = cardFaceLines(d, {}, hp);
+    const rows = rowsOf(face);
+    assert.ok(rows.length >= 1 && rows.length <= 4, `${tag}: ${rows.length} rows ${JSON.stringify(face)}`);
+    if (rows.length > 3) over3++;
+    if (!t) assert.ok(rows.length <= 3, `${tag}: an untempered card keeps to 3 rows`);
+    // A trigger block (word + colon, never a glyph) and its lines come after every play effect.
+    const first = rows.findIndex((l) => l.trig);
+    if (first >= 0) {
+      assert.ok(rows.slice(first).every((l) => l.trig || l.under), `${tag}: a play effect sits under a trigger ${JSON.stringify(face)}`);
+      for (const l of rows.filter((x) => x.trig)) assert.ok(TRIGGERS.includes(l.t), `${tag}: trigger word ${l.t}`);
+    }
+    // No glyph twice among the play effects (numbers merged).
+    const now = rows.filter((l) => 'g' in l && !l.under && /^[+-]?\d+$/.test(l.n)).map((l) => l.g + (l.all ? '-all' : ''));
+    assert.equal(new Set(now).size, now.length, `${tag}: repeated glyph ${JSON.stringify(face)}`);
+    // Self-exhaust: exactly one corner mark, never a line.
+    const exhausts = d.effects.some((e) => e.verb === 'exhaust');
+    assert.equal(face.filter((l) => l.mark === 'exhaust').length, exhausts ? 1 : 0, `${tag}: exhaust mark`);
+    assert.ok(!rows.some((l) => l.g === 'exhaust'), `${tag}: exhaust drawn as a line`);
+    // Signs: gains +N, losses -N.
+    for (const l of rows.filter((x) => 'g' in x && /^[+-]?\d+$/.test(x.n))) {
+      if (['hp', 'discard'].includes(l.g)) assert.match(l.n, /^-/, `${tag}: ${l.g} is a loss`);
+      else if (l.g !== 'damage') assert.match(l.n, /^\+/, `${tag}: ${l.g} is a gain`);
     }
   }
+  assert.ok(over3 <= 10, `${over3} variants on the 4-row fallback`);
+});
+
+test('the four misread tempered faces now read right (#53 P1-2)', () => {
+  const f = (id, t) => { const def = CARDS.find((c) => c.id === id); return cardFaceLines({ ...def, effects: temperEffects(def.effects, t) }, {}, temperHpCost(t)); };
+  assert.deepEqual(f('rupture', 'quenched'), [{ g: 'block', n: '+3' }, { t: 'HP lost:', trig: true }, { g: 'strength', n: '+1', under: true }]);
+  assert.deepEqual(f('combust', 'quenched'), [{ g: 'block', n: '+3' }, { t: 'Turn end:', trig: true }, { g: 'damage', n: '1', all: true, under: true }, { g: 'hp', n: '-1', under: true }]);
+  assert.deepEqual(f('dark_embrace', 'balanced'), [{ g: 'draw', n: '+1' }, { t: 'Exhaust:', trig: true }, { g: 'draw', n: '+1', under: true }, { mark: 'exhaust' }]);
+  assert.deepEqual(f('offering', 'balanced'), [{ g: 'hp', n: '-6' }, { g: 'energy', n: '+2' }, { g: 'draw', n: '+4' }, { mark: 'exhaust' }]);
+  assert.deepEqual(f('uppercut', 'balanced').length, 5); // 4 rows + the corner mark
 });
 
 test('one effect per line, damage/block, then statuses, then resources; ALL only for all-enemy hits', () => {
   for (const def of CARDS) {
-    const face = cardFaceLines(def);
+    const face = rowsOf(cardFaceLines(def));
     const g = face.filter((l) => 'g' in l);
     if (g.length === face.length && !def.effects.some((e) => e.verb === 'custom' && !['bloodletting', 'hemokinesis', 'offering', 'limit_break', 'entrench'].includes(e.handler))) {
       const ranks = g.map((l) => RANK[l.g]);
@@ -168,9 +221,12 @@ test('one effect per line, damage/block, then statuses, then resources; ALL only
     for (const l of g) if (l.all) assert.ok(def.effects.some((e) => e.target === 'all_enemies') || /ALL/.test(describeCard(def)), `${def.id}: ALL tag without an all-enemy effect`);
     assert.ok(face.length <= 3, `${def.id}: ${face.length} face lines`);
   }
-  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'uppercut')), [{ g: 'damage', n: '13' }, { g: 'weak', n: '1' }, { g: 'vulnerable', n: '1' }]);
-  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'thunderclap')), [{ g: 'damage', n: '4', all: true }, { g: 'vulnerable', n: '1' }]);
-  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'offering')), [{ g: 'hp', n: '-6' }, { g: 'energy', n: '+2' }, { g: 'draw', n: '3' }]);
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'uppercut')), [{ g: 'damage', n: '13' }, { g: 'weak', n: '+1' }, { g: 'vulnerable', n: '+1' }]);
+  // Matches the engine today: Forgeclap's Vulnerable goes to one enemy (no ALL). See #56.
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'thunderclap')), [{ g: 'damage', n: '4', all: true }, { g: 'vulnerable', n: '+1' }]);
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'offering')), [{ g: 'hp', n: '-6' }, { g: 'energy', n: '+2' }, { g: 'draw', n: '+3' }]);
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'combust')), [{ t: 'Turn end:', trig: true }, { g: 'damage', n: '1', all: true, under: true }, { g: 'hp', n: '-1', under: true }]);
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'pummel')), [{ g: 'damage', n: '2×4' }, { mark: 'exhaust' }]);
 });
 
 // Drive the real app into the first fight.
@@ -196,6 +252,7 @@ test('hand tiles: aria-label is the full sentence; the face is aria-hidden glyph
   s.hand.forEach((c, i) => {
     const label = tiles[i].attrs['aria-label'];
     assert.ok(label.includes(c.description), `${c.name}: aria-label must carry the full sentence`);
+    assert.ok(label.startsWith(`${c.name}. ${c.typeLabel || c.type}. `), `${c.name}: aria-label names the card type: ${label}`);
     assert.ok(/damage|Block|Apply|Draw|Gain|Lose|Double/.test(c.description));
     const face = tiles[i].querySelector('.cd-face');
     assert.ok(face, `${c.name}: has a card face`);
@@ -203,7 +260,7 @@ test('hand tiles: aria-label is the full sentence; the face is aria-hidden glyph
   });
 });
 
-test('a long press opens the preview; releasing it does not play the card; a tap still plays', async () => {
+test('touch: a long press opens the preview, it STAYS open after release (which never plays); X or a tap outside closes it', async () => {
   await toFight(11);
   const before = api.snapGet();
   const handN = before.hand.length; const energy = before.player?.energy ?? before.energy;
@@ -213,12 +270,18 @@ test('a long press opens the preview; releasing it does not play the card; a tap
   assert.ok(api.previewOpen(), 'preview open after ~350ms hold');
   const pv = root.querySelectorAll('.card-preview')[0];
   assert.ok(pv && pv.querySelector('.cp-text'), 'preview carries the full sentence');
+  assert.match(textOf(pv.querySelector('.cp-meta')), /^(Attack|Skill|Power|Status|Curse) · \d+ Energy$/, 'preview title carries the type');
   t.dispatch('pointerup', { pointerType: 'touch' });
-  assert.equal(api.previewOpen(), false, 'release closes the preview');
+  assert.ok(api.previewOpen(), 'the preview stays open after the release (touch)');
   t.dispatch('click');
   const after = api.snapGet();
   assert.equal(after.hand.length, handN, 'release after a preview must not play the card');
   assert.equal(after.player?.energy ?? after.energy, energy);
+  // The X closes it.
+  const x = root.querySelectorAll('.cp-close')[0];
+  assert.ok(x && x.attrs['aria-label'] === 'Close preview', 'the preview has an X button');
+  x.dispatch('click');
+  assert.equal(api.previewOpen(), false, 'X closes the preview');
   // A short tap (no hold) still plays at once.
   const t2 = handTiles().find((x) => x.attrs['aria-disabled'] === 'false');
   t2.dispatch('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10 });
@@ -244,7 +307,7 @@ test('Esc and a tap outside close the preview', async () => {
   t.dispatch('pointerup', { pointerType: 'touch' });
 });
 
-test('the long-press hint shows once per profile, on the first battle hand, and a tap dismisses it', async () => {
+test('the long-press hint shows once per profile, on the first battle hand, and a tap or a key dismisses it', async () => {
   delete localStorage._d['dlb.pressHint.v1'];
   await toFight(11);
   await sleep(800);
@@ -252,25 +315,25 @@ test('the long-press hint shows once per profile, on the first battle hand, and 
   assert.equal(hints().length, 1, 'hint shown on the first battle hand');
   assert.match(hints()[0].kids.map((k) => k.txt).join(''), /hold a card/);
   assert.equal(localStorage.getItem('dlb.pressHint.v1'), '1', 'remembered for this profile');
-  for (const fn of docLs.pointerdown || []) fn({ target: byId.hud });
-  assert.equal(hints().length, 0, 'a tap dismisses it');
+  for (const fn of docLs.keydown || []) fn({ key: 'Tab' });
+  assert.equal(hints().length, 0, 'a key dismisses it');
   await toFight(12);
   await sleep(800);
   assert.equal(hints().length, 0, 'never shown again for this profile');
 });
 
-test('keyboard: focusing a card opens its preview (full text + glyph names), described by it; Esc closes', async () => {
+test('keyboard: focusing a card opens its preview (full text + glyph names); no aria-describedby (the label already says it); Esc closes', async () => {
   await toFight(11);
   const t = handTiles().find((x) => (api.snapGet().hand.find((c) => c.slot === x.attrs['data-slot']) || {}).face?.some((l) => l.g));
   for (const fn of t._ls.focus || []) fn({ type: 'focus', target: t });
   assert.ok(api.previewOpen(), 'focus opens the preview');
-  assert.equal(t.attrs['aria-describedby'], 'card-preview', 'the card is described by the preview');
+  assert.equal(t.attrs['aria-describedby'], undefined, 'the label carries the sentence; the visual glyph key is not read twice');
   const pv = root.querySelectorAll('.card-preview')[0];
   assert.equal(pv.attrs.id, 'card-preview');
   const card = api.snapGet().hand.find((c) => c.slot === t.attrs['data-slot']);
   const text = pv.querySelector('.cp-text');
   assert.equal(text.kids.map((k) => k.txt).join(''), card.description, 'preview carries the full sentence');
-  assert.ok(pv.querySelectorAll('.cp-glyph').length >= 1, 'preview names and explains each glyph');
+  assert.ok(pv.querySelectorAll('.cp-glyph').length >= 1, 'preview names each glyph');
   for (const fn of docLs.keydown || []) fn({ key: 'Escape' });
   assert.equal(api.previewOpen(), false, 'Esc closes');
   assert.equal(t.attrs['aria-describedby'], undefined);

@@ -484,7 +484,7 @@ function keywordText(node, text) {
   for (const m of str.matchAll(re)) {
     if (m.index > at) node.append(str.slice(at, m.index));
     if (m[1]) node.append(el('span', { cls: 'kw kw-cost', text: m[1] }));
-    else node.append(el('span', { cls: 'kw', text: m[2], attrs: { title: terms.get(m[2].toLowerCase()) || '' } }));
+    else node.append(el('span', { cls: `kw kw-${m[2].toLowerCase()}`, text: m[2], attrs: { title: terms.get(m[2].toLowerCase()) || '' } }));
     at = m.index + m[0].length;
   }
   if (at < str.length) node.append(str.slice(at));
@@ -551,8 +551,10 @@ const GLYPHS = {
   'f-damage': { box: '0 0 20 20', body: '<path class="m" d="M4 16 L14.5 5.5"/><path class="mf" d="M12.6 3.4 L17 3 L16.6 7.4 L14.5 5.5 Z"/><path class="m" d="M3 12.5 L7.5 17"/><path class="m" d="M2.6 17.4 L4.6 15.4"/>' },
   'f-block': { box: '0 0 20 20', body: '<path class="mf" d="M10 2 L17 4.8 V10.6 C17 14.8 14 17.2 10 18.6 C6 17.2 3 14.8 3 10.6 V4.8 Z"/><path class="cut" d="M10 5 V15.6 M6.2 9.4 H13.8"/>' },
   'f-weak': { box: '0 0 20 20', body: '<path class="m" d="M3 5 L9.4 9.6"/><path class="m" d="M11.2 11.4 L13 16.8"/><path class="mf" d="M12 15 L13.6 19 L15 14.6 Z"/><path class="m" d="M2 8 L5.4 3"/><path class="m" d="M9.2 12.4 L11.8 9.2"/>' },
-  'f-vulnerable': { box: '0 0 20 20', body: '<path class="m" d="M10 2 L17 4.8 V10.6 C17 14.8 14 17.2 10 18.6 C6 17.2 3 14.8 3 10.6 V4.8 Z"/><path class="m" d="M10.8 2.4 L8.4 7.6 L11.6 9.8 L8.6 13.6 L10 18.4"/>' },
-  'f-strength': { box: '0 0 20 20', body: '<path class="mf" d="M5.4 9 C5.4 7.6 6.4 7 7.4 7.2 V5.6 C7.4 4.4 9.6 4.4 9.6 5.6 V4.8 C9.6 3.6 11.8 3.6 11.8 4.8 V5.6 C11.8 4.4 14 4.4 14 5.6 V11.6 C14 14.2 12.6 15.4 10.4 15.4 H9 C6.8 15.4 5.4 13.6 5.4 11.4 Z"/><path class="m" d="M7.6 16.6 V19 M12 16.6 V19"/>' },
+  // #53 P2: Vulnerable is a shield split into two offset halves with a gap (Block is whole).
+  'f-vulnerable': { box: '0 0 20 20', body: '<path class="mf" d="M9 2.3 L2.8 4.8 V10.6 C2.8 14.6 5.4 17 8.4 18.3 L7.2 12.6 L9.4 9 L7.8 5.6 Z"/><path class="mf" d="M11.8 3.7 L17.8 6.1 V11.7 C17.8 15.5 15.4 17.9 12.2 19.3 L10.8 13.9 L12.8 10.3 L11 6.7 Z"/>' },
+  // #53 P2: a fist read from its knuckles and thumb (the wrist strokes read as legs at 16px).
+  'f-strength': { box: '0 0 20 20', body: '<path class="mf" d="M4.4 8.2 C4.4 6.6 5.8 6 6.9 6.6 C7.1 5 9.3 5 9.6 6.4 C9.9 4.9 12.1 4.9 12.4 6.4 C12.7 5 14.9 5.2 15.1 6.8 C16.1 6.8 16.6 7.6 16.6 8.6 V12.4 C16.6 15.6 14.5 17.6 11.2 17.6 H9.6 C6.3 17.6 4.4 15.5 4.4 12.4 Z"/><path class="cut" d="M7 6.9 V9.3 M9.7 6.5 V9.1 M12.4 6.5 V9.1 M4.8 11.4 C6.8 10.3 10 10.3 11.6 11.6"/>' },
   'f-metallicize': { box: '0 0 20 20', body: '<path class="mf" d="M3 4 H17 V16 H3 Z"/><circle class="cut" cx="5.6" cy="6.6" r="0.9"/><circle class="cut" cx="14.4" cy="6.6" r="0.9"/><circle class="cut" cx="5.6" cy="13.4" r="0.9"/><circle class="cut" cx="14.4" cy="13.4" r="0.9"/><path class="cut" d="M8 10 H12"/>' },
   'f-draw': { box: '0 0 20 20', body: '<path class="m" d="M6 3 H15 V17 H6 Z"/><path class="m" d="M3.6 5.4 V16.6"/><path class="mf" d="M8.6 9.4 H12.4 L10.5 12.6 Z"/>' },
   'f-energy': { box: '0 0 20 20', body: '<path class="mf" d="M11.6 1.6 L4.4 11 H9.4 L8 18.4 L15.6 8.6 H10.6 Z"/>' },
@@ -971,7 +973,9 @@ function renderHud() {
     on: { click: () => toggleHelp(true) },
   }));
   hudEl.append(el('button', {
-    cls: 'btn ghost',
+    // #53 P1-3: `hud-new` lets the label wrap to two lines on a 320px phone instead of
+    // pushing the HUD (and the whole page) past the right edge.
+    cls: 'btn ghost hud-new',
     text: 'New Run',
     attrs: { type: 'button', title: `New run (seed ${snap.seed}) — keyboard: n` },
     on: { click: () => newGame() },
@@ -1870,16 +1874,23 @@ const faceGlyph = (key) => (snap.faceGlyphs || {})[key] || { label: key, meaning
 
 /**
  * The short card face: one effect per line, glyph + number (+ an ALL tag), or a short
- * sentence for a unique mechanic. Decorative for screen readers: the tile's aria-label
- * carries the full sentence.
- * @param {Array<{g?: string, n?: string, all?: boolean, t?: string}>} lines
+ * sentence for a unique mechanic. A trigger block is its word + colon on its own line
+ * ("Turn end:"), then its glyph lines; it is always last. A card that exhausts itself shows
+ * a flame in its bottom-right corner instead of a line. Decorative for screen readers: the
+ * tile's aria-label carries the full sentence.
+ * @param {Array<{g?: string, n?: string, all?: boolean, t?: string, trig?: boolean, under?: boolean, mark?: string}>} lines
  */
 function faceNode(lines) {
   const node = el('span', { cls: 'cd-face', attrs: { 'aria-hidden': 'true' } });
   for (const l of lines) {
-    if (l.t) { node.append(keywordText(el('span', { cls: 'fl fl-t' }), l.t)); continue; }
+    if (l.mark) {
+      const info = faceGlyph(l.mark);
+      node.append(el('span', { cls: `fx-mark fx-${l.mark}`, attrs: { title: `${info.label}: ${info.meaning}`, 'data-glyph': l.mark } }, glyphBox(`f-${l.mark}`, `fg fg-${l.mark}`)));
+      continue;
+    }
+    if (l.t) { node.append(keywordText(el('span', { cls: 'fl fl-t' + (l.trig ? ' fl-trig' : '') + (l.under ? ' fl-under' : '') }), l.t)); continue; }
     const info = faceGlyph(l.g);
-    const line = el('span', { cls: `fl fl-${l.g}`, attrs: { title: `${info.label}: ${info.meaning}`, 'data-glyph': l.g } },
+    const line = el('span', { cls: `fl fl-${l.g}` + (l.under ? ' fl-under' : ''), attrs: { title: `${info.label}: ${info.meaning}`, 'data-glyph': l.g } },
       glyphBox(`f-${l.g}`, `fg fg-${l.g}`));
     if (l.n) line.append(el('span', { cls: 'fn', text: l.n }));
     if (l.all) line.append(el('span', { cls: 'fall', text: 'ALL' }));
@@ -1894,41 +1905,51 @@ const LONG_PRESS_MS = 350;
 const HOVER_MS = 400;
 let previewEl = null;
 let previewTile = null;
+/** Set when a touch long-press opened the preview: it then stays open after the release,
+ *  until a tap outside (which only closes it, it does not also act) or its X button. */
+let previewSticky = false;
+let swallowClick = false;
 
 function hidePreview() {
-  if (previewTile && previewTile.removeAttribute) previewTile.removeAttribute('aria-describedby');
   if (previewEl) { previewEl.remove(); previewEl = null; previewTile = null; }
+  previewSticky = false;
 }
 
 /**
- * The card enlarged ~2x above the hand, centred: name, cost, the full sentence, and each
- * glyph on its face with its full name and explanation. It sits wholly above the hand, so
- * it never covers a cost orb or End Turn.
+ * The card enlarged above the hand, centred: name, type and cost, the full sentence, then a
+ * key to the glyphs on its face (glyph + name; the sentence already explains each). It is
+ * min(viewport - 16, 340) wide and sized to need no scrolling at 320x568 with 130% text; it
+ * sits wholly above the hand, so it never covers a cost orb or End Turn.
  */
-function showPreview(tile, card, desc) {
+function showPreview(tile, card, desc, sticky = false) {
   hidePreview();
-  const rows = (Array.isArray(card.face) ? card.face : []).filter((l) => l.g);
+  const rows = (Array.isArray(card.face) ? card.face : []).filter((l) => l.g || l.mark).map((l) => l.g || l.mark);
   const seen = new Set();
   const legend = el('span', { cls: 'cp-glyphs' });
-  for (const l of rows) {
-    if (seen.has(l.g)) continue; seen.add(l.g);
-    const info = faceGlyph(l.g);
-    legend.append(el('span', { cls: 'cp-glyph' }, glyphBox(`f-${l.g}`, `fg fg-${l.g}`),
-      el('span', { cls: 'cp-gtext' }, el('b', { text: `${info.label}. ` }), info.meaning)));
+  for (const key of rows) {
+    if (seen.has(key)) continue; seen.add(key);
+    const info = faceGlyph(key);
+    legend.append(el('span', { cls: `cp-glyph cp-${key}`, attrs: { title: info.meaning } }, glyphBox(`f-${key}`, `fg fg-${key}`),
+      el('span', { cls: 'cp-gtext', text: info.label })));
   }
+  const type = card.typeLabel || card.type;
+  const close = el('button', { cls: 'cp-close', text: '×', attrs: { type: 'button', 'aria-label': 'Close preview', title: 'Close' } });
+  close.addEventListener('click', (ev) => { ev.stopPropagation(); hidePreview(); });
   previewEl = el('div', { cls: `card-preview type-${card.type}`, attrs: { id: 'card-preview', role: 'tooltip' } },
-    el('span', { cls: 'cp-name', text: `${card.name} · ${card.cost} Energy` }),
+    el('span', { cls: 'cp-head' },
+      el('span', { cls: 'cp-name', text: card.name }),
+      el('span', { cls: 'cp-meta', text: `${type} · ${card.cost} Energy` })),
+    close,
     keywordText(el('span', { cls: 'cp-text' }), desc),
-    rows.length ? legend : null);
+    seen.size ? legend : null);
   document.body.append(previewEl);
   previewTile = tile;
-  // Screen readers: the focused card is described by the preview (full text + glyph names).
-  tile.setAttribute('aria-describedby', 'card-preview');
+  previewSticky = sticky;
   const r = tile.getBoundingClientRect();
   const hand = tile.closest('.hand');
   const top = hand ? hand.getBoundingClientRect().top : r.top;
   const vw = window.innerWidth;
-  const w = Math.min(vw - 16, Math.max(2 * r.width, 200), 340);
+  const w = Math.min(vw - 16, 340);
   previewEl.style.width = `${Math.round(w)}px`;
   previewEl.style.left = `${Math.round((vw - w) / 2)}px`;
   previewEl.style.bottom = `${Math.round(window.innerHeight - top + 6)}px`;
@@ -1936,16 +1957,17 @@ function showPreview(tile, card, desc) {
 }
 
 /**
- * Long-press (touch/pen, 350ms) or hover (mouse, 400ms) opens the preview; it closes on
- * release, a tap outside or Esc. A press that opened the preview does not also play.
+ * Long-press (touch/pen, 350ms) or hover (mouse, 400ms) opens the preview. On touch it stays
+ * open after the release until a tap outside or its X; the press that opened it never plays
+ * the card. Mouse: it closes when the pointer leaves. Keyboard focus opens it; Esc closes.
  */
 function attachPreview(tile, card, desc) {
   let timer = 0; let x0 = 0; let y0 = 0;
-  const end = () => { clearTimeout(timer); if (tile._lp && previewTile === tile) hidePreview(); };
+  const end = () => { clearTimeout(timer); };
   tile.addEventListener('pointerdown', (ev) => {
     if (ev.pointerType === 'mouse') return;
     x0 = ev.clientX; y0 = ev.clientY; tile._lp = false; clearTimeout(timer);
-    timer = setTimeout(() => { tile._lp = true; showPreview(tile, card, desc); }, LONG_PRESS_MS);
+    timer = setTimeout(() => { tile._lp = true; showPreview(tile, card, desc, true); }, LONG_PRESS_MS);
   });
   tile.addEventListener('pointermove', (ev) => { if (ev.pointerType !== 'mouse' && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10) clearTimeout(timer); });
   tile.addEventListener('pointerup', end);
@@ -1956,7 +1978,7 @@ function attachPreview(tile, card, desc) {
     clearTimeout(timer); timer = setTimeout(() => showPreview(tile, card, desc), HOVER_MS);
   });
   tile.addEventListener('pointerleave', (ev) => {
-    if (ev.pointerType === 'mouse') { clearTimeout(timer); if (previewTile === tile) hidePreview(); } else end();
+    if (ev.pointerType === 'mouse') { clearTimeout(timer); if (previewTile === tile && !previewSticky) hidePreview(); } else end();
   });
   // Keyboard: focusing a card opens its preview (keyboard focus only, not a mouse click's
   // focus); Esc closes it; moving focus away closes it.
@@ -1964,7 +1986,7 @@ function attachPreview(tile, card, desc) {
     const kb = typeof tile.matches !== 'function' || tile.matches(':focus-visible');
     if (kb) showPreview(tile, card, desc);
   });
-  tile.addEventListener('blur', () => { if (previewTile === tile) hidePreview(); });
+  tile.addEventListener('blur', () => { if (previewTile === tile && !previewSticky) hidePreview(); });
   tile.addEventListener('click', (ev) => {
     if (!tile._lp) return;
     tile._lp = false; consumeClick(ev); ev.stopImmediatePropagation(); ev.preventDefault();
@@ -1974,14 +1996,34 @@ function attachPreview(tile, card, desc) {
 if (typeof document.addEventListener === 'function') {
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && previewEl) hidePreview(); });
   document.addEventListener('pointerdown', (ev) => {
-    if (previewEl && !previewEl.contains(ev.target) && !(previewTile && previewTile.contains(ev.target))) hidePreview();
+    if (!previewEl || previewEl.contains(ev.target) || (previewTile && previewTile.contains(ev.target))) return;
+    // A tap outside a touch preview only closes it: it does not also play or press.
+    if (previewSticky) swallowClick = true;
+    hidePreview();
+  }, true);
+  document.addEventListener('click', (ev) => {
+    if (!swallowClick) return;
+    swallowClick = false; ev.stopImmediatePropagation(); ev.preventDefault();
   }, true);
 }
 
+/** Where the teaching pop-ups sit: over the stage, above the hand AND the dock row (energy
+ *  orb, piles), so they never cover a control. Returns a CSS `bottom` in px. */
+function popupBottom(hand) {
+  let top = hand.getBoundingClientRect().top;
+  for (const n of document.querySelectorAll('.page-combat .energy-orb, .page-combat .pile, .page-combat .dock')) {
+    if (n.getClientRects && n.getClientRects().length) top = Math.min(top, n.getBoundingClientRect().top);
+  }
+  return Math.round(window.innerHeight - top + 6);
+}
+
 /* One-time hint (once per profile, localStorage): a long press shows the full card. Shown
-   the first time a battle hand appears; any tap dismisses it. */
+   the first time a battle hand appears; any tap or key dismisses it, and it leaves on its own
+   after 6s. */
 const PRESS_HINT_KEY = 'dlb.pressHint.v1';
+const PRESS_HINT_MS = 6000;
 let pressHintEl = null;
+function dismissPressHint() { if (pressHintEl) { pressHintEl.remove(); pressHintEl = null; } }
 function maybePressHint() {
   if (pressHintEl || !snap || snap.phase !== 'combat' || typeof document.querySelector !== 'function') return false;
   try { if (localStorage.getItem(PRESS_HINT_KEY)) return false; } catch { return false; }
@@ -1995,14 +2037,18 @@ function maybePressHint() {
   const vw = window.innerWidth; const w = Math.min(vw - 16, 320);
   pressHintEl.style.width = `${w}px`;
   pressHintEl.style.left = `${Math.round((vw - w) / 2)}px`;
-  pressHintEl.style.bottom = `${Math.round(window.innerHeight - hand.getBoundingClientRect().top + 6)}px`;
+  pressHintEl.style.bottom = `${popupBottom(hand)}px`;
+  const mine = pressHintEl;
+  setTimeout(() => { if (pressHintEl === mine) dismissPressHint(); }, PRESS_HINT_MS);
   return true;
 }
 if (typeof document.addEventListener === 'function') {
-  document.addEventListener('pointerdown', () => { if (pressHintEl) { pressHintEl.remove(); pressHintEl = null; } }, true);
+  document.addEventListener('pointerdown', dismissPressHint, true);
+  document.addEventListener('keydown', dismissPressHint, true);
 }
 
-/* First sight of a status glyph in a run: its explanation pops up once, above the hand. */
+/* First sight of a status glyph in a run: its explanation pops up once, over the stage. */
+const GLYPH_TIP_MS = 5500;
 let glyphTipsSeen = new Set();
 let glyphTipEl = null;
 function maybeGlyphTip() {
@@ -2018,17 +2064,15 @@ function maybeGlyphTip() {
   const info = faceGlyph(key);
   if (glyphTipEl) glyphTipEl.remove();
   glyphTipEl = el('div', { cls: 'glyph-tip', attrs: { role: 'status' } }, glyphBox(`f-${key}`, `fg fg-${key}`),
-    el('span', {}, el('b', { text: `${info.label}: ` }), info.meaning));
+    el('span', {}, el('b', { cls: `kw-${key}`, text: `${info.label}: ` }), info.meaning));
   document.body.append(glyphTipEl);
   const hand = fresh.closest('.hand');
-  const r = fresh.getBoundingClientRect();
-  const top = hand ? hand.getBoundingClientRect().top : r.top;
   const vw = window.innerWidth; const w = Math.min(vw - 16, 300);
   glyphTipEl.style.width = `${w}px`;
-  glyphTipEl.style.left = `${Math.round(Math.max(8, Math.min(vw - w - 8, r.left + r.width / 2 - w / 2)))}px`;
-  glyphTipEl.style.bottom = `${Math.round(window.innerHeight - top + 6)}px`;
+  glyphTipEl.style.left = `${Math.round((vw - w) / 2)}px`;
+  glyphTipEl.style.bottom = `${hand ? popupBottom(hand) : 8}px`;
   const tip = glyphTipEl;
-  setTimeout(() => { tip.remove(); if (glyphTipEl === tip) glyphTipEl = null; }, 3200);
+  setTimeout(() => { tip.remove(); if (glyphTipEl === tip) glyphTipEl = null; }, GLYPH_TIP_MS);
 }
 
 /**
@@ -2071,7 +2115,7 @@ function cardTile(card, opts = {}) {
       'data-slot': card.slot,
       ...(opts.actionId ? { 'data-action': opts.actionId } : {}),
       'aria-disabled': String(disabled),
-      'aria-label': `${card.name}. Costs ${card.cost} Energy. ${desc}${disabled ? ' Not playable: not enough Energy.' : ''}${awaiting}`,
+      'aria-label': `${card.name}. ${card.typeLabel || card.type}. Costs ${card.cost} Energy. ${desc}${disabled ? ' Not playable: not enough Energy.' : ''}${awaiting}`,
       ...(isPending ? { 'aria-pressed': 'true' } : {}),
     },
     on: disabled && !opts.onClick ? {} : { click: onClick },
