@@ -1830,6 +1830,25 @@ function enemyCard(e, position) {
 }
 
 /**
+ * #29: the rules text of a tile, with each keyword gloss (" — its attacks deal 25% less
+ * damage") in its own `.cgloss` span. The text is the kernel's sentence unchanged; the span
+ * only lets a cramped hand (short portrait phones, where five cards share 360px) drop the
+ * gloss so the rule itself — numbers, keywords, targets — is shown in full instead of being
+ * clamped mid-sentence. The keyword stays tappable (its title is the gloss), the glossary
+ * carries it, and the tile's aria-label keeps the whole sentence.
+ * @param {string} desc
+ */
+function cardDescNode(desc) {
+  const node = el('span', { cls: 'cdesc' });
+  String(desc ?? '').split(/( — [^.]*)/).forEach((part, i) => {
+    if (!part) return;
+    if (i % 2) node.append(keywordText(el('span', { cls: 'cgloss' }), part));
+    else node.append(keywordText(el('span', {}), part));
+  });
+  return node;
+}
+
+/**
  * One card tile. Structure: cost gem, type line (mark + word), name, plain-English
  * effect, then the compact CLI code. Auto height means a 3-line effect grows the tile
  * rather than clipping it.
@@ -1910,7 +1929,7 @@ function cardTile(card, opts = {}) {
   }
   tile.append(el('span', { cls: 'cname', text: card.name }));
   if (card.flavor) tile.append(el('span', { cls: 'cflavor', text: card.flavor }));
-  tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));
+  tile.append(cardDescNode(desc));
   // The compact code is NOT repeated on a reward tile: the player is choosing a card to
   // keep, not playing one, so the shorthand is noise there.
   if (card.showSummary !== false) {
