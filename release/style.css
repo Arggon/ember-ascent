@@ -3977,7 +3977,7 @@ html, body {
 .cd-face .fx-mark { display: inline-grid; line-height: 0; }
 .cd-face .fx-exhaust .fg { width: 1.0667rem; height: 1.0667rem; }
 .cd-face .fl { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; column-gap: 1px; line-height: 1.15; white-space: nowrap; }
-.cd-face .fl-t { display: block; white-space: normal; text-align: center; font-size: 0.8rem; }
+.cd-face .fl-t { display: block; white-space: normal; text-align: center; font-size: 0.8rem; font-family: var(--num); font-weight: 600; }
 .cd-face .fn { font-family: var(--rules); font-size: 0.8rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
 /* ALL in the condensed numeral face: same size, narrower, so "+3 ALL" stays on one line. */
 .cd-face .fall { margin-left: 2px; font-family: var(--num); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.02em; color: #ffcf8a; }
