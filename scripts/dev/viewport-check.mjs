@@ -126,6 +126,9 @@ const HAND_SIZES = [
 const MATRIX = [
   ...SIZES.map(([w, h, label]) => [w, h, label, 1, 0]),
   ...LARGE_FONT_SIZES.map(([w, h, label, scale]) => [w, h, label, scale, 0]),
+  // #53: the smallest phone the card face is held to (4 face lines allowed there).
+  [320, 568, 'phone-xs', 1, 0],
+  [320, 568, 'phone-xs-font130', LARGE_FONT_SIZES[0][3], 0],
   ...HAND_SIZES.map(([w, h, label, n]) => [w, h, label, 1, n]),
   ...LARGE_FONT_SIZES.map(([w, h, label, scale]) => [w, h, label + '-hand10', scale, MAX_HAND]),
 ];
@@ -151,6 +154,90 @@ const HAND_FIXTURE = (n) => `(() => {
   hand.style.setProperty('--n', String(hand.children.length));
   hand.scrollLeft = 0;
   return hand.children.length;
+})()`;
+const GEM_CHECK = `(() => {
+  const hand = document.querySelector('.stage-combat .hand'); if (!hand) return [];
+  const bad = [];
+  const clipBoxes = (n) => { const out = []; for (let p = n.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+    const st = getComputedStyle(p); if (st.overflowX !== 'visible' || st.overflowY !== 'visible') out.push(p); } return out; };
+  const start = hand.scrollLeft;
+  for (const c of hand.querySelectorAll('.card')) {
+    const g = c.querySelector('.cost-gem'); if (!g) continue;
+    c.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const r = g.getBoundingClientRect();
+    const name = ((c.querySelector('.cname') || {}).textContent || '?').trim();
+    const boxes = [{ left: 0, top: 0, right: innerWidth, bottom: innerHeight, tag: 'viewport' },
+      ...clipBoxes(g).map((p) => Object.assign(p.getBoundingClientRect().toJSON(), { tag: (p.className || p.id || p.tagName).toString().split(' ')[0] }))];
+    const out = boxes.filter((b) => r.left < b.left - 0.5 || r.top < b.top - 0.5 || r.right > b.right + 0.5 || r.bottom > b.bottom + 0.5);
+    if (out.length) bad.push(name + ' orb [' + [r.left, r.top, r.right, r.bottom].map(Math.round) + '] clipped by ' + out.map((b) => b.tag).join('+'));
+  }
+  hand.scrollLeft = start; window.scrollTo(0, 0);
+  return bad;
+})()`;
+// #53: the short-portrait card face, checked against EVERY card in the list. The real
+// renderer draws each batch (window.__dlb.render) from kernel data (cardFaceLines /
+// describeCard), longest faces first; the first batch is the 'longest' hand.
+const LONGEST_HAND_CHECK = `(async () => {
+  if (!matchMedia('(max-width: 700px) and (max-height: 760px) and (orientation: portrait)').matches) return null;
+  const dlb = window.__dlb; const snap = dlb && dlb.snapshot();
+  const hand0 = document.querySelector('.stage-combat .hand'); if (!hand0 || !snap || !Array.isArray(snap.hand)) return null;
+  const cardsNow = () => [...document.querySelectorAll('.stage-combat .hand .card')];
+  const vw = innerWidth;
+  const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const k = rootPx / 15; // 1 at 100% text (root 15px), 1.3 at 130%
+  const maxLines = vw <= 340 ? 4 : 3;
+  const allInViewNow = () => { const hand = document.querySelector('.stage-combat .hand');
+    return hand.scrollWidth <= hand.clientWidth + 1 && cardsNow().every((c) => { const r = c.getBoundingClientRect(); return r.left >= -0.5 && r.right <= vw + 0.5; }); };
+  const box = () => { const f = document.querySelector('.page-combat .fight').getBoundingClientRect(), h = document.querySelector('.stage-combat .hero .fig'), hr = h ? h.getBoundingClientRect() : { top: 0 };
+    return [f.top, f.bottom, hr.top].map(Math.round); };
+  const allInView = snap.hand.length <= 5 ? allInViewNow() : null;
+  const before = box();
+  const d = await import(new URL('../kernel/describe.js', location.href));
+  const raw = await (await fetch(new URL('../kernel/content/cards.json', location.href))).json();
+  const all = raw.cards.map((c) => ({ id: c.id, name: c.name, cost: c.cost, type: c.type, face: d.cardFaceLines(c), description: d.describeCard(c) }))
+    .sort((a, b) => b.face.length - a.face.length || d.describeCardFace(b).length - d.describeCardFace(a).length);
+  const orig = snap.hand.map((c) => ({ ...c }));
+  const n = Math.min(5, snap.hand.length);
+  const unfit = []; const moved = []; const over = []; const small = []; const heights = new Set(); const lines = {};
+  let fiveInView = null;
+  const lineCount = (c) => {
+    let total = 0;
+    for (const fl of c.querySelectorAll('.cd-face .fl')) {
+      const tops = new Set();
+      const rg = document.createRange(); rg.selectNodeContents(fl);
+      for (const q of rg.getClientRects()) if (q.width > 0.5 && q.height > 0.5) tops.add(Math.round(q.top + q.height / 2));
+      const merged = [...tops].sort((a, b) => a - b).filter((t, i, a) => i === 0 || t - a[i - 1] > 6);
+      total += merged.length;
+    }
+    return total;
+  };
+  for (let at = 0; at < all.length; at += n) {
+    const batch = all.slice(at, at + n);
+    while (batch.length < n) batch.push(all[batch.length]);
+    snap.hand = orig.slice(0, n).map((c, i) => ({ ...c, name: batch[i].name, cost: batch[i].cost, type: batch[i].type, description: batch[i].description, face: batch[i].face }));
+    dlb.render();
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const b = box(); if (b.some((v, i) => Math.abs(v - before[i]) > 1)) moved.push(batch[0].id + ' batch: ' + b.join(','));
+    if (at === 0) fiveInView = n === 5 ? allInViewNow() : null;
+    cardsNow().forEach((c, i) => {
+      const id = batch[i].id;
+      heights.add(Math.round(c.getBoundingClientRect().height));
+      const cr = c.getBoundingClientRect(); const cs = getComputedStyle(c);
+      const face = c.querySelector('.cd-face');
+      if (!face || getComputedStyle(face).display === 'none') { unfit.push(id + ' (no card face shown)'); return; }
+      const inner = { l: cr.left + parseFloat(cs.borderLeftWidth) - 0.5, r: cr.right - parseFloat(cs.borderRightWidth) + 0.5, b: cr.bottom - parseFloat(cs.borderBottomWidth) + 0.5 };
+      const rg = document.createRange(); rg.selectNodeContents(face);
+      const parts = [...rg.getClientRects(), ...[...face.querySelectorAll('.fg')].map((x) => x.getBoundingClientRect())].filter((q) => q.width > 0.5);
+      if (parts.some((q) => q.left < inner.l || q.right > inner.r || q.bottom > inner.b) || c.scrollHeight > c.clientHeight + 1 || /…/.test(face.textContent)) unfit.push(id);
+      const lc = lineCount(c); lines[id] = lc;
+      if (lc > maxLines) over.push(id + ' ' + lc + ' lines');
+      for (const fg of face.querySelectorAll('.fg')) { const r = fg.getBoundingClientRect(); if (Math.min(r.width, r.height) < 16 * k - 0.5) small.push(id + ' glyph ' + Math.round(r.width) + 'px'); }
+      for (const t of face.querySelectorAll('.fn, .fall, .fl-t')) { const px = parseFloat(getComputedStyle(t).fontSize); if (px < 12 * k - 0.05) small.push(id + ' text ' + px.toFixed(1) + 'px'); }
+    });
+  }
+  snap.hand = orig; dlb.render();
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  return { before, moved, unfit, over, small: [...new Set(small)], heights: [...heights], allInView, fiveInView, maxLines, lines, checked: all.length };
 })()`;
 if (!SIZES_SEL.length) { console.error('no sizes matched --sizes ' + sizesArg); process.exit(2); }
 
@@ -519,6 +606,15 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
       hand.scrollLeft = 0;
       return out;
     })()`);
+    // Cost orb (Product Designer, #53): each hand card's energy-cost orb must be drawn whole.
+    // Every clipping ancestor (overflow not visible: the card, the hand, the stage) and the
+    // viewport must contain the orb's box. Cards a scrolling hand shows only by scrolling are
+    // brought into view one at a time.
+    m.gemClipped = await ev(GEM_CHECK);
+    // Short-portrait hand (#29/#53): five cards side by side with no sideways scroll; every
+    // card in the list (longest card-face text first) is put on the hand's tiles in turn and
+    // must fit its card; the cards share one height and the battle stage never moves.
+    m.longestHand = await ev(LONGEST_HAND_CHECK);
     await endTextScale(S, textScaleId);
     rows.push([keyOf(w, h, scale, handN), label, m]);
   }
@@ -588,6 +684,18 @@ function evaluateRow(m) {
   if (m.lastCardReach !== null && m.lastCardReach !== 'ok') {
     fails.push(`scrolling hand cannot bring its last card fully into view: ${m.lastCardReach}`);
   }
+  if (m.gemClipped && m.gemClipped.length) {
+    fails.push(`hand card cost orb clipped: ${m.gemClipped.join('; ')}`);
+  }
+  if (m.longestHand) {
+    const L = m.longestHand;
+    if (L.moved.length) fails.push(`battle stage moved when the hand's cards changed (fight top/bottom, hero top ${L.before.join(',')}): ${L.moved.join('; ')}`);
+    if (L.unfit.length) fails.push(`card face clipped or missing (${L.checked} cards checked): ${L.unfit.join('; ')}`);
+    if (L.over.length) fails.push(`card face over ${L.maxLines} lines: ${L.over.join('; ')}`);
+    if (L.small.length) fails.push(`card-face glyph < 16px or text < 12px (at 100% text): ${L.small.join('; ')}`);
+    if (L.heights.length > 1) fails.push(`hand cards differ in height in the short-portrait layout: ${L.heights.join(', ')}px`);
+    if (L.allInView === false || L.fiveInView === false) fails.push('short-portrait hand of 5 cards scrolls sideways or has a card out of view');
+  }
   if (m.viewport[0] >= HERO_NAME_MIN_WIDTH && m.heroName !== 'shown') {
     fails.push(`HUD hero name ${m.heroName} at ${m.viewport[0]}px wide (must be shown in full from ${HERO_NAME_MIN_WIDTH}px)`);
   }
@@ -651,6 +759,7 @@ if (diag) {
   }
 }
 function pad(v) { return String(v === null ? '-' : v).padStart(5); }
+for (const [size, , m] of rows) if (m.longestHand && m.longestHand.lines) console.log(`face lines ${size}: ${JSON.stringify(m.longestHand.lines)}`);
 console.log('\nscreenshots in shots/viewport/');
 
 ws.close(); child.kill('SIGTERM');

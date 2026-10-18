@@ -310,6 +310,102 @@ export function describeCard(def, instance = {}) {
   return parts.map(sentence).join(' ');
 }
 
+/* --------------------------------------------------------------- card face (#29) */
+
+/**
+ * The card-face glyphs (#29/#53): one per repeatable effect. A short phone's hand card shows
+ * its rule as glyph lines ("[sword]13 / [Weak]1 / [Vuln]1"); these are the names and the
+ * one-line explanations the preview, the glossary legend and the first-sight tip read.
+ * `status` marks the glyphs that stand for a keyword status.
+ * @type {Record<string, {label: string, meaning: string, status?: boolean}>}
+ */
+export const FACE_GLYPHS = {
+  damage: { label: 'Damage', meaning: 'Deal this much damage to the enemy you aim at. ALL: to every enemy. ×N: that many hits.' },
+  block: { label: 'Block', meaning: 'Gain this much Block: it absorbs incoming damage until your next turn.' },
+  weak: { label: 'Weak', meaning: 'Apply Weak: its attacks deal 25% less damage. Wears off by 1 each turn.', status: true },
+  vulnerable: { label: 'Vulnerable', meaning: 'Apply Vulnerable: it takes 50% more damage from attacks. Wears off by 1 each turn.', status: true },
+  strength: { label: 'Strength', meaning: 'Gain Strength: your attacks deal that much more damage for the whole fight. ×2: double it.', status: true },
+  metallicize: { label: 'Metallicize', meaning: 'Gain Metallicize: at the end of each turn, gain that much Block.', status: true },
+  draw: { label: 'Draw', meaning: 'Draw this many cards.' },
+  energy: { label: 'Energy', meaning: 'Gain this much Energy this turn.' },
+  hp: { label: 'Lose HP', meaning: 'You lose this much HP. Block does not stop it.' },
+  discard: { label: 'Discard', meaning: 'Discard this many cards from your hand at random.' },
+  exhaust: { label: 'Exhaust', meaning: 'Remove this card for the rest of the fight. With an arrow: whenever a card is exhausted.' },
+};
+
+/** Line order on every face: damage/block, then statuses, then resources. */
+const FACE_RANK = { damage: 0, block: 0, weak: 1, vulnerable: 1, strength: 1, metallicize: 1, hp: 2, energy: 2, draw: 2, discard: 2, exhaust: 3 };
+
+const g = (glyph, n = '', all = false) => ({ g: glyph, n: String(n), ...(all ? { all: true } : {}) });
+
+/**
+ * Face lines per `custom` handler, from the same literals as CUSTOM_SENTENCE. Composable
+ * handlers are glyph lines; a unique mechanic keeps a short sentence (`t`) beside them.
+ * `sorted: false` keeps the written order (a sentence reads top to bottom).
+ */
+const CUSTOM_FACE = {
+  bloodletting: () => [g('hp', -3), g('energy', '+2')],
+  hemokinesis: () => [g('hp', -2), g('damage', 15)],
+  offering: () => [g('hp', -6), g('energy', '+2'), g('draw', 3)],
+  limit_break: () => [g('strength', '×2')],
+  entrench: () => [g('block', '×2')],
+  reaper: () => Object.assign([g('damage', 4, true), { t: 'Heal that much' }], { sorted: false }),
+  combust: () => Object.assign([g('damage', 1, true), g('hp', -1), { t: 'each turn' }], { sorted: false }),
+  dark_embrace: () => Object.assign([g('exhaust', '→'), g('draw', '+1')], { sorted: false }),
+  feel_no_pain: () => Object.assign([g('exhaust', '→'), g('block', '+1')], { sorted: false }),
+  rupture: () => Object.assign([{ t: 'HP lost:' }, g('strength', '+1')], { sorted: false }),
+  rampage: (inst) => Object.assign([g('damage', 8 + (inst.perPlay || 0)), { t: '+5 each play' }], { sorted: false }),
+};
+
+/**
+ * The structured card face (#29/#53): one effect per line as glyph + number, built from the
+ * (tempered) definition, so its numbers always agree with describeCard.
+ * @param {any} def
+ * @param {{perPlay?: number}} [instance]
+ * @param {number} [hpCost] extra HP the instance costs to play (a temper)
+ * @returns {Array<{g: string, n: string, all?: boolean} | {t: string}>}
+ */
+export function cardFaceLines(def, instance = {}, hpCost = 0) {
+  if (!def || !Array.isArray(def.effects)) return [{ t: 'No description available.' }];
+  let lines = [];
+  let sorted = true;
+  for (const e of foldRepeatedDamage(def.effects)) {
+    const all = e.target === 'all_enemies';
+    switch (e.verb) {
+      case 'damage': lines.push(g('damage', (e.hits ?? 1) > 1 ? `${e.amount}×${e.hits}` : e.amount, all)); break;
+      case 'block': lines.push(g('block', e.amount)); break;
+      case 'draw': lines.push(g('draw', e.amount)); break;
+      case 'energy': lines.push(g('energy', `+${e.amount}`)); break;
+      case 'status': lines.push(g(FACE_GLYPHS[e.status] ? e.status : 'strength', e.amount, all)); break;
+      case 'discard': lines.push(g('discard', e.amount)); break;
+      case 'exhaust': lines.push(g('exhaust')); break;
+      case 'custom': {
+        const f = CUSTOM_FACE[e.handler];
+        if (!f) { lines.push({ t: describeEffect(e, def) }); sorted = false; break; }
+        const out = f(instance);
+        if (out.sorted === false) sorted = false;
+        lines.push(...out);
+        break;
+      }
+      default: lines.push({ t: describeEffect(e, def) }); sorted = false;
+    }
+  }
+  if (hpCost > 0) lines.push(g('hp', -hpCost));
+  if (sorted) lines = lines.map((l, i) => [l, i]).sort((a, b) => (FACE_RANK[a[0].g] ?? 9) - (FACE_RANK[b[0].g] ?? 9) || a[1] - b[1]).map(([l]) => l);
+  return lines;
+}
+
+/**
+ * The face as one plain line ("[damage]13 / [weak]1 / [vulnerable]1"), for logs and the
+ * wording table.
+ * @param {any} def
+ * @param {{perPlay?: number}} [instance]
+ * @returns {string}
+ */
+export function describeCardFace(def, instance = {}) {
+  return cardFaceLines(def, instance).map((l) => ('t' in l ? l.t : `[${l.g}]${l.n}${l.all ? ' ALL' : ''}`)).join(' / ');
+}
+
 /**
  * One-line playability note for a tile: why the card cannot be played right now.
  * Reads the kernel's own snapshot fields (`cost`, `playable`) — no rule is restated.

@@ -1,0 +1,277 @@
+// #29 / #53: the short-phone card face and its preview, end to end.
+// - Kernel: every card's face (cardFaceLines) carries every number of its full sentence
+//   (keyword glosses aside), plain and under every temper; one effect per line, damage/block
+//   first, then statuses, then resources.
+// - Renderer (the REAL src/web/app.js on the fake DOM of hero-select.test.js): a hand
+//   tile's aria-label is the FULL sentence; a long press opens the preview and releasing it
+//   does NOT play the card; the one-time long-press hint shows once per profile.
+// Line limits, glyph/text sizes, the five-cards-in-view rule, the orb and the fixed stage
+// are measured in a real browser by scripts/dev/viewport-check.mjs.
+import { readFileSync } from 'node:fs';
+
+let uid = 0;
+class N {
+  constructor(tag) {
+    this.tag = tag; this.uid = uid++; this.kids = []; this.parent = null;
+    this.attrs = {}; this._cls = ''; this.txt = ''; this.style = { setProperty(k, v) { this[k] = v; }, removeProperty() {} };
+    this._ls = {}; this.disabled = false;
+  }
+  set className(v) { this._cls = String(v); }
+  get className() { return this._cls; }
+  get classList() {
+    const list = () => this._cls.split(/\s+/).filter(Boolean);
+    const set = (a) => { this._cls = a.join(' '); };
+    return {
+      contains: (c) => list().includes(c),
+      add: (...cs) => set([...new Set([...list(), ...cs])]),
+      remove: (...cs) => set(list().filter((x) => !cs.includes(x))),
+      toggle: (c, force) => { const on = force ?? !list().includes(c); if (on) set([...new Set([...list(), c])]); else set(list().filter((x) => x !== c)); return on; },
+    };
+  }
+  set textContent(v) { this.txt = String(v); this.kids = []; }
+  get textContent() { return this.txt; }
+  append(...c) { for (let x of c) if (x != null) { if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); x = t; } x.parent = this; this.kids.push(x); } }
+  prepend(...c) { const add = c.filter((x) => x != null); for (const x of add) x.parent = this; this.kids.unshift(...add); }
+  appendChild(c) { c.parent = this; this.kids.push(c); return c; }
+  replaceChildren(...c) { this.kids = []; this.append(...c); }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return this.attrs[k]; }
+  addEventListener(t, fn) { (this._ls[t] ||= []).push(fn); }
+  removeEventListener() {}
+  closest(sel) {
+    const want = sel.replace(/^\./, '');
+    let n = this;
+    while (n) { if (n._cls.split(/\s+/).includes(want)) return n; n = n.parent; }
+    return null;
+  }
+  querySelector(sel) {
+    const hit = this._all().find((n) => m(n, sel));
+    if (hit) return hit;
+    // Fallback: some builders set style on a child obtained before insertion.
+    const g = (root && root._all ? root._all() : []).find((n) => m(n, sel));
+    return g ?? null;
+  }
+  querySelectorAll(sel) { return this._all().filter((n) => m(n, sel)); }
+  _all() { const o = []; const go = (n) => { for (const k of n.kids) { o.push(k); go(k); } }; go(this); return o; }
+  focus() { document.activeElement = this; }
+  remove() { if (this.parent) { this.parent.kids = this.parent.kids.filter((k) => k !== this); this.parent = null; } }
+  get firstElementChild() { return this.kids.find((k) => k.tag !== '#text') ?? null; }
+  dispatch(type, extra = {}) {
+    const ev = { type, target: this, preventDefault() { this.defaultPrevented = true; }, stopImmediatePropagation() { this._stop = true; }, ...extra };
+    let n = this;
+    const chain = [];
+    while (n) { chain.push(n); n = n.parent; }
+    for (const node of chain) {
+      ev.currentTarget = node;
+      for (const fn of node._ls[type] || []) { fn(ev); if (ev._stop) return; }
+    }
+  }
+}
+function m(n, sel) {
+  const a = /^\[data-([a-z-]+)="([^"]*)"\]$/.exec(sel);
+  if (a) return n.attrs[`data-${a[1]}`] === a[2];
+  if (sel.startsWith('.')) { const have = n._cls.split(/\s+/); return sel.slice(1).split('.').every((c) => have.includes(c)); }
+  // Tag selector (e.g. 'i'). Without this the shim cannot find `el('i', {})`, which the
+  // renderer queries immediately after building it — a harness gap, not an app bug.
+  return n.tag === sel;
+}
+
+const root = new N('body');
+const byId = {};
+for (const id of ['hud', 'stage', 'toast', 'live', 'app', 'fx-layer']) { const d = new N('div'); d._cls = id; byId[id] = d; root.append(d); }
+globalThis.document = {
+  getElementById: (id) => byId[id] ?? null,
+  createElement: (t) => new N(t),
+  createTextNode: (t) => { const n = new N('#text'); n.txt = String(t); return n; },
+  querySelector: (s) => root.querySelector(s),
+  querySelectorAll: (s) => root.querySelectorAll(s),
+  addEventListener: () => {}, body: root, activeElement: null,
+};
+globalThis.window = { addEventListener: () => {}, location: { search: '?seed=11' } };
+globalThis.location = { search: '?seed=11' };
+globalThis.localStorage = { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = v; } };
+globalThis.URLSearchParams = URLSearchParams;
+globalThis.requestAnimationFrame = () => 0;
+// Count act title cards ever ADDED to the fx layer (a run rebuild also clears the layer,
+// so a live count would lie).
+const fxAdded = [];
+{
+  const layer = byId['fx-layer'];
+  const append = layer.append.bind(layer);
+  layer.append = (...c) => { for (const x of c) if (x && x._cls) fxAdded.push(x._cls); append(...c); };
+}
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+// Layout stubs the preview needs (the fake DOM has no layout engine).
+N.prototype.getBoundingClientRect = function () { return { left: 0, top: 500, right: 72, bottom: 600, width: 72, height: 100 }; };
+N.prototype.getClientRects = function () { return [this.getBoundingClientRect()]; };
+N.prototype.removeAttribute = function (k) { delete this.attrs[k]; };
+N.prototype.contains = function (o) { for (let n = o; n; n = n.parent) if (n === this) return true; return false; };
+globalThis.getComputedStyle = () => ({ display: 'flex' });
+globalThis.window.innerWidth = 360; globalThis.window.innerHeight = 640;
+const docLs = {};
+globalThis.document.addEventListener = (t, fn) => { (docLs[t] ||= []).push(fn); };
+
+const appUrl = new URL('../../src/web/app.js', import.meta.url);
+const rawSrc = readFileSync(appUrl, 'utf8');
+const IMPORT_RE = /^import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"];?[ \t]*$/gm;
+const importPrelude = [];
+const importedModules = [];
+for (const [, names, spec] of rawSrc.matchAll(IMPORT_RE)) {
+  const bound = names.split(',').map((n) => n.trim()).filter(Boolean)
+    .map((n) => { const [orig, local = orig] = n.split(/\s+as\s+/); return [orig, local]; });
+  if (!bound.length) continue;
+  const mod = await import(new URL(spec, appUrl));
+  importPrelude.push(`const { ${bound.map(([o, l]) => (o === l ? o : `${o}: ${l}`)).join(', ')} } = __mods[${importedModules.length}];`);
+  importedModules.push(mod);
+}
+let src = rawSrc
+  .replace(/^import\b[\s\S]*?\bfrom\s*['"][^'"]+['"];?[ \t]*$|^import\s*['"][^'"]+['"];?[ \t]*$/gm, '')
+  .replace(/\bboot\(\)\s*;?\s*$/, '');
+src = 'async function measure(){ return null; }\n' + src;
+src += '\nreturn { render, newGame, snapGet(){ return snap; }, previewOpen(){ return !!previewEl; } };';
+const api = new Function('__mods', `${importPrelude.join('\n')}\n${src}`)(importedModules);
+
+import { cardFaceLines, describeCard } from '../../src/kernel/describe.js';
+import { TEMPERS, temperEffects, temperHpCost } from '../../src/kernel/rules/tempers.js';
+const CARDS = JSON.parse(readFileSync(new URL('../../src/kernel/content/cards.json', import.meta.url), 'utf8')).cards;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const nums = (s) => (s.replace(/ — [^.]*/g, '').match(/\d+/g) || []);
+const faceNums = (lines) => lines.flatMap((l) => (('t' in l ? l.t : l.n).match(/\d+/g) || []));
+const RANK = { damage: 0, block: 0, weak: 1, vulnerable: 1, strength: 1, metallicize: 1, hp: 2, energy: 2, draw: 2, discard: 2, exhaust: 3 };
+
+test('every number of the full sentence is on the card face, plain and tempered', () => {
+  assert.equal(CARDS.length, 44);
+  for (const def of CARDS) {
+    const variants = [[def, 0, 'plain']];
+    for (const t of Object.keys(TEMPERS)) variants.push([{ ...def, effects: temperEffects(def.effects, t) }, temperHpCost(t), t]);
+    for (const [d, hp, tag] of variants) {
+      const full = describeCard(d) + (hp ? ` Lose ${hp} HP when played.` : '');
+      const face = cardFaceLines(d, {}, hp);
+      const have = faceNums(face);
+      for (const n of nums(full)) assert.ok(have.includes(n), `${def.id} (${tag}): ${n} from "${full}" missing on face ${JSON.stringify(face)}`);
+      assert.ok(face.length >= 1, `${def.id}: empty face`);
+    }
+  }
+});
+
+test('one effect per line, damage/block, then statuses, then resources; ALL only for all-enemy hits', () => {
+  for (const def of CARDS) {
+    const face = cardFaceLines(def);
+    const g = face.filter((l) => 'g' in l);
+    if (g.length === face.length && !def.effects.some((e) => e.verb === 'custom' && !['bloodletting', 'hemokinesis', 'offering', 'limit_break', 'entrench'].includes(e.handler))) {
+      const ranks = g.map((l) => RANK[l.g]);
+      assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b), `${def.id}: order ${JSON.stringify(face)}`);
+    }
+    for (const l of g) if (l.all) assert.ok(def.effects.some((e) => e.target === 'all_enemies') || /ALL/.test(describeCard(def)), `${def.id}: ALL tag without an all-enemy effect`);
+    assert.ok(face.length <= 3, `${def.id}: ${face.length} face lines`);
+  }
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'uppercut')), [{ g: 'damage', n: '13' }, { g: 'weak', n: '1' }, { g: 'vulnerable', n: '1' }]);
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'thunderclap')), [{ g: 'damage', n: '4', all: true }, { g: 'vulnerable', n: '1' }]);
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'offering')), [{ g: 'hp', n: '-6' }, { g: 'energy', n: '+2' }, { g: 'draw', n: '3' }]);
+});
+
+// Drive the real app into the first fight.
+async function toFight(seed) {
+  api.newGame(seed, { quiet: true });
+  const boon = byId.stage.querySelectorAll('.boon').find((b) => b.attrs['data-action']);
+  boon.dispatch('click');
+  for (let i = 0; i < 5 && api.snapGet().phase !== 'combat'; i++) {
+    const node = root.querySelectorAll('.node').find((n) => n._cls.includes('available'));
+    if (!node) break;
+    node.dispatch('click');
+    await sleep(50);
+  }
+  assert.equal(api.snapGet().phase, 'combat', 'reached the first fight');
+}
+const handTiles = () => byId.stage.querySelectorAll('.card').filter((c) => c.attrs['data-slot'] && c.parent && c.parent._cls.includes('card-wrap'));
+
+test('hand tiles: aria-label is the full sentence; the face is aria-hidden glyph lines', async () => {
+  await toFight(11);
+  const s = api.snapGet();
+  const tiles = handTiles();
+  assert.equal(tiles.length, s.hand.length);
+  s.hand.forEach((c, i) => {
+    const label = tiles[i].attrs['aria-label'];
+    assert.ok(label.includes(c.description), `${c.name}: aria-label must carry the full sentence`);
+    assert.ok(/damage|Block|Apply|Draw|Gain|Lose|Double/.test(c.description));
+    const face = tiles[i].querySelector('.cd-face');
+    assert.ok(face, `${c.name}: has a card face`);
+    assert.equal(face.attrs['aria-hidden'], 'true');
+  });
+});
+
+test('a long press opens the preview; releasing it does not play the card; a tap still plays', async () => {
+  await toFight(11);
+  const before = api.snapGet();
+  const handN = before.hand.length; const energy = before.player?.energy ?? before.energy;
+  const t = handTiles().find((x) => x.attrs['aria-disabled'] === 'false');
+  t.dispatch('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10 });
+  await sleep(420);
+  assert.ok(api.previewOpen(), 'preview open after ~350ms hold');
+  const pv = root.querySelectorAll('.card-preview')[0];
+  assert.ok(pv && pv.querySelector('.cp-text'), 'preview carries the full sentence');
+  t.dispatch('pointerup', { pointerType: 'touch' });
+  assert.equal(api.previewOpen(), false, 'release closes the preview');
+  t.dispatch('click');
+  const after = api.snapGet();
+  assert.equal(after.hand.length, handN, 'release after a preview must not play the card');
+  assert.equal(after.player?.energy ?? after.energy, energy);
+  // A short tap (no hold) still plays at once.
+  const t2 = handTiles().find((x) => x.attrs['aria-disabled'] === 'false');
+  t2.dispatch('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10 });
+  t2.dispatch('pointerup', { pointerType: 'touch' });
+  t2.dispatch('click');
+  const played = api.snapGet();
+  assert.ok(played.hand.length < handN || played.pending || (played.player?.energy ?? played.energy) !== energy || api.snapGet() !== after, 'a plain tap plays (or aims) the card');
+});
+
+test('Esc and a tap outside close the preview', async () => {
+  await toFight(11);
+  const t = handTiles()[0];
+  t.dispatch('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10 });
+  await sleep(420);
+  assert.ok(api.previewOpen());
+  for (const fn of docLs.keydown || []) fn({ key: 'Escape' });
+  assert.equal(api.previewOpen(), false, 'Esc closes');
+  t.dispatch('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10 });
+  await sleep(420);
+  assert.ok(api.previewOpen());
+  for (const fn of docLs.pointerdown || []) fn({ target: byId.hud });
+  assert.equal(api.previewOpen(), false, 'a tap outside closes');
+  t.dispatch('pointerup', { pointerType: 'touch' });
+});
+
+test('the long-press hint shows once per profile, on the first battle hand, and a tap dismisses it', async () => {
+  delete localStorage._d['dlb.pressHint.v1'];
+  await toFight(11);
+  await sleep(800);
+  const hints = () => root.querySelectorAll('.press-hint');
+  assert.equal(hints().length, 1, 'hint shown on the first battle hand');
+  assert.match(hints()[0].kids.map((k) => k.txt).join(''), /hold a card/);
+  assert.equal(localStorage.getItem('dlb.pressHint.v1'), '1', 'remembered for this profile');
+  for (const fn of docLs.pointerdown || []) fn({ target: byId.hud });
+  assert.equal(hints().length, 0, 'a tap dismisses it');
+  await toFight(12);
+  await sleep(800);
+  assert.equal(hints().length, 0, 'never shown again for this profile');
+});
+
+test('keyboard: focusing a card opens its preview (full text + glyph names), described by it; Esc closes', async () => {
+  await toFight(11);
+  const t = handTiles().find((x) => (api.snapGet().hand.find((c) => c.slot === x.attrs['data-slot']) || {}).face?.some((l) => l.g));
+  for (const fn of t._ls.focus || []) fn({ type: 'focus', target: t });
+  assert.ok(api.previewOpen(), 'focus opens the preview');
+  assert.equal(t.attrs['aria-describedby'], 'card-preview', 'the card is described by the preview');
+  const pv = root.querySelectorAll('.card-preview')[0];
+  assert.equal(pv.attrs.id, 'card-preview');
+  const card = api.snapGet().hand.find((c) => c.slot === t.attrs['data-slot']);
+  const text = pv.querySelector('.cp-text');
+  assert.equal(text.kids.map((k) => k.txt).join(''), card.description, 'preview carries the full sentence');
+  assert.ok(pv.querySelectorAll('.cp-glyph').length >= 1, 'preview names and explains each glyph');
+  for (const fn of docLs.keydown || []) fn({ key: 'Escape' });
+  assert.equal(api.previewOpen(), false, 'Esc closes');
+  assert.equal(t.attrs['aria-describedby'], undefined);
+});
