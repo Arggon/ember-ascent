@@ -3879,18 +3879,31 @@ html, body {
      size), so the hand never changes height and the fight above never moves. The cost orb
      sits inside the card's corner: the card clips overflow, and at -6px only a sliver showed. */
 .stage-combat .card .cd-face { display: none; }
+/* The cost orb inside the card's top-left corner at every size: the combat card clips its
+   overflow, so the old -6px offset left only a sliver of the orb (and of its digit). */
+.stage-combat .card .cost-gem { top: 2px; left: 2px; }
+.stage-combat .card .ctype { padding-left: 30px; }
+@media (max-width: 760px), (max-height: 480px) { .stage-combat .card .ctype { padding-left: 22px; } }
+@media (min-width: 761px) and (min-height: 481px) { .stage-combat .hand { padding-top: 24px; } }
+@media (min-width: 1000px) and (max-height: 480px) { .stage-combat .hand { padding-top: 16px; } }
+@media (max-width: 340px) and (max-height: 760px) and (orientation: portrait) {
+  /* 320px: the five cards barely overlap, so each face line (glyph + number + ALL) fits. */
+  .stage-combat .hand { padding-left: 2px; padding-right: 2px; }
+  .stage-combat .hand > .card-wrap { margin: 0 -3px; }
+  .stage-combat .card { padding-left: 1px; padding-right: 1px; }
+}
 @media (max-width: 700px) and (max-height: 760px) and (orientation: portrait) {
   .stage-combat .card .cd-full { display: none; }
   .stage-combat .card .cd-face { display: flex; flex-direction: column; align-items: center; gap: 0; }
   .stage-combat .card .cdesc { display: block; -webkit-line-clamp: unset; overflow: visible; line-height: 1.15; font-size: 0.8rem; align-content: start; }
   .stage-combat .card { height: 7.4rem; max-height: none; padding: 4px 2px 3px; align-content: start; }
-  .stage-combat .card .cost-gem { top: 2px; left: 2px; }
-  .stage-combat .card .ctype { padding-left: 18px; }
+  .stage-combat .card { min-width: 0; grid-template-columns: minmax(0, 1fr); transform: none; }
+  .stage-combat .card .ctype { min-width: 0; overflow: hidden; padding-left: 18px; }
 }
-.cd-face .fl { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; column-gap: 2px; line-height: 1.15; white-space: nowrap; }
+.cd-face .fl { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; column-gap: 1px; line-height: 1.15; white-space: nowrap; }
 .cd-face .fl-t { display: block; white-space: normal; text-align: center; font-size: 0.8rem; }
 .cd-face .fn { font-family: var(--rules); font-size: 0.8rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
-.cd-face .fall { font-family: var(--rules); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; color: #ffcf8a; }
+.cd-face .fall { font-family: var(--rules); font-size: 0.8rem; font-weight: 800; letter-spacing: 0; color: #ffcf8a; }
 .fg { display: inline-grid; place-items: center; flex: none; width: 1.0667rem; height: 1.0667rem; }
 .fg svg { width: 100%; height: 100%; overflow: visible; }
 .fg .m { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }

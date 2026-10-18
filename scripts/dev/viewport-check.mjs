@@ -185,12 +185,13 @@ const LONGEST_HAND_CHECK = `(async () => {
   const vw = innerWidth;
   const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize);
   const k = rootPx / 15; // 1 at 100% text (root 15px), 1.3 at 130%
-  const maxLines = vw <= 340 ? 4 : 3;
+  const maxLines = Math.min(vw, screen.width || vw) <= 340 ? 4 : 3; // 320px: 4 only as the fallback
   const allInViewNow = () => { const hand = document.querySelector('.stage-combat .hand');
     return hand.scrollWidth <= hand.clientWidth + 1 && cardsNow().every((c) => { const r = c.getBoundingClientRect(); return r.left >= -0.5 && r.right <= vw + 0.5; }); };
   const box = () => { const f = document.querySelector('.page-combat .fight').getBoundingClientRect(), h = document.querySelector('.stage-combat .hero .fig'), hr = h ? h.getBoundingClientRect() : { top: 0 };
     return [f.top, f.bottom, hr.top].map(Math.round); };
-  const allInView = snap.hand.length <= 5 ? allInViewNow() : null;
+  const fixtureHand = cardsNow().length !== snap.hand.length; // the max-hand fixture cloned tiles
+  const allInView = snap.hand.length <= 5 && !fixtureHand ? allInViewNow() : null;
   const before = box();
   const d = await import(new URL('../kernel/describe.js', location.href));
   const raw = await (await fetch(new URL('../kernel/content/cards.json', location.href))).json();
@@ -218,10 +219,10 @@ const LONGEST_HAND_CHECK = `(async () => {
     dlb.render();
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const b = box(); if (b.some((v, i) => Math.abs(v - before[i]) > 1)) moved.push(batch[0].id + ' batch: ' + b.join(','));
-    if (at === 0) fiveInView = n === 5 ? allInViewNow() : null;
+    if (at === 0) { await new Promise((r) => setTimeout(r, 700)); fiveInView = n === 5 && !fixtureHand ? allInViewNow() : null; }
     cardsNow().forEach((c, i) => {
       const id = batch[i].id;
-      heights.add(Math.round(c.getBoundingClientRect().height));
+      heights.add(c.offsetHeight); // layout height: a fanned card's rotated box is taller
       const cr = c.getBoundingClientRect(); const cs = getComputedStyle(c);
       const face = c.querySelector('.cd-face');
       if (!face || getComputedStyle(face).display === 'none') { unfit.push(id + ' (no card face shown)'); return; }
