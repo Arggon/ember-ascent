@@ -2413,8 +2413,9 @@ html, body {
 #hud .btn.new-run { display: none; }
 /* #53 P1-3: at 320px with 130% text the one-line "New Run" pushed the HUD to 352px, so the
    whole page was wider than the screen (and End Turn fell below the visible bottom). Below
-   381px its label wraps to two short lines instead. */
-@media (max-width: 380px) {
+   421px its label wraps to two short lines instead (from 381 to 420 that also keeps room
+   for the full hero name once Help got its 44px minimum, r2 P2-7). */
+@media (max-width: 420px) {
   #hud .btn.hud-new { white-space: normal; line-height: 1.05; width: min-content; padding-left: 4px; padding-right: 4px; flex: 0 0 auto; }
   #hud .btn { min-width: 44px; }
 }

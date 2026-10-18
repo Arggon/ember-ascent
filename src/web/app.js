@@ -2031,8 +2031,9 @@ if (typeof document.addEventListener === 'function') {
     swallowUntil = 0;
     if (!previewEl || previewEl.contains(ev.target) || (previewTile && previewTile.contains(ev.target))) return;
     // A tap outside a touch preview only closes it: it does not also play or press.
-    if (previewSticky) swallowUntil = Date.now() + SWALLOW_MS;
-    hidePreview();
+    const sticky = previewSticky;
+    hidePreview(); // clears any swallow, so the new one is set after it
+    if (sticky) swallowUntil = Date.now() + SWALLOW_MS;
   }, true);
   const unswallow = () => { if (swallowUntil) setTimeout(() => { swallowUntil = 0; }, 0); };
   document.addEventListener('pointercancel', () => { swallowUntil = 0; }, true);

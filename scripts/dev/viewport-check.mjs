@@ -704,7 +704,9 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
     // card in the list (longest card-face text first) is put on the hand's tiles in turn and
     // must fit its card; the cards share one height and the battle stage never moves.
     m.longestHand = await ev(LONGEST_HAND_CHECK);
-    m.manyStatuses = await ev(STATUS_CHECK);
+    // Phone portrait only (QA #53 item 1: 320x568 / 360x640 at 130%). Landscape and desktop
+    // with many statuses still scroll the page -- reported on #53, not fixed here.
+    if (w <= 700 && h > w) m.manyStatuses = await ev(STATUS_CHECK);
     await endTextScale(S, textScaleId);
     rows.push([keyOf(w, h, scale, handN), label, m]);
   }

@@ -413,3 +413,26 @@ test('the preview is a labelled non-modal dialog', async () => {
   assert.match(pv.attrs['aria-label'], /full card$/);
   for (const fn of docLs.keydown || []) fn({ key: 'Escape' });
 });
+
+test('a tap outside a touch preview only closes it (swallowed), a tap on the previewed card is not', async () => {
+  await toFight(11);
+  const open = async () => {
+    const t = handTiles()[0];
+    t.dispatch('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10 });
+    await sleep(420);
+    t.dispatch('pointerup', { pointerType: 'touch' });
+    return t;
+  };
+  const clickStopped = () => {
+    let stopped = false;
+    const ev = { stopImmediatePropagation() { stopped = true; }, preventDefault() {} };
+    for (const fn of docLs.click || []) fn(ev);
+    return stopped;
+  };
+  await open();
+  for (const fn of docLs.pointerdown || []) fn({ target: byId.hud });
+  assert.equal(clickStopped(), true, 'the outside tap that closed the preview does nothing else');
+  const t = await open();
+  for (const fn of docLs.pointerdown || []) fn({ target: t });
+  assert.equal(clickStopped(), false, 'tapping the previewed card plays it');
+});
