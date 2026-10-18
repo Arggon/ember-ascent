@@ -3552,12 +3552,30 @@ html, body {
 .boon-text { font-size: 0.86rem; line-height: 1.3; }
 .boon-text .kw { color: #f5c542; font-weight: 700; }
 .boon-text .kw-cost { color: #ff7a5a; }
+/* #40: the price on its own line, labelled, in the cost colour; never clipped. */
+.boon-cost { font-size: 0.86rem; line-height: 1.3; color: #ff9a7a; font-weight: 700; }
+.boon-cost-label { color: #ff7a5a; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.8em; }
 @media (max-height: 480px) {
   .kindling { gap: 3px; }
   .kindling-head { font-size: var(--fs-4); }
   .kindling-note { display: none; }
   .boon { min-height: 0; padding: 6px 8px; }
-  .boon-text { font-size: 0.76rem; }
+  /* #52 review: three 200px boons + gaps need 620px and the landscape plate gives 618, so
+     the third wrapped below the fold (Ash Purge at 915x412 / 844x390). 180px fits three. */
+  .kindling .boon { flex-basis: 180px; }
+  .boon-text, .boon-cost { font-size: 0.76rem; }
+}
+/* #40: on phones every boon, cost line included, must be on screen before the pick (it
+   was 0-1 boons fully visible at 360x640 with 130% text). The forge plate and the note
+   give way; boons get tighter padding. */
+@media (max-width: 620px) {
+  .kindling .boon-list { gap: 6px; }
+  .kindling .boon { min-height: 0; padding: 6px 10px; gap: 2px; flex-basis: 100%; }
+  .kindling .kindling-note { display: none; }
+  .kindling .kindling-head { font-size: var(--fs-4); }
+}
+@media (max-width: 620px) and (max-height: 700px) {
+  .kindling .scene-illus { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .boon { transition: none; } .boon:hover { transform: none; } }
 
