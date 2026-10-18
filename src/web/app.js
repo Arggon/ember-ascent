@@ -2007,6 +2007,8 @@ let glyphTipsSeen = new Set();
 let glyphTipEl = null;
 function maybeGlyphTip() {
   if (pressHintEl) return;
+  // Never over a dialog (help / pile view): the tip waits for the next combat paint.
+  if (typeof document.querySelector === 'function' && document.querySelector('.modal-back, .pile-back')) return;
   if (!snap || snap.phase !== 'combat' || typeof document.querySelector !== 'function') return;
   const fresh = [...document.querySelectorAll('.stage-combat .hand .fl[data-glyph]')]
     .find((n) => faceGlyph(n.getAttribute('data-glyph')).status && !glyphTipsSeen.has(n.getAttribute('data-glyph')) && n.getClientRects && n.getClientRects().length);
