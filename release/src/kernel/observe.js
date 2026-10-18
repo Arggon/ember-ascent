@@ -24,6 +24,8 @@ import { QUESTS } from './rules/quests.js';
 // of the abbreviations that describe.js explains.
 import {
   describeCard,
+  cardFaceLines,
+  FACE_GLYPHS,
   describeIntent,
   describePlayability,
   describePower,
@@ -416,6 +418,8 @@ export function snapshot(state) {
       // Both read the TEMPERED definition, so a Red-hot Hammerfall says "Deal 9 damage."
       summary: effectSummary(def),
       description: describeCard(def, card) + (hpCost > 0 ? ` Lose ${hpCost} HP when played.` : ''),
+      // #29: the same rule cut to fit a 72px hand card (src/web shows it on short phones).
+      face: cardFaceLines(def, card, hpCost),
       playable,
       // The engine's own answer to "may this card be aimed?" — so a renderer never has to
       // infer it from the card type (Defend is type 'skill', Bash is 'attack', but the
@@ -563,6 +567,8 @@ export function snapshot(state) {
     cardTypes: CARD_TYPE_LABEL,
     glossary: glossary(),
     glossarySections: GLOSSARY_SECTIONS,
+    // #29/#53: names and meanings of the card-face glyphs (preview, legend, first-sight tip).
+    faceGlyphs: FACE_GLYPHS,
     help: helpTopics(),
     // Legal actions, verbatim from the kernel, so a view can label its buttons without
     // inventing an id. Includes the R5 line text for parity with the CLI surface.
