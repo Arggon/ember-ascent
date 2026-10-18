@@ -1934,7 +1934,7 @@ function showPreview(tile, card, desc, sticky = false) {
   }
   const type = card.typeLabel || card.type;
   const close = el('button', { cls: 'cp-close', text: '×', attrs: { type: 'button', 'aria-label': 'Close preview', title: 'Close' } });
-  close.addEventListener('click', (ev) => { ev.stopPropagation(); hidePreview(); });
+  close.addEventListener('click', (ev) => { if (ev && ev.stopPropagation) ev.stopPropagation(); hidePreview(); });
   previewEl = el('div', { cls: `card-preview type-${card.type}`, attrs: { id: 'card-preview', role: 'tooltip' } },
     el('span', { cls: 'cp-head' },
       el('span', { cls: 'cp-name', text: card.name }),

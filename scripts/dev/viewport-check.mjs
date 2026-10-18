@@ -209,7 +209,8 @@ const LONGEST_HAND_CHECK = `(async () => {
   const orig = snap.hand.map((c) => ({ ...c }));
   const n = Math.min(5, snap.hand.length);
   const unfit = []; const moved = []; const over = []; const small = []; const heights = new Set(); const lines = {};
-  const nameOrb = []; const nameClip = []; const orbMark = []; const missing = [];
+  const nameOrb = []; const nameClip = []; const orbMark = []; const missing = []; const preview = [];
+  const checkPreview = vw <= 360; // P1-5: every card's preview must fit with no scroll here
   const inter = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
   let fiveInView = null;
   const lineCount = (c) => {
@@ -262,10 +263,30 @@ const LONGEST_HAND_CHECK = `(async () => {
       for (const fg of face.querySelectorAll('.fg')) { const r = fg.getBoundingClientRect(); if (Math.min(r.width, r.height) < 16 * k - 0.5) small.push(id + ' glyph ' + Math.round(r.width) + 'px'); }
       for (const t of face.querySelectorAll('.fn, .fall, .fl-t')) { const px = parseFloat(getComputedStyle(t).fontSize); if (px < 12 * k - 0.05) small.push(id + ' text ' + px.toFixed(1) + 'px'); }
     });
+    if (checkPreview) {
+      for (const [i, c] of cardsNow().entries()) {
+        const id = batch[i].id; const r = c.getBoundingClientRect();
+        c.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+        await new Promise((res) => setTimeout(res, 380));
+        c.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'touch', bubbles: true }));
+        await new Promise((res) => setTimeout(res, 220)); // past the 160ms zoom-in
+        const pv = document.querySelector('.card-preview');
+        if (!pv) { preview.push(id + ' no preview'); continue; }
+        const pr = pv.getBoundingClientRect();
+        const orbTop = Math.min(...cardsNow().map((x) => x.querySelector('.cost-gem').getBoundingClientRect().top));
+        const title = pv.querySelector('.cp-name');
+        if (pv.scrollHeight > pv.clientHeight + 1) preview.push(id + ' needs scroll ' + pv.scrollHeight + '>' + pv.clientHeight);
+        if (pr.top < -0.5 || pr.left < -0.5 || pr.right > vw + 0.5) preview.push(id + ' off screen');
+        if (pr.bottom > orbTop + 0.5) preview.push(id + ' covers a cost orb');
+        if (pv.offsetWidth !== Math.round(Math.min(vw - 16, 340))) preview.push(id + ' width ' + pv.offsetWidth);
+        if (title && title.getClientRects().length > 1) preview.push(id + ' title wraps');
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      }
+    }
   }
   snap.hand = orig; dlb.render();
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  return { before, moved, unfit, over, small: [...new Set(small)], heights: [...heights], allInView, fiveInView, maxLines, lines, checked: all.length, nameOrb, nameClip, orbMark, missing };
+  return { before, moved, unfit, over, small: [...new Set(small)], heights: [...heights], allInView, fiveInView, maxLines, lines, checked: all.length, nameOrb, nameClip, orbMark, missing, preview };
 })()`;
 if (!SIZES_SEL.length) { console.error('no sizes matched --sizes ' + sizesArg); process.exit(2); }
 
@@ -733,6 +754,7 @@ function evaluateRow(m) {
     if (L.nameOrb && L.nameOrb.length) fails.push(`card name overlaps the cost orb (name ∩ orb must be 0): ${L.nameOrb.join('; ')}`);
     if (L.nameClip && L.nameClip.length) fails.push(`card name clipped or not >= 2px below the header: ${L.nameClip.join('; ')}`);
     if (L.orbMark && L.orbMark.length) fails.push(`card type mark missing, under 12px or under the orb: ${[...new Set(L.orbMark)].slice(0, 8).join('; ')}`);
+    if (L.preview && L.preview.length) fails.push(`card preview does not fit (no scroll, clear of the orbs, min(vw-16,340) wide): ${L.preview.slice(0, 12).join('; ')}${L.preview.length > 12 ? ' …+' + (L.preview.length - 12) : ''}`);
     if (L.missing && L.missing.length) fails.push(`card face is missing a number or mark: ${L.missing.join('; ')}`);
     if (L.heights.length > 1) fails.push(`hand cards differ in height in the short-portrait layout: ${L.heights.join(', ')}px`);
     if (L.allInView === false || L.fiveInView === false) fails.push('short-portrait hand of 5 cards scrolls sideways or has a card out of view');

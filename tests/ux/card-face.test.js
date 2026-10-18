@@ -143,7 +143,7 @@ const nums = (s) => (s.replace(/ — [^.]*/g, '').match(/\d+/g) || []);
 const faceNums = (lines) => lines.flatMap((l) => (String(l.t ?? l.n ?? '').match(/\d+/g) || []));
 const RANK = { damage: 0, block: 0, weak: 1, vulnerable: 1, strength: 1, metallicize: 1, hp: 2, energy: 2, draw: 2, discard: 2 };
 const rowsOf = (face) => face.filter((l) => !('mark' in l));
-const TRIGGERS = ['Turn end:', 'Exhaust:', 'HP lost:', 'Each play:'];
+const TRIGGERS = ['Turn end:', 'Exhaust:', 'HP lost:', 'Played:'];
 /** Every legal (card, temper) pair: Red-hot only on cards that deal damage. */
 const VARIANTS = CARDS.flatMap((def) => [null, ...Object.keys(TEMPERS)]
   .filter((t) => t !== 'redhot' || def.effects.some((e) => e.verb === 'damage'))
@@ -218,12 +218,13 @@ test('one effect per line, damage/block, then statuses, then resources; ALL only
       const ranks = g.map((l) => RANK[l.g]);
       assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b), `${def.id}: order ${JSON.stringify(face)}`);
     }
-    for (const l of g) if (l.all) assert.ok(def.effects.some((e) => e.target === 'all_enemies') || /ALL/.test(describeCard(def)), `${def.id}: ALL tag without an all-enemy effect`);
+    for (const l of g) if (l.all) assert.ok(def.effects.some((e) => e.target === 'all_enemies' || e.to === 'all_enemies') || /ALL/.test(describeCard(def)), `${def.id}: ALL tag without an all-enemy effect`);
     assert.ok(face.length <= 3, `${def.id}: ${face.length} face lines`);
   }
   assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'uppercut')), [{ g: 'damage', n: '13' }, { g: 'weak', n: '+1' }, { g: 'vulnerable', n: '+1' }]);
-  // Matches the engine today: Forgeclap's Vulnerable goes to one enemy (no ALL). See #56.
-  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'thunderclap')), [{ g: 'damage', n: '4', all: true }, { g: 'vulnerable', n: '+1' }]);
+  // #56: Forgeclap and Heat Wash give their statuses to ALL living enemies; the face says so.
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'thunderclap')), [{ g: 'damage', n: '4', all: true }, { g: 'vulnerable', n: '+1', all: true }]);
+  assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'shockwave')), [{ g: 'weak', n: '+3', all: true }, { g: 'vulnerable', n: '+3', all: true }]);
   assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'offering')), [{ g: 'hp', n: '-6' }, { g: 'energy', n: '+2' }, { g: 'draw', n: '+3' }]);
   assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'combust')), [{ t: 'Turn end:', trig: true }, { g: 'damage', n: '1', all: true, under: true }, { g: 'hp', n: '-1', under: true }]);
   assert.deepEqual(cardFaceLines(CARDS.find((c) => c.id === 'pummel')), [{ g: 'damage', n: '2×4' }, { mark: 'exhaust' }]);

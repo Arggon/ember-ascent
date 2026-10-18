@@ -366,7 +366,7 @@ const CUSTOM_FACE = {
   dark_embrace: () => ({ trig: { t: 'Exhaust:', lines: [g('draw', 1)] } }),
   feel_no_pain: () => ({ trig: { t: 'Exhaust:', lines: [g('block', 1)] } }),
   rupture: () => ({ trig: { t: 'HP lost:', lines: [g('strength', 1)] } }),
-  rampage: (inst) => ({ now: [g('damage', 8 + (inst.perPlay || 0))], trig: { t: 'Each play:', lines: [g('damage', '+5')] } }),
+  rampage: (inst) => ({ now: [g('damage', 8 + (inst.perPlay || 0))], trig: { t: 'Played:', lines: [g('damage', '+5')] } }),
 };
 
 /** Merge repeated glyphs (#53 P1-2): two "+1 draw" lines become one "+2". */

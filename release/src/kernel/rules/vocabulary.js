@@ -193,7 +193,6 @@ export const VOCABULARY = {
     }
     const idx = ctx.targetEnemyIndex ?? 0;
     const enemies = state.combat.enemies;
-    if (!enemies[idx]) return { state, events: [] };
     if (params.to === 'all_enemies') {
       const out = enemies.map((e) => (e.dead ? e : addStatus(e, params.status, params.amount)));
       return {
@@ -201,6 +200,9 @@ export const VOCABULARY = {
         events: [{ t: 'status', who: 'enemies', status: params.status, stacks: params.amount }],
       };
     }
+    if (!enemies[idx]) return { state, events: [] };
+    // A status never lands on a dead enemy (a stale target index, or enemy 0 already slain).
+    if (enemies[idx].dead) return { state, events: [] };
     return {
       state: { ...state, combat: { ...state.combat, enemies: enemies.map((e, i) => (i === idx ? addStatus(e, params.status, params.amount) : e)) } },
       events: [{ t: 'status', who: 'enemy', index: idx, status: params.status, stacks: params.amount }],
