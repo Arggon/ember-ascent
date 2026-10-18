@@ -143,7 +143,7 @@ const nums = (s) => (s.replace(/ — [^.]*/g, '').match(/\d+/g) || []);
 const faceNums = (lines) => lines.flatMap((l) => (String(l.t ?? l.n ?? '').match(/\d+/g) || []));
 const RANK = { damage: 0, block: 0, weak: 1, vulnerable: 1, strength: 1, metallicize: 1, hp: 2, energy: 2, draw: 2, discard: 2 };
 const rowsOf = (face) => face.filter((l) => !('mark' in l));
-const TRIGGERS = ['Turn end:', 'Exhaust:', 'HP lost:', 'Played:'];
+const TRIGGERS = ['Turn end:', 'Exhaust:', 'HP lost:', 'Grows:'];
 /** Every legal (card, temper) pair: Red-hot only on cards that deal damage. */
 const VARIANTS = CARDS.flatMap((def) => [null, ...Object.keys(TEMPERS)]
   .filter((t) => t !== 'redhot' || def.effects.some((e) => e.verb === 'damage'))
@@ -208,6 +208,10 @@ test('the four misread tempered faces now read right (#53 P1-2)', () => {
   assert.deepEqual(f('dark_embrace', 'balanced'), [{ g: 'draw', n: '+1' }, { t: 'Exhaust:', trig: true }, { g: 'draw', n: '+1', under: true }, { mark: 'exhaust' }]);
   assert.deepEqual(f('offering', 'balanced'), [{ g: 'hp', n: '-6' }, { g: 'energy', n: '+2' }, { g: 'draw', n: '+4' }, { mark: 'exhaust' }]);
   assert.deepEqual(f('uppercut', 'balanced').length, 5); // 4 rows + the corner mark
+  // r2: the heal sentence stays under its damage line; the temper's line comes after it.
+  assert.deepEqual(f('reaper', 'quenched'), [{ g: 'damage', n: '4', all: true }, { t: 'Heal that much' }, { g: 'block', n: '+3' }]);
+  assert.deepEqual(f('reaper', 'balanced'), [{ g: 'damage', n: '4', all: true }, { t: 'Heal that much' }, { g: 'draw', n: '+1' }, { mark: 'exhaust' }]);
+  assert.deepEqual(f('rampage', 'quenched').slice(2), [{ t: 'Grows:', trig: true }, { g: 'damage', n: '+5', under: true }]);
 });
 
 test('one effect per line, damage/block, then statuses, then resources; ALL only for all-enemy hits', () => {
@@ -289,7 +293,7 @@ test('touch: a long press opens the preview, it STAYS open after release (which 
   t2.dispatch('pointerup', { pointerType: 'touch' });
   t2.dispatch('click');
   const played = api.snapGet();
-  assert.ok(played.hand.length < handN || played.pending || (played.player?.energy ?? played.energy) !== energy || api.snapGet() !== after, 'a plain tap plays (or aims) the card');
+  assert.ok(played.hand.length < handN || played.pending || (played.player?.energy ?? played.energy) !== energy, 'a plain tap plays (or aims) the card');
 });
 
 test('Esc and a tap outside close the preview', async () => {
@@ -326,6 +330,11 @@ test('the long-press hint shows once per profile, on the first battle hand, and 
 test('keyboard: focusing a card opens its preview (full text + glyph names); no aria-describedby (the label already says it); Esc closes', async () => {
   await toFight(11);
   const t = handTiles().find((x) => (api.snapGet().hand.find((c) => c.slot === x.attrs['data-slot']) || {}).face?.some((l) => l.g));
+  // A focus that follows a pointer (a re-render after a touch tap, e.g. End Turn) never opens it.
+  for (const fn of docLs.pointerdown || []) fn({ target: byId.hud });
+  for (const fn of t._ls.focus || []) fn({ type: 'focus', target: t });
+  assert.equal(api.previewOpen(), false, 'focus after a touch/pointer input does not open a preview');
+  for (const fn of docLs.keydown || []) fn({ key: 'Tab' });
   for (const fn of t._ls.focus || []) fn({ type: 'focus', target: t });
   assert.ok(api.previewOpen(), 'focus opens the preview');
   assert.equal(t.attrs['aria-describedby'], undefined, 'the label carries the sentence; the visual glyph key is not read twice');
@@ -338,4 +347,69 @@ test('keyboard: focusing a card opens its preview (full text + glyph names); no 
   for (const fn of docLs.keydown || []) fn({ key: 'Escape' });
   assert.equal(api.previewOpen(), false, 'Esc closes');
   assert.equal(t.attrs['aria-describedby'], undefined);
+});
+
+test('a preview closed by a drag leaves no dead tap: the next tap still acts', async () => {
+  await toFight(11);
+  const t = handTiles()[0];
+  t.dispatch('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10 });
+  await sleep(420);
+  t.dispatch('pointerup', { pointerType: 'touch' });
+  assert.ok(api.previewOpen());
+  // Dismiss by a drag on the stage: pointerdown outside, then pointercancel, and NO click.
+  for (const fn of docLs.pointerdown || []) fn({ target: byId.hud });
+  for (const fn of docLs.pointercancel || []) fn({ target: byId.hud });
+  assert.equal(api.previewOpen(), false);
+  assert.equal(t._lp, false, 'gesture state cleared on close');
+  // The next real tap: a fresh pointerdown, then its click, must NOT be swallowed.
+  for (const fn of docLs.pointerdown || []) fn({ target: t });
+  let stopped = false;
+  const ev = { stopImmediatePropagation() { stopped = true; }, preventDefault() {} };
+  for (const fn of docLs.click || []) fn(ev);
+  assert.equal(stopped, false, 'the next tap after a drag-dismiss acts');
+});
+
+test('glyph tips are remembered for the profile (once ever, not per run)', async () => {
+  localStorage.setItem('dlb.pressHint.v1', '1');
+  delete localStorage._d['dlb.glyphTips.v1'];
+  await toFight(11);
+  await sleep(800);
+  const seen = JSON.parse(localStorage.getItem('dlb.glyphTips.v1') || '[]');
+  // A new run does not forget them.
+  await toFight(12);
+  await sleep(800);
+  const after = JSON.parse(localStorage.getItem('dlb.glyphTips.v1') || '[]');
+  for (const k of seen) assert.ok(after.includes(k), 'still remembered after a new run: ' + k);
+});
+
+test('an unknown status gets the neutral glyph plus its name, never another status glyph', () => {
+  const face = cardFaceLines({ effects: [{ verb: 'status', status: 'frail', amount: 2, to: 'enemy' }] });
+  assert.deepEqual(face, [{ g: 'status', n: '+2', label: 'frail' }]);
+});
+
+test('reviewer: an outside touch that turns into a scroll (pointercancel, no click) never swallows the next tap', async () => {
+  await toFight(11);
+  const t = handTiles()[0];
+  t.dispatch('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10 });
+  await sleep(420);
+  t.dispatch('pointerup', { pointerType: 'touch' });
+  for (const fn of docLs.pointerdown || []) fn({ target: byId.hud });
+  for (const fn of docLs.pointercancel || []) fn({ target: byId.hud });
+  let stopped = false;
+  const ev = { stopImmediatePropagation() { stopped = true; }, preventDefault() {} };
+  for (const fn of docLs.click || []) fn(ev); // the next tap's click, with no pointerdown seen
+  assert.equal(stopped, false, 'pointercancel cleared the swallow');
+});
+
+test('the preview is a labelled non-modal dialog', async () => {
+  await toFight(11);
+  const t = handTiles()[0];
+  t.dispatch('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 10 });
+  await sleep(420);
+  t.dispatch('pointerup', { pointerType: 'touch' });
+  const pv = root.querySelectorAll('.card-preview')[0];
+  assert.equal(pv.attrs.role, 'dialog');
+  assert.equal(pv.attrs['aria-modal'], 'false');
+  assert.match(pv.attrs['aria-label'], /full card$/);
+  for (const fn of docLs.keydown || []) fn({ key: 'Escape' });
 });

@@ -560,6 +560,8 @@ const GLYPHS = {
   'f-energy': { box: '0 0 20 20', body: '<path class="mf" d="M11.6 1.6 L4.4 11 H9.4 L8 18.4 L15.6 8.6 H10.6 Z"/>' },
   'f-hp': { box: '0 0 20 20', body: '<path class="mf" d="M10 17.6 C4.6 13.6 2.4 10.6 2.4 7.6 C2.4 5 4.4 3.2 6.6 3.2 C8.2 3.2 9.4 4.2 10 5.4 C10.6 4.2 11.8 3.2 13.4 3.2 C15.6 3.2 17.6 5 17.6 7.6 C17.6 10.6 15.4 13.6 10 17.6 Z"/><path class="cut" d="M6.6 9.6 H13.4"/>' },
   'f-discard': { box: '0 0 20 20', body: '<path class="m" d="M4.4 5.6 L12.2 3.4 L15.6 15.6 L7.8 17.8 Z"/><path class="m" d="M17 3 L19 5 M19 3 L17 5"/>' },
+  // Neutral fallback for a status the face has no glyph for (#53 review): a plain diamond.
+  'f-status': { box: '0 0 20 20', body: '<path class="m" d="M10 3 L17 10 L10 17 L3 10 Z"/><circle class="mf" cx="10" cy="10" r="2"/>' },
   'f-exhaust': { box: '0 0 20 20', body: '<path class="mf" d="M10 18.6 C5 16 5.6 11.2 8.4 7.6 C8.8 10.2 11 10.4 11 7.6 C11 5.4 10 3.6 9 1.6 C14.4 4.2 16.4 9.6 15 13.6 C14.2 16.2 12.4 17.8 10 18.6 Z"/><path class="cut" d="M8.4 15.2 C9.6 15.8 11 15.6 12 14.4"/>' },
   // --- enemy illustrations (art-direction rev): forged-iron woodcut. Three layers per
   //     creature: `.b` body (near-black iron), `.r` rim light (currentColor = the creature's
@@ -887,7 +889,6 @@ const sumEnemyHp = (s) => s.enemies.reduce((n, e) => n + e.hp, 0);
  *   not replay the act title card
  */
 function newGame(seed = null, opts = {}) {
-  glyphTipsSeen = new Set();
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
   // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
@@ -1851,11 +1852,21 @@ function enemyCard(e, position) {
     card.append(bb);
   }
   const fresh = freshStatusKeys(e.statuses);
-  const statuses = e.statuses.map((s) => el('span', {
-    cls: `pill ${s.key}` + (fresh.has(s.key) ? ' juice-in' : ''),
-    text: s.text || `${s.label} ${s.stacks}`,
-    attrs: { title: s.explain || '' },
-  }));
+  // #53 (QA): "Strength 2 — your attacks deal 2 more damage" grew the fight panel on turn 2
+  // and pushed End Turn off a 320/360 phone. The pill keeps its short head ("Strength 2")
+  // and its explanation in a second span that short phones hide (the title and the enemy's
+  // aria-label still carry it).
+  const statuses = e.statuses.map((s) => {
+    const full = s.text || `${s.label} ${s.stacks}`;
+    const cut = full.indexOf(' — ');
+    const pill = el('span', {
+      cls: `pill ${s.key}` + (fresh.has(s.key) ? ' juice-in' : ''),
+      attrs: { title: s.explain || full },
+    });
+    if (cut > 0) pill.append(el('span', { cls: 'ps-head', text: full.slice(0, cut) }), el('span', { cls: 'ps-rest', text: full.slice(cut) }));
+    else pill.textContent = full;
+    return pill;
+  });
   if (statuses.length > 0) card.append(el('div', { cls: 'e-statuses' }, ...statuses));
   card.append(efxBox(e.index));
   // The sentence stays readable under the figure. The badge above is the scaled glyph.
@@ -1890,9 +1901,10 @@ function faceNode(lines) {
     }
     if (l.t) { node.append(keywordText(el('span', { cls: 'fl fl-t' + (l.trig ? ' fl-trig' : '') + (l.under ? ' fl-under' : '') }), l.t)); continue; }
     const info = faceGlyph(l.g);
-    const line = el('span', { cls: `fl fl-${l.g}` + (l.under ? ' fl-under' : ''), attrs: { title: `${info.label}: ${info.meaning}`, 'data-glyph': l.g } },
+    const line = el('span', { cls: `fl fl-${l.g}` + (l.under ? ' fl-under' : ''), attrs: { title: `${l.label || info.label}: ${info.meaning}`, 'data-glyph': l.g } },
       glyphBox(`f-${l.g}`, `fg fg-${l.g}`));
     if (l.n) line.append(el('span', { cls: 'fn', text: l.n }));
+    if (l.label) line.append(el('span', { cls: 'flabel', text: l.label }));
     if (l.all) line.append(el('span', { cls: 'fall', text: 'ALL' }));
     node.append(line);
   }
@@ -1908,11 +1920,20 @@ let previewTile = null;
 /** Set when a touch long-press opened the preview: it then stays open after the release,
  *  until a tap outside (which only closes it, it does not also act) or its X button. */
 let previewSticky = false;
-let swallowClick = false;
+/** The click that follows a dismissing tap is swallowed, but only within this window: a
+ *  dismissal by drag fires no click, and the NEXT real tap must still act (#53 r2). */
+const SWALLOW_MS = 500;
+let swallowUntil = 0;
 
+/** Every close path ends here, and clears the gesture state with it. */
 function hidePreview() {
+  swallowUntil = 0;
+  if (previewTile) previewTile._lp = false;
+  const back = previewEl && previewTile && typeof previewEl.contains === 'function' && typeof document.activeElement !== 'undefined' && previewEl.contains(document.activeElement) ? previewTile : null;
   if (previewEl) { previewEl.remove(); previewEl = null; previewTile = null; }
   previewSticky = false;
+  // Focus was inside the preview (its ×): it goes back to the card the preview belongs to.
+  if (back && typeof back.focus === 'function') back.focus();
 }
 
 /**
@@ -1923,19 +1944,22 @@ function hidePreview() {
  */
 function showPreview(tile, card, desc, sticky = false) {
   hidePreview();
-  const rows = (Array.isArray(card.face) ? card.face : []).filter((l) => l.g || l.mark).map((l) => l.g || l.mark);
+  const rows = (Array.isArray(card.face) ? card.face : []).filter((l) => l.g || l.mark);
   const seen = new Set();
   const legend = el('span', { cls: 'cp-glyphs' });
-  for (const key of rows) {
-    if (seen.has(key)) continue; seen.add(key);
+  for (const l of rows) {
+    const key = l.g || l.mark;
     const info = faceGlyph(key);
+    const label = l.label || info.label;
+    if (seen.has(key + label)) continue; seen.add(key + label);
     legend.append(el('span', { cls: `cp-glyph cp-${key}`, attrs: { title: info.meaning } }, glyphBox(`f-${key}`, `fg fg-${key}`),
-      el('span', { cls: 'cp-gtext', text: info.label })));
+      el('span', { cls: 'cp-gtext', text: label })));
   }
   const type = card.typeLabel || card.type;
   const close = el('button', { cls: 'cp-close', text: '×', attrs: { type: 'button', 'aria-label': 'Close preview', title: 'Close' } });
   close.addEventListener('click', (ev) => { if (ev && ev.stopPropagation) ev.stopPropagation(); hidePreview(); });
-  previewEl = el('div', { cls: `card-preview type-${card.type}`, attrs: { id: 'card-preview', role: 'tooltip' } },
+  // A non-modal dialog (it holds a button): labelled by the card; focus stays where it was.
+  previewEl = el('div', { cls: `card-preview type-${card.type}`, attrs: { id: 'card-preview', role: 'dialog', 'aria-modal': 'false', 'aria-label': `${card.name}, full card` } },
     el('span', { cls: 'cp-head' },
       el('span', { cls: 'cp-name', text: card.name }),
       el('span', { cls: 'cp-meta', text: `${type} · ${card.cost} Energy` })),
@@ -1983,7 +2007,10 @@ function attachPreview(tile, card, desc) {
   // Keyboard: focusing a card opens its preview (keyboard focus only, not a mouse click's
   // focus); Esc closes it; moving focus away closes it.
   tile.addEventListener('focus', () => {
-    const kb = typeof tile.matches !== 'function' || tile.matches(':focus-visible');
+    // Only a REAL keyboard focus: the last input was a key, and the browser agrees it is a
+    // visible focus. A focus restored by a re-render after a touch tap (End Turn) never opens
+    // a preview (#53 QA).
+    const kb = lastInputKeyboard && (typeof tile.matches !== 'function' || tile.matches(':focus-visible'));
     if (kb) showPreview(tile, card, desc);
   });
   tile.addEventListener('blur', () => { if (previewTile === tile && !previewSticky) hidePreview(); });
@@ -1993,17 +2020,28 @@ function attachPreview(tile, card, desc) {
   }, true);
 }
 
+/** The last input was a keyboard key (not a pointer). */
+let lastInputKeyboard = false;
 if (typeof document.addEventListener === 'function') {
+  document.addEventListener('keydown', () => { lastInputKeyboard = true; }, true);
+  document.addEventListener('pointerdown', () => { lastInputKeyboard = false; }, true);
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && previewEl) hidePreview(); });
   document.addEventListener('pointerdown', (ev) => {
+    // A fresh press never inherits a swallow left by an earlier dismissal.
+    swallowUntil = 0;
     if (!previewEl || previewEl.contains(ev.target) || (previewTile && previewTile.contains(ev.target))) return;
     // A tap outside a touch preview only closes it: it does not also play or press.
-    if (previewSticky) swallowClick = true;
+    if (previewSticky) swallowUntil = Date.now() + SWALLOW_MS;
     hidePreview();
   }, true);
+  const unswallow = () => { if (swallowUntil) setTimeout(() => { swallowUntil = 0; }, 0); };
+  document.addEventListener('pointercancel', () => { swallowUntil = 0; }, true);
+  document.addEventListener('pointerup', unswallow, true);
   document.addEventListener('click', (ev) => {
-    if (!swallowClick) return;
-    swallowClick = false; ev.stopImmediatePropagation(); ev.preventDefault();
+    if (!swallowUntil) return;
+    const live = Date.now() < swallowUntil;
+    swallowUntil = 0;
+    if (live) { ev.stopImmediatePropagation(); ev.preventDefault(); }
   }, true);
 }
 
@@ -2047,9 +2085,25 @@ if (typeof document.addEventListener === 'function') {
   document.addEventListener('keydown', dismissPressHint, true);
 }
 
-/* First sight of a status glyph in a run: its explanation pops up once, over the stage. */
-const GLYPH_TIP_MS = 5500;
-let glyphTipsSeen = new Set();
+/* First sight of a status glyph in a run: its explanation pops up once, in the clear band
+   of the fight between the enemy intents and the HP lines, so it covers neither. */
+const GLYPH_TIP_MS = 4500;
+function clearBand() {
+  const vis = (s) => [...document.querySelectorAll(s)].filter((n) => n.getClientRects && n.getClientRects().length).map((n) => n.getBoundingClientRect());
+  const tops = vis('.stage-combat .intent-badge, .stage-combat .intent-line, .stage-combat .e-head');
+  const lows = vis('.stage-combat .ehp, .stage-combat .ename, .stage-combat .hpbar, .stage-combat .hero-name');
+  if (!tops.length || !lows.length) return null;
+  const top = Math.max(...tops.map((r) => r.bottom)) + 4;
+  const bottom = Math.min(...lows.filter((r) => r.top > top).map((r) => r.top), window.innerHeight) - 4;
+  return bottom > top ? { top, bottom } : null;
+}
+/* Each status glyph's tip shows once EVER per profile (localStorage), like the press hint. */
+const GLYPH_TIPS_KEY = 'dlb.glyphTips.v1';
+const glyphTipsSeen = {
+  get() { try { return new Set(JSON.parse(localStorage.getItem(GLYPH_TIPS_KEY) || '[]')); } catch { return new Set(); } },
+  has(k) { return this.get().has(k); },
+  add(k) { const s = this.get(); s.add(k); try { localStorage.setItem(GLYPH_TIPS_KEY, JSON.stringify([...s])); } catch {} },
+};
 let glyphTipEl = null;
 function maybeGlyphTip() {
   if (pressHintEl) return;
@@ -2070,7 +2124,10 @@ function maybeGlyphTip() {
   const vw = window.innerWidth; const w = Math.min(vw - 16, 300);
   glyphTipEl.style.width = `${w}px`;
   glyphTipEl.style.left = `${Math.round((vw - w) / 2)}px`;
-  glyphTipEl.style.bottom = `${hand ? popupBottom(hand) : 8}px`;
+  const band = clearBand();
+  const h = glyphTipEl.getBoundingClientRect ? glyphTipEl.getBoundingClientRect().height : 0;
+  if (band && h && h <= band.bottom - band.top) glyphTipEl.style.top = `${Math.round(band.top + (band.bottom - band.top - h) / 2)}px`;
+  else glyphTipEl.style.bottom = `${hand ? popupBottom(hand) : 8}px`;
   const tip = glyphTipEl;
   setTimeout(() => { tip.remove(); if (glyphTipEl === tip) glyphTipEl = null; }, GLYPH_TIP_MS);
 }
@@ -2988,6 +3045,8 @@ document.addEventListener('keydown', (ev) => {
 const capitalize = (s) => (typeof s === 'string' && s.length > 0 ? s[0].toUpperCase() + s.slice(1) : s);
 
 /** Expose the controller for a curious viewer (read-only use). Not required by the game. */
+// TEST-ONLY hooks (dev harnesses: viewport-check, card-face probes). `render` repaints from
+// the current snapshot so a harness can inject a hand; the game never calls it through here.
 window.__dlb = { controller: () => ctl, snapshot: () => snap, render: () => render() };
 
 render();

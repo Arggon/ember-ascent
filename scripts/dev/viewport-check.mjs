@@ -129,6 +129,8 @@ const MATRIX = [
   // #53: the smallest phone the card face is held to (4 face lines allowed there).
   [320, 568, 'phone-xs', 1, 0],
   [320, 568, 'phone-xs-font130', LARGE_FONT_SIZES[0][3], 0],
+  // r2: the name-neighbour and corner-mark checks at 412 with 100% text too.
+  [412, 915, 'galaxy-s25plus', 1, 0],
   ...HAND_SIZES.map(([w, h, label, n]) => [w, h, label, 1, n]),
   ...LARGE_FONT_SIZES.map(([w, h, label, scale]) => [w, h, label + '-hand10', scale, MAX_HAND]),
 ];
@@ -174,6 +176,23 @@ const GEM_CHECK = `(() => {
   hand.scrollLeft = start; window.scrollTo(0, 0);
   return bad;
 })()`;
+// #53 (QA): many statuses on every enemy (and the hero) must not push End Turn off screen.
+const STATUS_CHECK = `(async () => {
+  const dlb = window.__dlb; const snap = dlb && dlb.snapshot(); if (!snap || !snap.enemies) return null;
+  const orig = JSON.parse(JSON.stringify({ e: snap.enemies.map((e) => e.statuses), p: snap.player && snap.player.statuses }));
+  const many = [['strength', 'Strength', 'your attacks deal 2 more damage'], ['vulnerable', 'Vulnerable', 'it takes 50% more damage from attacks'], ['weak', 'Weak', 'its attacks deal 25% less damage'], ['metallicize', 'Metallicize', 'it gains 3 Block at the end of each turn']]
+    .map(([key, label, ex], i) => ({ key, label, stacks: i + 2, text: label + ' ' + (i + 2) + ' — ' + ex, explain: ex }));
+  for (const e of snap.enemies) e.statuses = many.map((s) => ({ ...s }));
+  if (snap.player && Array.isArray(snap.player.statuses)) snap.player.statuses = many.map((s) => ({ ...s }));
+  dlb.render(); await new Promise((r) => setTimeout(r, 400));
+  const et = [...document.querySelectorAll('button')].find((b) => /end turn/i.test(b.textContent || ''));
+  const r = et && et.getBoundingClientRect();
+  const vh = Math.min(innerHeight, visualViewport ? visualViewport.height : innerHeight);
+  const out = { endTurnBottom: r ? Math.round(r.bottom) : null, vh, pageScroll: document.documentElement.scrollHeight - innerHeight };
+  snap.enemies.forEach((e, i) => { e.statuses = orig.e[i]; }); if (snap.player && orig.p) snap.player.statuses = orig.p;
+  dlb.render(); await new Promise((r2) => setTimeout(r2, 200));
+  return out;
+})()`;
 // #53: the short-portrait card face, checked against EVERY card in the list. The real
 // renderer draws each batch (window.__dlb.render) from kernel data (cardFaceLines /
 // describeCard), longest faces first; the first batch is the 'longest' hand.
@@ -210,7 +229,8 @@ const LONGEST_HAND_CHECK = `(async () => {
   const n = Math.min(5, snap.hand.length);
   const unfit = []; const moved = []; const over = []; const small = []; const heights = new Set(); const lines = {};
   const nameOrb = []; const nameClip = []; const orbMark = []; const missing = []; const preview = [];
-  const checkPreview = vw <= 360; // P1-5: every card's preview must fit with no scroll here
+  const marks = []; const covered = []; const sticky = [];
+  const checkPreview = vw <= 420; // P1-5: every card's preview must fit with no scroll here
   const inter = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
   let fiveInView = null;
   const lineCount = (c) => {
@@ -259,8 +279,16 @@ const LONGEST_HAND_CHECK = `(async () => {
       const txt = face.textContent;
       for (const l of batch[i].face) if (l.n && !txt.includes(l.n)) missing.push(id + ' ' + l.g + ' ' + l.n);
       if (batch[i].face.some((l) => l.mark) && !face.querySelector('.fx-mark')) missing.push(id + ' corner exhaust mark');
+      // r2 P2-2: the corner flame and the temper stamp never overlap a text line's box.
+      const cornerBoxes = [...c.querySelectorAll('.fx-mark, .ctemper')].filter((x) => x.getClientRects().length).map((x) => [x.classList.contains('ctemper') ? 'stamp' : 'flame', x.getBoundingClientRect()]);
+      for (const fl of face.querySelectorAll('.fl')) { const fr = fl.getBoundingClientRect();
+        for (const [k2, br] of cornerBoxes) if (inter(fr, br) > 0) marks.push(id + ' ' + k2 + ' ∩ "' + fl.textContent + '"'); }
+      // r2 P2-5: no name is covered by its right-hand neighbour (which paints above it).
+      const next = cardsNow()[i + 1];
+      if (nm && next) { const rg3 = document.createRange(); rg3.selectNodeContents(nm); const nl = next.getBoundingClientRect().left;
+        for (const q of rg3.getClientRects()) if (q.width > 0.5 && q.right > nl + 0.5) { covered.push(id + ' "' + batch[i].name + '" under the next card by ' + Math.round(q.right - nl) + 'px'); break; } }
       if (lc > maxLines) over.push(id + ' ' + lc + ' lines');
-      for (const fg of face.querySelectorAll('.fg')) { const r = fg.getBoundingClientRect(); if (Math.min(r.width, r.height) < 16 * k - 0.5) small.push(id + ' glyph ' + Math.round(r.width) + 'px'); }
+      for (const fg of face.querySelectorAll('.fl .fg')) { const r = fg.getBoundingClientRect(); if (Math.min(r.width, r.height) < 16 * k - 0.5) small.push(id + ' glyph ' + Math.round(r.width) + 'px'); }
       for (const t of face.querySelectorAll('.fn, .fall, .fl-t')) { const px = parseFloat(getComputedStyle(t).fontSize); if (px < 12 * k - 0.05) small.push(id + ' text ' + px.toFixed(1) + 'px'); }
     });
     if (checkPreview) {
@@ -270,6 +298,11 @@ const LONGEST_HAND_CHECK = `(async () => {
         await new Promise((res) => setTimeout(res, 380));
         c.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'touch', bubbles: true }));
         await new Promise((res) => setTimeout(res, 220)); // past the 160ms zoom-in
+        // r2 P2-1: after a long-press and release no hand card is transformed or off-screen.
+        if (matchMedia('(hover: none)').matches) for (const x of cardsNow()) { const t = getComputedStyle(x).transform; const xr = x.getBoundingClientRect();
+          if ((t && t !== 'none') || xr.left < -0.5 || xr.right > vw + 0.5) { sticky.push(id + ': ' + (x.querySelector('.cname') || {}).textContent + ' ' + t + ' [' + Math.round(xr.left) + ',' + Math.round(xr.right) + ']'); break; } }
+        const xb = document.querySelector('.card-preview .cp-close');
+        if (xb && (xb.offsetWidth < 44 || xb.offsetHeight < 44)) preview.push(id + ' close button ' + xb.offsetWidth + 'x' + xb.offsetHeight);
         const pv = document.querySelector('.card-preview');
         if (!pv) { preview.push(id + ' no preview'); continue; }
         const pr = pv.getBoundingClientRect();
@@ -286,7 +319,7 @@ const LONGEST_HAND_CHECK = `(async () => {
   }
   snap.hand = orig; dlb.render();
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  return { before, moved, unfit, over, small: [...new Set(small)], heights: [...heights], allInView, fiveInView, maxLines, lines, checked: all.length, nameOrb, nameClip, orbMark, missing, preview };
+  return { before, moved, unfit, over, small: [...new Set(small)], heights: [...heights], allInView, fiveInView, maxLines, lines, checked: all.length, nameOrb, nameClip, orbMark, missing, preview, marks, covered, sticky };
 })()`;
 if (!SIZES_SEL.length) { console.error('no sizes matched --sizes ' + sizesArg); process.exit(2); }
 
@@ -549,6 +582,9 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
         // #53 P1-3: the REAL viewport. On a phone a page wider than the screen widens the
         // layout viewport too, so innerWidth alone hides the overflow; visualViewport and the
         // device width do not.
+        // r2 P2-7: Help and New Run are at least 44x44 (speed buttons: #30-era, logged separately).
+        hudSmall: [...document.querySelectorAll('#hud .btn')].filter((b) => b.getClientRects().length && /^(Help|New Run)$/.test(b.textContent.trim()))
+          .map((b) => b.getBoundingClientRect()).map((r, i, a) => r).filter((r) => r.width < 43.5 || r.height < 43.5).map((r) => Math.round(r.width) + 'x' + Math.round(r.height)),
         realViewport: [innerWidth, innerHeight, visualViewport ? Math.round(visualViewport.width) : null, visualViewport ? Math.round(visualViewport.height) : null, screen.width, screen.height],
         pageScrollPx: doc.scrollHeight - vh,
         endTurnFound: !!endTurn,
@@ -668,6 +704,7 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
     // card in the list (longest card-face text first) is put on the hand's tiles in turn and
     // must fit its card; the cards share one height and the battle stage never moves.
     m.longestHand = await ev(LONGEST_HAND_CHECK);
+    m.manyStatuses = await ev(STATUS_CHECK);
     await endTextScale(S, textScaleId);
     rows.push([keyOf(w, h, scale, handN), label, m]);
   }
@@ -683,6 +720,9 @@ function evaluateRow(m) {
   if (m.viewport[0] !== m.requested[0] || m.viewport[1] !== m.requested[1]) {
     fails.push(`page wider than the screen: rendered viewport ${m.viewport.join('x')} != device ${m.requested.join('x')} (mobile zooms out to fit)`);
   }
+  if (m.manyStatuses && (m.manyStatuses.endTurnBottom === null || m.manyStatuses.endTurnBottom > m.manyStatuses.vh - END_TURN_CLEARANCE_PX || m.manyStatuses.pageScroll > PAGE_SCROLL_ALLOW_PX))
+    fails.push(`with 4 statuses on every enemy and the hero, End Turn bottom=${m.manyStatuses.endTurnBottom} (viewport ${m.manyStatuses.vh}, page scroll ${m.manyStatuses.pageScroll}px)`);
+  if (m.hudSmall && m.hudSmall.length) fails.push(`HUD Help/New Run tap target under 44x44: ${m.hudSmall.join(', ')}`);
   if (m.realViewport) {
     const [iw, ih, vvw, vvh] = m.realViewport; const dw = m.requested[0];
     const realVw = Math.min(iw, vvw ?? iw, dw);
@@ -754,6 +794,9 @@ function evaluateRow(m) {
     if (L.nameOrb && L.nameOrb.length) fails.push(`card name overlaps the cost orb (name ∩ orb must be 0): ${L.nameOrb.join('; ')}`);
     if (L.nameClip && L.nameClip.length) fails.push(`card name clipped or not >= 2px below the header: ${L.nameClip.join('; ')}`);
     if (L.orbMark && L.orbMark.length) fails.push(`card type mark missing, under 12px or under the orb: ${[...new Set(L.orbMark)].slice(0, 8).join('; ')}`);
+    if (L.marks && L.marks.length) fails.push(`corner flame or temper stamp overlaps a face line: ${L.marks.slice(0, 10).join('; ')}`);
+    if (L.covered && L.covered.length) fails.push(`card name covered by its neighbour: ${[...new Set(L.covered)].slice(0, 10).join('; ')}`);
+    if (L.sticky && L.sticky.length) fails.push(`hand card transformed or off-screen after a long-press and release: ${L.sticky.slice(0, 6).join('; ')}`);
     if (L.preview && L.preview.length) fails.push(`card preview does not fit (no scroll, clear of the orbs, min(vw-16,340) wide): ${L.preview.slice(0, 12).join('; ')}${L.preview.length > 12 ? ' …+' + (L.preview.length - 12) : ''}`);
     if (L.missing && L.missing.length) fails.push(`card face is missing a number or mark: ${L.missing.join('; ')}`);
     if (L.heights.length > 1) fails.push(`hand cards differ in height in the short-portrait layout: ${L.heights.join(', ')}px`);
