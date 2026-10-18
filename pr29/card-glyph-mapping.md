@@ -129,9 +129,9 @@ Line counts are measured in a real browser by scripts/dev/viewport-check.mjs at 
 | pummel (Hail of Blows) | quenched | Deal 2 damage to the enemy 4 times. Exhaust this card for the rest of the fight. Gain 3 Block. | [damage] 2×4 / [block] +3 / (corner exhaust flame) | 2 | 2 |
 | pummel (Hail of Blows) | redhot | Deal 3 damage to the enemy 4 times. Exhaust this card for the rest of the fight. Lose 2 HP. | [damage] 3×4 / [hp] -2 / (corner exhaust flame) | 2 | 2 |
 | pummel (Hail of Blows) | balanced | Deal 2 damage to the enemy 4 times. Exhaust this card for the rest of the fight. Draw 1 card. | [damage] 2×4 / [draw] +1 / (corner exhaust flame) | 2 | 2 |
-| rampage (Climbing Heat) | — | Deal 8 damage. This card gains +5 damage permanently each time you play it. | [damage] 8 / **Played:** / ↳ [damage] +5 | 3 | 3 |
-| rampage (Climbing Heat) | quenched | Deal 8 damage. This card gains +5 damage permanently each time you play it. Gain 3 Block. | [damage] 8 / [block] +3 / **Played:** / ↳ [damage] +5 | 4 | 4 |
-| rampage (Climbing Heat) | balanced | Deal 8 damage. This card gains +5 damage permanently each time you play it. Draw 1 card. Exhaust this card for the rest of the fight. | [damage] 8 / [draw] +1 / **Played:** / ↳ [damage] +5 / (corner exhaust flame) | 4 | 4 |
+| rampage (Climbing Heat) | — | Deal 8 damage. This card gains +5 damage permanently each time you play it. | [damage] 8 / **Grows:** / ↳ [damage] +5 | 3 | 3 |
+| rampage (Climbing Heat) | quenched | Deal 8 damage. This card gains +5 damage permanently each time you play it. Gain 3 Block. | [damage] 8 / [block] +3 / **Grows:** / ↳ [damage] +5 | 4 | 4 |
+| rampage (Climbing Heat) | balanced | Deal 8 damage. This card gains +5 damage permanently each time you play it. Draw 1 card. Exhaust this card for the rest of the fight. | [damage] 8 / [draw] +1 / **Grows:** / ↳ [damage] +5 / (corner exhaust flame) | 4 | 4 |
 | rupture (Split Seam) | — | Gain Rupture: whenever a card makes you lose HP, gain 1 Strength. | **HP lost:** / ↳ [strength] +1 | 2 | 2 |
 | rupture (Split Seam) | quenched | Gain Rupture: whenever a card makes you lose HP, gain 1 Strength. Gain 3 Block. | [block] +3 / **HP lost:** / ↳ [strength] +1 | 3 | 3 |
 | rupture (Split Seam) | balanced | Gain Rupture: whenever a card makes you lose HP, gain 1 Strength. Draw 1 card. Exhaust this card for the rest of the fight. | [draw] +1 / **HP lost:** / ↳ [strength] +1 / (corner exhaust flame) | 3 | 3 |
@@ -155,6 +155,6 @@ Line counts are measured in a real browser by scripts/dev/viewport-check.mjs at 
 | offering (Blood Tithe) | — | Lose 6 HP. Gain 2 Energy. Draw 3 cards. | [hp] -6 / [energy] +2 / [draw] +3 | 3 | 3 |
 | offering (Blood Tithe) | quenched | Lose 6 HP. Gain 2 Energy. Draw 3 cards. Gain 3 Block. | [block] +3 / [hp] -6 / [energy] +2 / [draw] +3 | 4 | 4 |
 | offering (Blood Tithe) | balanced | Lose 6 HP. Gain 2 Energy. Draw 3 cards. Draw 1 card. Exhaust this card for the rest of the fight. | [hp] -6 / [energy] +2 / [draw] +4 / (corner exhaust flame) | 3 | 3 |
-| reaper (Ash Harvest) | — | Deal 4 damage to ALL enemies. Heal HP equal to the damage dealt. | [damage] 4 ALL / "Heal that" | 2 | 2 |
-| reaper (Ash Harvest) | quenched | Deal 4 damage to ALL enemies. Heal HP equal to the damage dealt. Gain 3 Block. | [damage] 4 ALL / [block] +3 / "Heal that" | 3 | 3 |
-| reaper (Ash Harvest) | balanced | Deal 4 damage to ALL enemies. Heal HP equal to the damage dealt. Draw 1 card. Exhaust this card for the rest of the fight. | [damage] 4 ALL / [draw] +1 / "Heal that" / (corner exhaust flame) | 3 | 3 |
+| reaper (Ash Harvest) | — | Deal 4 damage to ALL enemies. Heal HP equal to the damage dealt. | [damage] 4 ALL / "Heal that much" | 2 | 2 |
+| reaper (Ash Harvest) | quenched | Deal 4 damage to ALL enemies. Heal HP equal to the damage dealt. Gain 3 Block. | [damage] 4 ALL / "Heal that much" / [block] +3 | 3 | 3 |
+| reaper (Ash Harvest) | balanced | Deal 4 damage to ALL enemies. Heal HP equal to the damage dealt. Draw 1 card. Exhaust this card for the rest of the fight. | [damage] 4 ALL / "Heal that much" / [draw] +1 / (corner exhaust flame) | 3 | 3 |
