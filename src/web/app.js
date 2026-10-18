@@ -1958,6 +1958,16 @@ function showPreview(tile, card, desc, sticky = false) {
   const type = card.typeLabel || card.type;
   const close = el('button', { cls: 'cp-close', text: '×', attrs: { type: 'button', 'aria-label': 'Close preview', title: 'Close' } });
   close.addEventListener('click', (ev) => { if (ev && ev.stopPropagation) ev.stopPropagation(); hidePreview(); });
+  // Keyboard: Tab from the card lands on × (see attachPreview); Tab or Shift+Tab on × goes
+  // back to the card; Enter closes (a button click), Escape closes (document handler); both
+  // return focus to the card. Focus leaving both closes the preview.
+  close.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Tab' && previewTile) { ev.preventDefault(); previewTile.focus(); }
+  });
+  close.addEventListener('blur', (ev) => {
+    const to = ev && ev.relatedTarget;
+    if (previewEl && to !== previewTile && !(to && typeof previewEl.contains === 'function' && previewEl.contains(to))) hidePreview();
+  });
   // A non-modal dialog (it holds a button): labelled by the card; focus stays where it was.
   previewEl = el('div', { cls: `card-preview type-${card.type}`, attrs: { id: 'card-preview', role: 'dialog', 'aria-modal': 'false', 'aria-label': `${card.name}, full card` } },
     el('span', { cls: 'cp-head' },
@@ -2013,7 +2023,16 @@ function attachPreview(tile, card, desc) {
     const kb = lastInputKeyboard && (typeof tile.matches !== 'function' || tile.matches(':focus-visible'));
     if (kb) showPreview(tile, card, desc);
   });
-  tile.addEventListener('blur', () => { if (previewTile === tile && !previewSticky) hidePreview(); });
+  tile.addEventListener('blur', (ev) => {
+    const to = ev && ev.relatedTarget;
+    if (to && previewEl && typeof previewEl.contains === 'function' && previewEl.contains(to)) return; // into its own ×
+    if (previewTile === tile && !previewSticky) hidePreview();
+  });
+  tile.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Tab' || ev.shiftKey || previewTile !== tile || !previewEl) return;
+    const x = previewEl.querySelector('.cp-close');
+    if (x && typeof x.focus === 'function') { ev.preventDefault(); x.focus(); }
+  });
   tile.addEventListener('click', (ev) => {
     if (!tile._lp) return;
     tile._lp = false; consumeClick(ev); ev.stopImmediatePropagation(); ev.preventDefault();

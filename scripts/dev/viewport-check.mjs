@@ -288,6 +288,8 @@ const LONGEST_HAND_CHECK = `(async () => {
       if (nm && next) { const rg3 = document.createRange(); rg3.selectNodeContents(nm); const nl = next.getBoundingClientRect().left;
         for (const q of rg3.getClientRects()) if (q.width > 0.5 && q.right > nl + 0.5) { covered.push(id + ' "' + batch[i].name + '" under the next card by ' + Math.round(q.right - nl) + 'px'); break; } }
       if (lc > maxLines) over.push(id + ' ' + lc + ' lines');
+      // The corner flame is a fixed 14px mark (Product Designer r3: distinct at 130%); never smaller.
+      for (const fg of face.querySelectorAll('.fx-mark .fg')) { const r = fg.getBoundingClientRect(); if (Math.min(r.width, r.height) < 14 - 0.5) small.push(id + ' corner flame ' + Math.round(r.width) + 'px'); }
       for (const fg of face.querySelectorAll('.fl .fg')) { const r = fg.getBoundingClientRect(); if (Math.min(r.width, r.height) < 16 * k - 0.5) small.push(id + ' glyph ' + Math.round(r.width) + 'px'); }
       for (const t of face.querySelectorAll('.fn, .fall, .fl-t')) { const px = parseFloat(getComputedStyle(t).fontSize); if (px < 12 * k - 0.05) small.push(id + ' text ' + px.toFixed(1) + 'px'); }
     });

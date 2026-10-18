@@ -443,8 +443,9 @@ export function cardFaceLines(def, instance = {}, hpCost = 0) {
   const merged = mergeLines(now);
   const rankOf = [];
   merged.forEach((l, i) => { rankOf[i] = 'g' in l ? (FACE_RANK[l.g] ?? 9) : (i > 0 ? rankOf[i - 1] : 9); });
-  const ranked = merged.map((l, i) => [l, i, 'g' in l ? i : i - 0.5 + 0.49])
-    .sort((a, b) => rankOf[a[1]] - rankOf[b[1]] || a[2] - b[2]).map(([l]) => l);
+  // Within a rank, keep the original order (a sentence line already follows its glyph).
+  const ranked = merged.map((l, i) => [l, i])
+    .sort((a, b) => rankOf[a[1]] - rankOf[b[1]] || a[1] - b[1]).map(([l]) => l);
   const lines = [...ranked];
   for (const tb of trigs) {
     lines.push({ t: tb.t, trig: true });

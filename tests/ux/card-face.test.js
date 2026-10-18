@@ -443,3 +443,21 @@ test('a tap outside a touch preview only closes it (swallowed), a tap on the pre
   const t = await open();
   assert.equal(await tap(t), false, 'tapping the previewed card plays it');
 });
+
+test('keyboard: the preview × is reachable with Tab, Tab goes back to the card, Enter closes', async () => {
+  await toFight(11);
+  const t = handTiles()[0];
+  for (const fn of docLs.keydown || []) fn({ key: 'Tab' });
+  for (const fn of t._ls.focus || []) fn({ type: 'focus', target: t });
+  assert.ok(api.previewOpen(), 'keyboard focus opens the preview');
+  const x = root.querySelectorAll('.card-preview')[0].querySelector('.cp-close');
+  t.dispatch('keydown', { key: 'Tab' });
+  assert.equal(document.activeElement, x, 'Tab from the card lands on ×');
+  for (const fn of t._ls.blur || []) fn({ type: 'blur', target: t, relatedTarget: x });
+  assert.ok(api.previewOpen(), 'moving focus into × keeps the preview open');
+  x.dispatch('keydown', { key: 'Tab' });
+  assert.equal(document.activeElement, t, 'Tab on × goes back to the card');
+  t.dispatch('keydown', { key: 'Tab' });
+  x.dispatch('click');
+  assert.equal(api.previewOpen(), false, 'Enter (a click on ×) closes it');
+});
