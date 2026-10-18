@@ -190,18 +190,33 @@ export function describeCardType(type) {
  * with it, and tests/ux/descriptions.test.js pins the sentences for every shipped card.
  * @type {Record<string, string>}
  */
+/**
+ * The numbers of each `custom` handler, in ONE place: the sentence (CUSTOM_SENTENCE) and the
+ * card face (CUSTOM_FACE) are both built from them, so the two can never drift apart.
+ */
+const CN = {
+  bloodletting: { hp: 3, energy: 2 },
+  hemokinesis: { hp: 2, damage: 15 },
+  reaper: { damage: 4 },
+  offering: { hp: 6, energy: 2, draw: 3 },
+  combust: { damage: 1, hp: 1 },
+  dark_embrace: { draw: 1 },
+  feel_no_pain: { block: 1 },
+  rupture: { strength: 1 },
+  rampage: { damage: 8, grow: 5 },
+};
 const CUSTOM_SENTENCE = {
-  bloodletting: 'Lose 3 HP. Gain 2 Energy.',
-  hemokinesis: 'Lose 2 HP. Deal 15 damage.',
-  reaper: 'Deal 4 damage to ALL enemies. Heal HP equal to the damage dealt.',
+  bloodletting: `Lose ${CN.bloodletting.hp} HP. Gain ${CN.bloodletting.energy} Energy.`,
+  hemokinesis: `Lose ${CN.hemokinesis.hp} HP. Deal ${CN.hemokinesis.damage} damage.`,
+  reaper: `Deal ${CN.reaper.damage} damage to ALL enemies. Heal HP equal to the damage dealt.`,
   limit_break: 'Double your current Strength. Does nothing if you have no Strength.',
-  offering: 'Lose 6 HP. Gain 2 Energy. Draw 3 cards.',
-  combust: 'Gain Combust: at the end of each turn, deal 1 damage to ALL enemies and lose 1 HP.',
-  dark_embrace: 'Gain Dark Embrace: whenever a card is exhausted, draw 1 card.',
-  feel_no_pain: 'Gain Feel No Pain: whenever a card is exhausted, gain 1 Block.',
-  rupture: 'Gain Rupture: whenever a card makes you lose HP, gain 1 Strength.',
+  offering: `Lose ${CN.offering.hp} HP. Gain ${CN.offering.energy} Energy. Draw ${CN.offering.draw} cards.`,
+  combust: `Gain Combust: at the end of each turn, deal ${CN.combust.damage} damage to ALL enemies and lose ${CN.combust.hp} HP.`,
+  dark_embrace: `Gain Dark Embrace: whenever a card is exhausted, draw ${CN.dark_embrace.draw} card.`,
+  feel_no_pain: `Gain Feel No Pain: whenever a card is exhausted, gain ${CN.feel_no_pain.block} Block.`,
+  rupture: `Gain Rupture: whenever a card makes you lose HP, gain ${CN.rupture.strength} Strength.`,
   entrench: 'Double your current Block. Does nothing if you have no Block.',
-  rampage: 'Deal 8 damage. This card gains +5 damage permanently each time you play it.',
+  rampage: `Deal ${CN.rampage.damage} damage. This card gains +${CN.rampage.grow} damage permanently each time you play it.`,
 };
 
 /**
@@ -309,6 +324,137 @@ export function describeCard(def, instance = {}) {
   });
   return parts.map(sentence).join(' ');
 }
+
+/* --------------------------------------------------------------- card face (#29) */
+
+/**
+ * The card-face glyphs (#29/#53): one per repeatable effect. A short phone's hand card shows
+ * its rule as glyph lines ("[sword]13 / [Weak]1 / [Vuln]1"); these are the names and the
+ * one-line explanations the preview, the glossary legend and the first-sight tip read.
+ * `status` marks the glyphs that stand for a keyword status.
+ * @type {Record<string, {label: string, meaning: string, status?: boolean}>}
+ */
+export const FACE_GLYPHS = {
+  damage: { label: 'Damage', meaning: 'Deal this much damage to the enemy you aim at. ALL: to every enemy. ×N: that many hits.' },
+  block: { label: 'Block', meaning: 'Gain this much Block: it absorbs incoming damage until your next turn. ×2: double your Block.' },
+  weak: { label: 'Weak', meaning: 'Apply Weak: its attacks deal 25% less damage. Wears off by 1 each turn.', status: true },
+  vulnerable: { label: 'Vulnerable', meaning: 'Apply Vulnerable: it takes 50% more damage from attacks. Wears off by 1 each turn.', status: true },
+  strength: { label: 'Strength', meaning: 'Gain Strength: your attacks deal that much more damage for the whole fight. ×2: double it.', status: true },
+  metallicize: { label: 'Metallicize', meaning: 'Gain Metallicize: at the end of each turn, gain that much Block.', status: true },
+  draw: { label: 'Draw', meaning: 'Draw this many cards.' },
+  energy: { label: 'Energy', meaning: 'Gain this much Energy this turn.' },
+  hp: { label: 'Lose HP', meaning: 'You lose this much HP. Block does not stop it.' },
+  discard: { label: 'Discard', meaning: 'Discard this many cards from your hand at random.' },
+  status: { label: 'Status', meaning: 'A status effect; the preview names it.', status: true },
+  exhaust: { label: 'Exhaust', meaning: 'A flame in the card\'s corner: playing it removes it for the rest of the fight.' },
+};
+
+/** Line order on every face: damage/block, then statuses, then resources. */
+const FACE_RANK = { damage: 0, block: 0, weak: 1, vulnerable: 1, strength: 1, metallicize: 1, hp: 2, energy: 2, draw: 2, discard: 2 };
+
+/** Signs (#53 P3): a gain always reads +N, a loss -N. Damage is an amount dealt: unsigned. */
+const GAIN = new Set(['block', 'weak', 'vulnerable', 'strength', 'metallicize', 'draw', 'energy', 'status']);
+const LOSS = new Set(['hp', 'discard']);
+function signed(glyph, n) {
+  const s = String(n);
+  if (!/^\d+$/.test(s)) return s;
+  if (GAIN.has(glyph)) return `+${s}`;
+  if (LOSS.has(glyph)) return `-${s}`;
+  return s;
+}
+const g = (glyph, n = '', all = false) => ({ g: glyph, n: signed(glyph, n), ...(all ? { all: true } : {}) });
+
+/**
+ * Face pieces per `custom` handler, from the same literals as CUSTOM_SENTENCE.
+ * `now`: effects that happen when played (merged and sorted with the rest of the card).
+ * `trig`: a trigger block — a short word + colon on its own line, then its glyph lines;
+ * trigger blocks always come last on the face (#53 design call b). A trigger word is never
+ * a glyph and never abbreviated.
+ */
+const CUSTOM_FACE = {
+  bloodletting: () => ({ now: [g('hp', CN.bloodletting.hp), g('energy', CN.bloodletting.energy)] }),
+  hemokinesis: () => ({ now: [g('hp', CN.hemokinesis.hp), g('damage', CN.hemokinesis.damage)] }),
+  offering: () => ({ now: [g('hp', CN.offering.hp), g('energy', CN.offering.energy), g('draw', CN.offering.draw)] }),
+  limit_break: () => ({ now: [g('strength', '×2')] }),
+  entrench: () => ({ now: [g('block', '×2')] }),
+  reaper: () => ({ now: [g('damage', CN.reaper.damage, true), { t: 'Heal that much' }] }),
+  combust: () => ({ trig: { t: 'Turn end:', lines: [g('damage', CN.combust.damage, true), g('hp', CN.combust.hp)] } }),
+  dark_embrace: () => ({ trig: { t: 'Exhaust:', lines: [g('draw', CN.dark_embrace.draw)] } }),
+  feel_no_pain: () => ({ trig: { t: 'Exhaust:', lines: [g('block', CN.feel_no_pain.block)] } }),
+  rupture: () => ({ trig: { t: 'HP lost:', lines: [g('strength', CN.rupture.strength)] } }),
+  rampage: (inst) => ({ now: [g('damage', CN.rampage.damage + (inst.perPlay || 0))], trig: { t: 'Grows:', lines: [g('damage', `+${CN.rampage.grow}`)] } }),
+};
+
+/** Merge repeated glyphs (#53 P1-2): two "+1 draw" lines become one "+2". */
+function mergeLines(lines) {
+  const out = [];
+  for (const l of lines) {
+    const prev = 'g' in l && out.find((o) => o.g === l.g && !!o.all === !!l.all);
+    const num = (x) => (/^[+-]?\d+$/.test(x.n) ? Number(x.n) : NaN);
+    if (prev && !Number.isNaN(num(prev)) && !Number.isNaN(num(l)) && /^[+-]/.test(prev.n) === /^[+-]/.test(l.n)) {
+      const sum = num(prev) + num(l);
+      prev.n = /^[+-]/.test(prev.n) ? (sum < 0 ? String(sum) : `+${sum}`) : String(sum);
+    } else out.push({ ...l });
+  }
+  return out;
+}
+
+/**
+ * The structured card face (#29/#53), built from the (tempered) definition so its numbers
+ * always agree with describeCard. Order: what happens on play (merged, ranked), then trigger
+ * blocks (`{t, trig: true}` header + its lines, each `{..., under: true}`). A card that
+ * exhausts ITSELF carries one `{mark: 'exhaust'}` entry instead of a line: the renderer draws
+ * it as a corner flame.
+ * @param {any} def
+ * @param {{perPlay?: number}} [instance]
+ * @param {number} [hpCost] extra HP the instance costs to play (a temper)
+ * @returns {Array<{g: string, n: string, all?: boolean, under?: boolean} | {t: string, trig?: boolean, under?: boolean} | {mark: 'exhaust'}>}
+ */
+export function cardFaceLines(def, instance = {}, hpCost = 0) {
+  if (!def || !Array.isArray(def.effects)) return [{ t: 'No description available.' }];
+  const now = [];
+  const trigs = [];
+  let exhaust = false;
+  for (const e of foldRepeatedDamage(def.effects)) {
+    const all = e.target === 'all_enemies' || e.to === 'all_enemies';
+    switch (e.verb) {
+      case 'damage': now.push(g('damage', (e.hits ?? 1) > 1 ? `${e.amount}×${e.hits}` : e.amount, all)); break;
+      case 'block': now.push(g('block', e.amount)); break;
+      case 'draw': now.push(g('draw', e.amount)); break;
+      case 'energy': now.push(g('energy', e.amount)); break;
+      // An unknown status gets a neutral mark plus its name, never another status's glyph.
+      case 'status': now.push(FACE_GLYPHS[e.status] ? g(e.status, e.amount, all) : { ...g('status', e.amount, all), label: String(e.status) }); break;
+      case 'discard': now.push(g('discard', e.amount)); break;
+      case 'exhaust': exhaust = true; break;
+      case 'custom': {
+        const f = CUSTOM_FACE[e.handler];
+        if (!f) { now.push({ t: describeEffect(e, def) }); break; }
+        const out = f(instance);
+        if (out.now) now.push(...out.now);
+        if (out.trig) trigs.push(out.trig);
+        break;
+      }
+      default: now.push({ t: describeEffect(e, def) });
+    }
+  }
+  if (hpCost > 0) now.push(g('hp', hpCost));
+  // A sentence line ("Heal that much") belongs to the line above it: it takes that line's
+  // rank and sorts right after it, so a temper's Block never lands between them (#53 r2).
+  const merged = mergeLines(now);
+  const rankOf = [];
+  merged.forEach((l, i) => { rankOf[i] = 'g' in l ? (FACE_RANK[l.g] ?? 9) : (i > 0 ? rankOf[i - 1] : 9); });
+  // Within a rank, keep the original order (a sentence line already follows its glyph).
+  const ranked = merged.map((l, i) => [l, i])
+    .sort((a, b) => rankOf[a[1]] - rankOf[b[1]] || a[1] - b[1]).map(([l]) => l);
+  const lines = [...ranked];
+  for (const tb of trigs) {
+    lines.push({ t: tb.t, trig: true });
+    for (const l of tb.lines) lines.push({ ...l, under: true });
+  }
+  if (exhaust) lines.push({ mark: 'exhaust' });
+  return lines;
+}
+
 
 /**
  * One-line playability note for a tile: why the card cannot be played right now.

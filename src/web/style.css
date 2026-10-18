@@ -2408,9 +2408,23 @@ html, body {
 
 #hud .pill { flex: 1 1 44px; min-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-#hud .btn { font-size: var(--fs-2); font-weight: 700; padding: 6px 8px; min-height: 44px; }
+#hud .btn { font-size: var(--fs-2); font-weight: 700; padding: 6px 8px; min-height: 44px; min-width: 44px; }
 
 #hud .btn.new-run { display: none; }
+/* #53 P1-3: at 320px with 130% text the one-line "New Run" pushed the HUD to 352px, so the
+   whole page was wider than the screen (and End Turn fell below the visible bottom). Below
+   421px its label wraps to two short lines instead (from 381 to 420 that also keeps room
+   for the full hero name once Help got its 44px minimum, r2 P2-7). */
+@media (max-width: 420px) {
+  #hud .btn.hud-new { white-space: normal; line-height: 1.05; width: min-content; padding-left: 4px; padding-right: 4px; flex: 0 0 auto; }
+  #hud .btn { min-width: 44px; }
+}
+@media (max-width: 340px) {
+  #hud { gap: 2px; padding-left: 4px; padding-right: 4px; }
+  #hud .stat { padding-left: 3px; padding-right: 3px; }
+  #hud .hud-step { padding-left: 0; padding-right: 0; }
+  #hud .btn { padding-left: 4px; padding-right: 4px; min-width: 44px; }
+}
 
 /* The five rules below were written by a run that was cut off mid-edit: each @media block
    opened and never closed, so the parser swallowed everything after the first one. They are
@@ -3870,6 +3884,245 @@ html, body {
 @media (max-width: 700px) and (max-height: 760px) {
   .stage-combat .card .cdesc { -webkit-line-clamp: 3; }
 }
+/* - #29 / #53: on those same short portrait phones the 3-line cap hid the rule itself at
+     130% text. All five cards stay in view, so the tile shows the kernel's card face
+     (cardFaceLines): one effect per line as a glyph and a number, ALL tagged, a short
+     sentence only for a unique mechanic. Glyphs are 16px at 100% text (root 15px), numbers
+     0.8rem (12px) Alegreya; nothing shrinks to fit. The full sentence is the long-press / hover
+     preview and the aria-label. Every card has one fixed height in rem (it follows the text
+     size), so the hand never changes height and the fight above never moves. The cost orb
+     sits inside the card's corner: the card clips overflow, and at -6px only a sliver showed. */
+.stage-combat .card .cd-face { display: none; }
+/* The cost orb inside the card's top-left corner at every size: the combat card clips its
+   overflow, so the old -6px offset left only a sliver of the orb (and of its digit). */
+.stage-combat .card .cost-gem { top: 2px; left: 2px; }
+.stage-combat .card .ctype { padding-left: 30px; }
+@media (max-width: 760px), (max-height: 480px) { .stage-combat .card .ctype { padding-left: 22px; } }
+@media (min-width: 761px) and (min-height: 481px) { .stage-combat .hand { padding-top: 24px; } }
+@media (min-width: 1000px) and (max-height: 480px) { .stage-combat .hand { padding-top: 16px; } }
+@media (max-width: 340px) and (max-height: 760px) and (orientation: portrait) {
+  /* 320px: the five cards barely overlap, so each face line (glyph + number + ALL) fits. */
+  .stage-combat .hand { padding-left: 2px; padding-right: 2px; }
+  /* Side by side, not overlapped: a neighbour's edge cut the last letters of a name. */
+  .stage-combat .hand > .card-wrap { margin: 0; }
+  .stage-combat .card { padding-left: 1px; padding-right: 1px; }
+  /* #53 P1-3: End Turn must sit inside 568px at 130% text: the figures give back 24px. */
+  .stage-combat .hero .fig,
+  .stage-combat .fig { height: 76px; }
+}
+/* #53 P2-5: every portrait phone (not only the short ones): at 390x844 and 412x915 with 130%
+   text the full sentence was cut with "…", cards differed in height and the fight moved. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .stage-combat .card .cd-full { display: none; }
+  .stage-combat .card .cd-face { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .stage-combat .card .cdesc { display: block; -webkit-line-clamp: unset; overflow: visible; line-height: 1.15; font-size: 0.8rem; align-content: start; }
+  /* One fixed height in rem for every card (header + a 2-line name + 4 face lines). */
+  .stage-combat .card { --hd: 1.3rem; height: max(7.6rem, 136px); max-height: none; padding: 0 2px 3px; align-content: start; }
+  /* The chapter label above the fight gives its row back to the hand on these phones. */
+  .page.page-combat .page-num { display: none; }
+  .stage-combat .card .cd-face .fl { line-height: 1.1; }
+  .stage-combat .card { min-width: 0; grid-template-columns: minmax(0, 1fr); transform: none; }
+  /* #53 P1-1: the header is the orb's own slot. The type word is hidden at this width, so the
+     cost orb sits in the header's left end, fully inside it, and the name starts BELOW the
+     header with 2px clearance: the orb never covers a letter, the plate never cuts a cap. */
+  .stage-combat .card .ctype,
+  .stage-combat .card.has-illus .ctype {
+    position: relative; display: block; box-sizing: border-box;
+    height: var(--hd); min-height: var(--hd); min-width: 0;
+    margin: 0 -2px; padding: 0; overflow: hidden;
+  }
+  .stage-combat .card .ctype > span:last-child { display: none; }
+  .stage-combat .card .cost-gem { top: 2px; left: 2px; width: calc(var(--hd) - 4px); height: calc(var(--hd) - 4px); border-width: 1px; }
+  .stage-combat .card .cost-gem .gem-core { font-size: 0.8rem; }
+  /* Design call (a): the type mark is back, 13px, in the header's free right corner. */
+  .stage-combat .card .ctype > .c-type-mark,
+  .stage-combat .card.has-illus .ctype > .c-type-mark {
+    position: absolute; z-index: 2; top: calc((var(--hd) - 13px) / 2); right: 3px;
+    width: 13px; height: 13px; margin: 0; visibility: visible; opacity: 1;
+    padding: 1px; border-radius: 50%; background: rgba(12, 8, 6, 0.82); box-sizing: content-box;
+  }
+  .stage-combat .card .cname { margin-top: 2px; padding-left: 0; text-align: center; overflow-wrap: normal; word-break: normal; }
+  /* r2 P2-5: side by side, never overlapped, so a neighbour never covers a name's last letter. */
+  .stage-combat .hand > .card-wrap { margin-left: 0; margin-right: 0; }
+  /* r2 P2-2: the corner marks (temper stamp bottom-left, self-exhaust flame bottom-right) get
+     their own strip under the face; no text line can reach it. */
+  .stage-combat .card .cdesc { padding-bottom: 15px; }
+  .stage-combat .card .cd-face .fl:not(.fl-t) { margin: -1px 0; }
+  .stage-combat .card .cname { line-height: 1.04; }
+  .stage-combat .card.tempered .cfoot { bottom: 1px; left: 1px; }
+  .stage-combat .card .cd-face .fx-mark { right: 1px; bottom: 1px; }
+  .stage-combat .card .cd-face .fx-mark .fg { width: 14px; height: 14px; }
+  /* The temper stamp shrinks to its mark in the bottom-left corner (the flame takes the right). */
+  .stage-combat .card.tempered .cfoot { top: auto; right: auto; bottom: 2px; left: 2px; }
+  .stage-combat .card.tempered .ctemper { padding: 1px 3px; }
+  .stage-combat .card.tempered .ctemper .t-name { display: none; }
+  .stage-combat .card .cd-face .fx-mark { position: absolute; right: 2px; bottom: 2px; }
+}
+@media (max-width: 340px) and (max-height: 760px) and (orientation: portrait) {
+  /* 320px: five equal columns over the whole row and a 1px inner gutter. */
+  .stage-combat .hand > .card-wrap { flex: 1 1 0; max-width: none; }
+  .stage-combat .hand { padding-left: 0; padding-right: 0; }
+  .stage-combat .card { padding: 0 0 3px; }
+  .stage-combat .card .cd-face .fl { column-gap: 0; }
+  .stage-combat .card .cd-face .fall { margin-left: 3px; }
+  /* "Hammerfall" at the 9px name floor: tighter tracking, same size, fits a 61px card. */
+  .stage-combat .card .cname { letter-spacing: -0.03em; }
+}
+/* #53 P2-4 (r2): on touch screens :hover "sticks" after a long press, so the pressed card
+   stayed lifted and tilted (and at 320 the edge card hung off-screen). Where there is no
+   hover, a hovered or tapped card is never transformed. */
+@media (hover: none) {
+  .stage-combat .card-wrap:hover:not(.is-disabled):not(.is-pending) .card,
+  .stage-combat .card-wrap:focus-within:not(.is-disabled):not(.is-pending):not(:has(:focus-visible)) .card { transform: none; }
+}
+/* Narrow phones (<= 380px): a 1px inner gutter and no gap inside a face line, so "+3 ALL"
+   (with its 3px gap) stays on one line. */
+@media (max-width: 380px) and (orientation: portrait) {
+  .stage-combat .card { padding-left: 0; padding-right: 0; }
+  .stage-combat .card .cd-face .fl { column-gap: 0; }
+}
+/* Tall portrait phones (390x844, 412x915): the names are set larger there (they follow the
+   card width), so the card is taller too; there is room. */
+@media (max-width: 700px) and (min-height: 780px) and (orientation: portrait) {
+  .stage-combat .card { height: max(8.6rem, 150px); }
+}
+/* #53 (QA): enemy status pills keep their short head on phones; the explanation is the
+   pill's title and the enemy's label. Two rows at most, so a turn-2 status can never push
+   End Turn off a 320/360 screen. */
+.stage-combat .e-statuses .ps-rest { display: inline; }
+.stage-combat .e-statuses .ps-head { white-space: nowrap; }
+@media (max-width: 700px) {
+  .stage-combat .e-statuses .ps-rest { display: none; }
+}
+/* Phones: the status pills float over the enemy figure (under its intent) instead of adding
+   a row to the fight, so the hand and End Turn never move; two rows at most, then they
+   scroll. */
+@media (max-width: 700px) {
+  .stage-combat .enemy { position: relative; }
+  .stage-combat .e-statuses {
+    position: absolute; z-index: 3; left: 2px; right: 2px; top: 34%;
+    max-height: calc(2 * (0.7rem * 1.5 + 4px) + 3px); overflow-y: auto; scrollbar-width: none;
+  }
+}
+/* #53 (QA): "DISCARD" was clipped to "DISCARI" at 320/360 with 130% text: the pile grows to
+   its label, and the tracking tightens. */
+@media (max-width: 420px) {
+  .page-combat .pile { width: auto; min-width: 44px; padding-left: 3px; padding-right: 3px; }
+  .page-combat .pile-name { letter-spacing: 0.03em; }
+}
+/* Trigger blocks (design call b): a short word + colon on its own line, never shrunk or
+   abbreviated (it may wrap), then its lines. */
+/* Barlow Condensed at the same size as the numbers: the word is narrower, never smaller, so
+   "Turn end:" fits a 320px card on one line (it still wraps if it must). */
+.cd-face .fl-trig { font-family: var(--num); font-weight: 700; letter-spacing: 0.01em; color: #ffcf8a; }
+.cd-face .fl-under { opacity: 1; }
+.cd-face .fx-mark { display: inline-grid; line-height: 0; }
+.cd-face .fx-exhaust .fg { width: 14px; height: 14px; }
+.cd-face .fl { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; column-gap: 1px; line-height: 1.15; white-space: nowrap; }
+.cd-face .fl-t { display: block; white-space: normal; text-align: center; font-size: 0.8rem; font-family: var(--num); font-weight: 600; }
+.cd-face .fn { font-family: var(--rules); font-size: 0.8rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+/* ALL in the condensed numeral face: same size, narrower, so "+3 ALL" stays on one line. */
+.cd-face .fall { margin-left: 3px; font-family: var(--num); font-size: 0.8rem; font-weight: 700; letter-spacing: 0; color: #ffcf8a; }
+.fg { display: inline-grid; place-items: center; flex: none; width: 1.0667rem; height: 1.0667rem; }
+.fg svg { width: 100%; height: 100%; overflow: visible; }
+.fg .m { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.fg .mf { fill: currentColor; stroke: #0c0806; stroke-width: 0.9; stroke-linejoin: round; }
+.fg .cut { fill: none; stroke: #0c0806; stroke-width: 1.5; stroke-linecap: round; }
+/* Keyword colours: the status glyph, its keyword word in the preview and the legend share
+   one hue; the silhouette differs too, so no meaning rests on colour alone. */
+.fg-damage { color: #ff9a6a; }
+.fg-block { color: #8fd0ff; }
+.fg-weak { color: #c9a2ff; }
+.fg-vulnerable { color: #ff6f91; }
+.fg-strength { color: #ffb347; }
+.fg-metallicize { color: #c4d0d8; }
+.fg-draw { color: #f2e4d8; }
+.fg-energy { color: #ffd84a; }
+.fg-hp { color: #ff5a4a; }
+.fg-discard { color: #d8c3ad; }
+.fg-exhaust { color: #b8a690; }
+.fg-status { color: #d8c3ad; }
+.cd-face .flabel { margin-left: 2px; font-family: var(--num); font-size: 0.8rem; font-weight: 600; color: var(--ink); }
+.card-preview {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 170, 90, 0.55);
+  background: rgba(20, 12, 8, 0.97);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75);
+  color: var(--ink);
+  font-family: var(--rules);
+  font-size: var(--fs-3);
+  line-height: 1.35;
+  transform-origin: 50% 100%;
+  animation: cp-zoom 160ms ease-out;
+}
+@keyframes cp-zoom { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: none; } }
+@keyframes cp-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  /* !important: the global reduced-motion rule sets every animation to 0.001ms. */
+  .card-preview, .glyph-tip, .press-hint { animation: cp-fade 120ms linear !important; transform: none; }
+}
+.card-preview .cp-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; padding-right: 30px; }
+.card-preview .cp-name { font-weight: 700; color: #ffcf8a; font-size: 1.05em; white-space: nowrap; }
+.card-preview .cp-meta { color: var(--dim); font-size: 0.9em; white-space: nowrap; }
+.card-preview .cp-close {
+  position: absolute; top: 2px; right: 2px; width: 44px; height: 44px;
+  display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--ink); font-size: 1.4rem; line-height: 1; cursor: pointer;
+}
+.card-preview .cp-close:focus-visible { outline: 2px solid var(--gold); }
+.card-preview .cp-text { display: block; }
+.card-preview .kw { color: #f5c542; font-weight: 700; }
+/* Keyword words share their glyph's colour (P3). */
+.kw.kw-block, .kw-block { color: #8fd0ff; }
+.kw.kw-weak, .kw-weak { color: #c9a2ff; }
+.kw.kw-vulnerable, .kw-vulnerable { color: #ff6f91; }
+.kw.kw-strength, .kw-strength { color: #ffb347; }
+.kw.kw-metallicize, .kw-metallicize { color: #c4d0d8; }
+.kw.kw-exhaust, .kw-exhaust { color: #d8c3ad; }
+.card-preview .kw-cost { color: #ff7a5a; }
+.card-preview .cp-glyphs { display: flex; flex-wrap: wrap; gap: 4px 12px; border-top: 1px solid rgba(255, 170, 90, 0.3); padding-top: 6px; }
+.card-preview .cp-glyph { display: inline-flex; gap: 4px; align-items: center; font-size: 0.9em; white-space: nowrap; }
+.card-preview .cp-glyph .fg { width: 1.25rem; height: 1.25rem; }
+.card-preview .cp-gtext { min-width: 0; }
+.glyph-tip {
+  position: fixed;
+  z-index: 55;
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  gap: 6px;
+  align-items: start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 170, 90, 0.5);
+  background: rgba(20, 12, 8, 0.95);
+  color: var(--ink);
+  font-family: var(--rules);
+  font-size: var(--fs-2);
+  line-height: 1.3;
+  pointer-events: none;
+  animation: cp-fade 160ms linear;
+}
+.press-hint {
+  position: fixed;
+  z-index: 56;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 207, 107, 0.6);
+  background: rgba(20, 12, 8, 0.96);
+  color: var(--ink);
+  font-family: var(--rules);
+  font-size: var(--fs-3);
+  line-height: 1.35;
+  animation: cp-fade 160ms linear;
+}
+.glyph-tip .fg { width: 1.25rem; height: 1.25rem; }
+.gl-glyphs .gl-token .fg { width: 1.25rem; height: 1.25rem; }
 /* - Tall-narrow phones at large text (#28: 360x780 with 130% text). Between 700 and 780px
      tall the fight is capped at 348px and the figures are 36-42vh (210-260px), so the hero
      and enemy columns (figure + name + HP + intent) are the fight's floor. 130% text grows
