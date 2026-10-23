@@ -740,7 +740,7 @@ function act(actionId, targetK = null) {
       const playedSlot = actionId.split('_')[0];
       const played = before.hand.find((c) => c.slot === playedSlot && c.cardId);
       if (played) {
-        const aimIdx = targetK != null && aimedAt ? (after.enemies.find((e) => e.index === aimedAt.index) ?? null) : null;
+        const aimIdx = targetK != null && aimedAt ? (after.enemies.find((e) => e.index === aimedAt.index) ?? aimedAt) : null;
         fx.push({
           kind: 'card-fly',
           name: played.name,
@@ -749,8 +749,11 @@ function act(actionId, targetK = null) {
           // type (`heroPose()` reads this one paint later). Presentation only: the kernel
           // snapshot already carries the id, this just keeps it alive for the effect.
           id: played.cardId,
-          // The aimed enemy's living index (or null), so per-card signatures can direct
+          // The aimed enemy's STABLE index (or null), so per-card signatures can direct
           // their effects at the actual target (e.g. Rising Blow launches THAT enemy).
+          // A kill empties the aimed enemy from the AFTER snapshot, so the aim itself is
+          // the fallback — the effects still need to know which body they are flying
+          // toward (a kill's ghost carries `data-death-index` = this).
           enemy: aimIdx ? aimIdx.index : null,
           // A whole lane class, not an index: `positionClass` already returns `side-0` etc.
           side: aimIdx ? positionClass(aimIdx.index, after.enemies) : 'side-none',
@@ -1412,9 +1415,12 @@ function throwLane(b) {
   if (!stageEl || !stageEl.querySelector) return null;
   let card = null;
   if (b && Number.isInteger(b.enemy)) {
-    card = stageEl.querySelector(`.enemy[data-target-index="${b.enemy + 1}"]`);
+    // A kill re-indexes the row (the survivor takes the dead foe's TARGETING slot), so
+    // the aimed foe's collapsing ghost must be matched BEFORE any living card — it is
+    // the body the blow is still flying toward.
+    card = stageEl.querySelector(`.enemy.is-dying[data-death-index="${b.enemy}"]`)
+      ?? stageEl.querySelector(`.enemy[data-target-index="${b.enemy + 1}"]`);
   }
-  if (!card && b && b.side) card = stageEl.querySelector(`.enemy.is-dying.side-${b.side}`);
   if (!card) {
     const living = stageEl.querySelectorAll('.enemy[data-target-index]');
     if (living.length === 1) card = living[0];
@@ -1750,20 +1756,49 @@ function freshStatusKeys(list) {
  * @param {HTMLElement} [row] the row to append the ghosts to; a fresh one when omitted
  * @returns {HTMLElement} the row the ghosts were appended to
  */
+/**
+ * How long a dying enemy must HOLD its slot before collapsing: when the killing stroke
+ * is a thrown weapon, the hammer must be seen ARRIVING before the foe shatters, so the
+ * ghost waits for the impact beat (`fill: both` keeps the 0% frame — standing — until
+ * the delay ends). Only the AIMED foe waits; a splash death collapses on its own beat.
+ */
+function deathHoldMs(d) {
+  if (reducedMotion) return 0;
+  const fly = bursts.find((b) => b.kind === 'card-fly');
+  if (!fly || d.enemy !== fly.enemy) return 0;
+  const spec = HERO_THROWS[fly.id];
+  if (spec) return animMs(Math.round((spec.ms ?? THROW_MS) * (spec.hitAt ?? 0.84)));
+  if (signatureFor(fly)?.twin) return animMs(Math.round(THROW_MS * 0.84));
+  return 0;
+}
+
+/** The collapsing card for one just-dead enemy. `data-death-index` is its slot in the
+ *  row it died in — a kill re-indexes the survivors, so the fx layer needs a stable
+ *  handle on the body the blow is still flying toward. */
+function dyingCard(d) {
+  // A boss says so: its collapse is the biggest single event in the run, and the word is
+  // what makes the difference readable with no motion at all (the row is also the only
+  // place the boss's name is still on screen, its card having left the snapshot).
+  const label = d.boss ? 'BOSS DOWN' : 'DOWN';
+  // No lane class here: the ghost sits in the flex row at its own slot, and the fx layer
+  // aims by `data-death-index`, not by side (a `side-${d.side}` prefix produced the
+  // meaningless `side-side-0` anyway).
+  const ghost = el('div', {
+    cls: `enemy is-dying ash` + (d.boss ? ' boss-down' : ''),
+    attrs: { 'data-death-index': String(d.enemy) },
+  });
+  const holdMs = deathHoldMs(d);
+  if (holdMs > 0) ghost.style.animationDelay = `${holdMs}ms`;
+  const fig = el('div', { cls: 'fig pose-hurt', attrs: { 'aria-hidden': 'true' } });
+  fig.innerHTML = enemyMarkup(d.id);
+  ghost.append(fig);
+  ghost.append(el('div', { cls: 'ename', text: d.name }));
+  ghost.append(el('div', { cls: 'ehp', text: label }));
+  return ghost;
+}
+
 function dyingRow(dying, row = el('div', { cls: 'enemies' })) {
-  for (const d of dying) {
-    // A boss says so: its collapse is the biggest single event in the run, and the word is
-    // what makes the difference readable with no motion at all (the row is also the only
-    // place the boss's name is still on screen, its card having left the snapshot).
-    const label = d.boss ? 'BOSS DOWN' : 'DOWN';
-    const ghost = el('div', { cls: `enemy is-dying ash side-${d.side}` + (d.boss ? ' boss-down' : '') });
-    const fig = el('div', { cls: 'fig pose-hurt', attrs: { 'aria-hidden': 'true' } });
-    fig.innerHTML = enemyMarkup(d.id);
-    ghost.append(fig);
-    ghost.append(el('div', { cls: 'ename', text: d.name }));
-    ghost.append(el('div', { cls: 'ehp', text: label }));
-    row.append(ghost);
-  }
+  for (const d of dying) row.append(dyingCard(d));
   return row;
 }
 
@@ -2082,8 +2117,19 @@ function combatView() {
   fight.append(backdrop);
   fight.append(el('div', { cls: 'ground', attrs: { 'aria-hidden': 'true' } }));
   fight.append(heroFigure());
-  const row = el('div', { cls: 'enemies' }, ...snap.enemies.map((e, i) => enemyCard(e, i)));
-  dyingRow(dyingThisPaint, row);
+  // The row paints the LINEUP the stroke was aimed at: a just-killed enemy keeps its slot
+  // as a collapsing ghost and the survivors keep theirs, so the killing blow reads
+  // against the target it was aimed at and no survivor slides into a dead foe's place
+  // while the weapon is still in the air. (The row never reorders, so the stable kernel
+  // index IS the old slot; death only removes — living slots and ghost slots together
+  // are exactly 0..n-1.)
+  const ghostAt = new Map(dyingThisPaint.map((d) => [d.enemy, d]));
+  const slots = snap.enemies.length + dyingThisPaint.length;
+  const row = el('div', { cls: 'enemies' });
+  for (let slot = 0, live = 0; slot < slots; slot += 1) {
+    if (ghostAt.has(slot)) row.append(dyingCard(ghostAt.get(slot)));
+    else row.append(enemyCard(snap.enemies[live], live++));
+  }
   fight.append(row);
   fight.append(speedDock());
   wrap.append(fight);

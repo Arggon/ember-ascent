@@ -446,3 +446,92 @@ async function probeHammerArc(t, seed) {
     await browser.close();
   }
 }
+
+test('a killing throw holds the victim in its slot until the hammer lands', { timeout: 300000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  // Probe seeds for a two-enemy first fight where the salvo (5x2) kills the weaker foe.
+  for (const seed of [7, 8, 9, 10, 11, 12]) {
+    const r = await probeKillSlot(t, seed);
+    if (!r) continue;
+    const { before, mid } = r;
+    const victimBefore = before.find((b) => b.t === String(mid.victimIdx + 1));
+    const ghostNow = mid.ghost;
+    const survivorNow = mid.survivors.find((b) => b.t !== String(mid.victimIdx + 1));
+    const survivorBefore = before.find((b) => b.t !== String(mid.victimIdx + 1));
+    assert.ok(ghostNow, 'the killed enemy must remain on stage as an addressed ghost');
+    assert.ok(Math.abs(ghostNow.x - victimBefore.x) < 60,
+      `the ghost must hold the victim's slot (ghost ${ghostNow.x}px vs victim ${victimBefore.x}px)`);
+    assert.ok(mid.ghostOpacity > 0.5,
+      `the ghost must still be visible while the hammer flies (opacity ${mid.ghostOpacity})`);
+    assert.ok(survivorNow && survivorBefore && Math.abs(survivorNow.x - survivorBefore.x) < 30,
+      'the survivor must not slide into the dead foe\'s slot mid-flight');
+    return;
+  }
+  assert.fail('no seed offered a two-enemy fight the salvo could end');
+});
+
+/** Boot into a two-enemy floor-1 fight, kill the weaker foe with Twin Hammers, and
+ *  sample the row mid-flight. Returns null when the seed does not offer the setup. */
+async function probeKillSlot(t, seed) {
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      reducedMotion: 'no-preference',
+    });
+    const page = await ctx.newPage();
+    await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+    await page.goto(`${base}/src/web/index.html?seed=${seed}`);
+    await page.waitForLoadState('domcontentloaded');
+    const bellows = page.getByRole('button', { name: /^Bellows Breath:/ });
+    if ((await bellows.count()) === 1) await bellows.click();
+    else await page.getByRole('button', { name: /^(Iron Skin|Sparkfall):/ }).first().click();
+    await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+    await page.evaluate(() => {
+      const ctl = window.__dlb.controller();
+      const save = JSON.parse(ctl.save());
+      for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-kill-twin-${i}`, cardId: 'twin_strike' });
+      const res = ctl.load(save);
+      if (!res.ok) throw new Error(`save/load failed: ${(res.problems || []).join('; ')}`);
+    });
+    await travelToFight(page);
+    await sleep(600);
+
+    let s = await readState(page);
+    if (s.enemies.length !== 2) return null;
+    if (!s.hand.some((c) => c.cardId === 'twin_strike')) {
+      await endTurn(page);
+      await sleep(2200);
+      s = await readState(page);
+      if (s.phase !== 'combat' || !s.hand.some((c) => c.cardId === 'twin_strike')) return null;
+    }
+    const victim = s.enemies.reduce((a, b) => (b.hp < a.hp ? b : a));
+    if (victim.hp > 10) return null; // the salvo must KILL, or there is no reflow to pin
+
+    const before = await page.evaluate(() => [...document.querySelectorAll('.enemy[data-target-index]')]
+      .map((el) => { const r = el.getBoundingClientRect(); return { t: el.getAttribute('data-target-index'), x: Math.round(r.x + r.width / 2) }; }));
+
+    const twin = page.locator('button[data-slot][aria-label^="Twin Hammers"][aria-disabled="false"]');
+    await twin.first().click();
+    await page.waitForSelector('.enemy.targeting', { timeout: 3000 });
+    await page.locator(`.enemy[data-target-index="${victim.index + 1}"]`).click();
+    await sleep(500); // mid-flight; the ghost holds until ~756ms, then shatters
+
+    const mid = await page.evaluate((victimIdx) => {
+      const g = document.querySelector(`.enemy.is-dying[data-death-index="${victimIdx}"]`);
+      const survivors = [...document.querySelectorAll('.enemy[data-target-index]')]
+        .map((el) => { const r = el.getBoundingClientRect(); return { t: el.getAttribute('data-target-index'), x: Math.round(r.x + r.width / 2) }; });
+      return {
+        victimIdx,
+        ghost: g ? { x: Math.round(g.getBoundingClientRect().x + g.getBoundingClientRect().width / 2) } : null,
+        ghostOpacity: g ? Number(getComputedStyle(g).opacity) : 0,
+        survivors,
+      };
+    }, victim.index);
+    return { before, mid };
+  } catch {
+    return null;
+  } finally {
+    await browser.close();
+  }
+}
