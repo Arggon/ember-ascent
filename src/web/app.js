@@ -732,7 +732,11 @@ function act(actionId, targetK = null) {
     // Card played: it travels toward the enemy row as a copy on the effect layer. The
     // copy is built from the hand tile the player actually clicked, so the thing that
     // flies is the thing they pressed; the tile itself is gone from the rebuilt tree.
-    if (before.phase === 'combat' && after.phase === 'combat') {
+    // The fly (and with it the pose hold and the signature timers) must also arm on a
+    // KILL — `after` is reward/ended then, and a kill is exactly the stroke the player
+    // most needs to see. The hold stage mirrors the fight's own layout, so the fly's
+    // lane classes still read against it.
+    if (before.phase === 'combat') {
       const playedSlot = actionId.split('_')[0];
       const played = before.hand.find((c) => c.slot === playedSlot && c.cardId);
       if (played) {
@@ -1245,9 +1249,13 @@ function render() {
    * transparent and the stage would be blank again. The sequence the brief asks for survives
    * — the collapse is still a beat of its own, before the summary.
    */
-  const endHeld = arriving.victory || arriving.defeat;
+  // A MID-RUN kill arrives at `reward`, not `ended`, but the beat is the same one: the
+  // stroke lands, the enemy folds, THEN the next panel replaces the stage. Without the
+  // reward arrival here, the spoils view swapped in on the very next paint — no swing,
+  // no collapse (owner report: "when I use a card that kills the enemy I don't see any
+  // animation, just the victory screen").
+  const endHeld = arriving.victory || arriving.defeat || arriving.reward;
   if (endHeld && dyingThisPaint.length > 0) {
-    const wait = reducedMotion ? 0 : Math.min(END_DELAY_MS, COLLAPSE_MS);
     // The killing stroke must still be SEEN. The old hold painted only the dying ghost +
     // a spacer, so the hero vanished the instant its blow landed and the victory panel
     // replaced everything ~480ms later — the player never saw the swing they triggered
@@ -1267,9 +1275,24 @@ function render() {
     dyingRow(dyingThisPaint, holdEnemies);
     holdFight.append(holdEnemies);
     holdWrap.append(holdFight, el('div', { cls: 'ended-hold', attrs: { 'aria-hidden': 'true' } }));
-    stageEl.replaceChildren(holdWrap);
-    laterPaint(() => { if (snap.phase === 'ended') render(); }, wait);
-    paintedPhase = snap.phase;
+    // The hold stage must sit in the SAME page wrapper combatView uses (`page-combat`
+    // sizes and positions the fight), or the hero lands outside the frame and the
+    // backdrop loses its lighting — a near-black stage instead of the fight it ended.
+    stageEl.replaceChildren(page('combat', 'II — The Fight', 'blade', '', [holdWrap]));
+    // How long the stage holds. The collapse ghost reads for COLLAPSE_MS; a killing
+    // stroke with a SIGNATURE needs longer, because its impact beat fires at ~70% of the
+    // pose and the effect (shockwave, anvil, salvo, rend, launch) lives ~600ms beyond
+    // that — on the persistent fx layer, so it plays against THIS stage only while the
+    // stage is up. heroFigure() above armed the pose hold, so `heroMoveHold.dur` is the
+    // pose's true length (the signature's poseMs, or its move's base when it has none).
+    const held = heroMoveHold;
+    const sig = signatureFor(bursts.find((b) => b.kind === 'card-fly'));
+    const strokeMs = held && sig ? Math.round(held.dur * 0.7) + 650 : 0;
+    const wait = reducedMotion ? 0 : Math.max(Math.min(END_DELAY_MS, COLLAPSE_MS), strokeMs);
+    laterPaint(() => { if (snap.phase === 'ended' || snap.phase === 'reward') render(); }, wait);
+    // Keep the fight as the painted phase after a reward hold, so the spoils panel still
+    // gets its entrance animation when the beat ends. The ended panel paints plain.
+    if (snap.phase !== 'reward') paintedPhase = snap.phase;
     lastPlayerStatuses = statusKeysNow;
     if (dealPending || dyingThisPaint.length > 0 || travelPending) {
       laterPaint(() => { dealPending = false; dyingThisPaint = []; }, 0);

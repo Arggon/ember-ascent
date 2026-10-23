@@ -253,12 +253,27 @@ test('end turn: the turn advances and the enemy does what its intent announced',
   }
 });
 
-test('kill: the stroke that ends the fight resolves into the reward screen', { timeout: 240000 }, async (t) => {
+test('kill: the stroke plays against the hold stage, then the reward arrives', { timeout: 240000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   const page = await freshPage(t);
   await bootToMap(page);
   await injectMaulDeck(page);
   await travelToFight(page);
+
+  // In-page collector for the kill beat: the hold is transient (~1.5s for a signature
+  // stroke) and the shockwave fires mid-hold, so sample from inside the page.
+  await page.evaluate(() => {
+    window.__fx = { shake: 0, shockwave: 0, hold: 0, heroInHold: 0 };
+    window.__fxTimer = setInterval(() => {
+      const stage = document.getElementById('stage');
+      if (stage && stage.classList.contains('stage-shake')) window.__fx.shake += 1;
+      if (document.querySelector('.fx-shockwave')) window.__fx.shockwave += 1;
+      if (stage && stage.querySelector('.ended-hold')) {
+        window.__fx.hold += 1;
+        if (stage.querySelector('.stage-combat .fight .hero')) window.__fx.heroInHold += 1;
+      }
+    }, 40);
+  });
 
   // Turn 1: Maul (32) leaves the 40-HP Jaw Worm at 8.
   let s = await readState(page);
@@ -274,17 +289,26 @@ test('kill: the stroke that ends the fight resolves into the reward screen', { t
   await endTurn(page);
   await sleep(2200);
 
-  // Turn 2: Maul kills. The fight must hand over to the reward screen.
+  // Turn 2: Maul kills. The stroke must PLAY — hold stage with the hero + the shockwave
+  // beat — and only then hand over to the reward screen.
   await playCard(page, 'Maul');
   let reward = null;
-  for (let i = 0; i < 24 && !reward; i += 1) {
+  for (let i = 0; i < 40 && !reward; i += 1) {
     await sleep(350);
     const st = await readState(page);
     if (st.phase === 'reward') reward = st;
   }
   assert.ok(reward, 'a killing stroke must resolve the fight into the reward phase');
   assert.ok(reward.rewardCards > 0, 'the reward must offer cards');
-  assert.ok((await page.locator('button[data-action]').count()) > 0, 'reward actions must be clickable');
+  // The kernel flips to `reward` at the kill, while the hold is still playing; the
+  // clickable panel arrives when the beat ends.
+  await page.waitForSelector('button[data-action]', { timeout: 5000 });
+
+  const fx = await page.evaluate(() => window.__fx);
+  assert.ok(fx.hold > 0, 'the kill must hold the fight stage before the panel (the beat)');
+  assert.ok(fx.heroInHold > 0, 'the held stage must include the hero figure');
+  assert.ok(fx.shake > 0, "Maul's stage shake must fire during the kill");
+  assert.ok(fx.shockwave > 0, "Maul's ember shockwave must fire during the kill");
 });
 
 test('signature: Maul fires shake + shockwave through the real targeting path', { timeout: 300000 }, async (t) => {
