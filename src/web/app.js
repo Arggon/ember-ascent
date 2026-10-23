@@ -1248,8 +1248,26 @@ function render() {
   const endHeld = arriving.victory || arriving.defeat;
   if (endHeld && dyingThisPaint.length > 0) {
     const wait = reducedMotion ? 0 : Math.min(END_DELAY_MS, COLLAPSE_MS);
-    stageEl.replaceChildren(dyingRow(dyingThisPaint),
-      el('div', { cls: 'ended-hold', attrs: { 'aria-hidden': 'true' } }));
+    // The killing stroke must still be SEEN. The old hold painted only the dying ghost +
+    // a spacer, so the hero vanished the instant its blow landed and the victory panel
+    // replaced everything ~480ms later — the player never saw the swing they triggered
+    // (owner report: "when the card kills the enemy the attack effect does not play").
+    // The hold therefore mirrors combatView's structure — same .stage-combat > .fight
+    // wrapper, backdrop, ground, the hero figure HOLDING its killing pose, and the ghost
+    // row — so the pose animation (and its impact beat, fired by dispatchFx right after)
+    // plays against a stage that looks exactly like the fight it ended.
+    const holdWrap = el('div', { cls: 'stage-combat' });
+    const holdFight = el('div', { cls: 'fight' });
+    const holdBackdrop = el('div', { cls: 'backdrop', attrs: { 'aria-hidden': 'true' } });
+    holdBackdrop.innerHTML = backdropMarkup((BIOMES[snap.biome] ?? BIOMES[DEFAULT_BIOME]).backdrop);
+    holdFight.append(holdBackdrop);
+    holdFight.append(el('div', { cls: 'ground', attrs: { 'aria-hidden': 'true' } }));
+    holdFight.append(heroFigure());
+    const holdEnemies = el('div', { cls: 'enemies' });
+    dyingRow(dyingThisPaint, holdEnemies);
+    holdFight.append(holdEnemies);
+    holdWrap.append(holdFight, el('div', { cls: 'ended-hold', attrs: { 'aria-hidden': 'true' } }));
+    stageEl.replaceChildren(holdWrap);
     laterPaint(() => { if (snap.phase === 'ended') render(); }, wait);
     paintedPhase = snap.phase;
     lastPlayerStatuses = statusKeysNow;
