@@ -1423,6 +1423,16 @@ function dispatchFx() {
                 animMs(560) || 560);
             }, animMs(Math.round((sig.poseMs || 1000) * 0.66)) || 1);
           }
+          // Anvil Blow: the spectral anvil falls and cracks onto the target.
+          if (sig.anvil) {
+            const genA = ++animGen;
+            later(() => {
+              if (genA !== animGen) return;
+              fxAdd(el('div', { cls: `fx-anvil ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
+                el('span', { cls: 'fx-anvil-body' }), el('span', { cls: 'fx-anvil-crack' })),
+                animMs(700) || 700);
+            }, animMs(Math.round(HERO_POSE_MS.heavy * 0.58)) || 1);
+          }
         }
         break;
       default:
@@ -1655,6 +1665,9 @@ const THROW_MS = 900;
 const HERO_SIGNATURES = {
   // Maul: longer windup, screen shake and an ember shockwave on impact.
   bludgeon: { poseMs: 1150, shake: true, shockwave: true },
+  // Anvil Blow: "The anvil answers louder than the hammer." A spectral anvil drops
+  // from above onto the target the moment the hammer lands.
+  bash: { anvil: true },
 };
 /** The signature knobs for a card-fly burst, or null. */
 function signatureFor(fly) {

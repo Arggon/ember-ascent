@@ -1719,6 +1719,7 @@ html, body {
   .fx-hammer,
   .fx-hammer-hit,
   .fx-shockwave,
+  .fx-anvil,
   .fx-armor-dome,
   .fx-channel-embers { animation: none !important; }
 
@@ -3631,6 +3632,50 @@ html, body {
   55% { opacity: 0.75; }
   100% { transform: scale(4.4); opacity: 0; border-width: 1px; }
 }
+/* Anvil Blow's spectral anvil: a dark iron anvil with an ember seam falls from the top
+   of the stage onto the aimed lane, cracks the ground with a flash, and fades. */
+.fx-anvil {
+  position: absolute; z-index: 4; width: 74px; height: 60px; pointer-events: none;
+  top: 6%;
+  animation: anvil-drop 0.7s cubic-bezier(0.55, 0, 0.85, 0.36) both;
+}
+.fx-anvil .fx-anvil-body {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, #4a382c, #241812 58%, #38261a);
+  border: 1px solid #6a4a32; border-radius: 4px 4px 8px 8px;
+  box-shadow: inset 0 -3px 6px rgba(255, 120, 40, 0.55), 0 0 14px rgba(255, 110, 40, 0.4);
+  clip-path: polygon(12% 0, 88% 0, 96% 34%, 78% 34%, 82% 100%, 18% 100%, 22% 34%, 4% 34%);
+}
+.fx-anvil .fx-anvil-body::after {
+  content: ''; position: absolute; left: 30%; right: 30%; top: 42%; height: 5px;
+  background: linear-gradient(90deg, transparent, #ffb050 30%, #ff5a1e 70%, transparent);
+  box-shadow: 0 0 9px rgba(255, 130, 40, 0.95);
+}
+.fx-anvil .fx-anvil-crack {
+  position: absolute; left: 50%; bottom: -6px; width: 110px; height: 26px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 190, 110, 0.85), rgba(255, 110, 30, 0.4) 55%, transparent 75%);
+  opacity: 0;
+  animation: anvil-crack 0.34s ease-out 0.34s both;
+}
+@keyframes anvil-drop {
+  0% { transform: translateY(0) scale(0.85); opacity: 0; }
+  10% { opacity: 1; }
+  48% { transform: translateY(46vh) scale(1.06); opacity: 1; }
+  58% { transform: translateY(48vh) scale(0.96); opacity: 1; }
+  86% { transform: translateY(48vh) scale(0.9); opacity: 0.85; }
+  100% { transform: translateY(48vh) scale(0.82); opacity: 0; }
+}
+@keyframes anvil-crack {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.4); }
+  30% { opacity: 1; transform: translateX(-50%) scale(1.15); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.5); }
+}
+.fx-anvil.side-0 { left: 24vw; }
+.fx-anvil.side-1 { left: 70vw; }
+.fx-anvil.side-mid, .fx-anvil.side-none { left: 47vw; }
 .stage-combat .fig.pose-throw .spr-frame-windup { animation: frame-throw-wind 0.9s ease-in-out both; }
 .stage-combat .fig.pose-throw .spr-frame-strike { animation: frame-throw-strike 0.9s ease-in-out both; }
 @keyframes frame-throw-wind {

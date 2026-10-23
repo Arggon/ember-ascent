@@ -283,7 +283,15 @@ test('MAUL (bludgeon) plays its own colossal signature move, not the shared heav
   // The signature knobs drive the hold and the impact beat.
   const sig = api.signatureFor({ kind: 'card-fly', id: 'bludgeon', type: 'attack' });
   assert.ok(sig && sig.poseMs === 1150 && sig.shake && sig.shockwave, 'Maul signature: 1150ms hold, shake, shockwave');
-  assert.equal(api.signatureFor({ kind: 'card-fly', id: 'bash', type: 'attack' }), null, 'non-signature cards have no knobs');
+  assert.equal(api.signatureFor({ kind: 'card-fly', id: 'clothesline', type: 'attack' }), null, 'non-signature cards have no knobs');
+});
+
+test('ANVIL BLOW (bash) drops the spectral anvil on its heavy stroke', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'bash', type: 'attack' }), 'heavy', 'Anvil Blow keeps the heavy body motion');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'bash', type: 'attack' });
+  assert.ok(sig && sig.anvil, 'Anvil Blow signature: the anvil drop knob');
+  assert.ok(!sig.shake && !sig.shockwave, 'Anvil Blow does not steal Maul\'s stage shake');
 });
 
 test('throw cards play the throw pose, and HERO_THROWS carries the flight choreography', () => {
