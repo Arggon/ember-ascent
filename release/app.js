@@ -1400,6 +1400,30 @@ function dispatchFx() {
               animMs(420) || 420);
           }, animMs(Math.round(THROW_MS * 0.84)) || 1);
         }
+        // SIGNATURE choreography (per-card): Maul shakes the whole stage and detonates an
+        // ember shockwave at the moment its colossal stroke lands (66% of the pose).
+        const sig = signatureFor(b);
+        if (sig) {
+          if (sig.shake) {
+            const genS = ++animGen;
+            later(() => {
+              if (genS !== animGen) return;
+              if (stageEl && stageEl.classList) stageEl.classList.add('stage-shake');
+              later(() => {
+                if (genS !== animGen) return;
+                if (stageEl && stageEl.classList) stageEl.classList.remove('stage-shake');
+              }, animMs(450) || 450);
+            }, animMs(Math.round((sig.poseMs || 1000) * 0.66)) || 1);
+          }
+          if (sig.shockwave) {
+            const genW = ++animGen;
+            later(() => {
+              if (genW !== animGen) return;
+              fxAdd(el('div', { cls: `fx-shockwave ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } }),
+                animMs(560) || 560);
+            }, animMs(Math.round((sig.poseMs || 1000) * 0.66)) || 1);
+          }
+        }
         break;
       default:
         break;
@@ -1594,7 +1618,10 @@ const HERO_MOVES = {
   strike: 'strike', anger: 'strike', headbutt: 'strike', pommel: 'strike',
   dropkick: 'strike', ironwave: 'strike', rampage: 'strike',
   bash: 'heavy', clothesline: 'heavy', wild_strike: 'heavy', carnage: 'heavy',
-  uppercut: 'heavy', bludgeon: 'heavy',
+  uppercut: 'heavy',
+  // Per-card signature moves (one commit per card): bludgeon — Maul, "One stroke. The
+  // argument ends." — is the 32-damage rare: its own COLOSSAL pose, not shared heavy.
+  bludgeon: 'colossal',
   twin_strike: 'flurry', pummel: 'flurry',
   cleave: 'sweep', thunderclap: 'sweep', reaper: 'sweep', gust: 'sweep',
   // THROW cards: the flavor text says the weapon flies and (for the Brand) comes back,
@@ -1624,6 +1651,15 @@ const HERO_THROWS = {
 };
 /** Total wall-clock of the hammer flight (there + burst + optional return), in ms at 1x. */
 const THROW_MS = 900;
+/** Per-card signature moves: extra knobs keyed by card id (pose handled via HERO_MOVES). */
+const HERO_SIGNATURES = {
+  // Maul: longer windup, screen shake and an ember shockwave on impact.
+  bludgeon: { poseMs: 1150, shake: true, shockwave: true },
+};
+/** The signature knobs for a card-fly burst, or null. */
+function signatureFor(fly) {
+  return fly && fly.id ? HERO_SIGNATURES[fly.id] || null : null;
+}
 
 function heroMove(fly) {
   if (!fly) return null;
@@ -1649,8 +1685,11 @@ function heroPose() {
     // Reduced motion and speed 0 skip the animation; do not hold a pose that never plays.
     // The hold length is the CSS animation's own duration (the keyframes do not scale
     // with the JS speed setting), so the pose is never dropped mid-swing on a repaint.
+    // A per-card SIGNATURE (HERO_SIGNATURES) may override the pose's base duration.
+    const sig = move ? signatureFor(bursts.find((b) => b.kind === 'card-fly')) : null;
+    const base = (sig && sig.poseMs) || HERO_POSE_MS[move] || 400;
     if (reducedMotion || animSpeed === 0) heroMoveHold = null;
-    else heroMoveHold = { pose: move, start: Date.now(), dur: HERO_POSE_MS[move] || 400 };
+    else heroMoveHold = { pose: move, start: Date.now(), dur: base };
     return move;
   }
   // An incidental repaint (hover, aim) during the hold repaints the SAME pose rather

@@ -120,7 +120,7 @@ let src = rawSrc
   .replace(/\bboot\(\)\s*;?\s*$/, '');
 src = src.replace('function toast(msg, kind = \'warn\') {', 'function toast(msg, kind = \'warn\') { __toasts.push(msg);');
 src = 'async function measure(){ return null; }\n' + src;
-src += '\nreturn { render, clickCard, act, get pendingSlot(){return pendingSlot;}, snapGet(){return snap;}, heroMove, heroPose, HERO_MOVES, MOVE_DEFAULTS, HERO_THROWS, animSpeedGet: () => animSpeed, injectBursts: (b) => { bursts = b; } };';
+src += '\nreturn { render, clickCard, act, get pendingSlot(){return pendingSlot;}, snapGet(){return snap;}, heroMove, heroPose, HERO_MOVES, MOVE_DEFAULTS, HERO_THROWS, signatureFor, animSpeedGet: () => animSpeed, injectBursts: (b) => { bursts = b; } };';
 
 const ctlMod = await import('../../src/surface/gui/controller.js');
 const factory = new Function('__ctl', '__toasts', '__mods', `
@@ -232,8 +232,9 @@ test('an unknown card id falls back to the type-based movement', () => {
   assert.equal(api.heroMove({ id: 'no_such_card', type: 'attack' }), 'strike', 'unknown attack falls back to strike');
   assert.equal(api.heroMove({ id: 'no_such_card', type: 'skill' }), 'brace', 'unknown skill falls back to brace');
   assert.equal(api.heroMove({ id: 'no_such_card', type: 'power' }), 'brace', 'unknown power falls back to brace');
-  // A known id overrides its type: bludgeon is an attack, but a 3-cost maul lands heavy.
-  assert.equal(api.heroMove({ id: 'bludgeon', type: 'attack' }), 'heavy', 'the per-card entry wins over the type default');
+  // A known id overrides its type. (Maul/bludgeon now has its OWN colossal signature —
+  // covered by the dedicated test below — so the override example here is Returning Brand.)
+  assert.equal(api.heroMove({ id: 'sword_boomerang', type: 'attack' }), 'throw', 'the per-card entry wins over the type default');
   assert.equal(api.heroMove(null), null, 'no card-fly burst means no movement override');
   // Prototype-chain trap: an id that collides with Object.prototype must not resolve.
   assert.equal(api.heroMove({ id: 'constructor', type: 'attack' }), 'strike', 'an Object.prototype key is not a movement');
@@ -271,6 +272,18 @@ test('a fast consecutive play replaces the still-running hold with the new card 
   assert.equal(api.heroPose(), 'heavy');
   api.injectBursts([{ kind: 'card-fly', id: 'defend', type: 'skill', name: 'Quench', side: 'side-none' }]);
   assert.equal(api.heroPose(), 'guard', 'the fresh card play wins over the previous hold');
+});
+
+test('MAUL (bludgeon) plays its own colossal signature move, not the shared heavy', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'bludgeon', type: 'attack' }), 'colossal', 'Maul resolves to its own colossal pose');
+  assert.equal(api.heroMove({ id: 'bash', type: 'attack' }), 'heavy', 'other heavies are untouched');
+  api.injectBursts([{ kind: 'card-fly', id: 'bludgeon', type: 'attack', name: 'Maul', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'colossal');
+  // The signature knobs drive the hold and the impact beat.
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'bludgeon', type: 'attack' });
+  assert.ok(sig && sig.poseMs === 1150 && sig.shake && sig.shockwave, 'Maul signature: 1150ms hold, shake, shockwave');
+  assert.equal(api.signatureFor({ kind: 'card-fly', id: 'bash', type: 'attack' }), null, 'non-signature cards have no knobs');
 });
 
 test('throw cards play the throw pose, and HERO_THROWS carries the flight choreography', () => {

@@ -1713,9 +1713,12 @@ html, body {
   .stage-combat .fig.pose-channel,
   .stage-combat .fig.pose-throw,
   .stage-combat .fig.pose-slam,
+  .stage-combat .fig.pose-colossal,
+  .stage-combat.stage-shake,
   .stage-combat .fig .spr-frame,
   .fx-hammer,
   .fx-hammer-hit,
+  .fx-shockwave,
   .fx-armor-dome,
   .fx-channel-embers { animation: none !important; }
 
@@ -3578,6 +3581,56 @@ html, body {
    throw lands with the strike frame; idle returns as the strike frame fades. */
 .stage-combat .fig.pose-throw { animation: hero-throw 0.9s ease-in-out; }
 .stage-combat .fig.pose-throw .spr { animation: frame-idle-hide 0.9s linear both; }
+/* COLOSSAL (Maul, per-card signature): the stroke of a 32-damage rare. A long, loaded
+   windup, an enormous forward crash with a heavy overshoot, and a slow settle — the
+   whole pose runs 1.15s and the impact beat fires the stage shake + shockwave. */
+.stage-combat .fig.pose-colossal { animation: hero-colossal 1.15s cubic-bezier(0.32, 0.72, 0.28, 1); }
+.stage-combat .fig.pose-colossal .spr { animation: frame-idle-hide 1.15s linear both; }
+.stage-combat .fig.pose-colossal .spr-frame-windup { animation: frame-colossal-a 1.15s ease-in-out both; filter: brightness(1.5) drop-shadow(0 0 2px rgba(255, 220, 160, 0.85)) drop-shadow(0 0 22px rgba(255, 90, 30, 0.8)); }
+.stage-combat .fig.pose-colossal .spr-frame-strike { animation: frame-colossal-b 1.15s ease-in-out both; filter: brightness(1.6) drop-shadow(0 0 3px rgba(255, 230, 170, 0.9)) drop-shadow(0 0 26px rgba(255, 110, 30, 0.9)); }
+@keyframes frame-colossal-a {
+  0% { opacity: 0; } 9% { opacity: 1; } 44% { opacity: 1; } 58%, 100% { opacity: 0; }
+}
+@keyframes frame-colossal-b {
+  0% { opacity: 0; } 52% { opacity: 0; } 60% { opacity: 1; } 88% { opacity: 1; } 96%, 100% { opacity: 0; }
+}
+@keyframes hero-colossal {
+  0% { transform: none; }
+  18% { transform: translate(-20px, 9px) rotate(8deg) scale(0.96); }
+  44% { transform: translate(-16px, 7px) rotate(6deg) scale(0.97); }
+  58% { transform: translate(46px, -12px) rotate(-14deg) scale(1.08); }
+  74% { transform: translate(40px, -6px) rotate(-9deg) scale(1.04); }
+  100% { transform: none; }
+}
+/* The impact beat: the WHOLE stage jumps for one beat (class added/removed by dispatchFx
+   so it is exactly once per signature stroke, never looped). */
+.stage-combat.stage-shake { animation: stage-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+@keyframes stage-shake {
+  0%, 100% { transform: translate(0, 0); }
+  12% { transform: translate(-9px, 4px); }
+  26% { transform: translate(8px, -5px); }
+  40% { transform: translate(-6px, 3px); }
+  55% { transform: translate(5px, -2px); }
+  72% { transform: translate(-3px, 1px); }
+  86% { transform: translate(2px, -1px); }
+}
+/* Ember shockwave: a fast expanding ring + heat wash from the impact point. */
+.fx-shockwave {
+  position: absolute; z-index: 4; width: 70px; height: 70px; pointer-events: none;
+  top: 34%;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 150, 50, 0.85);
+  box-shadow: 0 0 24px rgba(255, 110, 30, 0.6), inset 0 0 18px rgba(255, 170, 60, 0.45);
+  animation: fx-shockwave 0.56s cubic-bezier(0.16, 0.84, 0.44, 1) both;
+}
+.fx-shockwave.side-0 { left: 24vw; }
+.fx-shockwave.side-1 { left: 70vw; }
+.fx-shockwave.side-mid, .fx-shockwave.side-none { left: 47vw; }
+@keyframes fx-shockwave {
+  0% { transform: scale(0.35); opacity: 1; border-width: 5px; }
+  55% { opacity: 0.75; }
+  100% { transform: scale(4.4); opacity: 0; border-width: 1px; }
+}
 .stage-combat .fig.pose-throw .spr-frame-windup { animation: frame-throw-wind 0.9s ease-in-out both; }
 .stage-combat .fig.pose-throw .spr-frame-strike { animation: frame-throw-strike 0.9s ease-in-out both; }
 @keyframes frame-throw-wind {
