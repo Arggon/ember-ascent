@@ -173,14 +173,14 @@ async function reachQualifyingFight(page) {
   assert.fail('no qualifying fight within 12 steps');
 }
 
-/** Transit fight: spend Mauls (kills are fine here — no claim is taken from these). */
+/** Transit fight: spend attacks (kills are fine here — no claim is taken from these). */
 async function playOutTransitFight(page) {
   for (let guard = 0; guard < 24; guard += 1) {
     const s = await readState(page);
     if (s.phase !== 'combat') return;
-    const maul = page.locator('button[data-slot][aria-label^="Maul"][aria-disabled="false"]');
-    if ((await maul.count()) > 0) {
-      await maul.first().click();
+    const attack = page.locator('button[data-slot].type-attack[aria-disabled="false"]');
+    if ((await attack.count()) > 0) {
+      await attack.first().click();
       await sleep(300);
       if (s.enemies.length > 1) {
         const toughest = s.enemies.reduce((a, b) => (b.hp > a.hp ? b : a));
@@ -366,3 +366,83 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
   // The tank survived on purpose: no victory-hold race muddies the claim.
   assert.equal(after.phase, 'combat', 'the fight must still be running');
 });
+
+test('thrown hammers arc from the hero and land on the aimed enemy', { timeout: 300000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  // A fixed seed deals a FIXED hand: probe seeds until one deals the salvo (one redraw
+  // each), then verify the arc on that attempt.
+  for (const seed of [7, 8, 9, 10, 11, 12]) {
+    const attempt = await probeHammerArc(t, seed);
+    if (!attempt) continue;
+    const { arc } = attempt;
+    assert.ok(arc.first && arc.first.x < 320,
+      `the hammer must launch from the hero's side (first sample at ${JSON.stringify(arc.first)})`);
+    assert.ok(arc.minDist < 80,
+      `the hammer must land on the aimed enemy (closest approach ${Math.round(arc.minDist)}px)`);
+    return;
+  }
+  assert.fail('no seed dealt Twin Hammers in two hands');
+});
+
+/** Boot, inject a twin-heavy deck, travel, and fly one salvo. Returns the arc samples,
+ *  or null when this seed's two hands held no Twin Hammers. Closes its own browser. */
+async function probeHammerArc(t, seed) {
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      reducedMotion: 'no-preference',
+    });
+    const page = await ctx.newPage();
+    await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+    await page.goto(`${base}/src/web/index.html?seed=${seed}`);
+    await page.waitForLoadState('domcontentloaded');
+    // The kindling offer is seed-dependent; base 3 Energy covers the salvo's cost 1,
+    // so whichever gift is offered will do.
+    const bellows = page.getByRole('button', { name: /^Bellows Breath:/ });
+    if ((await bellows.count()) === 1) await bellows.click();
+    else await page.getByRole('button', { name: /^(Iron Skin|Sparkfall):/ }).first().click();
+    await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+    await page.evaluate(() => {
+      const ctl = window.__dlb.controller();
+      const save = JSON.parse(ctl.save());
+      for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-twin-${i}`, cardId: 'twin_strike' });
+      const res = ctl.load(save);
+      if (!res.ok) throw new Error(`save/load failed: ${(res.problems || []).join('; ')}`);
+    });
+    await travelToFight(page);
+
+    let s = await readState(page);
+    if (!s.hand.some((c) => c.cardId === 'twin_strike')) {
+      await endTurn(page);
+      await sleep(2200);
+      s = await readState(page);
+      if (s.phase !== 'combat' || !s.hand.includes('twin_strike')) return null;
+    }
+
+    // Sample the flying hammer against the enemy's live position.
+    await page.evaluate(() => {
+      const card = document.querySelector('.enemy[data-target-index]');
+      const cr = card.getBoundingClientRect();
+      window.__aim = { x: cr.left + cr.width / 2, y: cr.top + cr.height / 2 };
+      window.__arc = { first: null, minDist: Infinity };
+      window.__arcTimer = setInterval(() => {
+        const h = document.querySelector('.fx-hammer');
+        if (!h) return;
+        const r = h.getBoundingClientRect();
+        const p = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        if (!window.__arc.first) window.__arc.first = p;
+        const d = Math.hypot(p.x - window.__aim.x, p.y - window.__aim.y);
+        if (d < window.__arc.minDist) window.__arc.minDist = d;
+      }, 40);
+    });
+
+    const twin = page.locator('button[data-slot][aria-label^="Twin Hammers"][aria-disabled="false"]');
+    assert.ok((await twin.count()) > 0, 'Twin Hammers must be playable');
+    await twin.first().click(); // single enemy: one click plays it, no targeting
+    await sleep(2600);
+    return { arc: await page.evaluate(() => window.__arc) };
+  } finally {
+    await browser.close();
+  }
+}

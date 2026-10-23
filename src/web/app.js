@@ -1398,6 +1398,48 @@ function fxAdd(node, ms) {
 }
 
 /**
+ * Where the burst's aimed enemy actually sits, in fx-layer coordinates (the layer is
+ * `position: fixed; inset: 0`, so viewport rects map 1:1), plus the hero's throwing
+ * shoulder. The stylesheet's vw lane classes are only the fallback: the enemy row's
+ * real layout shifts with the enemy count, so a lane guessed in vw misses the card it
+ * is meant to hit — the thrown hammer flew across the top of the screen (owner report).
+ * Measuring the card the burst names is the same truth DOM ancestry gives the floaters:
+ * the burst carries the aimed enemy's living index, the card carries `data-target-index`.
+ * A kill's ghost (the hold stage) keeps its side class, so it can be found too.
+ * @returns {{x: number, y: number, from: {x: number, y: number}} | null}
+ */
+function throwLane(b) {
+  if (!stageEl || !stageEl.querySelector) return null;
+  let card = null;
+  if (b && Number.isInteger(b.enemy)) {
+    card = stageEl.querySelector(`.enemy[data-target-index="${b.enemy + 1}"]`);
+  }
+  if (!card && b && b.side) card = stageEl.querySelector(`.enemy.is-dying.side-${b.side}`);
+  if (!card) {
+    const living = stageEl.querySelectorAll('.enemy[data-target-index]');
+    if (living.length === 1) card = living[0];
+  }
+  if (!card) return null;
+  const r = card.getBoundingClientRect();
+  if (r.width === 0 && r.height === 0) return null;
+  const hero = stageEl.querySelector('.fight .hero');
+  const hr = hero ? hero.getBoundingClientRect() : null;
+  return {
+    x: Math.round(r.left + r.width / 2),
+    y: Math.round(r.top + r.height * 0.55),
+    from: hr
+      ? { x: Math.round(hr.left + hr.width * 0.62), y: Math.round(hr.top + hr.height * 0.28) }
+      : { x: Math.round(innerWidth * 0.08), y: Math.round(innerHeight * 0.39) },
+  };
+}
+
+/** Centre an fx node on a measured point (the node's own CSS size does the rest). */
+function placeAt(node, p, dx = 0, dy = 0) {
+  node.style.left = `${p.x + dx}px`;
+  node.style.top = `${p.y + dy}px`;
+}
+
+/**
  * Play the bursts collected for the action just taken. Called AFTER `render()`, so any
  * node an effect wants to attach to already exists in its final tree.
  */
@@ -1438,19 +1480,31 @@ function dispatchFx() {
         if (animSpeed === 0) break;
         fxAdd(el('div', { cls: `fx-card ${b.side || 'side-none'} type-${b.type || 'skill'}` },
           el('span', { cls: 'fx-card-name', text: b.name || '' })), animMs(460) || 460);
+        // Both ends of every aimed effect are MEASURED once here (throwLane above): the
+        // lane classes only remain as a fallback for an unmeasurable row, because a
+        // guessed vw lane misses multi-enemy rows.
+        const lane = throwLane(b);
         // THROW choreography: a spinning hammer leaves the hero, arcs into the aimed
         // lane, and (for Returning Brand) flies back. The burst carries the card id, so
         // the effect layer can read `HERO_THROWS` for the return beat. The impact flash
         // is delayed to the moment the arc lands (84% of the flight).
         if (b.id && HERO_THROWS[b.id]) {
-          const throwCls = `fx-hammer ${b.side || 'side-none'}${HERO_THROWS[b.id].returns ? ' fx-hammer-returns' : ''}`;
-          fxAdd(el('div', { cls: throwCls, attrs: { 'aria-hidden': 'true' } },
-            el('span', { cls: 'fx-hammer-head' }), el('span', { cls: 'fx-hammer-haft' })),
-            animMs(THROW_MS) || THROW_MS);
+          const spec = HERO_THROWS[b.id];
+          const flight = spec.ms ?? THROW_MS;
+          const throwCls = `fx-hammer ${b.side || 'side-none'}${spec.returns ? ' fx-hammer-returns' : ''}`;
+          const hammer = el('div', { cls: throwCls, attrs: { 'aria-hidden': 'true' } },
+            el('span', { cls: 'fx-hammer-head' }), el('span', { cls: 'fx-hammer-haft' }));
+          if (lane) {
+            hammer.style.left = `${lane.from.x - 27}px`;
+            hammer.style.top = `${lane.from.y - 11}px`;
+            hammer.style.setProperty('--fly-x', `${lane.x - lane.from.x}px`);
+          }
+          fxAdd(hammer, animMs(flight) || flight);
           fire(() => {
-            fxAdd(el('div', { cls: `fx-hammer-hit ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } }),
-              animMs(420) || 420);
-          }, animMs(Math.round(THROW_MS * 0.84)) || 1);
+            const hit = el('div', { cls: `fx-hammer-hit ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } });
+            if (lane) placeAt(hit, lane, -45, -45);
+            fxAdd(hit, animMs(420) || 420);
+          }, animMs(Math.round(flight * (spec.hitAt ?? 0.84))) || 1);
         }
         // SIGNATURE choreography (per-card): each knob fires at its own beat of the SAME
         // action generation, so the hit-stop queue below can never retire them early.
@@ -1467,16 +1521,18 @@ function dispatchFx() {
           }
           if (sig.shockwave) {
             fire(() => {
-              fxAdd(el('div', { cls: `fx-shockwave ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } }),
-                animMs(560) || 560);
+              const wave = el('div', { cls: `fx-shockwave ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } });
+              if (lane) placeAt(wave, lane, -35, -35);
+              fxAdd(wave, animMs(560) || 560);
             }, animMs(Math.round(sigMs * 0.66)) || 1);
           }
           // Anvil Blow: the spectral anvil falls and cracks onto the target.
           if (sig.anvil) {
             fire(() => {
-              fxAdd(el('div', { cls: `fx-anvil ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
-                el('span', { cls: 'fx-anvil-body' }), el('span', { cls: 'fx-anvil-crack' })),
-                animMs(700) || 700);
+              const anvil = el('div', { cls: `fx-anvil ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
+                el('span', { cls: 'fx-anvil-body' }), el('span', { cls: 'fx-anvil-crack' }));
+              if (lane) anvil.style.left = `${lane.x - 37}px`;
+              fxAdd(anvil, animMs(700) || 700);
             }, animMs(Math.round(sigMs * 0.58)) || 1);
           }
           // Twin Hammers: a SALVO — two hammers, 180ms apart, two impact flashes timed
@@ -1485,12 +1541,18 @@ function dispatchFx() {
             const TWIN_STAGGER = 180;
             for (let n = 0; n < 2; n++) {
               fire(() => {
-                fxAdd(el('div', { cls: `fx-hammer ${b.side || 'side-none'} fx-hammer-twin-${n ? 'second' : 'first'}`, attrs: { 'aria-hidden': 'true' } },
-                  el('span', { cls: 'fx-hammer-head' }), el('span', { cls: 'fx-hammer-haft' })),
-                  animMs(THROW_MS) || THROW_MS);
+                const hammer = el('div', { cls: `fx-hammer ${b.side || 'side-none'} fx-hammer-twin-${n ? 'second' : 'first'}`, attrs: { 'aria-hidden': 'true' } },
+                  el('span', { cls: 'fx-hammer-head' }), el('span', { cls: 'fx-hammer-haft' }));
+                if (lane) {
+                  hammer.style.left = `${lane.from.x - 27}px`;
+                  hammer.style.top = `${lane.from.y - 11}px`;
+                  hammer.style.setProperty('--fly-x', `${lane.x - lane.from.x}px`);
+                }
+                fxAdd(hammer, animMs(THROW_MS) || THROW_MS);
                 fire(() => {
-                  fxAdd(el('div', { cls: `fx-hammer-hit ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } }),
-                    animMs(420) || 420);
+                  const hit = el('div', { cls: `fx-hammer-hit ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } });
+                  if (lane) placeAt(hit, lane, -45, -45);
+                  fxAdd(hit, animMs(420) || 420);
                 }, animMs(Math.round(THROW_MS * 0.84)) || 1);
               }, animMs(n * TWIN_STAGGER) || 1);
             }
@@ -1498,9 +1560,10 @@ function dispatchFx() {
           // Sunder: the burning seam splits the air down the target lane.
           if (sig.rend) {
             fire(() => {
-              fxAdd(el('div', { cls: `fx-rend ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
-                el('span', { cls: 'fx-rend-seam' }), el('span', { cls: 'fx-rend-seam fx-rend-seam-2' })),
-                animMs(560) || 560);
+              const seam = el('div', { cls: `fx-rend ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
+                el('span', { cls: 'fx-rend-seam' }), el('span', { cls: 'fx-rend-seam fx-rend-seam-2' }));
+              if (lane) seam.style.left = `${lane.x - 13}px`;
+              fxAdd(seam, animMs(560) || 560);
             }, animMs(Math.round(sigMs * 0.55)) || 1);
           }
           // Rising Blow: the aimed enemy is LAUNCHED off its stance at the impact beat.
@@ -1755,10 +1818,13 @@ const MOVE_DEFAULTS = { attack: 'strike', skill: 'brace', power: 'brace' };
  * returns; hemokinesis — Blood Hammer, the hammer is hurled and stays in the target.
  */
 const HERO_THROWS = {
-  sword_boomerang: { returns: true },
-  hemokinesis: { returns: false },
+  // Returning Brand: the hammer comes BACK — the CSS round trip is 1.25s, and the lane
+  // moment (where the impact flash belongs) is the outward apex, not the 84% landing of
+  // a one-way throw. A plain throw's CSS flight is 0.9s, landing at 84%.
+  sword_boomerang: { returns: true, ms: 1250, hitAt: 0.55 },
+  hemokinesis: { returns: false, ms: 900, hitAt: 0.84 },
 };
-/** Total wall-clock of the hammer flight (there + burst + optional return), in ms at 1x. */
+/** Total wall-clock of a ONE-WAY hammer flight, in ms at 1x (the twin salvo rides this). */
 const THROW_MS = 900;
 /** Per-card signature moves: extra knobs keyed by card id (pose handled via HERO_MOVES). */
 const HERO_SIGNATURES = {

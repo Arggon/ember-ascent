@@ -3784,9 +3784,14 @@ html, body {
 /* ---------------------------------------------- the thrown hammer (fx layer) ----
    A code-drawn hammer (ink head, ember seam, haft) that spins in a flat arc from the
    hero to the aimed lane, flashes on arrival, and — for Returning Brand — flies back.
-   Geometry is fixed (fx layer is full-stage, aria-hidden, never interactive). */
+   The anchor is the hero's throwing shoulder; the lane classes set the horizontal
+   travel (--fly-x, read by the keyframes) so the arc LANDS on the aimed enemy — the
+   same lanes the impact flash uses. Without the anchor the hammer flew from the fx
+   layer's top-left corner, across the top of the screen (owner report). */
 .fx-hammer {
   position: absolute; z-index: 4; width: 54px; height: 22px; pointer-events: none;
+  top: 39%; left: 8vw;
+  --fly-x: 39vw;
   animation: hammer-fly 0.9s cubic-bezier(0.22, 0.68, 0.36, 1) both;
 }
 .fx-hammer .fx-hammer-head {
@@ -3805,31 +3810,33 @@ html, body {
   background: linear-gradient(180deg, #5a4030, #2a1c12); border-radius: 2px;
 }
 /* The arc: rise from the hero's shoulder to the enemy row, with the whole hammer
-   spinning around its own centre (the head leads on the way out). */
+   spinning around its own centre (the head leads on the way out). The horizontal
+   travel is the lane's --fly-x, so every keyframe lands where the aimed enemy is. */
 @keyframes hammer-fly {
   0% { transform: translate(0, 0) rotate(0deg) scale(0.7); opacity: 0; }
   8% { opacity: 1; }
-  50% { transform: translate(30vw, -90px) rotate(540deg) scale(1); opacity: 1; }
-  78% { transform: translate(52vw, 10px) rotate(900deg) scale(1); opacity: 1; }
-  84% { transform: translate(54vw, 16px) rotate(960deg) scale(1.25); opacity: 1; }
-  92%, 100% { transform: translate(54vw, 16px) rotate(960deg) scale(0); opacity: 0; }
+  50% { transform: translate(calc(var(--fly-x) * 0.56), -90px) rotate(540deg) scale(1); opacity: 1; }
+  78% { transform: translate(calc(var(--fly-x) * 0.96), 10px) rotate(900deg) scale(1); opacity: 1; }
+  84% { transform: translate(var(--fly-x), 16px) rotate(960deg) scale(1.25); opacity: 1; }
+  92%, 100% { transform: translate(var(--fly-x), 16px) rotate(960deg) scale(0); opacity: 0; }
 }
 /* Returning Brand: out to the lane, then all the way back to the hero. */
 .fx-hammer.fx-hammer-returns { animation-name: hammer-return; animation-duration: 1.25s; }
 @keyframes hammer-return {
   0% { transform: translate(0, 0) rotate(0deg) scale(0.7); opacity: 0; }
   6% { opacity: 1; }
-  34% { transform: translate(30vw, -90px) rotate(540deg) scale(1); opacity: 1; }
-  52% { transform: translate(52vw, 12px) rotate(900deg) scale(1.22); opacity: 1; }
-  58% { transform: translate(52vw, 12px) rotate(960deg) scale(1); opacity: 1; }
+  34% { transform: translate(calc(var(--fly-x) * 0.56), -90px) rotate(540deg) scale(1); opacity: 1; }
+  52% { transform: translate(calc(var(--fly-x) * 0.96), 12px) rotate(900deg) scale(1.22); opacity: 1; }
+  58% { transform: translate(var(--fly-x), 12px) rotate(960deg) scale(1); opacity: 1; }
   88% { transform: translate(2vw, -60px) rotate(1620deg) scale(0.8); opacity: 1; }
   96%, 100% { transform: translate(-2vw, -40px) rotate(1800deg) scale(0.4); opacity: 0; }
 }
-/* Lane classes shift the arc's landing point (side-none = the middle of the row). */
-.fx-hammer.side-0 { margin-top: -4px; }
-.fx-hammer.side-1 { margin-top: 4px; }
-.fx-hammer.side-mid { margin-top: 0; }
-.fx-hammer.side-none { margin-top: 0; }
+/* Lane classes aim the arc: the landing point rides the same lanes as the impact
+   flash (side-none = the middle of the row); margin-top keeps the fine lane stagger. */
+.fx-hammer.side-0 { --fly-x: 16vw; margin-top: -4px; }
+.fx-hammer.side-1 { --fly-x: 62vw; margin-top: 4px; }
+.fx-hammer.side-mid { --fly-x: 39vw; margin-top: 0; }
+.fx-hammer.side-none { --fly-x: 39vw; margin-top: 0; }
 /* Twin Hammers salvo: the first hammer flies flat to the aim lane; the second starts
    slightly higher and later, so the two read as a volley, not one hammer re-emitted. */
 .fx-hammer.fx-hammer-twin-first { margin-top: -6px; }
