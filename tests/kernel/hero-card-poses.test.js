@@ -304,6 +304,16 @@ test('TWIN HAMMERS (twin_strike) throws a salvo of two hammers, not the flurry',
   assert.equal(api.heroPose(), 'twinthrow');
 });
 
+test('SUNDER (carnage) rends the air with a vertical cleave', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'carnage', type: 'attack' }), 'rend', 'Sunder has its own rending pose');
+  assert.equal(api.heroMove({ id: 'wild_strike', type: 'attack' }), 'heavy', 'Untempered keeps the heavy');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'carnage', type: 'attack' });
+  assert.ok(sig && sig.rend, 'Sunder signature: the burning-seam knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'carnage', type: 'attack', name: 'Sunder', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'rend');
+});
+
 test('throw cards play the throw pose, and HERO_THROWS carries the flight choreography', () => {
   const { api } = startRun(11);
   assert.equal(api.heroMove({ id: 'sword_boomerang', type: 'attack' }), 'throw', 'Returning Brand hurls its hammer (throw)');

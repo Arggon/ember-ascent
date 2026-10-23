@@ -91,7 +91,7 @@ let animGen = 0;
  * each get their own movement.
  */
 let heroMoveHold = null; // { pose, start, dur } — the pose to keep painting, and its window
-const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100 };
+const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800 };
 let pileOpen = null;
 
 function animMs(ms) {
@@ -1452,6 +1452,16 @@ function dispatchFx() {
               }, animMs(n * TWIN_STAGGER) || 1);
             }
           }
+          // Sunder: the burning seam splits the air down the target lane.
+          if (sig.rend) {
+            const genR = ++animGen;
+            later(() => {
+              if (genR !== animGen) return;
+              fxAdd(el('div', { cls: `fx-rend ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
+                el('span', { cls: 'fx-rend-seam' }), el('span', { cls: 'fx-rend-seam fx-rend-seam-2' })),
+                animMs(560) || 560);
+            }, animMs(Math.round(HERO_POSE_MS.rend * 0.55)) || 1);
+          }
         }
         break;
       default:
@@ -1646,7 +1656,7 @@ const HERO_MOVES = {
   // Attacks — how the blow lands.
   strike: 'strike', anger: 'strike', headbutt: 'strike', pommel: 'strike',
   dropkick: 'strike', ironwave: 'strike', rampage: 'strike',
-  bash: 'heavy', clothesline: 'heavy', wild_strike: 'heavy', carnage: 'heavy',
+  bash: 'heavy', clothesline: 'heavy', wild_strike: 'heavy',
   uppercut: 'heavy',
   // Per-card signature moves (one commit per card): bludgeon — Maul, "One stroke. The
   // argument ends." — is the 32-damage rare: its own COLOSSAL pose, not shared heavy.
@@ -1654,6 +1664,9 @@ const HERO_MOVES = {
   // Twin Hammers: the card is the name — TWO hammers, two hits (5×2). Its own throw
   // pose with a salvo of two projectiles and two impacts.
   twin_strike: 'twinthrow',
+  // Sunder (carnage, 20 dmg): a RENDING vertical stroke — the hammer cleaves straight
+  // down and the air itself splits with a burning seam over the target.
+  carnage: 'rend',
   // Per-card signature moves (one commit per card): bludgeon — Maul, "One stroke. The
   // argument ends." — is the 32-damage rare: its own COLOSSAL pose, not shared heavy.
   bludgeon: 'colossal',
@@ -1695,6 +1708,8 @@ const HERO_SIGNATURES = {
   bash: { anvil: true },
   // Twin Hammers: two hammers in the air, staggered, with two impact flashes.
   twin_strike: { twin: true },
+  // Sunder: the rending seam flashes down the target lane as the stroke lands.
+  carnage: { rend: true },
 };
 /** The signature knobs for a card-fly burst, or null. */
 function signatureFor(fly) {
