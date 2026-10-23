@@ -1364,6 +1364,16 @@ function dispatchFx() {
   const list = bursts;
   bursts = [];
   if (reducedMotion || list.length === 0) return;
+  // ONE generation per action, captured before any timer is scheduled. Every delayed
+  // effect below (signature impacts, hammer landings, the hit-stop feel queue) checks
+  // THIS generation, so the effects of one action can never cancel each other. A newer
+  // action runs its own dispatchFx, bumps the generation once, and retires every pending
+  // timer of the previous action — which is the whole point of the guard. (Bug this
+  // replaced: each signature timer used to take its own ++animGen, so the feel queue's
+  // later increment made every delayed signature effect cancel itself before it fired —
+  // the stage shake, shockwave, anvil, salvo and rend never appeared.)
+  const gen = ++animGen;
+  const fire = (fn, ms) => later(() => { if (gen === animGen) fn(); }, ms);
   // The arrival banners are driven by `arriving`, not by `bursts`: they describe a moment
   // (a boss walking in, a run ending) rather than a value that changed, and `arriving` is
   // already reset by the next paint. Consumed HERE, once, so nothing replays.
@@ -1396,59 +1406,48 @@ function dispatchFx() {
           fxAdd(el('div', { cls: throwCls, attrs: { 'aria-hidden': 'true' } },
             el('span', { cls: 'fx-hammer-head' }), el('span', { cls: 'fx-hammer-haft' })),
             animMs(THROW_MS) || THROW_MS);
-          const genT = ++animGen;
-          later(() => {
-            if (genT !== animGen) return;
+          fire(() => {
             fxAdd(el('div', { cls: `fx-hammer-hit ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } }),
               animMs(420) || 420);
           }, animMs(Math.round(THROW_MS * 0.84)) || 1);
         }
-        // SIGNATURE choreography (per-card): Maul shakes the whole stage and detonates an
-        // ember shockwave at the moment its colossal stroke lands (66% of the pose).
+        // SIGNATURE choreography (per-card): each knob fires at its own beat of the SAME
+        // action generation, so the hit-stop queue below can never retire them early.
         const sig = signatureFor(b);
         if (sig) {
+          const sigMs = sig.poseMs || HERO_POSE_MS[heroMove(b)] || 800;
           if (sig.shake) {
-            const genS = ++animGen;
-            later(() => {
-              if (genS !== animGen) return;
+            fire(() => {
               if (stageEl && stageEl.classList) stageEl.classList.add('stage-shake');
               later(() => {
-                if (genS !== animGen) return;
-                if (stageEl && stageEl.classList) stageEl.classList.remove('stage-shake');
+                if (gen === animGen && stageEl && stageEl.classList) stageEl.classList.remove('stage-shake');
               }, animMs(450) || 450);
-            }, animMs(Math.round((sig.poseMs || 1000) * 0.66)) || 1);
+            }, animMs(Math.round(sigMs * 0.66)) || 1);
           }
           if (sig.shockwave) {
-            const genW = ++animGen;
-            later(() => {
-              if (genW !== animGen) return;
+            fire(() => {
               fxAdd(el('div', { cls: `fx-shockwave ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } }),
                 animMs(560) || 560);
-            }, animMs(Math.round((sig.poseMs || 1000) * 0.66)) || 1);
+            }, animMs(Math.round(sigMs * 0.66)) || 1);
           }
           // Anvil Blow: the spectral anvil falls and cracks onto the target.
           if (sig.anvil) {
-            const genA = ++animGen;
-            later(() => {
-              if (genA !== animGen) return;
+            fire(() => {
               fxAdd(el('div', { cls: `fx-anvil ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
                 el('span', { cls: 'fx-anvil-body' }), el('span', { cls: 'fx-anvil-crack' })),
                 animMs(700) || 700);
-            }, animMs(Math.round(HERO_POSE_MS.heavy * 0.58)) || 1);
+            }, animMs(Math.round(sigMs * 0.58)) || 1);
           }
           // Twin Hammers: a SALVO — two hammers, 180ms apart, two impact flashes timed
           // to each hammer's own landing (84% of the flight from each launch).
           if (sig.twin) {
             const TWIN_STAGGER = 180;
             for (let n = 0; n < 2; n++) {
-              const genN = ++animGen;
-              later(() => {
-                if (genN !== animGen) return;
+              fire(() => {
                 fxAdd(el('div', { cls: `fx-hammer ${b.side || 'side-none'} fx-hammer-twin-${n ? 'second' : 'first'}`, attrs: { 'aria-hidden': 'true' } },
                   el('span', { cls: 'fx-hammer-head' }), el('span', { cls: 'fx-hammer-haft' })),
                   animMs(THROW_MS) || THROW_MS);
-                later(() => {
-                  if (genN !== animGen) return;
+                fire(() => {
                   fxAdd(el('div', { cls: `fx-hammer-hit ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } }),
                     animMs(420) || 420);
                 }, animMs(Math.round(THROW_MS * 0.84)) || 1);
@@ -1457,19 +1456,15 @@ function dispatchFx() {
           }
           // Sunder: the burning seam splits the air down the target lane.
           if (sig.rend) {
-            const genR = ++animGen;
-            later(() => {
-              if (genR !== animGen) return;
+            fire(() => {
               fxAdd(el('div', { cls: `fx-rend ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
                 el('span', { cls: 'fx-rend-seam' }), el('span', { cls: 'fx-rend-seam fx-rend-seam-2' })),
                 animMs(560) || 560);
-            }, animMs(Math.round(HERO_POSE_MS.rend * 0.55)) || 1);
+            }, animMs(Math.round(sigMs * 0.55)) || 1);
           }
           // Rising Blow: the aimed enemy is LAUNCHED off its stance at the impact beat.
           if (sig.launch) {
-            const genL = ++animGen;
-            later(() => {
-              if (genL !== animGen) return;
+            fire(() => {
               // Enemy cards carry data-target-index = position+1 (the targeting k); the
               // burst's enemy index is the kernel's living index (0-based) at that paint.
               const cards = stageEl && stageEl.querySelectorAll ? [...stageEl.querySelectorAll('.enemy')] : [];
@@ -1479,13 +1474,11 @@ function dispatchFx() {
               const fig = (target || cards[0])?.querySelector('.fig');
               if (fig && fig.classList) {
                 fig.classList.add('launched');
-                const genL2 = ++animGen;
                 later(() => {
-                  if (genL2 !== animGen) return;
-                  fig.classList.remove('launched');
+                  if (gen === animGen && fig.classList) fig.classList.remove('launched');
                 }, animMs(620) || 620);
               }
-            }, animMs(Math.round(HERO_POSE_MS.uppercut * 0.55)) || 1);
+            }, animMs(Math.round(sigMs * 0.55)) || 1);
           }
         }
         break;
@@ -1510,9 +1503,9 @@ function dispatchFx() {
     fxAdd(el('div', { cls: 'fx-darken' }), 1700);
   }
   // Feel queue: the card is already in flight. Hold the stage for a short hit-stop,
-  // then let the damage and block numbers rise. A newer action bumps `animGen` and
-  // this wait becomes a no-op. Speed 0 and reduced motion never wait.
-  const gen = ++animGen;
+  // then let the damage and block numbers rise. Uses the SAME action generation captured
+  // above, so it coexists with the signature timers instead of retiring them. Speed 0
+  // and reduced motion never wait.
   if (reducedMotion || animSpeed === 0) {
     revealFloats();
     return;
