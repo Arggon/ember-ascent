@@ -1705,7 +1705,19 @@ html, body {
   .hand.deal-in > .card-wrap,
   .stat.hp.stat-jolt,
   .hpbar.block.block-eat > i,
-  .pill.juice-in { animation: none !important; }
+  .pill.juice-in,
+  .stage-combat .fig.pose-heavy,
+  .stage-combat .fig.pose-flurry,
+  .stage-combat .fig.pose-sweep,
+  .stage-combat .fig.pose-guard,
+  .stage-combat .fig.pose-channel,
+  .stage-combat .fig.pose-throw,
+  .stage-combat .fig.pose-slam,
+  .stage-combat .fig .spr-frame,
+  .fx-hammer,
+  .fx-hammer-hit,
+  .fx-armor-dome,
+  .fx-channel-embers { animation: none !important; }
 
   /* Keep the static, non-moving part of a couple of these cues. A hit is still visible
      as a border change (no geometry moves); an absorbed hit still reads in the block
@@ -3269,7 +3281,7 @@ html, body {
 }
 @keyframes hero-strike {
   0% { transform: translateX(0); }
-  40% { transform: translateX(16px) rotate(-4deg); }
+  40% { transform: translateX(28px) rotate(-7deg); }
   100% { transform: translateX(0); }
 }
 @keyframes foe-strike {
@@ -3277,19 +3289,70 @@ html, body {
   40% { transform: translateX(-16px) rotate(4deg); }
   100% { transform: translateX(0); }
 }
+/* Enemy SLAM: a real attack run, not a lean — the mob pulls back (anticipation), dashes
+   most of the way across the stage to the hero, holds the impact beat (the hero's own
+   hurt flinch + knockback play here), then returns. Longer than the old 0.32s lean: the
+   trip is the point. Runs on the ENEMY's own .fig, so a repaint during the hold would
+   restart it — the enemy pose is recomputed from bursts per paint exactly like the
+   hero's, and bursts clear after one paint, so in practice it plays once per turn. */
+@keyframes foe-slam {
+  0% { transform: translateX(0); }
+  16% { transform: translateX(26px) rotate(3deg); }
+  46% { transform: translateX(calc(-1 * min(38vw, 460px))) rotate(-5deg); }
+  60% { transform: translateX(calc(-1 * min(38vw, 460px))) rotate(-4deg); }
+  84% { transform: translateX(0) rotate(0deg); }
+  100% { transform: translateX(0); }
+}
 @keyframes fig-hurt {
   0% { transform: translateX(0); filter: none; }
-  35% { transform: translateX(-8px); filter: brightness(1.8); }
+  35% { transform: translateX(-22px); filter: brightness(1.8); }
+  55% { transform: translateX(-12px); filter: brightness(1.4); }
   100% { transform: none; filter: none; }
 }
 @keyframes hero-hurt {
   0% { transform: none; filter: none; }
-  35% { transform: translateX(8px); filter: brightness(1.7); }
+  35% { transform: translateX(26px) rotate(4deg); filter: brightness(1.7); }
+  55% { transform: translateX(16px) rotate(2deg); }
   100% { transform: none; filter: none; }
 }
 @keyframes fig-brace {
   0% { transform: none; }
   40% { transform: translateY(4px) scale(0.98); }
+  100% { transform: none; }
+}
+/* Per-card hero movements: the pose is chosen from WHICH card was played (HERO_MOVES in
+   app.js), not just its type. Each is a distinct read of the same attack/defend beat. */
+@keyframes hero-heavy {
+  0% { transform: none; }
+  30% { transform: translate(-14px, 8px) rotate(7deg) scale(0.97); }
+  55% { transform: translate(36px, -8px) rotate(-11deg) scale(1.05); }
+  75% { transform: translate(30px, -3px) rotate(-6deg) scale(1.02); }
+  100% { transform: none; }
+}
+@keyframes hero-flurry {
+  0%, 100% { transform: none; }
+  10% { transform: translate(22px, -2px) rotate(-3deg); }
+  22% { transform: translate(6px, 0) rotate(2deg); }
+  36% { transform: translate(26px, -3px) rotate(-4deg); }
+  50% { transform: translate(8px, 0) rotate(2deg); }
+  64% { transform: translate(24px, -1px) rotate(-3deg); }
+}
+@keyframes hero-sweep {
+  0% { transform: none; }
+  30% { transform: translate(-18px, 4px) rotate(8deg); }
+  55% { transform: translate(24px, -5px) rotate(-9deg); }
+  100% { transform: none; }
+}
+@keyframes hero-guard {
+  0% { transform: none; }
+  40% { transform: translateY(10px) scale(0.92, 0.86); }
+  66% { transform: translateY(10px) scale(0.92, 0.86); }
+  100% { transform: none; }
+}
+@keyframes hero-channel {
+  0% { transform: none; }
+  45% { transform: translateY(-16px) scale(1.07); }
+  70% { transform: translateY(-12px) scale(1.05); }
   100% { transform: none; }
 }
 @keyframes ash-fall {
@@ -3300,10 +3363,21 @@ html, body {
 .stage-combat .fig.pose-windup { animation: fig-wind 0.85s ease-in-out infinite; }
 .stage-combat .hero .fig.pose-strike { animation: hero-strike 0.32s ease-out; }
 .stage-combat .enemy .fig.pose-strike { animation: foe-strike 0.32s ease-out; }
-.stage-combat .hero .fig.pose-hurt { animation: hero-hurt 0.28s ease-out; }
-.stage-combat .enemy .fig.pose-hurt { animation: fig-hurt 0.28s ease-out; }
+/* The slam runs on the enemy card's lane: distant mobs travel farther (the vw term),
+   close ones cap at the same px so they never fly past the hero. */
+.stage-combat .enemy .fig.pose-slam { animation: foe-slam 0.9s cubic-bezier(0.3, 0.6, 0.4, 1) both; }
+.stage-combat .enemy .fig.pose-slam .spr { filter: brightness(1.4) drop-shadow(0 0 14px rgba(255, 90, 30, 0.7)); }
+.stage-combat .hero .fig.pose-hurt { animation: hero-hurt 0.44s ease-out; }
+.stage-combat .enemy .fig.pose-hurt { animation: fig-hurt 0.4s ease-out; }
 .stage-combat .fig.pose-brace { animation: fig-brace 0.28s ease-out; }
 .stage-combat .fig.pose-low { animation: fig-idle 1.1s ease-in-out infinite; filter: saturate(0.55) brightness(0.78); }
+/* New hero-only card movements (enemies never take these poses). Durations are long
+   enough that each card's motion reads as its own move, not a shared nudge. */
+.stage-combat .hero .fig.pose-heavy { animation: hero-heavy 0.6s ease-in-out; }
+.stage-combat .hero .fig.pose-flurry { animation: hero-flurry 0.55s ease-out; }
+.stage-combat .hero .fig.pose-sweep { animation: hero-sweep 0.55s ease-in-out; }
+.stage-combat .hero .fig.pose-guard { animation: hero-guard 0.5s ease-out; }
+.stage-combat .hero .fig.pose-channel { animation: hero-channel 0.6s ease-in-out; }
 
 @media (max-width: 760px) {
   .page-combat .dock {
@@ -3388,6 +3462,9 @@ html, body {
   .stage-combat .fig,
   .stage-combat .enemy.is-dying,
   .stage-combat .card { animation: none !important; }
+  /* The frame layers are motion-only: statically they must never paint, or the hero
+     would show a frozen swing pose instead of the idle stance. */
+  .stage-combat .fig .spr-frame { display: none; }
   .stage-combat .fig.pose-low,
   .stage-combat .hero.is-low .fig { transform: translateY(2px); filter: saturate(0.55) brightness(0.78); }
   .hitstop .fig, .hitstop .card, .hitstop .efloat { animation-play-state: running !important; }
@@ -3433,6 +3510,202 @@ html, body {
 .stage-combat .fig.pose-hurt .spr { filter: brightness(2.3) sepia(0.4) drop-shadow(0 0 10px rgba(255, 220, 170, 0.9)); }
 .stage-combat .fig.pose-strike .spr { filter: brightness(1.15) drop-shadow(0 0 1px rgba(255, 196, 140, 0.7)) drop-shadow(0 0 12px rgba(255, 130, 40, 0.6)); }
 .stage-combat .fig.pose-brace .spr { transform: scale(0.98, 0.96); }
+
+/* ===================================================== combat choreography (frame-swap + body motion)
+   The Ashwright has four real pose frames (generated from hero.webp, alpha-cut, feet
+   aligned on the idle canvas: hero-windup/-strike/-guard/-channel.webp), stacked inside
+   `.fig` by heroMarkup(). A move = the idle layer fades OUT while the pose layer fades
+   IN, riding the same body motion as before. Layer geometry mirrors `.spr` exactly, so
+   a layer swap cannot change layout; the figure box keeps its measured size.
+   The second hero (Bellows Keeper) has no frame set and keeps the single-sprite motion. */
+.stage-combat .fig .spr-frame {
+  position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 100%;
+  object-fit: contain; object-position: 50% 100%;
+  transform-origin: 50% 100%;
+  opacity: 0; pointer-events: none; user-select: none;
+}
+/* Heavy attack: windup frame holds while the body carks back, then the strike frame
+   lands with the forward lunge of hero-heavy. The idle sprite fades back in exactly
+   when the strike frame fades out, so the figure is NEVER an empty box — and after the
+   animation the rule at `frame-restore` below keeps idle visible for the pose-hold. */
+.stage-combat .fig.pose-heavy { animation: hero-heavy 0.72s ease-in-out; }
+.stage-combat .fig.pose-heavy .spr { animation: frame-idle-hide 0.72s linear both; }
+@keyframes frame-idle-hide {
+  0% { opacity: 1; } 10% { opacity: 0; } 88% { opacity: 0; } 100% { opacity: 1; }
+}
+.stage-combat .fig.pose-heavy .spr-frame-windup { animation: frame-heavy-a 0.72s ease-in-out both; filter: brightness(1.45) drop-shadow(0 0 1px rgba(255, 210, 150, 0.8)) drop-shadow(0 0 18px rgba(255, 90, 30, 0.75)); }
+.stage-combat .fig.pose-heavy .spr-frame-strike { animation: frame-heavy-b 0.72s ease-in-out both; filter: brightness(1.45) drop-shadow(0 0 1px rgba(255, 210, 150, 0.8)) drop-shadow(0 0 18px rgba(255, 90, 30, 0.75)); }
+@keyframes frame-heavy-a {
+  0% { opacity: 0; } 12% { opacity: 1; } 40% { opacity: 1; } 55%, 100% { opacity: 0; }
+}
+@keyframes frame-heavy-b {
+  0% { opacity: 0; } 50% { opacity: 0; } 58% { opacity: 1; } 84% { opacity: 1; } 94%, 100% { opacity: 0; }
+}
+/* Flurry: the strike frame flashes in three jabs timed with the body shuffles; idle
+   hides and returns on the same clock. */
+.stage-combat .fig.pose-flurry { animation: hero-flurry 0.66s ease-out; }
+.stage-combat .fig.pose-flurry .spr { animation: frame-idle-hide 0.66s linear both; }
+.stage-combat .fig.pose-flurry .spr-frame-strike { animation: frame-flurry 0.66s linear both; filter: brightness(1.3) drop-shadow(0 0 12px rgba(255, 150, 50, 0.65)); }
+@keyframes frame-flurry {
+  0% { opacity: 0; } 4% { opacity: 1; } 16% { opacity: 1; } 20% { opacity: 0; }
+  38% { opacity: 0; } 42% { opacity: 1; } 54% { opacity: 1; } 58% { opacity: 0; }
+  76% { opacity: 0; } 80% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; }
+}
+/* Guard: the barrier stance frame for the whole hold, then idle returns. */
+.stage-combat .fig.pose-guard { animation: hero-guard 0.55s ease-out; }
+.stage-combat .fig.pose-guard .spr { animation: frame-idle-hide 0.55s linear both; }
+.stage-combat .fig.pose-guard .spr-frame-guard { animation: frame-guard 0.55s ease-out both; filter: brightness(0.9) drop-shadow(0 0 12px rgba(120, 190, 255, 0.45)); }
+@keyframes frame-guard {
+  0% { opacity: 0; } 22% { opacity: 1; } 74% { opacity: 1; } 100% { opacity: 0; }
+}
+/* Channel: the raised-arms frame, embers handled by the fx layer. */
+.stage-combat .fig.pose-channel { animation: hero-channel 0.6s ease-in-out; }
+.stage-combat .fig.pose-channel .spr { animation: frame-idle-hide 0.6s linear both; }
+.stage-combat .fig.pose-channel .spr-frame-channel { animation: frame-channel 0.6s ease-in-out both; filter: brightness(1.35) sepia(0.25) drop-shadow(0 0 18px rgba(255, 200, 80, 0.75)); }
+@keyframes frame-channel {
+  0% { opacity: 0; } 26% { opacity: 1; } 72% { opacity: 1; } 100% { opacity: 0; }
+}
+/* Sweep attacks ride the strike frame across the wide body arc. */
+.stage-combat .fig.pose-sweep { animation: hero-sweep 0.55s ease-in-out; }
+.stage-combat .fig.pose-sweep .spr { animation: frame-idle-hide 0.55s linear both; }
+.stage-combat .fig.pose-sweep .spr-frame-strike { animation: frame-sweep 0.55s ease-in-out both; filter: brightness(1.28) drop-shadow(0 0 14px rgba(255, 120, 40, 0.6)); }
+@keyframes frame-sweep {
+  0% { opacity: 0; } 24% { opacity: 1; } 64% { opacity: 1; } 92%, 100% { opacity: 0; }
+}
+/* The plain strike (Hammerfall & co.) keeps the single idle sprite: its 28px lunge reads
+   fine without a frame swap, and hiding idle here would leave an empty box. */
+/* Throw pose: the windup frame holds (hammer cocked) while the hammer flies, then the
+   throw lands with the strike frame; idle returns as the strike frame fades. */
+.stage-combat .fig.pose-throw { animation: hero-throw 0.9s ease-in-out; }
+.stage-combat .fig.pose-throw .spr { animation: frame-idle-hide 0.9s linear both; }
+.stage-combat .fig.pose-throw .spr-frame-windup { animation: frame-throw-wind 0.9s ease-in-out both; }
+.stage-combat .fig.pose-throw .spr-frame-strike { animation: frame-throw-strike 0.9s ease-in-out both; }
+@keyframes frame-throw-wind {
+  0% { opacity: 0; } 10% { opacity: 1; } 38% { opacity: 1; } 52%, 100% { opacity: 0; }
+}
+@keyframes frame-throw-strike {
+  0% { opacity: 0; } 46% { opacity: 0; } 56% { opacity: 1; } 88% { opacity: 1; } 96%, 100% { opacity: 0; }
+}
+@keyframes hero-throw {
+  0% { transform: none; }
+  30% { transform: translate(-10px, 2px) rotate(4deg); }
+  52% { transform: translate(12px, -3px) rotate(-4deg); }
+  70% { transform: translate(6px, 0) rotate(-1deg); }
+  100% { transform: none; }
+}
+
+/* ---------------------------------------------- the thrown hammer (fx layer) ----
+   A code-drawn hammer (ink head, ember seam, haft) that spins in a flat arc from the
+   hero to the aimed lane, flashes on arrival, and — for Returning Brand — flies back.
+   Geometry is fixed (fx layer is full-stage, aria-hidden, never interactive). */
+.fx-hammer {
+  position: absolute; z-index: 4; width: 54px; height: 22px; pointer-events: none;
+  animation: hammer-fly 0.9s cubic-bezier(0.22, 0.68, 0.36, 1) both;
+}
+.fx-hammer .fx-hammer-head {
+  position: absolute; left: 0; top: 0; width: 24px; height: 20px;
+  background: linear-gradient(180deg, #3a2a22, #191210 55%, #2c1e16);
+  border: 1px solid #6a4a32; border-radius: 3px;
+  box-shadow: inset 0 0 5px rgba(255, 120, 40, 0.85), 0 0 12px rgba(255, 110, 40, 0.55);
+}
+.fx-hammer .fx-hammer-head::after {
+  content: ''; position: absolute; inset: 4px 9px; border-radius: 2px;
+  background: linear-gradient(180deg, #ffb050, #ff5a1e 60%, #c0301c);
+  box-shadow: 0 0 8px rgba(255, 130, 40, 0.9);
+}
+.fx-hammer .fx-hammer-haft {
+  position: absolute; left: 22px; top: 9px; width: 30px; height: 4px;
+  background: linear-gradient(180deg, #5a4030, #2a1c12); border-radius: 2px;
+}
+/* The arc: rise from the hero's shoulder to the enemy row, with the whole hammer
+   spinning around its own centre (the head leads on the way out). */
+@keyframes hammer-fly {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0.7); opacity: 0; }
+  8% { opacity: 1; }
+  50% { transform: translate(30vw, -90px) rotate(540deg) scale(1); opacity: 1; }
+  78% { transform: translate(52vw, 10px) rotate(900deg) scale(1); opacity: 1; }
+  84% { transform: translate(54vw, 16px) rotate(960deg) scale(1.25); opacity: 1; }
+  92%, 100% { transform: translate(54vw, 16px) rotate(960deg) scale(0); opacity: 0; }
+}
+/* Returning Brand: out to the lane, then all the way back to the hero. */
+.fx-hammer.fx-hammer-returns { animation-name: hammer-return; animation-duration: 1.25s; }
+@keyframes hammer-return {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0.7); opacity: 0; }
+  6% { opacity: 1; }
+  34% { transform: translate(30vw, -90px) rotate(540deg) scale(1); opacity: 1; }
+  52% { transform: translate(52vw, 12px) rotate(900deg) scale(1.22); opacity: 1; }
+  58% { transform: translate(52vw, 12px) rotate(960deg) scale(1); opacity: 1; }
+  88% { transform: translate(2vw, -60px) rotate(1620deg) scale(0.8); opacity: 1; }
+  96%, 100% { transform: translate(-2vw, -40px) rotate(1800deg) scale(0.4); opacity: 0; }
+}
+/* Lane classes shift the arc's landing point (side-none = the middle of the row). */
+.fx-hammer.side-0 { margin-top: -4px; }
+.fx-hammer.side-1 { margin-top: 4px; }
+.fx-hammer.side-mid { margin-top: 0; }
+.fx-hammer.side-none { margin-top: 0; }
+/* Impact burst: a quick ember flash where the hammer lands. Lives on the fx layer too. */
+.fx-hammer-hit {
+  position: absolute; z-index: 4; width: 90px; height: 90px; pointer-events: none;
+  top: 38%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 230, 170, 0.95), rgba(255, 120, 40, 0.55) 45%, rgba(255, 60, 20, 0.0) 72%);
+  animation: hammer-impact 0.42s ease-out both;
+}
+.fx-hammer-hit.side-0 { left: 24vw; }
+.fx-hammer-hit.side-1 { left: 70vw; }
+.fx-hammer-hit.side-mid, .fx-hammer-hit.side-none { left: 47vw; }@keyframes hammer-impact {
+  0% { transform: scale(0.4); opacity: 0.95; }
+  60% { transform: scale(1.5); opacity: 0.5; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+/* ---------------------------------------------- armor dome + channel embers ----
+   Guard cards: a shimmering blue-white dome rises over the hero and fades with the
+   block number. Channel cards: five embers spiral up the figure. Both live inside
+   `.efx` (inside the hero node), absolutely placed, aria-hidden, never interactive. */
+/* The dome and embers ride inside the hero node; no static positioning is imposed on
+   .efx itself (it already behaves correctly in the hero card). */
+.fx-armor-dome {
+  position: absolute; left: 50%; bottom: 12%; width: 130px; height: 150px;
+  transform: translateX(-50%);
+  border-radius: 50% 50% 42% 42% / 62% 62% 38% 38%;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 100% at 50% 100%, rgba(140, 200, 255, 0.16), rgba(140, 200, 255, 0.02) 60%, transparent 75%);
+  border: 2px solid rgba(170, 215, 255, 0.5);
+  border-bottom-color: rgba(170, 215, 255, 0.12);
+  box-shadow: 0 0 18px rgba(120, 190, 255, 0.4), inset 0 0 22px rgba(150, 205, 255, 0.25);
+  animation: armor-dome 1.1s ease-out both;
+}
+@keyframes armor-dome {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.7); }
+  22% { opacity: 1; transform: translateX(-50%) scale(1); }
+  46% { opacity: 0.9; box-shadow: 0 0 26px rgba(120, 190, 255, 0.6), inset 0 0 26px rgba(170, 215, 255, 0.4); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.06); }
+}
+.fx-channel-embers {
+  position: absolute; left: 50%; bottom: 8%; width: 10px; height: 10px; pointer-events: none;
+}
+.fx-channel-embers i {
+  position: absolute; left: 0; bottom: 0; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle, #ffd27a, #ff7a24 60%, transparent);
+  box-shadow: 0 0 9px rgba(255, 150, 50, 0.9);
+  opacity: 0;
+  animation: channel-ember 0.85s ease-out both;
+}
+.fx-channel-embers i:nth-child(1) { --ex: -34px; --ed: 0s; }
+.fx-channel-embers i:nth-child(2) { --ex: -12px; --ed: 0.09s; }
+.fx-channel-embers i:nth-child(3) { --ex: 10px; --ed: 0.02s; }
+.fx-channel-embers i:nth-child(4) { --ex: 30px; --ed: 0.13s; }
+.fx-channel-embers i:nth-child(5) { --ex: 48px; --ed: 0.05s; }
+@keyframes channel-ember {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--ex, 0), -110px) scale(1.1); }
+}
+
+/* Sprite reads for the card movements: the frame layers carry the glow now (see the
+   choreography block); the old per-pose idle-sprite rules were merged into it. */
 .stage-combat .fig.pose-windup .spr { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 12px rgba(255, 70, 30, 0.6)); }
 @media (max-height: 480px) {
   .stage-combat .fig .spr { filter: brightness(1.25) drop-shadow(0 0 1px rgba(255, 200, 150, 0.8)) drop-shadow(0 0 5px rgba(255, 120, 40, 0.5)); }

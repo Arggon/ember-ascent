@@ -67,13 +67,31 @@ const reducedMotion = typeof matchMedia === 'function'
 const SPEED_KEY = 'ea.animSpeed';
 function readAnimSpeed() {
   try {
-    const n = Number(localStorage.getItem(SPEED_KEY));
+    const raw = localStorage.getItem(SPEED_KEY);
+    // Nothing stored (or blank) is a FRESH player: animations on. `Number(null)` is 0,
+    // so the numeric path below would silently read "never chose" as "chose skip" —
+    // which left every combat animation off by default and was reported as "the
+    // characters don't move". Only an explicit stored 0/1/2 may change the default.
+    if (raw === null || raw === '') return 1;
+    const n = Number(raw);
     if (n === 0 || n === 1 || n === 2) return n;
   } catch { /* private mode */ }
   return 1;
 }
 let animSpeed = readAnimSpeed();
 let animGen = 0;
+/**
+ * The hero's card movement, held for its own duration. `bursts` lives for exactly one
+ * paint (cleared by `dispatchFx()`), so without this a single mousemove — which repaints
+ * the stage via `setAimed` — rebuilds the hero WITHOUT the pose and the movement is cut
+ * short mid-swing. The pose is therefore pinned here when the burst first paints and
+ * kept across incidental repaints until its window elapses (checked lazily, no timer),
+ * so the movement always plays out in full, exactly once, and cannot retrigger itself.
+ * A FRESH card-fly burst always replaces an existing hold, so fast consecutive plays
+ * each get their own movement.
+ */
+let heroMoveHold = null; // { pose, start, dur } — the pose to keep painting, and its window
+const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900 };
 let pileOpen = null;
 
 function animMs(ms) {
@@ -723,6 +741,10 @@ function act(actionId, targetK = null) {
           kind: 'card-fly',
           name: played.name,
           type: played.type,
+          // Which card it is, so the hero's movement can be chosen per card, not just per
+          // type (`heroPose()` reads this one paint later). Presentation only: the kernel
+          // snapshot already carries the id, this just keeps it alive for the effect.
+          id: played.cardId,
           // A whole lane class, not an index: `positionClass` already returns `side-0` etc.
           side: aimIdx ? positionClass(aimIdx.index, after.enemies) : 'side-none',
         });
@@ -898,6 +920,7 @@ function newGame(seed = null, opts = {}) {
   // presentation flag is cleared with the timers that would have released it.
   prevEnemies = [];
   enteredIds = new Set();
+  heroMoveHold = null;
   phaseArriving = null;
   arriving = noArrival();
   endFocusPending = false;
@@ -1361,6 +1384,22 @@ function dispatchFx() {
         if (animSpeed === 0) break;
         fxAdd(el('div', { cls: `fx-card ${b.side || 'side-none'} type-${b.type || 'skill'}` },
           el('span', { cls: 'fx-card-name', text: b.name || '' })), animMs(460) || 460);
+        // THROW choreography: a spinning hammer leaves the hero, arcs into the aimed
+        // lane, and (for Returning Brand) flies back. The burst carries the card id, so
+        // the effect layer can read `HERO_THROWS` for the return beat. The impact flash
+        // is delayed to the moment the arc lands (84% of the flight).
+        if (b.id && HERO_THROWS[b.id]) {
+          const throwCls = `fx-hammer ${b.side || 'side-none'}${HERO_THROWS[b.id].returns ? ' fx-hammer-returns' : ''}`;
+          fxAdd(el('div', { cls: throwCls, attrs: { 'aria-hidden': 'true' } },
+            el('span', { cls: 'fx-hammer-head' }), el('span', { cls: 'fx-hammer-haft' })),
+            animMs(THROW_MS) || THROW_MS);
+          const genT = ++animGen;
+          later(() => {
+            if (genT !== animGen) return;
+            fxAdd(el('div', { cls: `fx-hammer-hit ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } }),
+              animMs(420) || 420);
+          }, animMs(Math.round(THROW_MS * 0.84)) || 1);
+        }
         break;
       default:
         break;
@@ -1473,6 +1512,19 @@ function heroEfx() {
     if (b.kind !== 'hero-float') continue;
     box.append(floatNode(b));
   }
+  // A GUARD that actually gained block raises the glowing armor dome: the barrier is
+  // the card's promise made visible, and it flashes at the same beat the number rises.
+  // `heroMove` takes the BURST, not an array — an array has no `.id` and resolves null.
+  const fly = bursts.find((b) => b.kind === 'card-fly');
+  if (fly && heroMove(fly) === 'guard' &&
+      bursts.some((b) => b.kind === 'hero-float' && b.tone === 'block' && b.amount > 0)) {
+    box.append(el('span', { cls: 'fx-armor-dome', attrs: { 'aria-hidden': 'true' } }));
+  }
+  // A CHANNEL move throws embers up around the hero while the power lands.
+  if (fly && heroMove(fly) === 'channel') {
+    box.append(el('span', { cls: 'fx-channel-embers', attrs: { 'aria-hidden': 'true' } },
+      el('i', {}), el('i', {}), el('i', {}), el('i', {}), el('i', {})));
+  }
   return box;
 }
 
@@ -1530,13 +1582,85 @@ function dyingRow(dying, row = el('div', { cls: 'enemies' })) {
   return row;
 }
 
+/**
+ * Per-card hero movement. The pose is chosen by WHICH card was played, not only by its
+ * type: a maul lands differently from a jab, and raising a barrier plants the hero where
+ * channelling ember-lift raises them. Ids must match `src/kernel/content/cards.json`; a
+ * card missing from the table (or an id-less burst) falls back to the old type-based
+ * pose, so unknown or future content still animates.
+ */
+const HERO_MOVES = {
+  // Attacks — how the blow lands.
+  strike: 'strike', anger: 'strike', headbutt: 'strike', pommel: 'strike',
+  dropkick: 'strike', ironwave: 'strike', rampage: 'strike',
+  bash: 'heavy', clothesline: 'heavy', wild_strike: 'heavy', carnage: 'heavy',
+  uppercut: 'heavy', bludgeon: 'heavy',
+  twin_strike: 'flurry', pummel: 'flurry',
+  cleave: 'sweep', thunderclap: 'sweep', reaper: 'sweep', gust: 'sweep',
+  // THROW cards: the flavor text says the weapon flies and (for the Brand) comes back,
+  // so the move is a real throw — the hero winds up, a spinning hammer flies to the
+  // target and bursts. `HERO_THROWS` below holds the per-card choreography knobs.
+  sword_boomerang: 'throw', hemokinesis: 'throw',
+  // Skills and powers — how the hero plants or draws power.
+  // HP-cost cards (bloodletting, offering) read as their movement only when
+  // no HP was actually lost; the hurt flinch outranks the card flourish (see heroPose).
+  defend: 'guard', shrug: 'guard', true_grit: 'guard', armaments: 'guard',
+  entrench: 'guard', flame_barrier: 'guard', ghostly_armor: 'guard', impervious: 'guard',
+  flex: 'channel', warcry: 'channel', havoc: 'channel', battle_trance: 'channel',
+  bloodletting: 'channel', offering: 'channel', limit_break: 'channel', shockwave: 'channel',
+  combust: 'channel', dark_embrace: 'channel', feel_no_pain: 'channel',
+  inflame: 'channel', metallicize: 'channel', rupture: 'channel', fan_flames: 'channel',
+};
+// Type fallback for cards with no row above, kept identical to the pre-move behaviour.
+const MOVE_DEFAULTS = { attack: 'strike', skill: 'brace', power: 'brace' };
+/**
+ * Throw choreography per card id, keyed off what each card's own text says:
+ * sword_boomerang — Returning Brand, "Heat you threw comes back": the hammer flies AND
+ * returns; hemokinesis — Blood Hammer, the hammer is hurled and stays in the target.
+ */
+const HERO_THROWS = {
+  sword_boomerang: { returns: true },
+  hemokinesis: { returns: false },
+};
+/** Total wall-clock of the hammer flight (there + burst + optional return), in ms at 1x. */
+const THROW_MS = 900;
+
+function heroMove(fly) {
+  if (!fly) return null;
+  // `hasOwn`, not a bare index: card ids come from frozen content today, but a bare
+  // `HERO_MOVES[fly.id]` walks the prototype chain, so an id like "constructor" would
+  // resolve to a function and emit a garbage pose class.
+  const named = fly.id && Object.hasOwn(HERO_MOVES, fly.id) ? HERO_MOVES[fly.id] : null;
+  if (named) return named;
+  return MOVE_DEFAULTS[fly.type] || null;
+}
+
 function heroPose() {
+  // Precedence: getting hit outranks the card's own movement — a hero who just lost HP
+  // flinches, even while playing an attack (and HP-cost cards like bloodletting always
+  // read as hurt, never as their HERO_MOVES entry).
+  if (bursts.some((b) => b.kind === 'hero-float' && b.tone === 'dmg')) {
+    heroMoveHold = null;
+    return 'hurt';
+  }
+  // A fresh card play wins over any hold still running from the previous card.
+  const move = heroMove(bursts.find((b) => b.kind === 'card-fly'));
+  if (move) {
+    // Reduced motion and speed 0 skip the animation; do not hold a pose that never plays.
+    // The hold length is the CSS animation's own duration (the keyframes do not scale
+    // with the JS speed setting), so the pose is never dropped mid-swing on a repaint.
+    if (reducedMotion || animSpeed === 0) heroMoveHold = null;
+    else heroMoveHold = { pose: move, start: Date.now(), dur: HERO_POSE_MS[move] || 400 };
+    return move;
+  }
+  // An incidental repaint (hover, aim) during the hold repaints the SAME pose rather
+  // than dropping it: the movement plays out in full exactly once. The window includes
+  // the hit-stop beat, which pauses the animation without pausing this clock.
+  const held = heroMoveHold;
+  if (held && Date.now() < held.start + held.dur + 260) return held.pose;
+  if (held) heroMoveHold = null;
   const p = snap.player;
   const ratio = p.maxHp > 0 ? p.hp / p.maxHp : 1;
-  if (bursts.some((b) => b.kind === 'hero-float' && b.tone === 'dmg')) return 'hurt';
-  const fly = bursts.find((b) => b.kind === 'card-fly');
-  if (fly && fly.type === 'attack') return 'strike';
-  if (fly && (fly.type === 'skill' || fly.type === 'power')) return 'brace';
   if (ratio <= 0.35) return 'low';
   return 'idle';
 }
@@ -1551,6 +1675,22 @@ function heroFigure() {
     attrs: { role: 'group', 'aria-label': `${snap.characterName || 'Ashwright'}, ${p.hp} of ${p.maxHp} HP, block ${p.block}` },
   });
   const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
+  // The stage tree is rebuilt on every paint, which would restart the keyframe from 0%
+  // on each hover repaint during the hold. A negative animation-delay resumes the run
+  // from where it should be, so the movement stays in phase across repaints.
+  const held = heroMoveHold;
+  if (held && held.pose === pose && pose !== 'idle') {
+    const elapsed = Math.max(0, Date.now() - held.start);
+    if (elapsed < held.dur) {
+      // Mid-run: resume the keyframe where it should be, so hover repaints do not stutter.
+      fig.style.animationDuration = `${held.dur}ms`;
+      fig.style.animationDelay = `-${elapsed}ms`;
+    } else {
+      // Past the end (hit-stop grace): keep the pose class but stop the motion, so a
+      // repaint can never replay the swing.
+      fig.style.animation = 'none';
+    }
+  }
   fig.innerHTML = heroMarkup(snap.character);
   node.append(fig);
   node.append(el('div', { cls: 'hero-name', text: snap.characterName || 'Ashwright' }));
@@ -1564,7 +1704,10 @@ function heroFigure() {
 }
 
 function enemyPose(e) {
-  if (bursts.some((b) => b.kind === 'enemy-strike' && b.enemy === e.index)) return 'strike';
+  // The attack RUN: an enemy whose turn it was just acted — dash across and slam. The
+  // burst fires exactly once (when the turn flipped), like the old strike, but the pose
+  // reads as travel: anticipation, long dash, impact beat, return.
+  if (bursts.some((b) => b.kind === 'enemy-strike' && b.enemy === e.index)) return 'slam';
   if (flash.hits.includes(e.index)) return 'hurt';
   if (e.hp / Math.max(1, e.maxHp) <= 0.35) return 'low';
   if (e.intent && e.intent.kind === 'attack') return 'windup';

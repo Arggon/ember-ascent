@@ -23,13 +23,32 @@ const SPRITES = {
 /** Hero sprite per character id (fixed table; unknown ids fall back to the Ashwright). */
 const HERO_SPRITES = { ironclad: 'hero', bellows: 'bellows_keeper' };
 
+/**
+ * Combat pose frames for the Ashwright, generated from the idle hero.webp (image-to-image,
+ * alpha-cut, feet aligned on one 555x512 canvas so the layers cross-fade in place). The
+ * OTHER heroes have no frame set and keep the single-sprite CSS motion. Values are sprite
+ * keys under assets/sprites/: `hero-<pose>.webp`.
+ */
+const HERO_FRAMES = { ironclad: ['windup', 'strike', 'guard', 'channel'] };
+
 const sprite = (key) =>
   `<span class="sh" aria-hidden="true"></span>` +
   `<img class="spr spr-${key}" src="assets/sprites/${key}.webp" alt="" draggable="false" decoding="async">`;
 
-/** The Ashwright: hooded smith with a forge hammer, facing the enemies. */
+/**
+ * Layered hero figure: the idle sprite always paints first (so the figure box keeps its
+ * measured size), and every available pose frame is stacked on top at opacity 0. CSS
+ * cross-fades between the layers during a combat move; the layers never change the
+ * layout because they are absolutely positioned inside the existing `.fig` box.
+ */
 export function heroMarkup(character = 'ironclad') {
-  return sprite(HERO_SPRITES[character] ?? SPRITES.hero);
+  const key = HERO_SPRITES[character] ?? SPRITES.hero;
+  const frames = HERO_FRAMES[character];
+  if (!frames) return sprite(key);
+  const layers = frames
+    .map((f) => `<img class="spr-frame spr-frame-${f}" src="assets/sprites/hero-${f}.webp" alt="" draggable="false" decoding="async">`)
+    .join('');
+  return sprite(key) + layers;
 }
 
 /** Enemy figure markup keyed by stable encounter id. */

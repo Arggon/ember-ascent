@@ -114,6 +114,10 @@ function classesFromOptions(src) {
 }
 
 /** Expand the known-variant template literals into their concrete members. */
+// The pose set is the renderer's contract: it must track every pose app.js can emit,
+// i.e. the built-ins plus every movement value in HERO_MOVES (src/web/app.js). Adding a
+// movement there means adding it here AND a `.fig.pose-*` rule that really animates.
+const POSE_VALUES = ['idle', 'strike', 'brace', 'hurt', 'low', 'windup', 'heavy', 'flurry', 'sweep', 'guard', 'channel', 'throw', 'slam'];
 function variants(src) {
   const out = new Set();
   if (/card type-\$\{card\.type\}/.test(src)) {
@@ -143,7 +147,7 @@ function variants(src) {
   if (/demon\$\{won \? '' : ' lose'\}/.test(src)) out.add('lose');
   if (/page-\$\{kind\}/.test(src)) for (const k of ['map', 'combat', 'reward', 'rest', 'end']) out.add(`page-${k}`);
   if (/pose-\$\{/.test(src)) {
-    for (const t of ['idle', 'strike', 'brace', 'hurt', 'low', 'windup']) out.add(`pose-${t}`);
+    for (const t of POSE_VALUES) out.add(`pose-${t}`);
   }
   if (/tier-\$\{/.test(src)) for (const t of [1, 2, 3]) out.add(`tier-${t}`);
   return out;
@@ -164,6 +168,35 @@ const missing = [...used].filter((c) => !declared.has(c)).sort();
 notes.push(`classes: ${used.size} emitted by app.js, ${declared.size} present in style.css`);
 if (missing.length > 0) {
   problems.push(`app.js emits ${missing.length} class(es) with no rule in style.css: ${missing.join(', ')}`);
+}
+
+/* ------------------------------------------- 1b. poses must actually animate ---
+ * Rule 1 only asks whether a class name APPEARS anywhere in style.css, so a pose whose
+ * keyframe or animation rule was deleted stays "green" as long as the reduced-motion
+ * kill-list still names it. Every pose the renderer can emit must therefore have a real
+ * `.fig.pose-*` rule carrying an `animation:` declaration OUTSIDE any at-rule (the
+ * kill-list lives inside `@media`, so it cannot satisfy this), and that declaration must
+ * name a keyframe the stylesheet actually defines.
+ */
+function poseAnimations(src) {
+  const clean = maskAtBlocks(src.replace(/\/\*[\s\S]*?\*\//g, ' '));
+  const out = new Map(); // pose name -> animation (keyframe) name
+  for (const m of clean.matchAll(/\.fig\.pose-([a-z]+)[^{]*\{([^}]*)\}/g)) {
+    const a = /animation:\s*([a-zA-Z][\w-]*)/.exec(m[2]);
+    if (a) out.set(m[1], a[1]);
+  }
+  return out;
+}
+
+const poseDecls = poseAnimations(cssSrc);
+const poseDead = POSE_VALUES.filter((t) => !poseDecls.has(t));
+if (poseDead.length > 0) {
+  problems.push(`pose rule(s) with no top-level .fig.pose-* animation declaration: ${poseDead.map((t) => `pose-${t}`).join(', ')}`);
+}
+const poseKeyframes = new Set([...cssSrc.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]));
+const poseKfMissing = [...new Set([...poseDecls.values()].filter((n) => n !== 'none'))].filter((n) => !poseKeyframes.has(n));
+if (poseKfMissing.length > 0) {
+  problems.push(`animation name(s) referenced by pose rules but undefined: ${poseKfMissing.join(', ')}`);
 }
 
 /* ------------------------------------------------------- 2. braces and duplicate tops */
