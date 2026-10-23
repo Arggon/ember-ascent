@@ -91,7 +91,7 @@ let animGen = 0;
  * each get their own movement.
  */
 let heroMoveHold = null; // { pose, start, dur } — the pose to keep painting, and its window
-const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900 };
+const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100 };
 let pileOpen = null;
 
 function animMs(ms) {
@@ -1433,6 +1433,25 @@ function dispatchFx() {
                 animMs(700) || 700);
             }, animMs(Math.round(HERO_POSE_MS.heavy * 0.58)) || 1);
           }
+          // Twin Hammers: a SALVO — two hammers, 180ms apart, two impact flashes timed
+          // to each hammer's own landing (84% of the flight from each launch).
+          if (sig.twin) {
+            const TWIN_STAGGER = 180;
+            for (let n = 0; n < 2; n++) {
+              const genN = ++animGen;
+              later(() => {
+                if (genN !== animGen) return;
+                fxAdd(el('div', { cls: `fx-hammer ${b.side || 'side-none'} fx-hammer-twin-${n ? 'second' : 'first'}`, attrs: { 'aria-hidden': 'true' } },
+                  el('span', { cls: 'fx-hammer-head' }), el('span', { cls: 'fx-hammer-haft' })),
+                  animMs(THROW_MS) || THROW_MS);
+                later(() => {
+                  if (genN !== animGen) return;
+                  fxAdd(el('div', { cls: `fx-hammer-hit ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } }),
+                    animMs(420) || 420);
+                }, animMs(Math.round(THROW_MS * 0.84)) || 1);
+              }, animMs(n * TWIN_STAGGER) || 1);
+            }
+          }
         }
         break;
       default:
@@ -1632,7 +1651,13 @@ const HERO_MOVES = {
   // Per-card signature moves (one commit per card): bludgeon — Maul, "One stroke. The
   // argument ends." — is the 32-damage rare: its own COLOSSAL pose, not shared heavy.
   bludgeon: 'colossal',
-  twin_strike: 'flurry', pummel: 'flurry',
+  // Twin Hammers: the card is the name — TWO hammers, two hits (5×2). Its own throw
+  // pose with a salvo of two projectiles and two impacts.
+  twin_strike: 'twinthrow',
+  // Per-card signature moves (one commit per card): bludgeon — Maul, "One stroke. The
+  // argument ends." — is the 32-damage rare: its own COLOSSAL pose, not shared heavy.
+  bludgeon: 'colossal',
+  pummel: 'flurry',
   cleave: 'sweep', thunderclap: 'sweep', reaper: 'sweep', gust: 'sweep',
   // THROW cards: the flavor text says the weapon flies and (for the Brand) comes back,
   // so the move is a real throw — the hero winds up, a spinning hammer flies to the
@@ -1668,6 +1693,8 @@ const HERO_SIGNATURES = {
   // Anvil Blow: "The anvil answers louder than the hammer." A spectral anvil drops
   // from above onto the target the moment the hammer lands.
   bash: { anvil: true },
+  // Twin Hammers: two hammers in the air, staggered, with two impact flashes.
+  twin_strike: { twin: true },
 };
 /** The signature knobs for a card-fly burst, or null. */
 function signatureFor(fly) {

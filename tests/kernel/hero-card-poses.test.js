@@ -294,6 +294,16 @@ test('ANVIL BLOW (bash) drops the spectral anvil on its heavy stroke', () => {
   assert.ok(!sig.shake && !sig.shockwave, 'Anvil Blow does not steal Maul\'s stage shake');
 });
 
+test('TWIN HAMMERS (twin_strike) throws a salvo of two hammers, not the flurry', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'twin_strike', type: 'attack' }), 'twinthrow', 'Twin Hammers has its own two-throw pose');
+  assert.equal(api.heroMove({ id: 'pummel', type: 'attack' }), 'flurry', 'Pummel keeps the flurry');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'twin_strike', type: 'attack' });
+  assert.ok(sig && sig.twin, 'Twin Hammers signature: the two-hammer salvo knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'twin_strike', type: 'attack', name: 'Twin Hammers', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'twinthrow');
+});
+
 test('throw cards play the throw pose, and HERO_THROWS carries the flight choreography', () => {
   const { api } = startRun(11);
   assert.equal(api.heroMove({ id: 'sword_boomerang', type: 'attack' }), 'throw', 'Returning Brand hurls its hammer (throw)');

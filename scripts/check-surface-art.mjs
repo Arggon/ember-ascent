@@ -117,7 +117,7 @@ function classesFromOptions(src) {
 // The pose set is the renderer's contract: it must track every pose app.js can emit,
 // i.e. the built-ins plus every movement value in HERO_MOVES (src/web/app.js). Adding a
 // movement there means adding it here AND a `.fig.pose-*` rule that really animates.
-const POSE_VALUES = ['idle', 'strike', 'brace', 'hurt', 'low', 'windup', 'heavy', 'flurry', 'sweep', 'guard', 'channel', 'throw', 'slam', 'colossal'];
+const POSE_VALUES = ['idle', 'strike', 'brace', 'hurt', 'low', 'windup', 'heavy', 'flurry', 'sweep', 'guard', 'channel', 'throw', 'slam', 'colossal', 'twinthrow'];
 function variants(src) {
   const out = new Set();
   if (/card type-\$\{card\.type\}/.test(src)) {
