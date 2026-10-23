@@ -1716,6 +1716,8 @@ html, body {
   .stage-combat .fig.pose-colossal,
   .stage-combat .fig.pose-twinthrow,
   .stage-combat .fig.pose-rend,
+  .stage-combat .fig.pose-uppercut,
+  .stage-combat .enemy .fig.launched,
   .stage-combat.stage-shake,
   .stage-combat .fig .spr-frame,
   .fx-hammer,
@@ -3751,6 +3753,33 @@ html, body {
 .fx-rend.side-0 { left: 26vw; }
 .fx-rend.side-1 { left: 71vw; }
 .fx-rend.side-mid, .fx-rend.side-none { left: 48vw; }
+/* UPPERCUT (Rising Blow, per-card signature): the aim enemy is LAUNCHED — popped up
+   off the ground, hung for a beat, and dropped back with its own landing squash. The
+   class is toggled on the enemy's .fig by dispatchFx for exactly one launch, so an
+   incidental repaint cannot replay it. */
+.stage-combat .enemy .fig.launched { animation: foe-launch 0.62s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+@keyframes foe-launch {
+  0% { transform: translateY(0) rotate(0deg); }
+  22% { transform: translateY(-34px) rotate(-4deg) scale(1.04); }
+  46% { transform: translateY(-44px) rotate(-6deg) scale(1.05); }
+  74% { transform: translateY(6px) rotate(3deg) scale(0.94, 0.9); }
+  100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+}
+/* The uppercut itself: a deep duck then an explosive upward swing (the strike frame
+   rides it, tilted up). */
+.stage-combat .fig.pose-uppercut { animation: hero-uppercut 0.7s cubic-bezier(0.3, 0.8, 0.3, 1); }
+.stage-combat .fig.pose-uppercut .spr { animation: frame-idle-hide 0.7s linear both; }
+.stage-combat .fig.pose-uppercut .spr-frame-strike { animation: frame-uppercut 0.7s ease-in-out both; filter: brightness(1.5) drop-shadow(0 0 2px rgba(255, 220, 160, 0.85)) drop-shadow(0 0 20px rgba(255, 110, 30, 0.8)); }
+@keyframes frame-uppercut {
+  0% { opacity: 0; } 30% { opacity: 0; } 40% { opacity: 1; } 78% { opacity: 1; } 90%, 100% { opacity: 0; }
+}
+@keyframes hero-uppercut {
+  0% { transform: none; }
+  28% { transform: translate(2px, 20px) rotate(7deg) scale(0.95, 0.92); }
+  52% { transform: translate(-2px, -26px) rotate(-8deg) scale(1.05); }
+  70% { transform: translate(0, -14px) rotate(-4deg) scale(1.02); }
+  100% { transform: none; }
+}
 
 /* ---------------------------------------------- the thrown hammer (fx layer) ----
    A code-drawn hammer (ink head, ember seam, haft) that spins in a flat arc from the

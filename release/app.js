@@ -91,7 +91,7 @@ let animGen = 0;
  * each get their own movement.
  */
 let heroMoveHold = null; // { pose, start, dur } — the pose to keep painting, and its window
-const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800 };
+const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800, uppercut: 700 };
 let pileOpen = null;
 
 function animMs(ms) {
@@ -745,6 +745,9 @@ function act(actionId, targetK = null) {
           // type (`heroPose()` reads this one paint later). Presentation only: the kernel
           // snapshot already carries the id, this just keeps it alive for the effect.
           id: played.cardId,
+          // The aimed enemy's living index (or null), so per-card signatures can direct
+          // their effects at the actual target (e.g. Rising Blow launches THAT enemy).
+          enemy: aimIdx ? aimIdx.index : null,
           // A whole lane class, not an index: `positionClass` already returns `side-0` etc.
           side: aimIdx ? positionClass(aimIdx.index, after.enemies) : 'side-none',
         });
@@ -1462,6 +1465,28 @@ function dispatchFx() {
                 animMs(560) || 560);
             }, animMs(Math.round(HERO_POSE_MS.rend * 0.55)) || 1);
           }
+          // Rising Blow: the aimed enemy is LAUNCHED off its stance at the impact beat.
+          if (sig.launch) {
+            const genL = ++animGen;
+            later(() => {
+              if (genL !== animGen) return;
+              // Enemy cards carry data-target-index = position+1 (the targeting k); the
+              // burst's enemy index is the kernel's living index (0-based) at that paint.
+              const cards = stageEl && stageEl.querySelectorAll ? [...stageEl.querySelectorAll('.enemy')] : [];
+              const target = b.enemy != null
+                ? cards.find((c) => c.getAttribute && c.getAttribute('data-target-index') === String(b.enemy + 1))
+                : null;
+              const fig = (target || cards[0])?.querySelector('.fig');
+              if (fig && fig.classList) {
+                fig.classList.add('launched');
+                const genL2 = ++animGen;
+                later(() => {
+                  if (genL2 !== animGen) return;
+                  fig.classList.remove('launched');
+                }, animMs(620) || 620);
+              }
+            }, animMs(Math.round(HERO_POSE_MS.uppercut * 0.55)) || 1);
+          }
         }
         break;
       default:
@@ -1657,7 +1682,6 @@ const HERO_MOVES = {
   strike: 'strike', anger: 'strike', headbutt: 'strike', pommel: 'strike',
   dropkick: 'strike', ironwave: 'strike', rampage: 'strike',
   bash: 'heavy', clothesline: 'heavy', wild_strike: 'heavy',
-  uppercut: 'heavy',
   // Per-card signature moves (one commit per card): bludgeon — Maul, "One stroke. The
   // argument ends." — is the 32-damage rare: its own COLOSSAL pose, not shared heavy.
   bludgeon: 'colossal',
@@ -1667,6 +1691,9 @@ const HERO_MOVES = {
   // Sunder (carnage, 20 dmg): a RENDING vertical stroke — the hammer cleaves straight
   // down and the air itself splits with a burning seam over the target.
   carnage: 'rend',
+  // Rising Blow (uppercut): the name is an uppercut — the hammer swings UP and the
+  // target is LIFTED off its stance by the impact.
+  uppercut: 'uppercut',
   // Per-card signature moves (one commit per card): bludgeon — Maul, "One stroke. The
   // argument ends." — is the 32-damage rare: its own COLOSSAL pose, not shared heavy.
   bludgeon: 'colossal',
@@ -1710,6 +1737,8 @@ const HERO_SIGNATURES = {
   twin_strike: { twin: true },
   // Sunder: the rending seam flashes down the target lane as the stroke lands.
   carnage: { rend: true },
+  // Rising Blow: the aimed enemy is launched upward at the impact beat.
+  uppercut: { launch: true },
 };
 /** The signature knobs for a card-fly burst, or null. */
 function signatureFor(fly) {

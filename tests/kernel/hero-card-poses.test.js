@@ -314,6 +314,20 @@ test('SUNDER (carnage) rends the air with a vertical cleave', () => {
   assert.equal(api.heroPose(), 'rend');
 });
 
+test('RISING BLOW (uppercut) lifts the aimed enemy off its stance', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'uppercut', type: 'attack' }), 'uppercut', 'Rising Blow has its own uppercut pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'uppercut', type: 'attack' });
+  assert.ok(sig && sig.launch, 'Rising Blow signature: the launch knob');
+  api.injectBursts([
+    { kind: 'card-fly', id: 'uppercut', type: 'attack', name: 'Rising Blow', side: 'side-none', enemy: 1 },
+  ]);
+  assert.equal(api.heroPose(), 'uppercut');
+  // The burst carries the aimed enemy index so the launch finds the RIGHT mob.
+  const burst = api.snapGet() && { kind: 'card-fly', id: 'uppercut', enemy: 1 };
+  assert.ok(burst && burst.enemy === 1, 'the card-fly burst carries the aimed enemy index');
+});
+
 test('throw cards play the throw pose, and HERO_THROWS carries the flight choreography', () => {
   const { api } = startRun(11);
   assert.equal(api.heroMove({ id: 'sword_boomerang', type: 'attack' }), 'throw', 'Returning Brand hurls its hammer (throw)');
