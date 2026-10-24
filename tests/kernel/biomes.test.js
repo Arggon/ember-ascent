@@ -7,7 +7,7 @@
 // Skin costs the Keeper his Cyan Lantern in the Mines too (inherits the #8 fix).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadKernel, REPO } from '../helpers/harness.mjs';
 
@@ -33,9 +33,13 @@ test('the snapshot names the run\'s biome and lists the choices', () => {
 });
 
 test('no other file keeps its own biome list or biome name', () => {
-  const app = src('src/web/app.js');
-  assert.doesNotMatch(app, /'The Foundry'|'The Cinder Mines'/, 'src/web/app.js: Act I card and picker read the kernel table');
-  assert.doesNotMatch(app, /===\s*'mines'/, 'src/web/app.js: ?biome= is checked against the kernel table');
+  // The surface is split into sibling modules under src/web/; the assertion covers them
+  // all, so a biome fact cannot hide in a file the old single-file check never read.
+  const app = readdirSync(resolve(REPO, 'src/web'))
+    .filter((f) => f.endsWith('.js')).sort()
+    .map((f) => src(`src/web/${f}`)).join('\n');
+  assert.doesNotMatch(app, /'The Foundry'|'The Cinder Mines'/, 'src/web/*: Act I card and picker read the kernel table');
+  assert.doesNotMatch(app, /===\s*'mines'/, 'src/web/*: ?biome= is checked against the kernel table');
   const index = src('src/kernel/index.js');
   assert.doesNotMatch(index, /MINES_BY_TYPE|'mines'/, 'src/kernel/index.js: pools come from BIOMES');
   assert.doesNotMatch(src('src/surface/cli.js'), /'foundry'/, 'src/surface/cli.js: default comes from DEFAULT_BIOME');
