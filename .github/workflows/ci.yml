@@ -15,6 +15,19 @@ concurrency:
 permissions:
   contents: read
 
+# THIS WORKFLOW IS THE LOCAL GATES, NOTHING MORE. The steps below run exactly the
+# sequence a contributor runs before pushing (see docs/team/TEAM.md for the gate
+# meanings), in the same order, via the same npm scripts:
+#
+#   local                                              -> CI step
+#   npm ci                                             -> Install
+#   npm test                                           -> Tests
+#   npm run gate                                       -> Architecture gate
+#   node scripts/check-surface-art.mjs                 -> Surface art check
+#
+# When a new gate is added locally, add it HERE as its own step (same command, same
+# order) — a check that only exists locally is not a gate, and one that only exists
+# in CI blocks contributors for reasons they cannot reproduce.
 jobs:
   test:
     name: test + gate + surface-art
