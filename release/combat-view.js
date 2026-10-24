@@ -29,7 +29,7 @@ import {
 } from './runtime.js';
 import { el, keywordText } from './dom.js';
 import { TEMPER_GLYPH, TYPE_GLYPH, enemyLook, glyphBox } from './glyphs.js';
-import { heroMove, signatureFor } from './hero-moves.js';
+import { heroMove, isMeleeMove, signatureFor } from './hero-moves.js';
 import { backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, attackTier, intentGlyph } from './stage-art.js';
 import { cardArtMarkup } from './card-art.js';
 import { dyingCard, efxBox, freshStatusKeys, heroEfx, hitClass } from './floats.js';
@@ -55,7 +55,10 @@ export function heroPose() {
     const sig = move ? signatureFor(bursts.find((b) => b.kind === 'card-fly')) : null;
     const base = (sig && sig.poseMs) || HERO_POSE_MS[move] || 400;
     if (reducedMotion || animSpeed === 0) setHeroMoveHold(null);
-    else setHeroMoveHold({ pose: move, start: Date.now(), dur: base });
+    // `melee` arms the approach (`.hero.is-approach`): a stroke that is not a throw or a
+    // cast carries the hero into the enemy lane. fx.js measures the real gap right after
+    // the paint and writes it back as `approachX` on this same hold.
+    else setHeroMoveHold({ pose: move, start: Date.now(), dur: base, melee: isMeleeMove(move) });
     return move;
   }
   // An incidental repaint (hover, aim) during the hold repaints the SAME pose rather
@@ -94,6 +97,27 @@ export function heroFigure() {
       // Past the end (hit-stop grace): keep the pose class but stop the motion, so a
       // repaint can never replay the swing.
       fig.style.animation = 'none';
+    }
+  }
+  // The MELEE APPROACH rides the same hold on the .hero CONTAINER (not .fig, so it
+  // composes with the pose's own keyframes): a measured step into the enemy lane and
+  // back, over the pose's full duration. The distance lands after the paint (fx.js
+  // measures it and writes --approach-x both live and onto this hold), so a mid-hold
+  // repaint re-applies it from here. Reduced motion and speed 0 never arm the hold.
+  if (held && held.melee && held.pose === pose) {
+    const elapsed = Math.max(0, Date.now() - held.start);
+    node.classList.add('is-approach');
+    // setProperty is guarded: the fake-DOM test hosts carry a plain style object, and
+    // only a real CSSOM can hold custom properties anyway.
+    if (node.style.setProperty) {
+      node.style.setProperty('--approach-dur', `${held.dur}ms`);
+      if (held.approachX != null) node.style.setProperty('--approach-x', `${held.approachX}px`);
+    }
+    if (elapsed < held.dur) {
+      node.style.animationDuration = `${held.dur}ms`;
+      node.style.animationDelay = `-${elapsed}ms`;
+    } else {
+      node.style.animation = 'none';
     }
   }
   fig.innerHTML = heroMarkup(snap.character);

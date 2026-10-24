@@ -31,11 +31,13 @@ import {
   bursts,
   clearHitstop,
   fxEl,
+  heroMoveHold,
   later,
   quietIntro,
   reducedMotion,
   revealFloats,
   setBursts,
+  setHeroMoveHold,
   setQuietIntro,
   snap,
   stageEl,
@@ -168,6 +170,20 @@ export function dispatchFx() {
         // lane classes only remain as a fallback for an unmeasurable row, because a
         // guessed vw lane misses multi-enemy rows.
         const lane = throwLane(b);
+        // MELEE APPROACH: a stroke that is not a throw or a cast carries the hero into
+        // the aimed lane. The gap is measured HERE, after the paint, from the hero's
+        // shoulder to the aimed card — the row's real layout, not a guessed vw lane —
+        // written onto the live hero for THIS paint and onto the hold, so every repaint
+        // during the pose re-applies the same distance (combat-view reads it). The 56px
+        // margin keeps the hero just short of the card it strikes. No lane (unmeasurable
+        // host) means no visible step, and the pose still plays in place.
+        const hold = heroMoveHold;
+        if (hold && hold.melee) {
+          const dist = lane ? Math.max(0, Math.round(lane.x - lane.from.x - 56)) : 0;
+          setHeroMoveHold({ ...hold, approachX: dist });
+          const live = stageEl && stageEl.querySelector ? stageEl.querySelector('.hero') : null;
+          if (live && live.style && live.style.setProperty) live.style.setProperty('--approach-x', `${dist}px`);
+        }
         // THROW choreography: a spinning hammer leaves the hero, arcs into the aimed
         // lane, and (for Returning Brand) flies back. The burst carries the card id, so
         // the effect layer can read `HERO_THROWS` for the return beat. The impact flash
