@@ -38,7 +38,16 @@ export const COMMON = {
 
 /** Per-subcommand flag specs. Types and defaults are printed by --help. */
 export const SPECS = {
-  new: { ...COMMON, '--seed': { type: 'int', default: 0 }, '--character': { type: 'string', default: 'ironclad' }, '--difficulty': { type: 'int', default: 0 }, '--kindling': { type: 'bool', default: false }, '--tempers': { type: 'bool', default: false }, '--quests': { type: 'bool', default: false }, '--biome': { type: 'string', default: DEFAULT_BIOME } },
+  new: {
+    ...COMMON,
+    '--seed': { type: 'int', default: 0 },
+    '--character': { type: 'string', default: 'ironclad' },
+    '--difficulty': { type: 'int', default: 0 },
+    '--kindling': { type: 'bool', default: false },
+    '--tempers': { type: 'bool', default: false },
+    '--quests': { type: 'bool', default: false },
+    '--biome': { type: 'string', default: DEFAULT_BIOME },
+  },
   state: { ...COMMON, '--brief': { type: 'bool', default: false }, '--verbose': { type: 'bool', default: false }, '--tokens': { type: 'bool', default: false } },
   actions: { ...COMMON },
   play: { ...COMMON },
@@ -214,6 +223,184 @@ function readSave(path) {
   return res.session;
 }
 
+/** Write a save with the canonical serialization, then confirm with a fresh read. */
+function writeSave(path, session) {
+  writeFileSync(path, saveText(session));
+}
+
+/** Compact machine summary used by --json on new. */
+function summary(session) {
+  const s = session.state;
+  return {
+    phase: s.phase,
+    stepIndex: s.stepIndex,
+    rngDraws: s.rngDraws,
+    hp: s.player.hp,
+    maxHp: s.player.maxHp,
+    floor: s.floor,
+    contentVersion: s.contentVersion,
+  };
+}
+
+/** Apply --max-lines with an explicit, never-silent truncation notice (R7). */
+function emit(text, flags, err) {
+  const max = flags['--max-lines'];
+  const lines = text.split('\n');
+  if (max > 0 && lines.length > max) {
+    err(`# truncated: showing ${max} of ${lines.length} lines\n`);
+    return `${lines.slice(0, max).join('\n')}\n`;
+  }
+  return text.endsWith('\n') ? text : `${text}\n`;
+}
+
+// ---------------------------------------------------------------------------
+// The command table. One named handler per subcommand — adding a command means
+// adding a handler here and a flag spec in SPECS, and nothing else. Handlers see
+// exactly what dispatch() saw (flags, positional, out, err) and return an exit code;
+// they are the only place the CLI formats output.
+// ---------------------------------------------------------------------------
+
+/** @type {Record<string, (ctx: {flags: any, positional: string[], out: Function, err: Function}) => Promise<number>>} */
+const COMMANDS = {
+  async new({ flags, out }) {
+    const session = begin({ seed: flags['--seed'], character: flags['--character'], difficulty: flags['--difficulty'], kindling: flags['--kindling'], tempers: flags['--tempers'], quests: flags['--quests'], biome: flags['--biome'] });
+    writeSave(flags['--run'], session);
+    if (flags['--json']) {
+      out(`${JSON.stringify({ ok: true, run: flags['--run'], hash: runHash(session), state: summary(session) })}\n`);
+    } else {
+      out(`new run: seed ${session.state.seed} character ${session.state.character} difficulty ${session.state.difficulty}\n`);
+      out(`saved to ${flags['--run']}\n`);
+      out(`hash ${runHash(session)}\n`);
+    }
+    return EXIT.ok;
+  },
+
+  async state({ flags, out, err }) {
+    const session = readSave(flags['--run']);
+    const opts = { verbose: flags['--verbose'], brief: flags['--brief'] };
+    const text = view(session, opts);
+    if (flags['--json']) {
+      out(`${JSON.stringify({ ok: true, phase: session.state.phase, hash: runHash(session), dump: text })}\n`);
+    } else {
+      out(emit(text, flags, err));
+    }
+    if (flags['--tokens']) {
+      const t = await measureRun([{ dump: text, actionLines: [] }]);
+      err(`state dump tokens: worst=${t.stateDump?.worst} ceiling=${CEILINGS.stateDump} ${t.stateDump?.pass ? 'PASS' : 'FAIL'}\n`);
+    }
+    return EXIT.ok;
+  },
+
+  async actions({ flags, out, err }) {
+    const session = readSave(flags['--run']);
+    const lines = actionLines(session);
+    if (flags['--json']) {
+      out(`${JSON.stringify({ ok: true, hash: runHash(session), actions: legal(session) })}\n`);
+    } else {
+      out(emit(lines, flags, err));
+    }
+    return EXIT.ok;
+  },
+
+  async play({ flags, positional, out, err }) {
+    const id = positional[0];
+    if (id === undefined) throw new CliError('play needs an action id, e.g. `dlb play p1`', EXIT.usage);
+    let session = readSave(flags['--run']);
+    const res = submit(session, id);
+    session = res.session;
+    writeSave(flags['--run'], session);
+    if (res.error) {
+      // R6: stdout stays silent for the no-op; the structured error goes to stderr.
+      err(`${JSON.stringify({ error: res.error.error, id: res.error.id, code: res.error.code })}\n`);
+      out(emit(view(session), flags, err));
+      return EXIT.illegalAction;
+    }
+    if (flags['--json']) {
+      out(`${JSON.stringify({ ok: true, id, phase: session.state.phase, hash: runHash(session), events: res.events })}\n`);
+    } else {
+      out(emit(view(session), flags, err));
+    }
+    return EXIT.ok;
+  },
+
+  async save({ flags, positional, out }) {
+    const path = positional[0] ?? flags['--run'];
+    const session = readSave(flags['--run']);
+    writeSave(path, session);
+    out(`saved ${path} (stepIndex ${session.state.stepIndex}, hash ${runHash(session)})\n`);
+    return EXIT.ok;
+  },
+
+  async load({ flags, positional, out }) {
+    const path = positional[0];
+    if (path === undefined) throw new CliError('load needs a path, e.g. `dlb load ./run.json`', EXIT.usage);
+    const session = readSave(path);
+    writeSave(flags['--run'], session);
+    out(`loaded ${path} -> ${flags['--run']} (phase ${session.state.phase}, stepIndex ${session.state.stepIndex})\n`);
+    return EXIT.ok;
+  },
+
+  async replay({ flags, positional, out, err }) {
+    const logPath = positional[0];
+    if (logPath === undefined) throw new CliError('replay needs a log path, e.g. `dlb replay ./run.log.jsonl --assert`', EXIT.usage);
+    let text;
+    try {
+      text = readFileSync(logPath, 'utf8');
+    } catch (e) {
+      throw new CliError(`cannot read log "${logPath}": ${e.message}`, EXIT.usage);
+    }
+    const parsed = parseLog(text);
+    if (!parsed.ok) throw new CliError(`log "${logPath}" refused:\n - ${parsed.problems.join('\n - ')}`, EXIT.corruptSave);
+    if (flags['--hash-alg'] !== 'sha256') throw new CliError(`--hash-alg "${flags['--hash-alg']}" unsupported; the run identity is sha256`, EXIT.usage);
+
+    if (flags['--assert']) {
+      const result = assertReplay(parsed, { hashEvery: flags['--hash-every'] });
+      if (!result.ok) {
+        err(`${JSON.stringify({ error: 'replay_mismatch', checked: result.checked, mismatches: result.mismatches })}\n`);
+        return EXIT.replayMismatch;
+      }
+      out(flags['--json']
+        ? `${JSON.stringify({ ok: true, steps: parsed.entries.length, checked: result.checked, finalHash: result.finalHash })}\n`
+        : `replay OK: ${parsed.entries.length} steps, ${result.checked} hashes checked, finalHash ${result.finalHash}\n`);
+      return EXIT.ok;
+    }
+
+    const replayed = replay(parsed.header, parsed.entries);
+    out(flags['--json']
+      ? `${JSON.stringify({ ok: true, steps: replayed.steps.length, finalHash: runHash(replayed.session) })}\n`
+      : `${emit(view(replayed.session), flags, err)}`);
+    return EXIT.ok;
+  },
+
+  async sim({ flags, out, err }) {
+    const { simulate } = await import('./sim.js');
+    const result = await simulate({
+      runs: flags['--runs'],
+      seedStart: flags['--seed-start'],
+      policy: flags['--policy'],
+      threads: flags['--threads'],
+      outDir: flags['--out'],
+      onProgress: flags['--json'] ? null : (line) => err(line),
+    });
+    if (flags['--json']) {
+      out(`${JSON.stringify(result, null, 2)}\n`);
+    } else {
+      out(`${emit(result.report, flags, err)}`);
+      for (const [k, v] of Object.entries(result.summary)) {
+        if (typeof v === 'object' && v !== null && 'worst' in v) out(`${k}: worst ${v.worst} tokens (o200k ${v.o200k_base}, cl100k ${v.cl100k_base})\n`);
+      }
+    }
+    return EXIT.ok;
+  },
+
+  async stats({ flags, out, err }) {
+    const { stats } = await import('./stats.js');
+    const result = stats({ from: flags['--from'], byCard: flags['--by-card'], format: flags['--format'], provenance: flags['--provenance'] });
+    out(emit(result.text, flags, err));
+    return EXIT.ok;
+  },
+};
+
 /**
  * Execute one command.
  * @param {string} cmd
@@ -255,7 +442,7 @@ export async function run(cmd, argv, io = {}) {
   }
 
   try {
-    return await dispatch(cmd, flags, positional, out, err);
+    return await COMMANDS[cmd]({ flags, positional, out, err });
   } catch (e) {
     if (e instanceof CliError) {
       err(`dlb ${cmd}: ${e.message}\n`);
@@ -264,181 +451,6 @@ export async function run(cmd, argv, io = {}) {
     err(`dlb ${cmd}: internal error: ${e?.stack ?? e}\n`);
     return EXIT.internal;
   }
-}
-
-async function dispatch(cmd, flags, positional, out, err) {
-  switch (cmd) {
-    case 'new': {
-      const session = begin({ seed: flags['--seed'], character: flags['--character'], difficulty: flags['--difficulty'], kindling: flags['--kindling'], tempers: flags['--tempers'], quests: flags['--quests'], biome: flags['--biome'] });
-      writeSave(flags['--run'], session);
-      if (flags['--json']) {
-        out(`${JSON.stringify({ ok: true, run: flags['--run'], hash: runHash(session), state: summary(session) })}\n`);
-      } else {
-        out(`new run: seed ${session.state.seed} character ${session.state.character} difficulty ${session.state.difficulty}\n`);
-        out(`saved to ${flags['--run']}\n`);
-        out(`hash ${runHash(session)}\n`);
-      }
-      return EXIT.ok;
-    }
-
-    case 'state': {
-      const session = readSave(flags['--run']);
-      const opts = { verbose: flags['--verbose'], brief: flags['--brief'] };
-      const text = view(session, opts);
-      if (flags['--json']) {
-        out(`${JSON.stringify({ ok: true, phase: session.state.phase, hash: runHash(session), dump: text })}\n`);
-      } else {
-        out(emit(text, flags, err));
-      }
-      if (flags['--tokens']) {
-        const t = await measureRun([{ dump: text, actionLines: [] }]);
-        err(`state dump tokens: worst=${t.stateDump?.worst} ceiling=${CEILINGS.stateDump} ${t.stateDump?.pass ? 'PASS' : 'FAIL'}\n`);
-      }
-      return EXIT.ok;
-    }
-
-    case 'actions': {
-      const session = readSave(flags['--run']);
-      const lines = actionLines(session);
-      if (flags['--json']) {
-        out(`${JSON.stringify({ ok: true, hash: runHash(session), actions: legal(session) })}\n`);
-      } else {
-        out(emit(lines, flags, err));
-      }
-      return EXIT.ok;
-    }
-
-    case 'play': {
-      const id = positional[0];
-      if (id === undefined) throw new CliError('play needs an action id, e.g. `dlb play p1`', EXIT.usage);
-      let session = readSave(flags['--run']);
-      const res = submit(session, id);
-      session = res.session;
-      writeSave(flags['--run'], session);
-      if (res.error) {
-        // R6: stdout stays silent for the no-op; the structured error goes to stderr.
-        err(`${JSON.stringify({ error: res.error.error, id: res.error.id, code: res.error.code })}\n`);
-        out(emit(view(session), flags, err));
-        return EXIT.illegalAction;
-      }
-      if (flags['--json']) {
-        out(`${JSON.stringify({ ok: true, id, phase: session.state.phase, hash: runHash(session), events: res.events })}\n`);
-      } else {
-        out(emit(view(session), flags, err));
-      }
-      return EXIT.ok;
-    }
-
-    case 'save': {
-      const path = positional[0] ?? flags['--run'];
-      const session = readSave(flags['--run']);
-      writeSave(path, session);
-      out(`saved ${path} (stepIndex ${session.state.stepIndex}, hash ${runHash(session)})\n`);
-      return EXIT.ok;
-    }
-
-    case 'load': {
-      const path = positional[0];
-      if (path === undefined) throw new CliError('load needs a path, e.g. `dlb load ./run.json`', EXIT.usage);
-      const session = readSave(path);
-      writeSave(flags['--run'], session);
-      out(`loaded ${path} -> ${flags['--run']} (phase ${session.state.phase}, stepIndex ${session.state.stepIndex})\n`);
-      return EXIT.ok;
-    }
-
-    case 'replay': {
-      const logPath = positional[0];
-      if (logPath === undefined) throw new CliError('replay needs a log path, e.g. `dlb replay ./run.log.jsonl --assert`', EXIT.usage);
-      let text;
-      try {
-        text = readFileSync(logPath, 'utf8');
-      } catch (e) {
-        throw new CliError(`cannot read log "${logPath}": ${e.message}`, EXIT.usage);
-      }
-      const parsed = parseLog(text);
-      if (!parsed.ok) throw new CliError(`log "${logPath}" refused:\n - ${parsed.problems.join('\n - ')}`, EXIT.corruptSave);
-      if (flags['--hash-alg'] !== 'sha256') throw new CliError(`--hash-alg "${flags['--hash-alg']}" unsupported; the run identity is sha256`, EXIT.usage);
-
-      if (flags['--assert']) {
-        const result = assertReplay(parsed, { hashEvery: flags['--hash-every'] });
-        if (!result.ok) {
-          err(`${JSON.stringify({ error: 'replay_mismatch', checked: result.checked, mismatches: result.mismatches })}\n`);
-          return EXIT.replayMismatch;
-        }
-        out(flags['--json']
-          ? `${JSON.stringify({ ok: true, steps: parsed.entries.length, checked: result.checked, finalHash: result.finalHash })}\n`
-          : `replay OK: ${parsed.entries.length} steps, ${result.checked} hashes checked, finalHash ${result.finalHash}\n`);
-        return EXIT.ok;
-      }
-
-      const replayed = replay(parsed.header, parsed.entries);
-      out(flags['--json']
-        ? `${JSON.stringify({ ok: true, steps: replayed.steps.length, finalHash: runHash(replayed.session) })}\n`
-        : `${emit(view(replayed.session), flags, err)}`);
-      return EXIT.ok;
-    }
-
-    case 'sim': {
-      const { simulate } = await import('./sim.js');
-      const result = await simulate({
-        runs: flags['--runs'],
-        seedStart: flags['--seed-start'],
-        policy: flags['--policy'],
-        threads: flags['--threads'],
-        outDir: flags['--out'],
-        onProgress: flags['--json'] ? null : (line) => err(line),
-      });
-      if (flags['--json']) {
-        out(`${JSON.stringify(result, null, 2)}\n`);
-      } else {
-        out(`${emit(result.report, flags, err)}`);
-        for (const [k, v] of Object.entries(result.summary)) {
-          if (typeof v === 'object' && v !== null && 'worst' in v) out(`${k}: worst ${v.worst} tokens (o200k ${v.o200k_base}, cl100k ${v.cl100k_base})\n`);
-        }
-      }
-      return EXIT.ok;
-    }
-
-    case 'stats': {
-      const { stats } = await import('./stats.js');
-      const result = stats({ from: flags['--from'], byCard: flags['--by-card'], format: flags['--format'], provenance: flags['--provenance'] });
-      out(emit(result.text, flags, err));
-      return EXIT.ok;
-    }
-
-    default:
-      return EXIT.usage;
-  }
-}
-
-/** Write a save with the canonical serialization, then confirm with a fresh read. */
-function writeSave(path, session) {
-  writeFileSync(path, saveText(session));
-}
-
-/** Compact machine summary used by --json on new. */
-function summary(session) {
-  const s = session.state;
-  return {
-    phase: s.phase,
-    stepIndex: s.stepIndex,
-    rngDraws: s.rngDraws,
-    hp: s.player.hp,
-    maxHp: s.player.maxHp,
-    floor: s.floor,
-    contentVersion: s.contentVersion,
-  };
-}
-
-/** Apply --max-lines with an explicit, never-silent truncation notice (R7). */
-function emit(text, flags, err) {
-  const max = flags['--max-lines'];
-  const lines = text.split('\n');
-  if (max > 0 && lines.length > max) {
-    err(`# truncated: showing ${max} of ${lines.length} lines\n`);
-    return `${lines.slice(0, max).join('\n')}\n`;
-  }
-  return text.endsWith('\n') ? text : `${text}\n`;
 }
 
 export { saveObject, renderLog, malformed, EXIT };

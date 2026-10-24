@@ -10,6 +10,7 @@
 // than averaged into a number that means nothing.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { bossSummaryOf } from './boss-summary.js';
 
 /** Provenance classes, most authoritative last (human wins disagreements). */
 export const PROVENANCE = ['heuristic', 'llm', 'human'];
@@ -48,6 +49,81 @@ export function readRecords(from) {
 }
 
 /**
+ * Per-card counts over the record set: how often each card was offered, picked, and
+ * carried in decks, with the ratios that a balance report is read for.
+ *
+ * A RATIO NEEDS A DENOMINATOR. A starter card (`strike`, `defend`, `bash`) is never
+ * OFFERED as a reward — it is in the deck from turn one — so `picked / offered` was
+ * 0/0, printed as "0.000", which reads as "picked 0% of the time" when the truth is
+ * "not applicable". Same for a presence rate before the first win. Both are null and
+ * printed as `n/a`; the raw counts stay.
+ * @param {any[]} records records of ONE provenance class
+ * @param {any[]} wins the winning subset of `records`
+ * @returns {any[]} card rows, best pick rate first
+ */
+export function cardTable(records, wins) {
+  const byCard = new Map();
+  const bump = (id) => byCard.get(id) ?? { id, offered: 0, picked: 0, inDeck: 0, inWin: 0 };
+  for (const r of records) {
+    for (const id of r.offered ?? []) {
+      const row = bump(id);
+      row.offered += 1;
+      byCard.set(id, row);
+    }
+    for (const id of r.taken ?? []) {
+      const row = bump(id);
+      row.picked += 1;
+      byCard.set(id, row);
+    }
+    for (const id of r.deck ?? []) {
+      const row = bump(id);
+      row.inDeck += 1;
+      row.inWin += r.outcome === 'win' ? 1 : 0;
+      byCard.set(id, row);
+    }
+  }
+  return [...byCard.values()]
+    .map((c) => ({
+      ...c,
+      pickRate: c.offered > 0 ? c.picked / c.offered : null,
+      presenceInWins: wins.length > 0 ? c.inWin / wins.length : null,
+      presenceInDeck: records.length > 0 ? c.inDeck / records.length : null,
+    }))
+    .sort((a, b) => (b.pickRate ?? -1) - (a.pickRate ?? -1) || a.id.localeCompare(b.id));
+}
+
+/**
+ * Render the per-card table in one of three formats.
+ * Empty cells, not zeros: a consumer parsing this CSV must be able to tell "not
+ * applicable" from "picked never".
+ * @param {any[]} cards rows from cardTable()
+ * @param {'table'|'json'|'csv'} format
+ * @returns {string} trailing-newline-terminated section
+ */
+export function renderCardTable(cards, format) {
+  if (format === 'json') {
+    return `\n${JSON.stringify(cards, null, 2)}\n`;
+  }
+  if (format === 'csv') {
+    let text = '\ncard,offered,picked,pickRate,inWins,presenceInWins,presenceInDeck\n';
+    for (const c of cards) {
+      text += `${c.id},${c.offered},${c.picked},${c.pickRate === null ? 'n/a' : c.pickRate.toFixed(3)},${c.inWin},${c.presenceInWins === null ? 'n/a' : c.presenceInWins.toFixed(3)},${c.presenceInDeck.toFixed(3)}\n`;
+    }
+    return text;
+  }
+  if (format === 'table') {
+    let text = '\ncard                     offered picked pickRate inWins presence\n';
+    for (const c of cards) {
+      const rate = c.pickRate === null ? 'n/a' : c.pickRate.toFixed(3);
+      const pres = c.presenceInWins === null ? 'n/a' : c.presenceInWins.toFixed(3);
+      text += `${c.id.padEnd(24)} ${String(c.offered).padStart(7)} ${String(c.picked).padStart(6)} ${rate.padStart(8)} ${String(c.inWin).padStart(6)} ${pres.padStart(8)}\n`;
+    }
+    return text;
+  }
+  throw Object.assign(new Error(`unknown --format "${format}" (expected: table, json, csv)`), { code: 3 });
+}
+
+/**
  * Build the balance report.
  * @param {{from: string, byCard?: boolean, format?: string, provenance?: string}} opts
  * @returns {{ok: boolean, text: string, data: any}}
@@ -77,39 +153,7 @@ export function stats(opts) {
   }
 
   const wins = records.filter((r) => r.outcome === 'win');
-  const byCard = new Map();
-  for (const r of records) {
-    for (const id of r.offered ?? []) {
-      const row = byCard.get(id) ?? { id, offered: 0, picked: 0, inDeck: 0, inWin: 0 };
-      row.offered += 1;
-      byCard.set(id, row);
-    }
-    for (const id of r.taken ?? []) {
-      const row = byCard.get(id) ?? { id, offered: 0, picked: 0, inDeck: 0, inWin: 0 };
-      row.picked += 1;
-      byCard.set(id, row);
-    }
-    for (const id of r.deck ?? []) {
-      const row = byCard.get(id) ?? { id, offered: 0, picked: 0, inDeck: 0, inWin: 0 };
-      row.inDeck += 1;
-      row.inWin += r.outcome === 'win' ? 1 : 0;
-      byCard.set(id, row);
-    }
-  }
-
-  const cards = [...byCard.values()]
-    .map((c) => ({
-      ...c,
-      // A RATIO NEEDS A DENOMINATOR. A starter card (`strike`, `defend`, `bash`) is
-      // never OFFERED as a reward — it is in the deck from turn one — so `picked /
-      // offered` was 0/0, printed as "0.000", which reads as "picked 0% of the time"
-      // when the truth is "not applicable". Same for a presence rate before the first
-      // win. Both are now null and printed as `n/a`; the raw counts stay.
-      pickRate: c.offered > 0 ? c.picked / c.offered : null,
-      presenceInWins: wins.length > 0 ? c.inWin / wins.length : null,
-      presenceInDeck: records.length > 0 ? c.inDeck / records.length : null,
-    }))
-    .sort((a, b) => (b.pickRate ?? -1) - (a.pickRate ?? -1) || a.id.localeCompare(b.id));
+  const cards = cardTable(records, wins);
 
   const steps = records.map((r) => r.steps).sort((a, b) => a - b);
   const floorHist = {};
@@ -117,25 +161,9 @@ export function stats(opts) {
 
   // Boss floor, the same separation `sim` reports, derived from the same records so a
   // balance report can be rebuilt from a directory alone (see the file header).
-  const bossRuns = records.filter((r) => r.bossArrival);
-  const bossWins = bossRuns.filter((r) => r.outcome === 'win');
-  const bossDeaths = bossRuns.filter((r) => typeof r.bossHpRemaining === 'number' && r.outcome !== 'win');
-  const avg = (xs) => (xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  const boss = bossSummaryOf(records);
+  const bossData = boss.reached === 0 ? null : boss;
   const fmt = (v, d = 1) => (v === null ? 'n/a' : v.toFixed(d));
-  const bossData = bossRuns.length === 0 ? null : {
-    reached: bossRuns.length,
-    reachedRate: bossRuns.length / records.length,
-    kills: bossWins.length,
-    killRate: bossWins.length / bossRuns.length,
-    meanArrivalHp: avg(bossRuns.map((r) => r.bossArrival.hp)),
-    meanArrivalDeckSize: avg(bossRuns.map((r) => r.bossArrival.deckSize)),
-    meanArrivalAttacks: avg(bossRuns.map((r) => r.bossArrival.attacks)),
-    meanArrivalSkills: avg(bossRuns.map((r) => r.bossArrival.skills)),
-    meanArrivalPowers: avg(bossRuns.map((r) => r.bossArrival.powers)),
-    meanArrivalBlockPoints: avg(bossRuns.map((r) => r.bossArrival.blockPoints)),
-    meanBossHpRemaining: avg(bossDeaths.map((r) => r.bossHpRemaining)),
-    deathsCounted: bossDeaths.length,
-  };
 
   const header = `stats — provenance: ${wanted} | ${records.length} runs (of ${all.length} present${present.length > 1 ? `: ${present.join(', ')}` : ''}) | source: ${source}`;
   const notes = [
@@ -173,26 +201,6 @@ export function stats(opts) {
     text += `boss reached 0/${records.length} — no run in this set reached the boss floor\n`;
   }
 
-  if (opts.byCard) {
-    if (opts.format === 'json') {
-      text += `\n${JSON.stringify(cards, null, 2)}\n`;
-    } else if (opts.format === 'csv') {
-      // Empty cells, not zeros: a consumer parsing this CSV must be able to tell
-      // "not applicable" from "picked never".
-      text += '\ncard,offered,picked,pickRate,inWins,presenceInWins,presenceInDeck\n';
-      for (const c of cards) {
-        text += `${c.id},${c.offered},${c.picked},${c.pickRate === null ? 'n/a' : c.pickRate.toFixed(3)},${c.inWin},${c.presenceInWins === null ? 'n/a' : c.presenceInWins.toFixed(3)},${c.presenceInDeck.toFixed(3)}\n`;
-      }
-    } else if (opts.format === 'table') {
-      text += '\ncard                     offered picked pickRate inWins presence\n';
-      for (const c of cards) {
-        const rate = c.pickRate === null ? 'n/a' : c.pickRate.toFixed(3);
-        const pres = c.presenceInWins === null ? 'n/a' : c.presenceInWins.toFixed(3);
-        text += `${c.id.padEnd(24)} ${String(c.offered).padStart(7)} ${String(c.picked).padStart(6)} ${rate.padStart(8)} ${String(c.inWin).padStart(6)} ${pres.padStart(8)}\n`;
-      }
-    } else {
-      throw Object.assign(new Error(`unknown --format "${opts.format}" (expected: table, json, csv)`), { code: 3 });
-    }
-  }
+  if (opts.byCard) text += renderCardTable(cards, opts.format);
   return { text, data };
 }
