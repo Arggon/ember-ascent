@@ -42,13 +42,8 @@ import {
   bumpAnimGen,
 } from './runtime.js';
 import { el, placeAt } from './dom.js';
-import { fxAnvil, fxArcspan, fxAshscythe, fxAshswirl, fxAshtendrils, fxBankedglow, fxBloodcondense,
-  fxCardfan, fxChestpulse, fxCindercrust, fxCollarline, fxCrycone, fxDustcrack, fxFlamecurtain,
-  fxFlarefan, fxForgering, fxGustcone, fxHailticks, fxHeartbloom, fxHeatladder, fxHeatwashwave,
-  fxHeelburst, fxImpactstar, fxJabpull, fxLaunch, fxLockrings, fxPlateclank, fxPlatefly,
-  fxPlatestack, fxQuenchveil, fxRend, fxScaleripple, fxSelfseam, fxShake, fxShockwave, fxSlagwave,
-  fxSparkdart, fxStokedraft, fxTemperhiss, fxTithe, fxTwin, fxVeindrip, fxVentjets, fxWildcracks,
-} from './fx-signatures.js';
+import { fxAdd } from './fx-add.js';
+import { SIG_FX } from './fx-signatures.js';
 
 /**
  * One line of words on the screen layer at the moment of arrival: the boss walks in, the
@@ -87,13 +82,6 @@ export function sceneBeat(from, to) {
   }
   if (to === 'ended') return;
   fxAdd(el('div', { cls: `fx-scene to-${to}`, attrs: { 'aria-hidden': 'true' } }), 700);
-}
-
-export function fxAdd(node, ms) {
-  if (!fxEl || reducedMotion) return;
-  fxEl.append(node);
-  // `parentNode`, not `parent`: DOM nodes have no `.parent`, so effect nodes used to pile up forever.
-  later(() => { node.remove(); }, ms);
 }
 
 /**
@@ -210,53 +198,15 @@ export function dispatchFx() {
         }
         // SIGNATURE choreography (per-card): each knob fires at its own beat of the SAME
         // action generation, so the hit-stop queue below can never retire them early.
+        // The knob -> effect table lives in fx-signatures.js next to the effects it
+        // dispatches; Object.entries() yields it in creation order, which is the order
+        // the timers were scheduled in before the table existed.
         const sig = signatureFor(b);
         if (sig) {
           const sigMs = sig.poseMs || HERO_POSE_MS[heroMove(b)] || 800;
-          if (sig.shake) fxShake(fire, lane, b, sigMs, gen);
-          if (sig.shockwave) fxShockwave(fire, lane, b, sigMs, gen);
-          if (sig.anvil) fxAnvil(fire, lane, b, sigMs, gen);
-          if (sig.twin) fxTwin(fire, lane, b, sigMs, gen);
-          if (sig.rend) fxRend(fire, lane, b, sigMs, gen);
-          if (sig.launch) fxLaunch(fire, lane, b, sigMs, gen);
-          if (sig.dustcrack) fxDustcrack(fire, lane, b, sigMs, gen);
-          if (sig.quenchveil) fxQuenchveil(fire, lane, b, sigMs, gen);
-          if (sig.gustcone) fxGustcone(fire, lane, b, sigMs, gen);
-          if (sig.sparkdart) fxSparkdart(fire, lane, b, sigMs, gen);
-          if (sig.flarefan) fxFlarefan(fire, lane, b, sigMs, gen);
-          if (sig.arcspan) fxArcspan(fire, lane, b, sigMs, gen);
-          if (sig.collarline) fxCollarline(fire, lane, b, sigMs, gen);
-          if (sig.impactstar) fxImpactstar(fire, lane, b, sigMs, gen);
-          if (sig.slagwave) fxSlagwave(fire, lane, b, sigMs, gen);
-          if (sig.jabpull) fxJabpull(fire, lane, b, sigMs, gen);
-          if (sig.forgering) fxForgering(fire, lane, b, sigMs, gen);
-          if (sig.wildcracks) fxWildcracks(fire, lane, b, sigMs, gen);
-          if (sig.chestpulse) fxChestpulse(fire, lane, b, sigMs, gen);
-          if (sig.heelburst) fxHeelburst(fire, lane, b, sigMs, gen);
-          if (sig.bloodcondense) fxBloodcondense(fire, lane, b, sigMs, gen);
-          if (sig.platefly) fxPlatefly(fire, lane, b, sigMs, gen);
-          if (sig.temperhiss) fxTemperhiss(fire, lane, b, sigMs, gen);
-          if (sig.plateclank) fxPlateclank(fire, lane, b, sigMs, gen);
-          if (sig.crycone) fxCrycone(fire, lane, b, sigMs, gen);
-          if (sig.ventjets) fxVentjets(fire, lane, b, sigMs, gen);
-          if (sig.cardfan) fxCardfan(fire, lane, b, sigMs, gen);
-          if (sig.hailticks) fxHailticks(fire, lane, b, sigMs, gen);
-          if (sig.heatladder) fxHeatladder(fire, lane, b, sigMs, gen);
-          if (sig.veindrip) fxVeindrip(fire, lane, b, sigMs, gen);
-          if (sig.ashscythe) fxAshscythe(fire, lane, b, sigMs, gen);
-          if (sig.heatwashwave) fxHeatwashwave(fire, lane, b, sigMs, gen);
-          if (sig.lockrings) fxLockrings(fire, lane, b, sigMs, gen);
-          if (sig.flamecurtain) fxFlamecurtain(fire, lane, b, sigMs, gen);
-          if (sig.ashswirl) fxAshswirl(fire, lane, b, sigMs, gen);
-          if (sig.stokedraft) fxStokedraft(fire, lane, b, sigMs, gen);
-          if (sig.scaleripple) fxScaleripple(fire, lane, b, sigMs, gen);
-          if (sig.bankedglow) fxBankedglow(fire, lane, b, sigMs, gen);
-          if (sig.ashtendrils) fxAshtendrils(fire, lane, b, sigMs, gen);
-          if (sig.cindercrust) fxCindercrust(fire, lane, b, sigMs, gen);
-          if (sig.platestack) fxPlatestack(fire, lane, b, sigMs, gen);
-          if (sig.heartbloom) fxHeartbloom(fire, lane, b, sigMs, gen);
-          if (sig.tithe) fxTithe(fire, lane, b, sigMs, gen);
-          if (sig.selfseam) fxSelfseam(fire, lane, b, sigMs, gen);
+          for (const [knob, play] of Object.entries(SIG_FX)) {
+            if (sig[knob]) play(fire, lane, b, sigMs, gen);
+          }
         }
         break;
       default:

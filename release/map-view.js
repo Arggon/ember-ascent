@@ -5,11 +5,11 @@
 // laid-out nodes, so it follows any breakpoint. Map pins are browser-only planning marks
 // in localStorage, keyed by the run's seed and NEVER in run state.
 
-import { prevMapCurrent, prevMapFloor, snap } from './runtime.js';
+import { prevMapCurrent, prevMapFloor, repaint, snap } from './runtime.js';
 import { el, announce } from './dom.js';
 import { NODE_GLYPH, NODE_WORDS, glyphBox } from './glyphs.js';
 import { act } from './actions.js';
-import { page, render } from './render.js';
+import { page } from './page-frame.js';
 import { storeGet, storePut } from './run-history.js';
 
 /* ---------------------------------------------------------------------- MAP */
@@ -162,7 +162,7 @@ function mapNode(n) {
     on: {
       ...(n.available && n.actionId ? { click: () => act(n.actionId) } : {}),
       // Right-click (long-press on touch) drops or lifts a planning pin. Browser-only state.
-      contextmenu: (ev) => { ev.preventDefault(); toggleMapPin(n.id); render(); },
+      contextmenu: (ev) => { ev.preventDefault(); toggleMapPin(n.id); repaint(); },
     },
   });
   if (n.available) node.title = `Travel to ${n.label} · right-click to pin`;

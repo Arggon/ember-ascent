@@ -20,6 +20,7 @@ import {
   heroMoveHold,
   pileOpen,
   reducedMotion,
+  repaint,
   setAnimSpeed,
   setPileOpen,
   setHeroMoveHold,
@@ -34,7 +35,7 @@ import { cardArtMarkup } from './card-art.js';
 import { dyingCard, efxBox, freshStatusKeys, heroEfx, hitClass } from './floats.js';
 import { aimed, cancelTargeting, clickCard, consumeClick, enemyLabel, pendingCard, pendingSlot, pickTarget, setAimed } from './targeting.js';
 import { act } from './actions.js';
-import { page, render } from './render.js';
+import { page } from './page-frame.js';
 
 export function heroPose() {
   // Precedence: getting hit outranks the card's own movement — a hero who just lost HP
@@ -157,7 +158,7 @@ function pileButton(which) {
       click: (ev) => {
         consumeClick(ev);
         setPileOpen(pileOpen === which ? null : which);
-        render();
+        repaint();
       },
     },
   },
@@ -190,7 +191,7 @@ function speedDock() {
         setAnimSpeed(speed);
         try { localStorage.setItem(SPEED_KEY, String(speed)); } catch { /* private mode */ }
         if (speed === 0) skipAnim();
-        render();
+        repaint();
       },
     },
   }));
@@ -205,7 +206,7 @@ function pileModal(which) {
   const title = which === 'draw' ? 'Draw pile' : 'Discard pile';
   const back = el('div', { cls: 'pile-back', attrs: { role: 'dialog', 'aria-label': title } });
   back.addEventListener('click', (ev) => {
-    if (ev.target === back) { setPileOpen(null); render(); }
+    if (ev.target === back) { setPileOpen(null); repaint(); }
   });
   const sheet = el('div', { cls: 'pile-sheet' }, el('h2', { text: `${title} (${names.length})` }));
   if (names.length === 0) sheet.append(el('p', { text: 'Empty.' }));
@@ -222,7 +223,7 @@ function pileModal(which) {
     cls: 'btn secondary',
     text: 'Close',
     attrs: { type: 'button' },
-    on: { click: (ev) => { consumeClick(ev); setPileOpen(null); render(); } },
+    on: { click: (ev) => { consumeClick(ev); setPileOpen(null); repaint(); } },
   }));
   back.append(sheet);
   return back;

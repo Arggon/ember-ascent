@@ -20,30 +20,9 @@
 // INFERENCE, not a rule: see docs/status/TARGETING-UI-STATUS.md. The fallback never overrides an
 // explicit `card.target`.
 
-import { snap, stageEl } from './runtime.js';
+import { snap, repaint, setEndTargeting, stageEl } from './runtime.js';
 import { announce, toast } from './dom.js';
 import { act } from './actions.js';
-import { render } from './render.js';
-
-/* ------------------------------------------------------------------- TARGETING */
-//
-// WHO aims WHERE is not decided here. The engine owns the target index; this file only
-// collects the player's choice and submits it in the form the engine already accepts.
-//
-// The frozen interaction contract:
-//   * exactly one LIVING enemy  -> plain `p<N>`, no extra step at all;
-//   * two or more living enemies -> `p<N> <k>`, where k is 1-based among the LIVING
-//     enemies in the order the snapshot prints them. That is `position + 1` below.
-//     It is deliberately NOT `enemy.index`: `index` is stable identity that survives a
-//     death, so once an enemy in front dies the survivor's `index` stops matching its
-//     position. Measured in this repo — kill the first of two enemies and the survivor
-//     keeps index 1 while becoming `k` 1.
-//   * `all` / `self` cards never ask.
-//
-// `card.target` is the engine's own answer to "does this card need a target?". While the
-// snapshot omits that field the renderer falls back to the card's TYPE, which is an
-// INFERENCE, not a rule: see docs/status/TARGETING-UI-STATUS.md. The fallback never overrides an
-// explicit `card.target`.
 
 /** The hand slot ('p3') of the card currently waiting for a target, or null. */
 export let pendingSlot = null;
@@ -123,7 +102,7 @@ export function clickCard(slot) {
 export function enableTargeting(slot) {
   pendingSlot = slot;
   aimed = snap.enemies.length > 0 ? 1 : null;
-  render();
+  repaint();
   const card = snap.hand.find((c) => c.slot === slot);
   announce(`${card ? card.name : 'That card'} needs a target. ${snap.enemies.length} enemies alive. Press 1 to ${snap.enemies.length} to choose one, Escape to cancel.`);
   focusFirstTarget();
@@ -135,7 +114,7 @@ export function cancelTargeting() {
   const slot = pendingSlot;
   pendingSlot = null;
   aimed = null;
-  render();
+  repaint();
   toast('Target cancelled — nothing was played', 'info');
   announce('Target cancelled. Nothing was played.');
   focusSlot(slot);
@@ -159,7 +138,7 @@ export function pickTarget(k) {
 export function setAimed(k) {
   if (pendingSlot === null || aimed === k) return;
   aimed = k;
-  render();
+  repaint();
 }
 
 /** Drop the pending state without a toast — used when the turn moves on underneath us. */
@@ -168,6 +147,10 @@ export function endTargeting() {
   pendingSlot = null;
   aimed = null;
 }
+
+/* Registered with runtime.js at load, so actions.js can end a targeting step from below
+   the graph without importing targeting.js back (that would be a cycle). */
+setEndTargeting(endTargeting);
 
 /** Move keyboard focus onto the first legal target once the step appears. */
 export function focusFirstTarget() {

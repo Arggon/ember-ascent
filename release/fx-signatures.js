@@ -18,7 +18,7 @@
 
 import { el, placeAt } from './dom.js';
 import { animGen, animMs, later, stageEl } from './runtime.js';
-import { fxAdd } from './fx.js';
+import { fxAdd } from './fx-add.js';
 import { THROW_MS } from './hero-moves.js';
 
 
@@ -978,3 +978,56 @@ export function fxSelfseam(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.45)) || 1);
 }
 
+
+/* --------------------------------------------------------------------- REGISTRY ----
+ * The knob -> effect table, in dispatch order (dispatchFx() iterates it in creation
+ * order, which is the order the timers are scheduled in — keep it stable). Adding a
+ * signature is now one function here plus one entry below, not another branch in the
+ * dispatcher. The knob names are the keys HERO_SIGNATURES (./hero-moves.js) sets.
+ */
+export const SIG_FX = {
+  shake: fxShake,
+  shockwave: fxShockwave,
+  anvil: fxAnvil,
+  twin: fxTwin,
+  rend: fxRend,
+  launch: fxLaunch,
+  dustcrack: fxDustcrack,
+  quenchveil: fxQuenchveil,
+  gustcone: fxGustcone,
+  sparkdart: fxSparkdart,
+  flarefan: fxFlarefan,
+  arcspan: fxArcspan,
+  collarline: fxCollarline,
+  impactstar: fxImpactstar,
+  slagwave: fxSlagwave,
+  jabpull: fxJabpull,
+  forgering: fxForgering,
+  wildcracks: fxWildcracks,
+  chestpulse: fxChestpulse,
+  heelburst: fxHeelburst,
+  bloodcondense: fxBloodcondense,
+  platefly: fxPlatefly,
+  temperhiss: fxTemperhiss,
+  plateclank: fxPlateclank,
+  crycone: fxCrycone,
+  ventjets: fxVentjets,
+  cardfan: fxCardfan,
+  hailticks: fxHailticks,
+  heatladder: fxHeatladder,
+  veindrip: fxVeindrip,
+  ashscythe: fxAshscythe,
+  heatwashwave: fxHeatwashwave,
+  lockrings: fxLockrings,
+  flamecurtain: fxFlamecurtain,
+  ashswirl: fxAshswirl,
+  stokedraft: fxStokedraft,
+  scaleripple: fxScaleripple,
+  bankedglow: fxBankedglow,
+  ashtendrils: fxAshtendrils,
+  cindercrust: fxCindercrust,
+  platestack: fxPlatestack,
+  heartbloom: fxHeartbloom,
+  tithe: fxTithe,
+  selfseam: fxSelfseam,
+};

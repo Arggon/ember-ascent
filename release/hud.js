@@ -4,11 +4,10 @@
 // so the browser can never explain a rule differently from the engine that enforces it.
 // `helpOpen` is written only here (by `toggleHelp`), so it needs no setter.
 
-import { flash, hudEl, reducedMotion, snap } from './runtime.js';
+import { flash, hudEl, reducedMotion, repaint, snap } from './runtime.js';
 import { capitalize, el } from './dom.js';
 import { freshStatusKeys } from './floats.js';
 import { newGame } from './actions.js';
-import { render } from './render.js';
 
 /* ------------------------------------------------------------------------- HUD */
 
@@ -69,7 +68,7 @@ export const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
 
 export function toggleHelp(open) {
   helpOpen = open;
-  render();
+  repaint();
 }
 
 /**
