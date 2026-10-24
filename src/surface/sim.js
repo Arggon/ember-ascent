@@ -12,8 +12,10 @@ import { join } from 'node:path';
 import { availableParallelism } from 'node:os';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
-import { begin, submit, legal, view, actionLines, malformed, eventsOf } from './session.js';
+import { begin, submit, legal, view, actionLines, eventsOf } from './session.js';
 import { makePolicy, deckComposition } from './policies.js';
+import { incomingFromDump } from './policy-read.js';
+import { bossSummaryOf } from './boss-summary.js';
 import { measureRun } from './tokens.js';
 // The record builder lives in the KERNEL and is reached through its one public entry
 // (R1). `sim` no longer composes a record field-by-field: it hands the finished session
@@ -25,6 +27,28 @@ import { buildRunRecord, contentForProfile, fullyUnlockedProfile } from '../kern
 
 /** Hard stop so a pathological interaction cannot spin forever inside a worker. */
 const MAX_STEPS = 5000;
+
+/**
+ * The boss-arrival snapshot of a state entering its first boss-fight turn, or null.
+ *
+ * BOSS-FLOOR DIAGNOSTICS. The floor histogram says how many runs REACH the boss, but
+ * nothing about what they arrive with. These fields make "is the boss too strong?" a
+ * question the data can answer: arrival HP, arrival deck composition, and — when the
+ * run ends in that fight — how much of the boss was still standing. Recorded once, on
+ * the turn the boss fight starts, so "at the boss" means "on arrival".
+ */
+function bossArrivalOf(state) {
+  const comp = deckComposition(state.deck);
+  return {
+    hp: state.player.hp,
+    maxHp: state.player.maxHp,
+    deckSize: state.deck.length,
+    attacks: comp.attacks,
+    skills: comp.skills,
+    powers: comp.powers,
+    blockPoints: comp.block,
+  };
+}
 
 /**
  * Play one complete run with a built-in policy.
@@ -50,14 +74,6 @@ export async function playRun(opts) {
   const offered = [];
   const taken = [];
   let steps = 0;
-  let malformedAtEnd = { rejected: 0 };
-
-  // BOSS-FLOOR DIAGNOSTICS. The floor histogram says how many runs REACH the boss,
-  // but nothing about what they arrive with. These fields make "is the boss too
-  // strong?" a question the data can answer: arrival HP, arrival deck composition,
-  // and — when the run ends in that fight — how much of the boss was still standing.
-  // Recorded once, on the turn the boss fight starts, so "at the boss" means
-  // "on arrival".
   let bossArrival = null;
   let bossHpRemaining = null;
 
@@ -71,16 +87,7 @@ export async function playRun(opts) {
       memory.incoming = incomingFromDump(dump);
       memory.dump = dump;
       if (session.state.combat.nodeType === 'boss' && bossArrival === null) {
-        const comp = deckComposition(session.state.deck);
-        bossArrival = {
-          hp: session.state.player.hp,
-          maxHp: session.state.player.maxHp,
-          deckSize: session.state.deck.length,
-          attacks: comp.attacks,
-          skills: comp.skills,
-          powers: comp.powers,
-          blockPoints: comp.block,
-        };
+        bossArrival = bossArrivalOf(session.state);
       }
     }
     const choice = policy.choose({ session, state: session.state, legal: legal(session), stepIndex: session.state.stepIndex, memory, dump });
@@ -98,8 +105,6 @@ export async function playRun(opts) {
     steps += 1;
   }
 
-  const m = malformed(session);
-  malformedAtEnd = m;
   // Boss HP still standing when the run ended in the boss fight. Read before the
   // state is reduced to the record: an enemy that is absent (not a boss fight, or the
   // boss already dead) yields null rather than a misleading 0.
@@ -137,37 +142,33 @@ export async function playRun(opts) {
     record.payloadTokens = t;
     record.samples = samples.length;
   }
-  void malformedAtEnd;
   return record;
 }
 
 /**
- * Total incoming damage, read from the ENEMY block of a rendered dump.
- *
- * Reading the rendered text rather than state internals is deliberate: the printed
- * intent is exactly the information a player has, so the heuristic cannot quietly
- * use numbers no observation exposes. "A5x3" contributes 15; "B20"/"PWR3" contribute 0.
- * @param {string} dump
- * @returns {number}
- */
-function incomingFromDump(dump) {
-  const rows = dump.split('\n');
-  const at = rows.indexOf('ENEMY');
-  if (at === -1) return 0;
-  let total = 0;
-  for (let i = at + 1; i < rows.length; i += 1) {
-    const m = /A(\d+)(?:x(\d+))?/.exec(rows[i]);
-    if (m) total += Number(m[1]) * (m[2] ? Number(m[2]) : 1);
-  }
-  return total;
-}
-
-/**
- * Run a batch of games across worker threads.
+ * Split N runs over T workers into contiguous seed blocks.
  *
  * Seeds are assigned round-robin-free: worker w gets the contiguous block
  * [seedStart + w*chunk, ...). Contiguous blocks make each worker's output directory
  * browsable by seed, and make worker count irrelevant to the set of games played.
+ * @param {number} runs total run count (positive)
+ * @param {number} threads worker count (>= 1, already clamped by the caller)
+ * @param {number} seedStart first seed
+ * @returns {Array<{from: number, count: number}>}
+ */
+export function seedChunks(runs, threads, seedStart) {
+  const chunks = [];
+  const per = Math.ceil(runs / threads);
+  for (let t = 0; t < threads; t += 1) {
+    const from = seedStart + t * per;
+    const count = Math.max(0, Math.min(per, runs - t * per));
+    if (count > 0) chunks.push({ from, count });
+  }
+  return chunks;
+}
+
+/**
+ * Run a batch of games across worker threads.
  * @param {{runs: number, seedStart: number, policy: string, threads: number, outDir?: string|null, profile?: string, onProgress?: Function|null}} opts
  * @returns {Promise<any>}
  */
@@ -185,13 +186,7 @@ export async function simulate(opts) {
   if (dir) mkdirSync(dir, { recursive: true });
   const start = process.hrtime.bigint();
 
-  const chunks = [];
-  const per = Math.ceil(runs / threads);
-  for (let t = 0; t < threads; t += 1) {
-    const from = opts.seedStart + t * per;
-    const count = Math.max(0, Math.min(per, runs - t * per));
-    if (count > 0) chunks.push({ from, count });
-  }
+  const chunks = seedChunks(runs, threads, opts.seedStart);
 
   const records = [];
   await Promise.all(
@@ -226,33 +221,12 @@ export async function simulate(opts) {
   const rejectedTotal = records.reduce((s, r) => s + r.rejected, 0);
   const submissionsTotal = stepsTotal + rejectedTotal;
   const floors = records.map((r) => r.floor);
-  // BOSS FLOOR, measured rather than inferred. `bossArrival` is written on the turn the
-  // boss fight starts, so bossRuns is exactly the set of runs that reached it — the
-  // number that hides inside a raw floor histogram. bossKillRate is the rate the brief
-  // cares about: of the runs that got there, how many actually won.
-  const bossRuns = records.filter((r) => r.bossArrival);
-  const bossWins = bossRuns.filter((r) => r.outcome === 'win');
-  const bossDeaths = bossRuns.filter((r) => typeof r.bossHpRemaining === 'number' && r.outcome !== 'win');
-  const avg = (xs) => (xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  // BOSS FLOOR, measured rather than inferred: bossSummaryOf() reads the bossArrival
+  // markers playRun writes, so `reached` is exactly the set of runs that got there —
+  // the number that hides inside a raw floor histogram. `killRate` is the rate the
+  // brief cares about: of the runs that got there, how many actually won.
+  const bossSummary = bossSummaryOf(records);
   const fmt = (v, d = 1) => (v === null ? 'n/a' : v.toFixed(d));
-  const bossSummary = {
-    reached: bossRuns.length,
-    reachedRate: records.length ? bossRuns.length / records.length : 0,
-    kills: bossWins.length,
-    killRate: bossRuns.length ? bossWins.length / bossRuns.length : 0,
-    meanArrivalHp: avg(bossRuns.map((r) => r.bossArrival.hp)),
-    meanArrivalHpFrac: avg(bossRuns.map((r) => r.bossArrival.hp / r.bossArrival.maxHp)),
-    meanArrivalDeckSize: avg(bossRuns.map((r) => r.bossArrival.deckSize)),
-    meanArrivalAttacks: avg(bossRuns.map((r) => r.bossArrival.attacks)),
-    meanArrivalSkills: avg(bossRuns.map((r) => r.bossArrival.skills)),
-    meanArrivalPowers: avg(bossRuns.map((r) => r.bossArrival.powers)),
-    meanArrivalBlockPoints: avg(bossRuns.map((r) => r.bossArrival.blockPoints)),
-    // Only over runs that DIED in the boss fight: a run that killed the boss has no
-    // "HP remaining" to average, and folding a 0 in would understate the boss.
-    meanBossHpRemaining: avg(bossDeaths.map((r) => r.bossHpRemaining)),
-    meanBossHpRemainingPct: avg(bossDeaths.map((r) => r.bossHpRemaining / (r.bossArrival.bossMaxHp || 240))),
-    deathsCounted: bossDeaths.length,
-  };
   const tokens = records.find((r) => r.payloadTokens)?.payloadTokens ?? null;
 
   const report = [
