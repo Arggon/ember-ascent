@@ -630,3 +630,70 @@ async function probeSignatureFx(t, seed) {
     await browser.close();
   }
 }
+
+// The run-over screen was the one surface no e2e reached: a full victory (or a run that
+// ends at all) never happened in this file, so a mid-render crash there — the run-history
+// `el` defect shipped with the module split — left a BLANK stage where the restart menu
+// belongs and every other suite stayed green. This walks a whole run to the end (win or
+// loss at the Warden both exercise it) and asserts the restart menu is on screen.
+test('a full run ends on the restart menu, not a blank stage', { timeout: 300000 }, async (t) => {
+  if (!chromium) return t.skip('playwright unavailable');
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: 'reduce', // paint instantly: the walk's assertions are structural
+  });
+  t.after(() => { void browser.close(); });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+  await page.goto(`${base}/src/web/index.html?seed=7`);
+  await page.waitForLoadState('domcontentloaded');
+  await page.getByRole('button', { name: /^Bellows Breath:/ }).click();
+  await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    for (let i = 0; i < 10; i += 1) save.state.deck.push({ uid: `e2e-run-${i}`, cardId: 'bludgeon' });
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+
+  let sawBossFight = false;
+  for (let guard = 0; guard < 400; guard += 1) {
+    const phase = await page.evaluate(() => window.__dlb.snapshot().phase);
+    if (phase === 'ended') break;
+    if (phase === 'map') {
+      const boss = page.locator('button[aria-label*="boss" i]').first();
+      if ((await boss.count()) > 0) await boss.click();
+      else await page.locator('button[aria-label^="Travel to"]').last().click();
+    } else if (phase === 'combat') {
+      const names = await page.evaluate(() => window.__dlb.snapshot().enemies.map((e) => e.name).join(','));
+      if (/warden/i.test(names)) sawBossFight = true;
+      const maul = page.locator('.card:not(.disabled)', { hasText: 'Maul' }).first();
+      if ((await maul.count()) > 0) {
+        await maul.click();
+        const tgt = page.locator('.enemy.targeting').last();
+        if ((await tgt.count()) > 0) await tgt.click();
+      } else {
+        await page.getByRole('button', { name: /End Turn/i }).click();
+      }
+    } else {
+      const card = page.locator('#stage .card:not(.disabled)').first();
+      if ((await card.count()) > 0) await card.click();
+      else {
+        const btn = page.locator('#stage button:not(:disabled)').first();
+        if ((await btn.count()) > 0) await btn.click();
+        else { await page.keyboard.press('1'); }
+      }
+    }
+    await sleep(120);
+  }
+  await sleep(1000);
+  assert.equal(errors.length, 0, `no page errors during the run: ${errors.join(' | ')}`);
+  assert.equal(await page.evaluate(() => window.__dlb.snapshot().phase), 'ended', 'the run reached its end');
+  assert.ok(sawBossFight, 'the walk fought the Slag Warden');
+  const restartVisible = await page.getByRole('button', { name: /Restart/i }).isVisible();
+  assert.ok(restartVisible, 'the restart menu is on the screen after the run ends');
+});

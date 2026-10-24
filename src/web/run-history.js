@@ -33,6 +33,9 @@ import {
   pruneRuns,
   scoreRun,
 } from '../kernel/index.js';
+
+
+import { el } from './dom.js';
 import { ctl, runEvents } from './runtime.js';
 
 /* -------------------------------------------------------------------- RUN HISTORY */
