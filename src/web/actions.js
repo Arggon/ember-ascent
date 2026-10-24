@@ -17,7 +17,6 @@ import {
 } from '../kernel/index.js';
 import { createController } from '../surface/gui/controller.js';
 import {
-  bursts,
   clearFxTimers,
   clearHitstop,
   flash,

@@ -1,10 +1,11 @@
-// src/web/render.js — the one paint path, and the shared `page()` wrapper.
+// src/web/render.js — the one paint path.
 //
 // `render()` rebuilds #stage from the current snapshot: it consumes the one-shot arrival
 // beats, holds the stage for the collapse that precedes an end/reward panel, delegates to
 // the per-phase view module, animates a phase change in (a repaint inside the same phase
-// stays still), and releases the per-paint flags with a timer. `page()` wraps every phase
-// in the same "engraved page" frame, so the screens share one visual contract.
+// stays still), and releases the per-paint flags with a timer. The "engraved page" frame
+// every screen shares lives in ./page-frame.js; the views repaint through the runtime
+// hook, so nothing imports back into this file.
 
 import { BIOMES, DEFAULT_BIOME } from '../kernel/index.js';
 import {
@@ -20,7 +21,6 @@ import {
   noArrival,
   paintedPhase,
   phaseArriving,
-  prevEnemies,
   prevMapCurrent,
   reducedMotion,
   setArriving,
