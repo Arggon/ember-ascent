@@ -60,21 +60,21 @@ served page but are not maintained as instruments.
 | `probe-toggle.mjs` | which new declaration changed the 1280×800 document |
 | `probe-eleven.mjs` | 915×412 / 844×390 diagnostic — self-marked TEMPORARY, past its stated lifetime |
 
-## No-browser DOM/logic drivers (fake-DOM against the real `src/web/app.js`)
+## No-browser DOM/logic drivers (fake-DOM against the split surface)
 
 | File | Answers | Status |
 |---|---|---|
-| `targeting-smoke.mjs` | are the targeting states wired, is nothing dispatched before an enemy is chosen | imports resolve; not run in this pass |
-| `repro-target-click.mjs` | does clicking an enemy resolve or cancel the target | imports resolve; not run in this pass |
-| `juice-effects.mjs` | does action feedback survive `replaceChildren`, and respect `prefers-reduced-motion` | imports resolve; not run in this pass |
-| `render-reward.mjs` | what tree does the reward screen build | imports resolve; not run in this pass |
-| `browser-path-smoke.mjs` | controller → snapshot → dispatch loop without a browser | **BROKEN today**: `import './src/surface/gui/controller.js'` resolves relative to `scripts/dev/` and throws `ERR_MODULE_NOT_FOUND` (reproduced this pass); it needs `../../src/surface/gui/controller.js`. Content-frozen this run — follow-up filed, do not copy this pattern |
+| `targeting-smoke.mjs` | are the targeting states wired, is nothing dispatched before an enemy is chosen | **verified 2026-10-24** (33/33 pass): assertions updated to the engine's underscore id form (`p1_2`; the old space form and the bare-slot E-loop predate the kernel contract the targeting tests pin); each keyboard check now uses its own controller so a played card cannot change the next check's fight; the fake node gained `.remove()` for fx-add.js's cleanup timer |
+| `repro-target-click.mjs` | does clicking an enemy resolve or cancel the target | **verified 2026-10-24**: RESOLVED (enemy HP 14,10 → 14,4 on the click) |
+| `juice-effects.mjs` | does action feedback survive `replaceChildren`, and respect `prefers-reduced-motion` | **verified 2026-10-24** (17/17 pass): the floater check was updated to the documented contract — the floater carries the dealt DELTA with its tier glyph (`·−6`), the static `.ehp` line the remaining total; the old check asserted the pre-glyph "floater = post-hit total" design |
+| `render-reward.mjs` | what tree does the reward screen build | **verified 2026-10-24**: builds cleanly, no literal "undefined" in the tree |
+| `browser-path-smoke.mjs` | controller → snapshot → dispatch loop without a browser | **verified 2026-10-24**: runs green after the specifier fix (`../../src/...`); controller loop completes with a real run hash |
 
 ## Art & assets
 
 | File | Answers | Status |
 |---|---|---|
-| `card-gallery.html` | all cards in real markup + stylesheet, for art review | **stale label**: the h1 says “42 CARDS” while shipped content is 44 cards (kernel count, this pass); the gallery itself renders whatever `SHIPPED_CONTENT` holds, so only the heading lies. Open via the dev server: `http://localhost:5173/scripts/dev/card-gallery.html` |
+| `card-gallery.html` | all cards in real markup + stylesheet, for art review | heading fixed to 44 (2026-10-24, the shipped kernel count); the gallery itself renders whatever `SHIPPED_CONTENT` holds. Open via the dev server: `http://localhost:5173/scripts/dev/card-gallery.html` |
 | `cover.html` | the itch.io cover, from the game's own palette and glyphs | self-contained by design; its palette is copied by hand from `style.css`, so drift is possible by construction (its own header says so) |
 | `sprite-cutout.py` | colour-key cutout for combat sprites → WebP | needs numpy + Pillow; Pillow not installed here — not runnable in this environment |
 

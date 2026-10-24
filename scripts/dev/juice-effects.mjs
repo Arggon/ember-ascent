@@ -207,12 +207,16 @@ console.log('=== A. prefers-reduced-motion: NO (the normal path) ===\n');
     !!hostSnap && hostSnap.index === (hitIdx ? hitIdx.index : -2),
     `floater host = enemy position ${hostIdx}, snapshot enemy index ${hostSnap && hostSnap.index}, hit index ${hitIdx && hitIdx.index}`);
 
-  // 2. The floater's number IS the enemy's post-hit HP total, and the static `.ehp` line
-  //    agrees — this is what makes the reduced-motion path lossless.
+  // 2. The floater's number IS the DAMAGE DEALT (an HP delta, with a tier glyph that
+  //    scales with it — `·`/`◆`/`✸`, per floats.js's contract), while the static `.ehp`
+  //    line carries the remaining total. Losslessness comes from the two together:
+  //    delta on the floater, total on the bar.
   const floaterText = floaters[0] ? floaters[0].textContent : '';
   const ehpText = hostEnemy ? (hostEnemy.querySelector('.ehp')?.textContent ?? '') : '';
-  ok('the floater shows the same total as the static HP line',
-    !!hostSnap && floaterText.includes(String(hostSnap.hp)) && ehpText.includes(`${hostSnap.hp}/${hostSnap.maxHp}`),
+  const hitBefore = hitIdx ? before.enemies.find((e) => e.index === hitIdx.index) : null;
+  const dealt = hitBefore && hostSnap ? hitBefore.hp - hostSnap.hp : 0;
+  ok('the floater shows the dealt delta and the static HP line the remaining total',
+    !!hostSnap && floaterText.includes(`−${dealt}`) && ehpText.includes(`${hostSnap.hp}/${hostSnap.maxHp}`),
     `floater="${floaterText}"  .ehp="${ehpText}"  (enemy hp ${hostSnap && hostSnap.hp})`);
 
   // 3. The hit reaction is on the hit enemy, carry/save the generation suffix.
