@@ -14,20 +14,25 @@ Work top to bottom. Checked boxes are things already done and verified in this r
 ## Before you start — the one upload file
 
 - [x] **`release.zip`** exists in this workspace root. That is the artifact.
-- [x] Zip SHA-256 `4a6621600c69f409aa83b2733dd9d0374fe591a2badceb45e5a830c6f48ed0db`
-      — 25 entries, **123,283 bytes**. Rebuilt 2026-10-15 after the screen-size layout fix;
-      regenerates byte-for-byte with `node scripts/build-release.mjs` (verified: two runs, same SHA).
+- [x] Zip SHA-256 `ed79756acf12eb6d15e549ab684623c2e97195d57d61dfa69fdad7df10a53a31`
+      — 85 entries, **2,480,641 bytes**. Rebuilt 2026-10-24 after the module refactor
+      (`src/web/app.js` is now a small entry importing focused ES modules, so the artifact
+      carries 85 files instead of 25); regenerates byte-for-byte with
+      `node scripts/build-release.mjs` (verified: two runs, same SHA).
 
 > **Note on earlier hashes.** This file previously recorded `b86764e4…`/101,861 B and
 > `../RELEASE-NOTES.md` recorded `72d1dc63…`/104,895 B. Neither matched the zip on disk, which was
-> itself `f629b29c…`/119,618 B and predated the layout fix. All three are now superseded by the
-> hash above, which is the artifact you should upload.
+> itself `f629b29c…`/119,618 B and predated the layout fix. All were superseded on 2026-10-15 by
+> `4a662160…`/123,283 B, which is **itself superseded** by the hash above — the artifact of
+> 2026-10-24, and the one you should upload.
 - [x] **`index.html` is at the zip root** (not nested inside `src/web/`). Verified against
       itch.io's rule that the ZIP must contain `index.html` as the entry point.
-- [x] No file path in the zip exceeds 240 characters; the longest is 34.
-- [x] 25 extracted files, far below itch.io's 1,000-file limit.
-- [x] Every `.js` in the artifact is served as `text/javascript`; all 24 runtime
-      requests returned 200 in the clean-directory serve test.
+- [x] No file path in the zip exceeds 240 characters; the longest is 34
+      (`src/kernel/content/cards.bundle.js`).
+- [x] 85 extracted files, far below itch.io's 1,000-file limit.
+- [x] Every `.js` in the artifact is served as `text/javascript`; all **49** runtime
+      `.js` modules returned 200 (re-verified 2026-10-24 against the rebuilt artifact through its
+      own `tools/serve.mjs`).
 
 ### ✅ Screenshots and cover art — available now
 

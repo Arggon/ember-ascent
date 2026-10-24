@@ -24,7 +24,7 @@ check a file's own header first: several tools self-identify as temporary.
 | `space-check.mjs` | how much vertical space is wasted per viewport; `wastePx` is the only overflow signal | `node scripts/dev/space-check.mjs [--base 'http://localhost:5173/src/web/index.html?seed={seed}']` | maintained alongside viewport-check; not run in this pass |
 | `endturn-acceptance-measure.mjs` | at 4 viewports: is End Turn visible AND clickable, hand one row, nothing clipped — absent vs below-fold told apart | `node scripts/dev/endturn-acceptance-measure.mjs [URL]` | not run in this pass |
 | `text-scale.mjs` | helper MODULE for the two harnesses above: emulates Android 130 % large fonts via CDP | — (imported, not standalone: direct run is a designed no-op, exit 0) | current |
-| `css-parse-probe.mjs` | does `src/web/style.css` parse under postcss, and is the tail intact | `node scripts/dev/css-parse-probe.mjs` | **verified this pass**: `bytes: 343968 lines: 6936 / parsed OK / @media blocks: 71` |
+| `css-parse-probe.mjs` | does `src/web/style.css` parse under postcss, and is the tail intact | `node scripts/dev/css-parse-probe.mjs` | **verified 2026-10-24** (after the css refactor): `bytes: 340849 lines: 6860 / parsed OK / @media blocks: 67` |
 
 ## Balance / rules probes (kernel only — no server, no browser)
 
