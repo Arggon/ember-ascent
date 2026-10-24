@@ -17,8 +17,6 @@
 // This drives the REAL src/web/app.js against a fake DOM with bubbling and closest(), then
 // dispatches a click the way a browser would — including the realistic case where the
 // innermost element under the pointer is a child of the enemy button, not the button.
-import { readFileSync } from 'node:fs';
-
 let uid = 0;
 class N {
   constructor(tag) {
@@ -102,6 +100,7 @@ globalThis.requestAnimationFrame = (f) => f();
 globalThis.URLSearchParams = URLSearchParams;
 
 import test from 'node:test';
+import { bundleApp } from '../web/app-bundle.mjs';
 import assert from 'node:assert/strict';
 
 // The renderer measures token cost asynchronously after each paint; that dynamic import
@@ -110,26 +109,13 @@ const origRAF = globalThis.requestAnimationFrame;
 globalThis.requestAnimationFrame = () => 0;
 
 const toasts = [];
+// The surface is split into sibling ES modules (src/web/*.js); bundleApp concatenates
+// them back into ONE sloppy-mode body — the same evaluation contract this test always
+// used — re-binding the kernel/surface imports from the real modules, with
+// createController stubbed by the factory below.
 const appUrl = new URL('../../src/web/app.js', import.meta.url);
-const rawSrc = readFileSync(appUrl, 'utf8');
-// app.js's named imports (single- or multi-line) are re-bound from the real modules,
-// except createController, which the factory below stubs with the test controller.
-const IMPORT_RE = /^import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"];?[ \t]*$/gm;
-const importPrelude = [];
-const importedModules = [];
-for (const [, names, spec] of rawSrc.matchAll(IMPORT_RE)) {
-  const bound = names.split(',').map((n) => n.trim()).filter(Boolean)
-    .map((n) => { const [orig, local = orig] = n.split(/\s+as\s+/); return [orig, local]; })
-    .filter(([, local]) => local !== 'createController');
-  if (!bound.length) continue;
-  const mod = await import(new URL(spec, appUrl));
-  importPrelude.push(`const { ${bound.map(([o, l]) => (o === l ? o : `${o}: ${l}`)).join(', ')} } = __mods[${importedModules.length}];`);
-  importedModules.push(mod);
-}
-let src = rawSrc
-  // Strip every static import, including multi-line `import {\n ... \n} from '...';`.
-  .replace(/^import\b[\s\S]*?\bfrom\s*['"][^'"]+['"];?[ \t]*$|^import\s*['"][^'"]+['"];?[ \t]*$/gm, '')
-  .replace(/\bboot\(\)\s*;?\s*$/, '');
+const { prelude, body, mods: importedModules } = await bundleApp(appUrl, { stubController: true });
+let src = body.replace(/\bboot\(\)\s*;?\s*$/, '');
 // Record every toast, and expose the internals we need to inspect.
 src = src.replace('function toast(msg, kind = \'warn\') {', 'function toast(msg, kind = \'warn\') { __toasts.push(msg);');
 src = 'async function measure(){ return null; }\n' + src;
@@ -141,7 +127,7 @@ ctl.dispatch('n1');
 
 const factory = new Function('__ctl', '__toasts', '__mods', `
   function createController(){ return __ctl; }
-  ${importPrelude.join('\n')}
+  ${prelude}
   ${src}
 `);
 const api = factory(ctl, toasts, importedModules);
