@@ -12,6 +12,7 @@
 //
 // Usage: node scripts/dev/juice-effects.mjs
 import { readFileSync } from 'node:fs';
+import { bundleApp } from '../../tests/web/app-bundle.mjs';
 
 let uid = 0;
 class N {
@@ -22,7 +23,15 @@ class N {
   }
   set className(v) { this._cls = String(v); }
   get className() { return this._cls; }
-  get classList() { return { contains: (c) => this._cls.split(/\s+/).includes(c) }; }
+  get classList() {
+    const list = () => this._cls.split(/\s+/).filter(Boolean);
+    const set = (a) => { this._cls = a.join(' '); };
+    return {
+      contains: (c) => list().includes(c),
+      add: (...cs) => set([...new Set([...list(), ...cs])]),
+      remove: (...cs) => set(list().filter((x) => !cs.includes(x))),
+    };
+  }
   set textContent(v) { this.txt = String(v); this.kids = []; }
   get textContent() {
     // Aggregate descendants, as the real DOM does. Without this a node whose text lives on a
@@ -35,12 +44,35 @@ class N {
   // The shim has no CSS engine, so an inline style write is recorded and read back verbatim.
   get style() { return this._css; }
   set style(v) { Object.assign(this._css, v); }
-  append(...c) { for (const x of c) if (x != null) { x.parent = this; this.kids.push(x); } }
+  // Raw-string kids are wrapped as #text nodes, as the real DOM does (dom.js
+  // keywordText appends plain strings).
+  append(...c) {
+    for (const x of c) if (x != null) {
+      if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); this.kids.push(t); continue; }
+      x.parent = this; this.kids.push(x);
+    }
+  }
+  // src/web grew these two after the module split (map-view.js, combat-view.js cardTile).
+  prepend(...c) {
+    for (const x of c) if (x != null) {
+      if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); this.kids.unshift(t); continue; }
+      x.parent = this; this.kids.unshift(x);
+    }
+  }
+  insertBefore(node, ref) {
+    if (ref == null || !this.kids.includes(ref)) return this.appendChild(node);
+    node.parent = this;
+    this.kids.splice(this.kids.indexOf(ref), 0, node);
+    return node;
+  }
   appendChild(c) { c.parent = this; this.kids.push(c); return c; }
   replaceChildren(...c) { this.kids = []; this.append(...c); }
   removeChild(c) { this.kids = this.kids.filter((k) => k !== c); c.parent = null; return c; }
   remove() { if (this.parent) this.parent.removeChild(this); }
   setAttribute(k, v) { this.attrs[k] = String(v); }
+  // src/web/fx.js throwLane() measures the card and hero boxes (new after the module
+  // split): answer with a zero box, as there is no layout in this host.
+  getBoundingClientRect() { return { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }; }
   getAttribute(k) { return this.attrs[k]; }
   addEventListener(t, fn) { (this._ls[t] ||= []).push(fn); }
   removeEventListener() {}
@@ -72,7 +104,12 @@ function m(n, sel) {
   return n.tag === sel;
 }
 
-const APP = readFileSync(new URL('../../src/web/app.js', import.meta.url), 'utf8');
+// The surface is split into sibling ES modules (src/web/*.js); bundleApp concatenates
+// them back into ONE body — the same evaluation contract this probe always used —
+// re-binding the kernel/surface imports from the real modules, with createController
+// stubbed by the factory below. (The inlined src/web/tokens.js provides `measure`;
+// its dynamic tokenizer import is caught and degrades to null, no stub needed.)
+const { prelude: APP_PRELUDE, body: APP, mods: APP_MODS } = await bundleApp(new URL('../../src/web/app.js', import.meta.url), { stubController: true });
 const CSS = readFileSync(new URL('../../src/web/style.css', import.meta.url), 'utf8');
 
 /**
@@ -102,16 +139,14 @@ async function boot({ reduceMotion }) {
   globalThis.URLSearchParams = URLSearchParams;
 
   let src = APP
-    // A stub, not a deletion: app.js awaits this at the end of every render.
-    .replace(/^import .*$/gm, 'function measure(){ return Promise.resolve(undefined); }')
     .replace(/\brender\(\);\s*$/, '');
   src += '\nreturn { render, clickCard, pickTarget, get pendingSlot(){return pendingSlot;}, snapGet(){return snap;}, flashGet(){return flash;}, burstsGet(){return bursts;} };';
 
   const ctlMod = await import('../../src/surface/gui/controller.js');
   const ctl = ctlMod.createController({ run: { seed: 11 } });
   ctl.dispatch('n1');
-  const factory = new Function('__ctl', '`use strict`;\n  function createController(){ return __ctl; }\n' + src);
-  const api = factory(ctl);
+  const factory = new Function('__ctl', '__mods', '`use strict`;\n  function createController(){ return __ctl; }\n' + APP_PRELUDE + '\n' + src);
+  const api = factory(ctl, APP_MODS);
   return { api, byId, ctl, root };
 }
 

@@ -1,7 +1,7 @@
 // src/web/tokens.js — measure the observation's payload tokens for the on-screen badge.
 //
 // This exists so a human can SEE the product claim ("the agent-facing observation is
-// cheap") next to the game: the same number tests/golden/budget.test.js enforces.
+// cheap") next to the game: the same number tests/budget.test.js enforces.
 //
 // js-tiktoken is a DEV dependency and is imported dynamically and optionally. In a
 // plain browser the bare specifier has no import map and the import throws, which is

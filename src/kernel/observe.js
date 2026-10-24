@@ -9,7 +9,7 @@
 // two runs on the same content stay byte-identical.
 //
 // Budget: the dump is designed to stay under 250 tokens (worst of o200k/cl100k) and
-// every action line under 8 — enforced by tests/golden/budget.test.js on measured counts.
+// every action line under 8 — enforced by tests/budget.test.js on measured counts.
 import { ENEMIES, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { availableNodes, NODE_TYPES } from './rules/map.js';
 import { defaultContent } from './content.js';
@@ -275,7 +275,7 @@ function mapBody(state, opts) {
  *
  * Measured worst across all 42 content ids: 7 tokens (`p1 sword_boomerang`). Unlike
  * a name+summary scheme, this form is bounded BY CONSTRUCTION as content grows —
- * the only input is the slot and the card's stable id — and tests/golden/budget.test.js
+ * the only input is the slot and the card's stable id — and tests/budget.test.js
  * fails CI if any shipped id ever breaks the ceiling.
  * @param {any} state
  * @returns {string}

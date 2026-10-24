@@ -9,7 +9,7 @@
 //
 // The pattern (fake DOM + `new Function` over a stripped app.js) is copied from
 // scripts/dev/render-reward.mjs, with a real selector engine so assertions mean something.
-import { readFileSync } from 'node:fs';
+import { bundleApp } from '../../tests/web/app-bundle.mjs';
 
 /* ------------------------------------------------------------------ a fake DOM */
 
@@ -37,10 +37,33 @@ class N {
       contains(c) { return list().includes(c); },
     };
   }
-  append(...c) { for (const x of c) if (x != null) this.kids.push(x) && (x.parent = this); }
+  // Non-object kids are raw text (dom.js keywordText appends strings): the real DOM
+  // wraps them as #text nodes — the walker below expects that shape.
+  append(...c) {
+    for (const x of c) if (x != null) {
+      if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); this.kids.push(t); continue; }
+      this.kids.push(x); x.parent = this;
+    }
+  }
+  // src/web grew these two after the module split (map-view.js, combat-view.js cardTile).
+  prepend(...c) {
+    for (const x of c) if (x != null) {
+      if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); this.kids.unshift(t); continue; }
+      this.kids.unshift(x); x.parent = this;
+    }
+  }
+  insertBefore(node, ref) {
+    if (ref == null || !this.kids.includes(ref)) { this.kids.push(node); node.parent = this; return node; }
+    node.parent = this;
+    this.kids.splice(this.kids.indexOf(ref), 0, node);
+    return node;
+  }
   appendChild(c) { this.kids.push(c); c.parent = this; return c; }
   replaceChildren(...c) { this.kids = c.filter(Boolean); for (const k of this.kids) k.parent = this; }
   setAttribute(k, v) { this.a[k] = String(v); }
+  // src/web/fx.js throwLane() measures the card and hero boxes (new after the module
+  // split): answer with a zero box, as there is no layout in this host.
+  getBoundingClientRect() { return { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }; }
   getAttribute(k) { return this.a[k] ?? null; }
   addEventListener(t, f) { (this._h[t] || (this._h[t] = [])).push(f); }
   removeEventListener() {}
@@ -120,8 +143,12 @@ globalThis.URLSearchParams = URLSearchParams;
 /* ------------------------------------------------------------- the app under test */
 
 const HERE = new URL('../../', import.meta.url);
-const src = readFileSync(new URL('src/web/app.js', HERE), 'utf8')
-  .replace(/^import .*$/gm, '');
+// The surface is split into sibling ES modules (src/web/*.js); bundleApp concatenates
+// them back into ONE body — the same evaluation contract this probe always used when
+// app.js held everything — re-binding the kernel/surface imports from the real modules,
+// with createController stubbed by the factory below.
+const { prelude, body, mods } = await bundleApp(new URL('src/web/app.js', HERE), { stubController: true });
+const src = body;
 const ctlMod = await import(new URL('src/surface/gui/controller.js', HERE));
 
 /**
@@ -144,12 +171,13 @@ function buildApp(ctl) {
   };
   const factory = new Function(
     'const __ctl = arguments[0];\n'
+    + 'const __mods = arguments[1];\n'
     + 'function createController(){ return __ctl; }\n'
-    + 'const measure = async () => null;\n'
+    + prelude + '\n'
     + src
     + '\nreturn { render, combatView, clickCard, pickTarget, cancelTargeting, snapshot: () => snap, state: () => ({ pendingSlot, aimed }) };',
   );
-  const api = factory(spy);
+  const api = factory(spy, mods);
   const mine = hk.slice(before);
   return { api, dispatched, press: (key) => { for (const f of mine) f({ key, preventDefault() {} }); } };
 }

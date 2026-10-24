@@ -239,7 +239,7 @@ Independently re-run and confirmed: **45 tests pass, 0 fail**; the architecture 
 - **No renderer yet.** The GUI *controller* exists and is exercised by the dual-surface tests; the visual layer is phase 6.
 - **Content is 40 cards, not 120-150.** Scaling is gated on the human fun verdict.
 - `scripts/measure-tokens.mjs` is a dev spike holding **stale hand-written sample strings**; the real ceilings are enforced on engine output by `tests/budget.test.js`.
-- A harmless re-export shim remains at `src/kernel/rules/effects.js` (it could not be deleted — destructive commands are blocked).
+- The old re-export shim at `src/kernel/rules/effects.js` is gone (the module split removed it); the effect vocabulary lives in `src/kernel/rules/vocabulary.js` and the handlers in `src/kernel/rules/effects/index.js`.
 - `package.json` contains a `js-tiktoken` devDependency line that trips a secret-scanner false positive on writes. It is a dev-only dependency; the shipped engine has **zero runtime dependencies**.
 
 ---
