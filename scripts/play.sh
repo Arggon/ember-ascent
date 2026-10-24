@@ -29,17 +29,37 @@ AUTO=0
 CHARACTER="ironclad"
 DIFFICULTY=0
 RESUME=0
-LOG_FILE="${RUN_FILE%%.json}.log.jsonl"
+
+# NOTE: $DLB is deliberately UNQUOTED everywhere — it is a command PREFIX (default
+# "node bin/dlb"), so DLB="node --inspect bin/dlb" or a wrapper works as-is.
+# The action log always lives next to the run file: foo.json -> foo.log.jsonl.
+log_file_for() { printf '%s.log.jsonl\n' "${RUN_FILE%%.json}"; }
+LOG_FILE="$(log_file_for)"
+
+# --help prints this file's own header: every comment/blank line from after the
+# shebang down to (not including) the `set` line, `# ` stripped. (Anchored on the
+# header/code boundary, not on line numbers, so editing the header cannot silently
+# truncate the help text.)
+print_help() { sed -n '2,/^set -uo pipefail$/p' "$0" | sed '/^set -uo pipefail$/d; s/^# \{0,1\}//'; }
+
+# Every value flag must actually carry a value: `--seed` with nothing after it used
+# to leave the args unshifted and spin the parse loop forever.
+need_value() {
+  if [ $# -lt 2 ]; then
+    echo "play.sh: $1 needs a value (try --help)" >&2
+    exit 3
+  fi
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --seed)       SEED="${2:-}"; shift 2 ;;
+    --seed)       need_value "$@"; SEED="$2"; shift 2 ;;
     --auto)       AUTO=1; shift ;;
     --resume)     RESUME=1; shift ;;
-    --character)  CHARACTER="${2:-}"; shift 2 ;;
-    --difficulty) DIFFICULTY="${2:-}"; shift 2 ;;
-    --run)        RUN_FILE="${2:-}"; LOG_FILE="${RUN_FILE%%.json}.log.jsonl"; shift 2 ;;
-    -h|--help)    sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --character)  need_value "$@"; CHARACTER="$2"; shift 2 ;;
+    --difficulty) need_value "$@"; DIFFICULTY="$2"; shift 2 ;;
+    --run)        need_value "$@"; RUN_FILE="$2"; LOG_FILE="$(log_file_for)"; shift 2 ;;
+    -h|--help)    print_help; exit 0 ;;
     *) echo "play.sh: unknown flag '$1' (try --help)" >&2; exit 3 ;;
   esac
 done
@@ -76,6 +96,10 @@ echo
 echo "=== dlb — 40-card vertical slice. type an action id, ? for state, h for help, q to quit ==="
 echo
 
+# One scratch file for the engine's stderr, cleaned up on any exit path.
+ERR_FILE="$(mktemp "${TMPDIR:-/tmp}/dlb-play-err.XXXXXX")" || exit 1
+trap 'rm -f "$ERR_FILE"' EXIT
+
 turn=0
 while : ; do
   state="$(draw_state)"
@@ -88,7 +112,7 @@ while : ; do
   if is_over "$state"; then
     echo
     if [ -s "$LOG_FILE" ]; then
-      echo "=== run finished. replay it exactly with:  $DLB replay $LOG_FILE --assert ==="
+      echo "=== run finished. replay it exactly with:  $DLB replay $LOG_FILE --assert"
     else
       # The slice does not write an action log on `play` yet, so do not promise one.
       echo "=== run finished ==="
@@ -120,12 +144,12 @@ while : ; do
     "q"|"quit")   echo "bye — progress saved in $RUN_FILE"; break ;;
   esac
 
-  out="$($DLB play "$choice" --run "$RUN_FILE" 2>/tmp/dlb-err.$$)"
+  out="$($DLB play "$choice" --run "$RUN_FILE" 2>"$ERR_FILE")"
   rc=$?
-  if [ -s /tmp/dlb-err.$$ ]; then
-    printf '   ! %s\n' "$(cat /tmp/dlb-err.$$)"
+  if [ -s "$ERR_FILE" ]; then
+    printf '   ! %s\n' "$(cat "$ERR_FILE")"
   fi
-  rm -f /tmp/dlb-err.$$ 2>/dev/null
+  : >"$ERR_FILE"
 
   if [ "$rc" = "2" ]; then
     printf '   ! not a legal action right now — pick one of the ids above\n'
