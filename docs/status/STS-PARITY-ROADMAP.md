@@ -42,7 +42,7 @@ Process rules (standing):
 
 | # | Slice | Scope kernel | Scope web | Status |
 |---|---|---|---|---|
-| S1 | Master deck viewer | snapshot exposes full deck (id, name, cost, type, tempered, count) | "Deck" button on map+combat → modal overlay, sorted, grouped by count, Esc/click closes | committed 5b11de9 — QA PASS 7/7, in review |
+| S1 | Master deck viewer | snapshot exposes full deck (id, name, cost, type, tempered, count) | "Deck" button on map+combat → modal overlay, sorted, grouped by count, Esc/click closes | committed 5b11de9 — QA PASS 7/7, review APPROVE; follow-up fixes queued (S1.1) |
 | S2 | Card codex | expose draft pool via public API (`draftPoolFrom` already exists) | "Cards" button → codex modal grouped by rarity with descriptions | pending |
 | S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | pending |
 | S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | pending |
@@ -78,3 +78,10 @@ Process rules (standing):
   test:browser 10/10 incl. new deck-sheet e2e); manual QA PASS 7/7 via Playwright CLI
   (evidence: /tmp/s1-qa/ — 4 scripts, 4 screenshots; tempered propagation verified through
   the save/load lever); committed 5b11de9. Review + S2 dev dispatched in parallel.
+- 2026-10-24 — S1 review APPROVE (independent gate re-run at the commit). Findings queued as
+  S1.1 (run after S2 dev lands to avoid concurrent edits): P2 snapshotDeck throws on unknown
+  cardId (defOf) — tolerate like snapshotReward does, snapshot() now reads the deck in every
+  phase and a stale save or lever typo bricks the page; P3 aria-label lacks the text's
+  fallback; P3 dead re-derived temper fallback in hud.js; P3 two-distinct-tempers split
+  untested; P3 tempered row missing from e2e; P3 stale "exactly like Help" comment; P3 CSS
+  stamp-geometry duplication; P3 (later slice) shared modal focus helper.
