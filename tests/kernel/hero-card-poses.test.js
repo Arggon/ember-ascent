@@ -187,10 +187,11 @@ function assertPoseAnimated(id, move) {
   assert.ok(POSE_KEYFRAMES.has(kfName), `pose-${move} animates with @keyframes ${kfName}, which must be defined`);
 }
 
-test('a basic attack card plays the strike movement', () => {
+test('HAMMERFALL (strike) drops with its own hammerfall movement', () => {
   const { api } = startRun(11);
   playCard(api, 'strike');
-  assert.match(heroFig().className, /pose-strike/, 'Hammerfall lunges (pose-strike)');
+  assert.match(heroFig().className, /pose-hammerfall/, 'Hammerfall plays its own vertical drop (pose-hammerfall)');
+  assert.doesNotMatch(heroFig().className, /pose-strike/, 'the starter strike no longer rides the plain strike pose');
 });
 
 test('a heavy attack card plays a DIFFERENT movement than the basic strike', () => {
@@ -201,11 +202,11 @@ test('a heavy attack card plays a DIFFERENT movement than the basic strike', () 
   assert.doesNotMatch(cls, /pose-strike/, 'the heavy movement is not the plain strike');
 });
 
-test('a block card plays the guard movement, not the attack one', () => {
+test('QUENCH (defend) pours with its own movement, not the attack one', () => {
   const { api } = startRun(6);
   playCard(api, 'defend');
   const cls = heroFig().className;
-  assert.match(cls, /pose-guard/, 'Quench plants into a guard (pose-guard)');
+  assert.match(cls, /pose-quench/, 'Quench pours its veil (pose-quench)');
   assert.doesNotMatch(cls, /pose-strike/, 'no attack movement on a block card');
 });
 
@@ -245,7 +246,7 @@ test('the hurt flinch outranks the card movement when HP was lost (heroPose, not
   // HP-cost cards (bloodletting, offering, hemokinesis) carry a HERO_MOVES entry, but the
   // hero who just paid HP must flinch, not flourish. heroPose() owns that precedence.
   api.injectBursts([{ kind: 'card-fly', id: 'bloodletting', type: 'skill', name: 'Vein Tap', side: 'side-none' }]);
-  assert.equal(api.heroPose(), 'channel', 'without an HP loss, bloodletting reads as its channel movement');
+  assert.equal(api.heroPose(), 'veintap', 'without an HP loss, bloodletting reads as its vein-tap movement');
   api.injectBursts([
     { kind: 'card-fly', id: 'bloodletting', type: 'skill', name: 'Vein Tap', side: 'side-none' },
     { kind: 'hero-float', tone: 'dmg', amount: 3, tier: 1 },
@@ -271,7 +272,7 @@ test('a fast consecutive play replaces the still-running hold with the new card 
   api.injectBursts([{ kind: 'card-fly', id: 'bash', type: 'attack', name: 'Anvil Blow', side: 'side-none' }]);
   assert.equal(api.heroPose(), 'heavy');
   api.injectBursts([{ kind: 'card-fly', id: 'defend', type: 'skill', name: 'Quench', side: 'side-none' }]);
-  assert.equal(api.heroPose(), 'guard', 'the fresh card play wins over the previous hold');
+  assert.equal(api.heroPose(), 'quench', 'the fresh card play wins over the previous hold');
 });
 
 test('MAUL (bludgeon) plays its own colossal signature move, not the shared heavy', () => {
@@ -283,7 +284,9 @@ test('MAUL (bludgeon) plays its own colossal signature move, not the shared heav
   // The signature knobs drive the hold and the impact beat.
   const sig = api.signatureFor({ kind: 'card-fly', id: 'bludgeon', type: 'attack' });
   assert.ok(sig && sig.poseMs === 1150 && sig.shake && sig.shockwave, 'Maul signature: 1150ms hold, shake, shockwave');
-  assert.equal(api.signatureFor({ kind: 'card-fly', id: 'clothesline', type: 'attack' }), null, 'non-signature cards have no knobs');
+  // shockwave (Heat Wash) left this row for its own LOTE 6 signature — the no-knob
+  // example here is Returning Brand, whose flight choreography lives in HERO_THROWS.
+  assert.equal(api.signatureFor({ kind: 'card-fly', id: 'sword_boomerang', type: 'attack' }), null, 'non-signature cards have no knobs');
 });
 
 test('ANVIL BLOW (bash) drops the spectral anvil on its heavy stroke', () => {
@@ -297,7 +300,7 @@ test('ANVIL BLOW (bash) drops the spectral anvil on its heavy stroke', () => {
 test('TWIN HAMMERS (twin_strike) throws a salvo of two hammers, not the flurry', () => {
   const { api } = startRun(11);
   assert.equal(api.heroMove({ id: 'twin_strike', type: 'attack' }), 'twinthrow', 'Twin Hammers has its own two-throw pose');
-  assert.equal(api.heroMove({ id: 'pummel', type: 'attack' }), 'flurry', 'Pummel keeps the flurry');
+  assert.equal(api.heroMove({ id: 'pummel', type: 'attack' }), 'hailblows', "Pummel hails its own four blows, not the flurry");
   const sig = api.signatureFor({ kind: 'card-fly', id: 'twin_strike', type: 'attack' });
   assert.ok(sig && sig.twin, 'Twin Hammers signature: the two-hammer salvo knob');
   api.injectBursts([{ kind: 'card-fly', id: 'twin_strike', type: 'attack', name: 'Twin Hammers', side: 'side-none' }]);
@@ -307,7 +310,7 @@ test('TWIN HAMMERS (twin_strike) throws a salvo of two hammers, not the flurry',
 test('SUNDER (carnage) rends the air with a vertical cleave', () => {
   const { api } = startRun(11);
   assert.equal(api.heroMove({ id: 'carnage', type: 'attack' }), 'rend', 'Sunder has its own rending pose');
-  assert.equal(api.heroMove({ id: 'wild_strike', type: 'attack' }), 'heavy', 'Untempered keeps the heavy');
+  assert.equal(api.heroMove({ id: 'rampage', type: 'attack' }), 'climbcut', 'Rampage climbs its own diagonal stroke');
   const sig = api.signatureFor({ kind: 'card-fly', id: 'carnage', type: 'attack' });
   assert.ok(sig && sig.rend, 'Sunder signature: the burning-seam knob');
   api.injectBursts([{ kind: 'card-fly', id: 'carnage', type: 'attack', name: 'Sunder', side: 'side-none' }]);
@@ -328,14 +331,112 @@ test('RISING BLOW (uppercut) lifts the aimed enemy off its stance', () => {
   assert.ok(burst && burst.enemy === 1, 'the card-fly burst carries the aimed enemy index');
 });
 
+/* ---- LOTE 1 — mazo inicial y ataques básicos: one movement per card. ---- */
+
+test('HAMMERFALL (strike) holds the apex and cracks the lane with dust', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'strike', type: 'attack' }), 'hammerfall', 'Hammerfall has its own vertical-drop pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'strike', type: 'attack' });
+  assert.ok(sig && sig.dustcrack, 'Hammerfall signature: the dust-crack knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'strike', type: 'attack', name: 'Hammerfall', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'hammerfall');
+  assert.equal(api.heroMove({ id: 'anger', type: 'attack' }), 'snapcast', 'Spark left the shared strike row');
+});
+
+test('QUENCH (defend) pours a steam veil, not the guard dome', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'defend', type: 'skill' }), 'quench', 'Quench has its own pouring pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'defend', type: 'skill' });
+  assert.ok(sig && sig.quenchveil, 'Quench signature: the steam-veil knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'defend', type: 'skill', name: 'Quench', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'quench');
+});
+
+test('BELLOWS GUST (gust) pushes the whole row with a wind cone', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'gust', type: 'attack' }), 'bellowspush', 'Bellows Gust has its own two-armed push pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'gust', type: 'attack' });
+  assert.ok(sig && sig.gustcone, 'Bellows Gust signature: the wind-cone knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'gust', type: 'attack', name: 'Bellows Gust', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'bellowspush');
+});
+
+test('SPARK (anger) snapcasts a dart out and a mote back', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'anger', type: 'attack' }), 'snapcast', 'Spark has its own finger-snap pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'anger', type: 'attack' });
+  assert.ok(sig && sig.sparkdart, 'Spark signature: the dart-and-mote knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'anger', type: 'attack', name: 'Spark', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'snapcast');
+});
+
+test('FAN THE FLAMES (fan_flames) fans three tongues and sparks the orb', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'fan_flames', type: 'skill' }), 'fanflames', 'Fan the Flames has its own fanning pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'fan_flames', type: 'skill' });
+  assert.ok(sig && sig.flarefan, 'Fan the Flames signature: the flare-fan knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'fan_flames', type: 'skill', name: 'Fan the Flames', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'fanflames');
+});
+
 test('throw cards play the throw pose, and HERO_THROWS carries the flight choreography', () => {
   const { api } = startRun(11);
   assert.equal(api.heroMove({ id: 'sword_boomerang', type: 'attack' }), 'throw', 'Returning Brand hurls its hammer (throw)');
-  assert.equal(api.heroMove({ id: 'hemokinesis', type: 'attack' }), 'throw', 'Blood Hammer is hurled (throw)');
+  assert.equal(api.heroMove({ id: 'hemokinesis', type: 'attack' }), 'bloodhammer', 'Blood Hammer condenses, then hurls (bloodhammer)');
   assert.ok(api.HERO_THROWS.sword_boomerang.returns, 'the Brand hammer returns to the hero');
   assert.ok(!api.HERO_THROWS.hemokinesis.returns, 'the Blood Hammer stays in the target');
+  assert.ok(api.HERO_THROWS.hemokinesis.delayMs > 0, 'the Blood Hammer flight waits for the clot to close');
+  assert.ok(api.HERO_THROWS.hemokinesis.blood, 'the Blood Hammer flight wears the ember-blood tint');
   api.injectBursts([{ kind: 'card-fly', id: 'sword_boomerang', type: 'attack', name: 'Returning Brand', side: 'side-none' }]);
   assert.equal(api.heroPose(), 'throw', 'the pose dispatch resolves throw cards to the throw pose');
+});
+
+/* ---- LOTE 3 — ataques comunes II: one movement per common attack. ---- */
+
+test('FORGECLAP (thunderclap) clashes overhead and marks the whole row', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'thunderclap', type: 'attack' }), 'forgeclap', 'Forgeclap has its own overhead-clash pose');
+  assert.equal(api.heroMove({ id: 'reaper', type: 'attack' }), 'reapsweep', 'Reaper harvests with its own ash-scythe sweep');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'thunderclap', type: 'attack' });
+  assert.ok(sig && sig.forgering, 'Forgeclap signature: the forgering knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'thunderclap', type: 'attack', name: 'Forgeclap', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'forgeclap');
+});
+
+test('UNTEMPERED (wild_strike) flails without form, cracks around the lane', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'wild_strike', type: 'attack' }), 'wildflail', 'Untempered has its own wild-flail pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'wild_strike', type: 'attack' });
+  assert.ok(sig && sig.wildcracks, 'Untempered signature: the wild-cracks knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'wild_strike', type: 'attack', name: 'Untempered', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'wildflail');
+});
+
+test('BELLOWS (flex) swells the chest with one ember pulse', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'flex', type: 'skill' }), 'bellowsflex', 'Bellows has its own chest-swell pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'flex', type: 'skill' });
+  assert.ok(sig && sig.chestpulse, 'Bellows signature: the chest-pulse knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'flex', type: 'skill', name: 'Bellows', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'bellowsflex');
+});
+
+test('HEEL DROP (dropkick) launches feet-first and sparks the orb', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'dropkick', type: 'attack' }), 'dropkick', 'Heel Drop has its own airborne pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'dropkick', type: 'attack' });
+  assert.ok(sig && sig.heelburst, 'Heel Drop signature: the heel-burst knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'dropkick', type: 'attack', name: 'Heel Drop', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'dropkick');
+});
+
+test('BLOOD HAMMER (hemokinesis) condenses at the chest before the flight', () => {
+  const { api } = startRun(11);
+  assert.equal(api.heroMove({ id: 'hemokinesis', type: 'attack' }), 'bloodhammer', 'Blood Hammer has its own condense-and-heave pose');
+  const sig = api.signatureFor({ kind: 'card-fly', id: 'hemokinesis', type: 'attack' });
+  assert.ok(sig && sig.bloodcondense, 'Blood Hammer signature: the blood-condense knob');
+  api.injectBursts([{ kind: 'card-fly', id: 'hemokinesis', type: 'attack', name: 'Blood Hammer', side: 'side-none' }]);
+  assert.equal(api.heroPose(), 'bloodhammer');
 });
 
 test('a fresh browser with NO stored speed preference defaults to animations ON (1x)', () => {

@@ -535,3 +535,98 @@ async function probeKillSlot(t, seed) {
     await browser.close();
   }
 }
+
+test('smoke: las nuevas firmas emiten su fx propio', { timeout: 300000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  // The seed fixes the deal: probe seeds until one lets all four representatives reach
+  // the stage (8 copies each in a ~42-card deck makes that the common case).
+  for (const seed of [7, 8, 9, 10, 11, 12]) {
+    const fx = await probeSignatureFx(t, seed);
+    if (!fx) continue;
+    assert.ok(fx.slagwave > 0, 'Slag Surge (ironwave) must roll its slag wave into the aimed lane');
+    assert.ok(fx.heatwash > 0, 'Heat Wash (shockwave) must drag its thermal wave across the whole row');
+    assert.ok(fx.stokedraft > 0, 'Stoke (inflame) must draft its embers over the hero');
+    assert.ok(fx.platestack > 0, 'Unbroken (impervious) must stack its plates as the skill exhausts');
+    return;
+  }
+  assert.fail('no seed let all four signature cards reach the stage');
+});
+
+/** Boot, stack the deck with one representative per signature family (8 copies each,
+ *  dealt like real cards — see header), and play each once. Returns what the 40ms
+ *  collector saw, or null when this seed's eight hands could not get all four played.
+ *  Closes its own browser. */
+async function probeSignatureFx(t, seed) {
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      reducedMotion: 'no-preference',
+    });
+    const page = await ctx.newPage();
+    await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+    await page.goto(`${base}/src/web/index.html?seed=${seed}`);
+    await page.waitForLoadState('domcontentloaded');
+    const bellows = page.getByRole('button', { name: /^Bellows Breath:/ });
+    if ((await bellows.count()) === 1) await bellows.click();
+    else await page.getByRole('button', { name: /^(Iron Skin|Sparkfall):/ }).first().click();
+    await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+    await page.evaluate(() => {
+      const ctl = window.__dlb.controller();
+      const save = JSON.parse(ctl.save());
+      for (const id of ['ironwave', 'shockwave', 'inflame', 'impervious']) {
+        for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-fx-${id}-${i}`, cardId: id });
+      }
+      const res = ctl.load(save);
+      if (!res.ok) throw new Error(`save/load failed: ${(res.problems || []).join('; ')}`);
+    });
+    await travelToFight(page);
+
+    // In-page collector: each signature fx is transient (a ~0.2-0.3×pose beat, then
+    // 720-1240ms alive), so sample every 40ms from inside the page (see header).
+    await page.evaluate(() => {
+      window.__fx = { slagwave: 0, heatwash: 0, stokedraft: 0, platestack: 0 };
+      window.__fxTimer = setInterval(() => {
+        for (const cls of ['fx-slagwave', 'fx-heatwash', 'fx-stokedraft', 'fx-platestack']) {
+          if (document.querySelector(`.${cls}`)) window.__fx[cls.slice(3)] += 1;
+        }
+      }, 40);
+    });
+
+    // Face name → collector key: the fx classes are unique per card (Heat Wash's wave
+    // is fx-heatwash — Maul's ring is fx-shockwave, no clash).
+    const FACES = [
+      ['slagwave', 'Slag Surge'],   // ironwave
+      ['heatwash', 'Heat Wash'],    // shockwave
+      ['stokedraft', 'Stoke'],      // inflame
+      ['platestack', 'Unbroken'],   // impervious
+    ];
+    const pending = new Set(FACES.map(([key]) => key));
+    for (let hand = 0; hand < 8 && pending.size > 0; hand += 1) {
+      if ((await readState(page)).phase !== 'combat') return null;
+      for (const [key, face] of FACES) {
+        if (!pending.has(key)) continue;
+        const btn = page.locator(`button[data-slot][aria-label^="${face}"][aria-disabled="false"]`);
+        if ((await btn.count()) === 0) continue;
+        const seen = await page.evaluate((k) => window.__fx[k], key);
+        await btn.first().click();
+        // Only the attack aims: with 2+ enemies the row enters targeting; with one it
+        // plays straight through (see playCard).
+        if ((await page.locator('.enemy.targeting').count()) > 0) {
+          await page.locator('.enemy[data-target-index]').first().click();
+        }
+        await sleep(2000); // beat + fx life; also keeps the next play from retiring this
+                           // one's pending signature timer (the animGen guard)
+        if ((await page.evaluate((k) => window.__fx[k], key)) > seen) pending.delete(key);
+      }
+      if (pending.size === 0) break;
+      await endTurn(page);
+      await sleep(2200);
+    }
+    return pending.size === 0 ? await page.evaluate(() => window.__fx) : null;
+  } catch {
+    return null;
+  } finally {
+    await browser.close();
+  }
+}

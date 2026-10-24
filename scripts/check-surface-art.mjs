@@ -117,7 +117,7 @@ function classesFromOptions(src) {
 // The pose set is the renderer's contract: it must track every pose app.js can emit,
 // i.e. the built-ins plus every movement value in HERO_MOVES (src/web/app.js). Adding a
 // movement there means adding it here AND a `.fig.pose-*` rule that really animates.
-const POSE_VALUES = ['idle', 'strike', 'brace', 'hurt', 'low', 'windup', 'heavy', 'flurry', 'sweep', 'guard', 'channel', 'throw', 'slam', 'colossal', 'twinthrow', 'rend', 'uppercut'];
+const POSE_VALUES = ['idle', 'strike', 'brace', 'hurt', 'low', 'windup', 'heavy', 'flurry', 'sweep', 'guard', 'channel', 'throw', 'slam', 'colossal', 'twinthrow', 'rend', 'uppercut', 'hammerfall', 'quench', 'bellowspush', 'snapcast', 'fanflames', 'arccut', 'collarline', 'headbutt', 'surge', 'haftjab', 'forgeclap', 'wildflail', 'bellowsflex', 'dropkick', 'bloodhammer', 'castaside', 'truetemper', 'fitplate', 'kilncry', 'vent', 'heattrance', 'hailblows', 'climbcut', 'veintap', 'reapsweep', 'heatwash', 'bracelock', 'flameward', 'cindershroud', 'stoke', 'scaleup', 'bankcoal', 'ashembrace', 'cinderskin', 'lockdown', 'overtemper', 'tithe', 'splitseam'];
 function variants(src) {
   const out = new Set();
   if (/card type-\$\{card\.type\}/.test(src)) {
