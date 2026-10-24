@@ -4,7 +4,7 @@
 // Every hook is pure and returns a fresh state. Stack counts are finite integers, so
 // a run cannot grow unbounded state.
 import { addStatus, damageEnemy, loseHp } from './vocabulary.js';
-import { instantiate } from './card-instance.js';
+import { drawIntoHand } from './draw.js';
 
 /** When the hook fires. */
 export const HOOKS = ['end_of_turn', 'on_exhaust', 'on_self_damage'];
@@ -49,29 +49,16 @@ const IMPL = {
   /** Dark Embrace: draw `stacks` whenever a card is exhausted. */
   dark_embrace: {
     on_exhaust(state, stacks, ctx) {
-      const drawn = [];
-      let next = state;
-      for (let i = 0; i < stacks; i += 1) {
-        if (next.combat.draw.length === 0) {
-          if (next.combat.discard.length === 0) break;
-          const shuffled = ctx.rng.shuffle(next.combat.discard);
-          next = { ...next, rngDraws: next.rngDraws + shuffled.draws, combat: { ...next.combat, draw: shuffled.items, discard: [] } };
-        }
-        // The hand copy must carry `cost`, or the tile renders "undefined" and is unusable.
-        const head = instantiate(next.combat.draw[0]);
-        const room = next.combat.hand.length < 10;
-        drawn.push(head);
-        next = {
-          ...next,
-          combat: {
-            ...next.combat,
-            draw: next.combat.draw.slice(1),
-            hand: room ? [...next.combat.hand, head] : next.combat.hand,
-            discard: room ? next.combat.discard : [...next.combat.discard, head],
-          },
-        };
-      }
-      return { state: next, events: [{ t: 'draw', count: drawn.length, uids: drawn.map((c) => c.uid), reshuffles: 0, source: 'dark_embrace' }] };
+      // ctx.rng-bound shuffle, like the `draw` verb (rules/draw.js explains the
+      // callback): the old inline loop's stream semantics, preserved exactly.
+      const out = drawIntoHand(state, stacks, (_s, items) => ctx.rng.shuffle(items));
+      return {
+        state: out.state,
+        // `reshuffles: 0` is LITERAL, on purpose: the historical event reported 0 even
+        // when a reshuffle happened. A behavior-preserving refactor keeps the quirk;
+        // the real count is available as out.reshuffles if a fix is ever ruled on.
+        events: [{ t: 'draw', count: out.drawn.length, uids: out.drawn.map((c) => c.uid), reshuffles: 0, source: 'dark_embrace' }],
+      };
     },
   },
   /** Feel No Pain: gain `stacks` block whenever a card is exhausted. */

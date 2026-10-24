@@ -12,26 +12,15 @@ import { freezeDeep, hash as hashState, canonical } from './state.js';
 import { loadContent, defaultContent, draftPoolFrom } from './content.js';
 // Imported as a VALUE as well as re-exported below: `contentForProfile` calls it.
 import { poolSelection } from './unlocks.js';
-import { generateMap, availableNodes, findNode, NODE_TYPES, ROWS } from './rules/map.js';
-import { ENCOUNTERS, ENEMIES, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
-import { VOCABULARY } from './rules/vocabulary.js';
+import { generateMap, ROWS } from './rules/map.js';
+import { buildEncounterTable, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { DEFAULT_RELIC } from './rules/relics.js';
-import { intAt, shuffleAt, pickAt } from './rng.js';
-import { actions as legalActions, parsePlayId } from './actions.js';
-import {
-  startCombat,
-  endTurn,
-  resolveVictory,
-  _setCardDefs,
-  BASE_ENERGY,
-  HAND_SIZE,
-  REST_HEAL,
-  REWARD_CHOICES,
-} from './rules/act.js';
-import { fireHook } from './rules/powers.js';
-import { offerBoons, applyBoon } from './rules/kindling.js';
+import { actions as legalActions } from './actions.js';
+import { _setCardDefs, BASE_ENERGY, HAND_SIZE, REST_HEAL, REWARD_CHOICES } from './rules/act.js';
+import { offerBoons } from './rules/kindling.js';
 import { rollQuests, advanceQuests } from './rules/quests.js';
-import { offerTempers, temperEffects, temperHpCost } from './rules/tempers.js';
+// One row per action kind: what step() dispatches to (the mechanics live in rules).
+import { STEP_HANDLERS } from './rules/steps.js';
 import './rules/effects/index.js'; // registers the exotic handlers exactly once
 import { observe as observeState, observeActions, snapshot as snapshotState } from './observe.js';
 import {
@@ -172,50 +161,10 @@ export function newRun(opts = {}) {
   // Map generation consumes the first draws of the stream, then the deck is built.
   // Order matters and is part of the format: do not reorder these two blocks.
   const mapGen = generateMap(seed, 0);
-  let draws = mapGen.draws;
-
   const deck = character.startingDeck.map((cardId, i) => ({ uid: `c${i}`, cardId }));
-  draws += deck.length; // deck order is fixed by the character definition
-
-  const encounterTable = {};
-  for (const row of mapGen.rows) {
-    for (const node of row) {
-      const pool = byType[node.type];
-      if (!pool) {
-        // Non-combat node (rest): no enemies, no draws consumed. Skipping the draw
-        // keeps the stream aligned to *content that needs randomness*; rest nodes
-        // are fully determined by the map, which is itself seed-derived.
-        encounterTable[node.id] = {
-          id: node.id,
-          name: NODE_TYPES[node.type].label,
-          tier: NODE_TYPES[node.type].tier,
-          reward: NODE_TYPES[node.type].reward,
-          elite: false,
-          boss: false,
-          spawn: [],
-        };
-        continue;
-      }
-      const pick = intAt(seed, draws, pool.length);
-      draws += 1;
-      const enc = ENCOUNTERS[pool[pick]];
-      const spawn = enc.enemies.map((enemyId) => {
-        const def = ENEMIES[enemyId];
-        const hpRoll = intAt(seed, draws, def.maxHp[1] - def.maxHp[0] + 1);
-        draws += 1;
-        return { id: enemyId, hp: def.maxHp[0] + hpRoll };
-      });
-      encounterTable[node.id] = {
-        id: enc.id,
-        name: enc.stateName ?? enc.name,
-        tier: enc.tier,
-        reward: NODE_TYPES[node.type].reward,
-        elite: Boolean(enc.elite),
-        boss: Boolean(enc.boss),
-        spawn,
-      };
-    }
-  }
+  // Deck order is fixed by the character definition, so only its LENGTH advances the
+  // stream; the encounter table then rolls per node (rules/encounters.js).
+  const { table: encounterTable, draws } = buildEncounterTable(seed, mapGen.draws + deck.length, mapGen.rows, byType);
 
   const state = {
     contentVersion: content.contentVersion,
@@ -293,6 +242,10 @@ void legalActions;
  * Apply one action. This is the ONLY function that returns a new state (R1).
  * Illegal, unknown or unparseable actions are a legal NO-OP plus a structured
  * error (R6) — never a crash, never a retry.
+ *
+ * The facade owns the CONTRACT (validate against the legal list, bump stepIndex,
+ * run ONE handler, fold quests, freeze); WHAT each action kind does lives in the
+ * STEP_HANDLERS registry (rules/steps.js), so this function never grows a branch.
  * @param {any} state
  * @param {string} id
  * @returns {{state: any, events: any[], error: null | {code: number, error: string, id: string}}}
@@ -309,197 +262,19 @@ export function step(state, id) {
       error: { code: 2, error: 'illegal_action', id: String(id) },
     };
   }
+  const run = STEP_HANDLERS[match.kind];
+  if (!run) {
+    return { state, events: [], error: { code: 1, error: 'internal', id: String(id) } };
+  }
 
   const bumped = { ...state, stepIndex: state.stepIndex + 1 };
-  let result;
-  switch (match.kind) {
-    case 'play':
-      result = playCard(bumped, match, content);
-      break;
-    case 'end_turn':
-      result = endTurn(bumped, content.cards);
-      break;
-    case 'travel':
-      result = travel(bumped, match, content);
-      break;
-    case 'pick':
-      result = pickReward(bumped, match);
-      break;
-    case 'skip':
-      result = { state: { ...bumped, phase: 'map', reward: null }, events: [{ t: 'reward_skipped' }] };
-      break;
-    case 'rest_heal': {
-      const healed = Math.min(REST_HEAL, bumped.player.maxHp - bumped.player.hp);
-      result = {
-        state: { ...bumped, player: { ...bumped.player, hp: bumped.player.hp + healed }, phase: 'map', ...(bumped.tempers ? { temperOffers: null } : {}) },
-        events: [{ t: 'heal', who: 'player', amount: healed, source: 'rest' }],
-      };
-      break;
-    }
-    case 'temper': {
-      const o = match.offer;
-      result = {
-        state: { ...bumped, tempers: { ...bumped.tempers, [o.uid]: o.temper }, temperOffers: null, phase: 'map' },
-        events: [{ t: 'card_tempered', uid: o.uid, cardId: o.cardId, temper: o.temper }],
-      };
-      break;
-    }
-    case 'boon':
-      result = applyBoon(bumped, match.boon);
-      break;
-    case 'rest_leave':
-      result = { state: { ...bumped, phase: 'map', ...(bumped.tempers ? { temperOffers: null } : {}) }, events: [{ t: 'rest_left' }] };
-      break;
-    default:
-      return { state, events: [], error: { code: 1, error: 'internal', id: String(id) } };
-  }
+  let result = run(bumped, match, content);
 
   if (bumped.quests && result.state.phase !== 'ended') {
     const q = advanceQuests(result.state, { events: result.events, played: match.kind === 'play', nodeType: bumped.combat?.nodeType ?? null });
     result = { state: q.state, events: [...result.events, ...q.events] };
   }
   return { state: freezeDeep(result.state), events: result.events, error: null };
-}
-
-/** Play one card from hand and settle the combat if it ended. */
-function playCard(state, action, content) {
-  const parsed = parsePlayId(action.id);
-  if (!parsed) return { state, events: [] };
-  const idx = parsed.slot - 1;
-  const target = parsed.target;
-  const card = state.combat.hand[idx];
-  if (!card) return { state, events: [] };
-
-  const def = content.cards.get(card.cardId);
-  if (!def) return { state, events: [] };
-
-  // Resolve the aim against the LIVING enemies in state order — the same list, in the
-  // same order, that actions.js enumerated when it offered this id (rule 2).
-  //
-  // A dead or out-of-range target cannot reach here: `step` matched the id against the
-  // legal list, and that list never contains one. So the only way to arrive with a dead
-  // aim is for an effect of THIS card to have killed it mid-card (rule 5) — which is
-  // re-checked per effect inside the loop below.
-  const aimAt = (s) => {
-    const liveIdx = s.combat.enemies.map((e, i) => (!e.dead ? i : -1)).filter((i) => i !== -1);
-    if (target === null) return liveIdx[0] ?? 0;
-    // `target` is 1-BASED (the index the player and the action id use); `liveIdx` is a
-    // 0-based list of living enemy positions. Indexing it with the raw 1-based number was
-    // an off-by-one that silently fell back to enemy 1 for every choice — the player aimed
-    // at enemy 2 and always hit enemy 1. `target - 1` is the correct mapping.
-    const chosen = liveIdx[target - 1];
-    return chosen ?? liveIdx[0] ?? 0;
-  };
-
-  let next = {
-    ...state,
-    player: { ...state.player, energy: state.player.energy - card.cost },
-    combat: { ...state.combat, hand: state.combat.hand.filter((_, i) => i !== idx) },
-  };
-
-  const rng = {
-    shuffle: (items) => shuffleAt(state.seed, next.rngDraws, items),
-    pick: (items, n) => pickAt(state.seed, next.rngDraws, items, n),
-  };
-
-  const events = [];
-  // B2: a tempered instance resolves its modified effect list (looked up by uid).
-  const temper = state.tempers ? state.tempers[card.uid] : undefined;
-  const effects = temper ? temperEffects(def.effects, temper) : def.effects;
-  const exhausted = effects.some((e) => e.verb === 'exhaust');
-  const hpCost = temperHpCost(temper);
-  if (hpCost > 0) {
-    const paid = Math.min(hpCost, next.player.hp - 1);
-    next = { ...next, player: { ...next.player, hp: next.player.hp - paid } };
-    events.push({ t: 'hp_cost', amount: paid, source: 'temper' });
-  }
-
-  for (const effect of effects) {
-    // Re-resolved per effect, not hoisted: if an earlier effect killed the aimed enemy,
-    // the remaining effects of the SAME card must land somewhere legal rather than
-    // write to a corpse (rule 5). Re-resolution is what makes that a property instead of
-    // a promise, and it costs nothing when the aim is still alive.
-    const ctx = {
-      rng,
-      card,
-      source: 'player',
-      target: null,
-      targetEnemyIndex: aimAt(next),
-      aimed: target !== null,
-    };
-    const fn = VOCABULARY[effect.verb];
-    const out = fn(next, ctx, effect);
-    next = out.state;
-    events.push(...out.events);
-  }
-
-  // Load the spent card into discard, unless it exhausted itself.
-  const alreadyExhausted = next.combat.exhaust.some((e) => e.uid === card.uid);
-  if (!exhausted && !alreadyExhausted) {
-    next = {
-      ...next,
-      combat: { ...next.combat, discard: [...next.combat.discard, { uid: card.uid, cardId: card.cardId, perPlay: card.perPlay }] },
-    };
-  } else if (exhausted && !alreadyExhausted) {
-    // Only when the `exhaust` verb did not already file it: otherwise the card is
-    // pushed twice and the exhaust pile claims two copies of a one-copy card.
-    next = { ...next, combat: { ...next.combat, exhaust: [...next.combat.exhaust, { uid: card.uid, cardId: card.cardId }] } };
-  }
-
-  // Exhaust hooks (Feel No Pain / Dark Embrace) fire per exhausted card.
-  if (exhausted) {
-    const hook = fireHook(next, 'on_exhaust', { rng });
-    next = hook.state;
-    events.push(...hook.events);
-  }
-
-  // One enemy left alive on the field? Then the combat continues; if all are dead
-  // we settle victory immediately rather than making the player press end turn.
-  if (next.combat.active && next.combat.enemies.every((e) => e.dead)) {
-    const won = resolveVictory(next, content.cards);
-    // Same event shape as the end-turn path (rules/act.js): a combat won by a card must
-    // also emit `combat_won`, or elite/boss points are never awarded (DR-6).
-    return { state: won.state, events: [...events, { t: 'combat_won' }, ...won.events] };
-  }
-  if (next.combat.enemies.some((e) => e.dead)) {
-    next = { ...next, combat: { ...next.combat, enemies: next.combat.enemies.map((e) => (e.dead ? e : { ...e, index: e.index })) } };
-  }
-  return { state: next, events };
-}
-
-/** Enter the chosen map node. */
-function travel(state, action, content) {
-  const node = findNode(state.map.rows, action.nodeId);
-  if (!node) return { state, events: [] };
-  const floor = state.map.rows.findIndex((row) => row.some((n) => n.id === node.id));
-  const at = { ...state, floor, mapNodeId: node.id };
-
-  if (node.type === 'boss' || node.type.startsWith('combat') || node.type === 'elite') {
-    return startCombat(at, node, content.cards);
-  }
-  if (node.type === 'rest') {
-    if (at.tempers) {
-      const offer = offerTempers(at, content.cards);
-      return {
-        state: { ...at, phase: 'rest', rngDraws: at.rngDraws + offer.draws, temperOffers: offer.offers },
-        events: [{ t: 'rest_ready', node: node.id }],
-      };
-    }
-    return { state: { ...at, phase: 'rest' }, events: [{ t: 'rest_ready', node: node.id }] };
-  }
-  throw new Error(`unhandled node type "${node.type}"`);
-}
-
-/** Take one card from the reward offer. */
-function pickReward(state, action) {
-  const idx = Number(action.id.slice(1)) - 1;
-  const cardId = action.cardId;
-  if (!cardId || idx < 0) return { state, events: [] };
-  const uid = `c${state.deck.length}_${state.stepIndex}`;
-  return {
-    state: { ...state, deck: [...state.deck, { uid, cardId }], phase: 'map', reward: null },
-    events: [{ t: 'card_taken', cardId, uid }],
-  };
 }
 
 export { HAND_SIZE, REST_HEAL, REWARD_CHOICES, ROWS, generateMap };
