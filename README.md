@@ -21,8 +21,9 @@ Or serve the repo root with any static server and open `src/web/index.html`, or 
 ## Develop
 
 ```sh
-npm test        # node --test 'tests/**/*.test.js'  (Node >= 24)
-npm run gate    # architecture gate: scripts/check-architecture.mjs
+npm test             # node --test 'tests/**/*.test.js'  (Node >= 24)
+npm run test:browser # opt-in Playwright e2e over the served page (tests/web/e2e.browser.spec.js)
+npm run gate         # architecture gate: scripts/check-architecture.mjs
 node scripts/check-surface-art.mjs   # static CSS/markup checks for src/web/
 node scripts/build-release.mjs       # regenerate release/
 ```
@@ -35,13 +36,23 @@ node scripts/build-release.mjs       # regenerate release/
 ├── bin/                 dlb CLI entry point (npm "bin")
 ├── src/
 │   ├── kernel/          deterministic game rules, content, RNG, run records
-│   ├── surface/         CLI / GUI controllers, sessions, policies, sim
-│   └── web/             browser renderer (index.html, app.js, style.css, card art)
+│   │   └── rules/       rule modules — act, draw, steps, map, encounters,
+│   │                    vocabulary, effects/ (handlers), powers, relics, …
+│   ├── surface/         CLI / GUI controllers, sessions, sim, stats, and the
+│   │                    policy layer: policies.js (chooser) + the value models
+│   │                    policy-read.js, policy-greedy.js, policy-smart.js
+│   └── web/             browser renderer: index.html + style.css + focused ES
+│                        modules — app.js (entry) imports the views (combat, map,
+│                        reward, rest, kindling, end), fx, targeting, runtime,
+│                        hud, dom, glyphs, floats, run-history, …
 ├── assets/
 │   └── fonts/           bundled OFL web fonts + licence texts (loaded by src/web/)
-├── tests/               node:test suites (kernel, cards, content, golden, history, ux, qa-layout-fix)
+├── tests/               node:test suites (kernel, cards, content, golden, history,
+│                        ux, web, release, tools, qa-layout-fix)
 ├── scripts/             build, gate, content-gen, serve, token-measure, play.sh
 │   └── dev/             dev-only probes, browser captures, layout-contract harnesses
+│                        (indexed in scripts/dev/README.md)
+├── shots/               rendered screenshots produced by the scripts/dev capture tools
 ├── docs/
 │   ├── guides/          PLAYING, AGENT-PLAY-GUIDE, ITCH-UPLOAD
 │   ├── specs/           requirements, UX spec, LAYOUT-ACCEPTANCE (layout contract)
@@ -49,6 +60,7 @@ node scripts/build-release.mjs       # regenerate release/
 │   ├── research/        market and genre research
 │   ├── team/            TEAM.md (agent team playbook)
 │   ├── evidence/        release, simulation and sample-run evidence
+│   ├── pr-shots/        before/after captures attached to merged changes
 │   └── RELEASE-NOTES.md
 ├── archive/             pre-change backups kept for reference (not built or tested)
 └── release/             generated itch.io artifact (scripts/build-release.mjs)

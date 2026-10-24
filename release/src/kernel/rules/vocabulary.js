@@ -8,7 +8,7 @@
 // Cards cannot invent mechanics this file does not know: exotic cards reference a
 // handler in rules/effects/<id>.js through the one `custom` verb.
 
-import { instantiate } from './card-instance.js';
+import { drawIntoHand } from './draw.js';
 
 /** @typedef {{state: any, events: any[]}} EffectResult */
 /** @typedef {{rng: {shuffle: Function, pick: Function, int: Function}, card: any, source: string, target: any, targetEnemyIndex: number}} EffectCtx */
@@ -146,32 +146,15 @@ export const VOCABULARY = {
 
   /** draw — draw `amount` cards, reshuffling the discard pile when the draw pile empties. */
   draw(state, ctx, params) {
-    let next = state;
-    const drawn = [];
-    let reshuffles = 0;
-    for (let i = 0; i < params.amount; i += 1) {
-      if (next.combat.draw.length === 0) {
-        if (next.combat.discard.length === 0) break;
-        const shuffled = ctx.rng.shuffle(next.combat.discard);
-        reshuffles += 1;
-        next = { ...next, rngDraws: next.rngDraws + shuffled.draws, combat: { ...next.combat, draw: shuffled.items, discard: [] } };
-      }
-      // The hand copy must carry `cost`, or the tile renders "undefined" and is unusable.
-      const head = instantiate(next.combat.draw[0]);
-      const rest = next.combat.draw.slice(1);
-      const room = next.combat.hand.length < 10;
-      drawn.push(head);
-      next = {
-        ...next,
-        combat: {
-          ...next.combat,
-          draw: rest,
-          hand: room ? [...next.combat.hand, head] : next.combat.hand,
-          discard: room ? next.combat.discard : [...next.combat.discard, head],
-        },
-      };
-    }
-    return { state: next, events: [{ t: 'draw', count: drawn.length, uids: drawn.map((c) => c.uid), reshuffles }] };
+    // The shuffle deliberately ignores the state the loop passes it and goes through
+    // ctx.rng instead: that closure binds the draw index the enclosing play held when
+    // the effect started, which is the exact stream the inline loop used to consume
+    // (rules/draw.js documents why the callback exists at all).
+    const out = drawIntoHand(state, params.amount, (_s, items) => ctx.rng.shuffle(items));
+    return {
+      state: out.state,
+      events: [{ t: 'draw', count: out.drawn.length, uids: out.drawn.map((c) => c.uid), reshuffles: out.reshuffles }],
+    };
   },
 
   /** energy — gain `amount` energy immediately. */

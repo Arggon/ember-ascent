@@ -13,7 +13,8 @@
 //
 // This module sits BELOW act.js and vocabulary.js in the import graph on purpose: act.js
 // already imports vocabulary.js, so vocabulary.js cannot import act.js without a cycle.
-// Both of them, and the effect handlers, import this instead.
+// Both of them, and the effect handlers, import this instead. The draw LOOPS that call
+// it live in rules/draw.js — one implementation, four call sites.
 //
 // Purity: a pure function of its inputs. No I/O, no clock, no randomness, no mutation.
 

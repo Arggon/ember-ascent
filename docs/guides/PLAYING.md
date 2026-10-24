@@ -19,6 +19,10 @@ Add `?seed=42` to the URL for a reproducible run: `http://localhost:5173/src/web
 > definitions** (`src/kernel/content/cards.json`); 40 was the planning target. The text is left as
 > written so the intent stays visible. "40" in the questions at the end is a standalone sentiment —
 > it stands.
+>
+> **Addendum 2026-10-24 (reconciled after the module refactor):** the shipped build now has
+> **44 card definitions** — 21 attack / 17 skill / 6 power — counted by parsing
+> `src/kernel/content/cards.json`. The "42" above was true of the 2026-10-16 build.
 
 ---
 
@@ -137,7 +141,7 @@ node bin/dlb sim --runs 200 --seed-start 1 --policy greedy --threads 4 --out ./s
 node bin/dlb stats --from ./sim-out --by-card --format table
 ```
 
-~310 games per second. The balance report labels its provenance, because these numbers describe the heuristic policy — **not** human players.
+~275 games per second, measured. The balance report labels its provenance, because these numbers describe the heuristic policy — **not** human players.
 
 There is also a terminal wrapper (`./scripts/play.sh --seed 42`) if you ever want to play without a browser. It works, but it is not the intended way for a human.
 
@@ -146,9 +150,17 @@ There is also a terminal wrapper (`./scripts/play.sh --seed 42`) if you ever wan
 ## Verify the build yourself
 
 ```bash
-node --test 'tests/**/*.test.js'    # 60 pass, 0 fail
+node --test 'tests/**/*.test.js'      # 222 tests — 221 pass, 0 fail, 1 todo
 node scripts/check-architecture.mjs   # OK — no violations
 ```
+
+**Re-verified 2026-10-24, after the module refactor** (`src/web/app.js` split into focused ES
+modules; `policies.js` value models split out; kernel draw/step loops single-sourced): the suite
+reports **222 tests — 221 pass, 0 fail, 1 todo**. The todo is `§11.2` in
+`tests/history/record.test.js`, a real defect deliberately marked `{ todo: true }` so it stays
+visible instead of being forgotten; it is not a regression. The opt-in browser e2e
+(`npm run test:browser`, Playwright over the served page) passes **8/8**. The architecture gate
+scans **35 files** under `src/` and reports no violations.
 
 The architecture gate is what keeps the browser and CLI from drifting apart. It fails if a surface file reaches into game rules, or if the game kernel imports a Node-only module — which is why the browser build cannot silently rot. The card wording is covered by `tests/ux/descriptions.test.js`, which fails if any card ends up with a placeholder or an unexplained abbreviation — so this defect cannot come back.
 

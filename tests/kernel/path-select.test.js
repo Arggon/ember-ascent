@@ -7,8 +7,6 @@
 //
 // Drives the REAL src/web/app.js against the fake DOM from hero-select / click-targeting tests,
 // with real controllers, so a switch really rebuilds the run on the other path.
-import { readFileSync } from 'node:fs';
-
 let uid = 0;
 class N {
   constructor(tag) {
@@ -103,26 +101,18 @@ const fxAdded = [];
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { bundleApp } from '../web/app-bundle.mjs';
 
 const appUrl = new URL('../../src/web/app.js', import.meta.url);
-const rawSrc = readFileSync(appUrl, 'utf8');
-const IMPORT_RE = /^import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"];?[ \t]*$/gm;
-const importPrelude = [];
-const importedModules = [];
-for (const [, names, spec] of rawSrc.matchAll(IMPORT_RE)) {
-  const bound = names.split(',').map((n) => n.trim()).filter(Boolean)
-    .map((n) => { const [orig, local = orig] = n.split(/\s+as\s+/); return [orig, local]; });
-  if (!bound.length) continue;
-  const mod = await import(new URL(spec, appUrl));
-  importPrelude.push(`const { ${bound.map(([o, l]) => (o === l ? o : `${o}: ${l}`)).join(', ')} } = __mods[${importedModules.length}];`);
-  importedModules.push(mod);
-}
-let src = rawSrc
-  .replace(/^import\b[\s\S]*?\bfrom\s*['"][^'"]+['"];?[ \t]*$|^import\s*['"][^'"]+['"];?[ \t]*$/gm, '')
+// The surface is split into sibling ES modules (src/web/*.js); bundleApp concatenates
+// them back into ONE sloppy-mode body — the same evaluation contract this test always
+// used — re-binding every kernel/surface import from the real modules.
+const { prelude, body, mods: importedModules } = await bundleApp(appUrl);
+let src = body
   .replace(/\bboot\(\)\s*;?\s*$/, '');
 src = 'async function measure(){ return null; }\n' + src;
 src += '\nreturn { render, newGame, snapGet(){ return snap; } };';
-const api = new Function('__mods', `${importPrelude.join('\n')}\n${src}`)(importedModules);
+const api = new Function('__mods', `${prelude}\n${src}`)(importedModules);
 
 
 const actCards = () => fxAdded.filter((x) => x._cls === 'fx-act-card');

@@ -4,10 +4,12 @@
 // works." Targeting mode appears and highlights enemies; a click on an enemy produces the
 // "Target cancelled — nothing was played" toast, which only cancelTargeting() emits.
 //
-// This drives the REAL src/web/app.js against a fake DOM with bubbling and closest(), then
+// This drives the REAL src/web/app.js (concatenated from its sibling modules by
+// tests/web/app-bundle.mjs, which preserves the one-scope evaluation contract the
+// single-file app.js offered) against a fake DOM with bubbling and closest(), then
 // dispatches a click the way a browser would — including the realistic case where the
 // innermost element under the pointer is a child of the enemy button, not the button.
-import { readFileSync } from 'node:fs';
+import { bundleApp } from '../../tests/web/app-bundle.mjs';
 
 let uid = 0;
 class N {
@@ -18,13 +20,44 @@ class N {
   }
   set className(v) { this._cls = String(v); }
   get className() { return this._cls; }
-  get classList() { return { contains: (c) => this._cls.split(/\s+/).includes(c) }; }
+  get classList() {
+    const list = () => this._cls.split(/\s+/).filter(Boolean);
+    const set = (a) => { this._cls = a.join(' '); };
+    return {
+      contains: (c) => list().includes(c),
+      add: (...cs) => set([...new Set([...list(), ...cs])]),
+      remove: (...cs) => set(list().filter((x) => !cs.includes(x))),
+    };
+  }
   set textContent(v) { this.txt = String(v); this.kids = []; }
   get textContent() { return this.txt; }
-  append(...c) { for (const x of c) if (x != null) { x.parent = this; this.kids.push(x); } }
+  // Raw-string kids are wrapped as #text nodes, as the real DOM does (dom.js
+  // keywordText appends plain strings).
+  append(...c) {
+    for (const x of c) if (x != null) {
+      if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); this.kids.push(t); continue; }
+      x.parent = this; this.kids.push(x);
+    }
+  }
+  // src/web grew these two after the module split (map-view.js, combat-view.js cardTile).
+  prepend(...c) {
+    for (const x of c) if (x != null) {
+      if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); this.kids.unshift(t); continue; }
+      x.parent = this; this.kids.unshift(x);
+    }
+  }
+  insertBefore(node, ref) {
+    if (ref == null || !this.kids.includes(ref)) return this.appendChild(node);
+    node.parent = this;
+    this.kids.splice(this.kids.indexOf(ref), 0, node);
+    return node;
+  }
   appendChild(c) { c.parent = this; this.kids.push(c); return c; }
   replaceChildren(...c) { this.kids = []; this.append(...c); }
   setAttribute(k, v) { this.attrs[k] = String(v); }
+  // src/web/fx.js throwLane() measures the card and hero boxes (new after the module
+  // split): answer with a zero box, as there is no layout in this host.
+  getBoundingClientRect() { return { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }; }
   getAttribute(k) { return this.attrs[k]; }
   addEventListener(t, fn) { (this._ls[t] ||= []).push(fn); }
   removeEventListener() {}
@@ -82,9 +115,12 @@ globalThis.requestAnimationFrame = (f) => f();
 globalThis.URLSearchParams = URLSearchParams;
 
 const toasts = [];
-let src = readFileSync(new URL('../../src/web/app.js', import.meta.url), 'utf8')
-  .replace(/^import .*$/gm, '')
-  .replace(/\bboot\(\)\s*;?\s*$/, '');
+// The surface is split into sibling ES modules (src/web/*.js); bundleApp concatenates
+// them back into ONE body — the same evaluation contract this probe always used —
+// re-binding the kernel/surface imports from the real modules, with createController
+// stubbed by the factory below.
+const { prelude, body, mods } = await bundleApp(new URL('../../src/web/app.js', import.meta.url), { stubController: true });
+let src = body.replace(/\bboot\(\)\s*;?\s*$/, '');
 // Record every toast, and expose the internals we need to inspect.
 src = src.replace('function toast(msg, kind = \'warn\') {', 'function toast(msg, kind = \'warn\') { __toasts.push(msg);');
 src += '\nreturn { render, clickCard, pickTarget, cancelTargeting, get pendingSlot(){return pendingSlot;}, snapGet(){return snap;} };';
@@ -93,11 +129,12 @@ const ctlMod = await import('../../src/surface/gui/controller.js');
 const ctl = ctlMod.createController({ run: { seed: 11 } });
 ctl.dispatch('n1');
 
-const factory = new Function('__ctl', '__toasts', `
+const factory = new Function('__ctl', '__toasts', '__mods', `
   function createController(){ return __ctl; }
+  ${prelude}
   ${src}
 `);
-const api = factory(ctl, toasts);
+const api = factory(ctl, toasts, mods);
 
 api.render();
 const before = ctl.snapshot();

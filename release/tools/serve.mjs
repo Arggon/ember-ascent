@@ -9,6 +9,10 @@
 // costs nothing and cannot become a supply-chain surface. It serves the PROJECT ROOT
 // only; anything that resolves outside it is refused (path traversal).
 //
+// RELEASE NOTE: scripts/build-release.mjs copies this file into the artifact as
+// tools/serve.mjs and rewrites three literals (the usage line and two banner
+// strings) for the flattened layout. Keep those literals intact and byte-exact.
+//
 // Usage:  node tools/serve.mjs [--port 5173]
 import { createServer } from 'node:http';
 import { createReadStream, statSync } from 'node:fs';
@@ -17,6 +21,10 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
+
+// ---------------------------------------------------------------------------
+// CLI
+// ---------------------------------------------------------------------------
 
 const { values } = parseArgs({
   options: { port: { type: 'string', default: '5173' }, help: { type: 'boolean', default: false } },
@@ -33,6 +41,10 @@ if (!Number.isInteger(PORT) || PORT <= 0 || PORT > 65535) {
   process.stderr.write(`serve: --port must be an integer in 1..65535, got ${JSON.stringify(values.port)}\n`);
   process.exit(3);
 }
+
+// ---------------------------------------------------------------------------
+// Request-target math — everything that decides WHERE a URL points
+// ---------------------------------------------------------------------------
 
 /** Exact Content-Type table. `.js` MUST be text/javascript or the browser refuses the module. */
 const TYPES = {
@@ -53,6 +65,19 @@ const TYPES = {
 };
 
 /**
+ * Split a request target into its path and its `?query` (the query INCLUDES the '?',
+ * or is '' when absent). Both redirect helpers below answer on the path and must
+ * re-attach the query verbatim — the seed-in-the-URL bug (see directoryRedirect)
+ * was exactly a query handled as part of the path.
+ * @param {string} url request target: path plus optional `?query`
+ * @returns {{path: string, query: string}}
+ */
+function splitTarget(url) {
+  const q = url.indexOf('?');
+  return q === -1 ? { path: url, query: '' } : { path: url.slice(0, q), query: url.slice(q) };
+}
+
+/**
  * Map a URL path to an absolute file path INSIDE the project root, or null if the
  * request escapes the root. This is the only place traversal is decided.
  * @param {string} urlPath
@@ -69,6 +94,19 @@ function resolveInsideRoot(urlPath) {
 }
 
 /**
+ * An absolute path inside ROOT, re-encoded as a same-origin URL path: each segment
+ * URI-encoded, leading slashes collapsed to exactly one. Both redirects build their
+ * Location from the RESOLVED file (already checked to be inside ROOT), never from
+ * the raw request path.
+ * @param {string} file absolute path inside ROOT
+ * @returns {string} URL path like `/src/web/` or `/src/web/index.html`
+ */
+function encodeInside(file) {
+  const rel = relative(ROOT, file).split(sep).filter(Boolean).map(encodeURIComponent).join('/');
+  return `/${rel}`;
+}
+
+/**
  * Where a directory request without its trailing slash should be redirected, or null
  * when the PATH already ends in `/`. The slash goes on the path, BEFORE the query.
  *
@@ -78,9 +116,8 @@ function resolveInsideRoot(urlPath) {
  * fell back to a random seed. That is the "instrument was lying" root cause recorded in
  * LAYOUT-ACCEPTANCE.md §1. `/src/web?seed=11` now goes to `/src/web/?seed=11`.
  *
- * The Location is built from the RESOLVED directory (`file`, already checked to be inside
- * ROOT), never from the raw request path, and its leading slashes are collapsed to one. So
- * it is always a same-origin `/...` path. Copying the raw path was an open redirect:
+ * The Location comes from encodeInside (resolved path, one leading slash), so it is
+ * always a same-origin `/...` path. Copying the raw path was an open redirect:
  * `GET //evil.com/../src/web` resolves to the src/web/ directory, but answered
  * `Location: //evil.com/../src/web/`, which a browser reads as a protocol-relative URL to
  * evil.com (likewise `/\evil.com/...`, since browsers treat `\` as `/`).
@@ -89,13 +126,9 @@ function resolveInsideRoot(urlPath) {
  * @returns {string|null}
  */
 function directoryRedirect(url, file) {
-  const q = url.indexOf('?');
-  const path = q === -1 ? url : url.slice(0, q);
-  const query = q === -1 ? '' : url.slice(q);
+  const { path, query } = splitTarget(url);
   if (path.endsWith('/')) return null;
-  const rel = relative(ROOT, file).split(sep).filter(Boolean).map(encodeURIComponent).join('/');
-  const p = `/${rel}/`.replace(/^\/+/, '/');
-  return `${p}${query}`;
+  return `${encodeInside(file)}/${query}`;
 }
 
 /**
@@ -107,21 +140,58 @@ function directoryRedirect(url, file) {
 function legacyWebRedirect(url, file) {
   const parts = relative(ROOT, file).split(sep).filter(Boolean);
   if (parts[0] !== 'web') return null;
-  const q = url.indexOf('?');
-  const path = q === -1 ? url : url.slice(0, q);
-  const query = q === -1 ? '' : url.slice(q);
+  const { path, query } = splitTarget(url);
   const rest = parts.slice(1).map(encodeURIComponent).join('/');
   const slash = rest === '' || path.endsWith('/') ? '/' : '';
   return `/src/web/${rest}${rest ? slash : ''}${query}`;
 }
 
-const server = createServer((req, res) => {
+// ---------------------------------------------------------------------------
+// Responses
+// ---------------------------------------------------------------------------
+
+/** Every plain-text answer this server gives, as (status, body) pairs. */
+const TEXT_RESPONSES = {
+  methodNotAllowed: [405, 'method not allowed\n'],
+  badEncoding: [400, 'bad request: malformed percent-encoding in the path\n'],
+  escapesRoot: [403, 'forbidden: path escapes the project root\n'],
+  readError: [500, 'read error\n'],
+};
+
+/** Send a fixed plain-text response from the table above. */
+function sendText(res, name) {
+  const [status, body] = TEXT_RESPONSES[name];
+  res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end(body);
+}
+
+/** Stream a file (or just write the headers, for HEAD). Errors past stat answer 500. */
+function sendFile(req, res, file) {
+  const type = TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream';
+  res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
+  if (req.method === 'HEAD') {
+    res.end();
+    return;
+  }
+  createReadStream(file).on('error', () => {
+    sendText(res, 'readError');
+  }).pipe(res);
+}
+
+// ---------------------------------------------------------------------------
+// The request pipeline, one phase per block, in decision order
+// ---------------------------------------------------------------------------
+
+/** Resolve a request target to the file it should serve, answering redirects and
+ * errors on `res` and returning null when the response is already sent. */
+function handleRequest(req, res) {
+  // Phase 1 — method gate.
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('method not allowed\n');
+    sendText(res, 'methodNotAllowed');
     return;
   }
 
+  // Phase 2 — resolve the target inside ROOT.
   // A malformed %-escape (`GET /src/web%`, `/%E0%A4%A`) makes decodeURIComponent throw a
   // URIError. Uncaught, it killed the whole server; it is the client's bad request.
   let file;
@@ -129,21 +199,20 @@ const server = createServer((req, res) => {
     file = resolveInsideRoot(req.url ?? '/');
   } catch (err) {
     if (!(err instanceof URIError)) throw err;
-    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('bad request: malformed percent-encoding in the path\n');
+    sendText(res, 'badEncoding');
     return;
   }
   if (file === null) {
-    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('forbidden: path escapes the project root\n');
+    sendText(res, 'escapesRoot');
     return;
   }
 
-  // Legacy URLs (#46): the game moved from /web/ to /src/web/. Old bookmarks and harness
-  // commands (/web, /web/, /web?seed=N, /web/index.html?seed=N) get a 302 to the same file
-  // under /src/web/, query kept. Like directoryRedirect, the Location is built from the
-  // RESOLVED path (already checked to be inside ROOT, after the 400 for bad escapes), never
-  // from the raw request path, so `//evil.com/../web` still lands on same-origin /src/web/.
+  // Phase 3 — legacy URLs (#46): the game moved from /web/ to /src/web/. Old bookmarks
+  // and harness commands (/web, /web/, /web?seed=N, /web/index.html?seed=N) get a 302 to
+  // the same file under /src/web/, query kept. Like directoryRedirect, the Location is
+  // built from the RESOLVED path (already checked to be inside ROOT, after the 400 for
+  // bad escapes), never from the raw request path, so `//evil.com/../web` still lands on
+  // same-origin /src/web/.
   const legacy = legacyWebRedirect(req.url ?? '/', file);
   if (legacy !== null) {
     res.writeHead(302, { Location: legacy });
@@ -151,8 +220,7 @@ const server = createServer((req, res) => {
     return;
   }
 
-  // A directory (or the bare root) serves its index.html; a request for the root is
-  // redirected to /src/web/ so a human lands on the game, not a listing.
+  // Phase 4 — does it exist?
   let stat;
   try {
     stat = statSync(file);
@@ -161,6 +229,9 @@ const server = createServer((req, res) => {
     res.end(`not found: ${req.url}\n`);
     return;
   }
+
+  // Phase 5 — a directory (or the bare root) serves its index.html; a directory request
+  // without its trailing slash is redirected first.
   if (stat.isDirectory()) {
     const location = directoryRedirect(req.url ?? '/', file);
     if (location !== null) {
@@ -179,17 +250,15 @@ const server = createServer((req, res) => {
     }
   }
 
-  const type = TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
-  if (req.method === 'HEAD') {
-    res.end();
-    return;
-  }
-  createReadStream(file).on('error', () => {
-    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('read error\n');
-  }).pipe(res);
-});
+  // Phase 6 — serve the bytes.
+  sendFile(req, res, file);
+}
+
+const server = createServer(handleRequest);
+
+// ---------------------------------------------------------------------------
+// Startup
+// ---------------------------------------------------------------------------
 
 // If 5173 is taken, try the next few ports rather than dying with EADDRINUSE.
 let port = PORT;

@@ -2,22 +2,29 @@
 // scripts/check-surface-art.mjs — static checks for the browser surface's presentation.
 //
 // WHY THIS EXISTS: the art pass makes three claims that a browser would normally verify
-// and a headless run cannot: (1) every class app.js emits has a rule in style.css, so no
-// style ships invisible; (2) style.css has balanced braces and no duplicated top-level
-// selector; (3) no external asset is referenced. Grep cannot prove (1) because app.js
-// builds class names from templates, so this walks the two real sources.
+// and a headless run cannot: (1) every class a src/web module emits has a rule in
+// style.css, so no style ships invisible; (2) style.css has balanced braces and no
+// duplicated top-level selector; (3) no external asset is referenced. Grep cannot prove
+// (1) because the modules build class names from templates, so this walks the real
+// sources: every .js module under src/web/ plus style.css and index.html.
 //
 // It is read-only and dependency-free: node:fs only, no execution of the page.
 //
 // Usage: node scripts/check-surface-art.mjs [--json]
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const json = process.argv.includes('--json');
 
-const appSrc = readFileSync(join(ROOT, 'src/web/app.js'), 'utf8');
+// The browser surface is split into sibling ES modules under src/web/ (app.js boots,
+// the rest render); classes are emitted from any of them, so the check reads them ALL.
+// Deterministic order (sorted) keeps the name list stable run to run.
+const webModules = readdirSync(join(ROOT, 'src/web'))
+  .filter((f) => f.endsWith('.js')).sort()
+  .map((f) => join(ROOT, 'src/web', f));
+const appSrc = webModules.map((f) => readFileSync(f, 'utf8')).join('\n');
 const cssSrc = readFileSync(join(ROOT, 'src/web/style.css'), 'utf8');
 
 const problems = [];
@@ -30,7 +37,7 @@ const notes = [];
  *
  * WHY A SCANNER RATHER THAN A REGEX: the previous pattern
  * (`/\bcls:\s*(`[^`]*`|'[^']*'|"[^"]*")/g`) matched ONE complete quoted literal and then
- * stopped, so it was blind to a class assembled from several pieces. `src/web/app.js` emits the
+ * stopped, so it was blind to a class assembled from several pieces. The renderer emits the
  * dying-enemy ghost as `` `enemy is-dying side-${d.side}` + (d.boss ? ' boss-down' : '') ``,
  * and `boss-down` — a class with no rule anywhere in style.css — lived in the second piece,
  * invisible to the checker, which therefore reported OK. This walks the whole value instead.
@@ -114,8 +121,9 @@ function classesFromOptions(src) {
 }
 
 /** Expand the known-variant template literals into their concrete members. */
-// The pose set is the renderer's contract: it must track every pose app.js can emit,
-// i.e. the built-ins plus every movement value in HERO_MOVES (src/web/app.js). Adding a
+// The pose set is the renderer's contract: it must track every pose the modules can
+// emit, i.e. the built-ins plus every movement value in HERO_MOVES (src/web/hero-moves.js).
+// Adding a
 // movement there means adding it here AND a `.fig.pose-*` rule that really animates.
 const POSE_VALUES = ['idle', 'strike', 'brace', 'hurt', 'low', 'windup', 'heavy', 'flurry', 'sweep', 'guard', 'channel', 'throw', 'slam', 'colossal', 'twinthrow', 'rend', 'uppercut', 'hammerfall', 'quench', 'bellowspush', 'snapcast', 'fanflames', 'arccut', 'collarline', 'headbutt', 'surge', 'haftjab', 'forgeclap', 'wildflail', 'bellowsflex', 'dropkick', 'bloodhammer', 'castaside', 'truetemper', 'fitplate', 'kilncry', 'vent', 'heattrance', 'hailblows', 'climbcut', 'veintap', 'reapsweep', 'heatwash', 'bracelock', 'flameward', 'cindershroud', 'stoke', 'scaleup', 'bankcoal', 'ashembrace', 'cinderskin', 'lockdown', 'overtemper', 'tithe', 'splitseam'];
 function variants(src) {
@@ -165,9 +173,9 @@ const used = new Set([...classesFromOptions(appSrc), ...variants(appSrc)]);
 const declared = cssClasses(cssSrc);
 const missing = [...used].filter((c) => !declared.has(c)).sort();
 
-notes.push(`classes: ${used.size} emitted by app.js, ${declared.size} present in style.css`);
+notes.push(`classes: ${used.size} emitted by src/web modules, ${declared.size} present in style.css`);
 if (missing.length > 0) {
-  problems.push(`app.js emits ${missing.length} class(es) with no rule in style.css: ${missing.join(', ')}`);
+  problems.push(`src/web modules emit ${missing.length} class(es) with no rule in style.css: ${missing.join(', ')}`);
 }
 
 /* ------------------------------------------- 1b. poses must actually animate ---
@@ -273,7 +281,12 @@ notes.push(`top-level selectors: ${sels.length}, distinct ${seen.size}`);
 /* --------------------------------------------------------------- 3. external assets */
 
 const external = [];
-for (const [file, src] of [['src/web/index.html', readFileSync(join(ROOT, 'src/web/index.html'), 'utf8')], ['src/web/app.js', appSrc], ['src/web/style.css', cssSrc]]) {
+const externalTargets = [
+  ['src/web/index.html', readFileSync(join(ROOT, 'src/web/index.html'), 'utf8')],
+  ...webModules.map((f) => [`src/web/${f.split('/').pop()}`, readFileSync(f, 'utf8')]),
+  ['src/web/style.css', cssSrc],
+];
+for (const [file, src] of externalTargets) {
   for (const re of [/https?:\/\//gi, /\bcdn\b/gi, /@import/gi, /googleapis/gi, /\.woff2?\b/gi]) {
     const m = src.match(re);
     if (m) external.push(`${file}: ${re} matched ${JSON.stringify(m.slice(0, 3))}`);

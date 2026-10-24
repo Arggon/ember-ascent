@@ -1,7 +1,7 @@
 # Agent Play Guide — `dlb`
 
 **What this is:** how an AI agent (or a human, or a script) plays the deckbuilder from a terminal, at the lowest practical token cost.
-**Status:** phase 3 vertical slice complete — 40 cards, one act, one boss, one character. **Mechanically verified; the human fun gate is still open.**
+**Status:** vertical slice complete — 44 cards, one act, one boss, two characters (the Ashwright and the Bellows Keeper; the CLI's internal ids remain `ironclad` and `bellows`). **Mechanically verified; the human fun gate is still open.**
 **Every command and output below was run and captured, not described.**
 
 ---
@@ -37,6 +37,8 @@ dlb play <id> --run run.json        # act
 **The agent loop is: `actions` → pick an id → `play <id>` → read the new state. Repeat.**
 
 ### Verified session (seed 42, stdin closed, no TTY)
+
+*(Re-run 2026-10-24 after the module refactor: byte-identical output, including the run hash.)*
 
 ```
 $ dlb new --seed 42 --run run.json < /dev/null
@@ -115,6 +117,7 @@ T1 | HP 60/60 | EN 3/3 | BLK 0 | draw5 disc0
 | ID form | Meaning | Example |
 |---|---|---|
 | `p<n>` | play the card in hand slot *n* | `p1` |
+| `p<n>_<k>` | aim hand card *n* at enemy *k* (multi-enemy fights; 1-based, living enemies) | `p2_1` |
 | `e1` | end turn | `e1` |
 | `c` | continue / confirm | `c` |
 | `s<n>` | pick reward *n* | `s2` |
@@ -152,13 +155,20 @@ dlb sim --runs 200 --seed-start 1 --policy greedy --threads 4 --out ./sim-out
 
 ```
 sim 200 runs | policy greedy | threads 4 | seeds 1..200
-win 3 (1.5%) loss 197 (98.5%) unfinished 0
-steps total 14623 mean 73.1 | floors max 7 mean 5.58
-malformed 0/14623 (0.0%)
-elapsed 649ms | 308.0 runs/sec
+win 15 (7.5%) loss 185 (92.5%) unfinished 0
+steps total 14040 mean 70.2 | floors max 7 mean 5.29
+malformed 0/14040 (0.0%)
+boss reached 112/200 (56.0%) | kills 15 (13.4% of those that reached)
+boss arrival: HP 36.1/60 (60%) | deck 15.3 (atk 9.9 blk 4.8 pow 0.6) | block points in deck 20.4
+boss at death: mean HP remaining 61.3/110 (56%) over 97 boss deaths
+elapsed 726ms | 275.3 runs/sec
+payload tokens: dump worst 116/250 PASS | action line worst 7/8 PASS (297 lines measured)
 ```
 
-**308 games/second at zero API tokens.** A 500-run sweep completes in 775 ms (645 runs/sec). Use `sim` for volume and reserve LLM tokens for **exploration and novelty only** — that is where an LLM adds value a heuristic cannot.
+**275 games/second at zero API tokens** (measured 2026-10-24, after the module refactor; the
+pre-refactor build measured 308 runs/sec on the same machine — treat the rate as
+hardware- and build-dependent). Use `sim` for volume and reserve LLM tokens for **exploration and
+novelty only** — that is where an LLM adds value a heuristic cannot.
 
 ---
 
@@ -171,22 +181,30 @@ dlb stats --from ./sim-out --by-card --format table
 ```
 
 ```
-stats — provenance: heuristic | 200 runs (of 200 present)
+stats — provenance: heuristic | 200 runs (of 200 present) | source: ./sim-out/runs.jsonl
 HEURISTIC POLICY DATA — these numbers describe the heuristic policy, not human players.
 
-win rate 1.5% (3/200) | mean floor 5.58
-run length (steps) min 25 median 76 max 173 mean 73.1
-floor distribution f1:9 f2:15 f3:24 f4:11 f5:11 f6:4 f7:126
+win rate 7.5% (15/200) | mean floor 5.29
+run length (steps) min 23 median 71 max 115 mean 70.2
+floor distribution f1:10 f2:13 f3:39 f4:12 f5:10 f6:4 f7:112
+boss reached 112/200 (56.0%) | KILL RATE AT THE BOSS 13.4% (15/112)
+boss arrival: HP 36.1 | deck 15.3 (atk 9.9 blk 4.8 pow 0.6) | block points 20.4
+boss HP remaining at death 61.3/240 over 97 boss deaths
 
-card                     offered picked pickRate inWins
-bludgeon                      68     68    1.000  0.000
-carnage                       71     67    0.944  0.333
-uppercut                      80     75    0.938  0.333
-shockwave                     78     68    0.872  0.667
-clothesline                   71     58    0.817  0.333
+card                     offered picked pickRate inWins presence
+bludgeon                      58     58    1.000      5    0.333
+carnage                       82     79    0.963      7    0.467
+uppercut                      63     56    0.889      9    0.600
+clothesline                   76     62    0.816      7    0.467
+pommel                        64     49    0.766      4    0.267
 ```
 
-`bludgeon` is picked **100%** of the time and appears in **0%** of wins — the strongest "this card is a trap, or the policy is wrong about it" signal in the current data. This output also demonstrates the **provenance label** (`heuristic`), which is mandatory: these are not human numbers.
+`bludgeon` is picked **100%** of the time and appears in **5 of the 15 winning decks** — the
+strongest "this card is a trap, or the policy is wrong about it" signal in the current data. This
+output also demonstrates the **provenance label** (`heuristic`), which is mandatory: these are not
+human numbers. *(Re-captured 2026-10-24 after the module refactor — the table gained a `presence`
+column and the report gained the boss-arrival lines; the pre-refactor capture was taken on the
+2026-10-16 build, which had 42 cards and a 1.5% win rate.)*
 
 Also available: `--format json`, `--format csv`, `--from` any `sim` output directory.
 
@@ -199,7 +217,7 @@ Also available: `--format json`, `--format csv`, `--from` any `sim` output direc
 | **Never blocks** | Never reads stdin; works with `< /dev/null` and no TTY | ✅ session above |
 | **Illegal action is cheap** | Applies a legal no-op, prints `{"error":"illegal_action","id":"zz9","code":2}` to **stderr**, exits **2** | ✅ |
 | **stdout is machine-only** | Diagnostics never contaminate stdout — in the illegal-action case stdout stayed clean | ✅ |
-| **Deterministic** | Same seed + same actions = byte-identical state, cross-process | ✅ 45 tests |
+| **Deterministic** | Same seed + same actions = byte-identical state, cross-process | ✅ 221 passing tests (2026-10-24) |
 | **Replayable** | `dlb replay <log> --assert` re-runs an action log and verifies every step hash | ✅ |
 | **Reproducible saves** | `save`/`load` round-trip preserves the state hash exactly | ✅ |
 | **Bounded output** | `--max-lines` prints `# truncated: showing 3 of 14 lines` to **stderr** — never silently | ✅ |
@@ -225,21 +243,29 @@ Also available: `--format json`, `--format csv`, `--from` any `sim` output direc
 ## 6. Self-check before you trust the build
 
 ```bash
-node --test 'tests/**/*.test.js'   # 45 pass / 0 fail
+node --test 'tests/**/*.test.js'     # 222 tests — 221 pass, 0 fail, 1 todo
 node scripts/check-architecture.mjs  # OK — no R1/R3 violations
 ```
 
-Independently re-run and confirmed: **45 tests pass, 0 fail**; the architecture gate scans 20 files and reports no violations — and **fails with exit 2** when a surface file is made to import a rules module, which is what keeps the GUI and CLI from silently diverging.
+Independently re-run 2026-10-24, after the module refactor, and confirmed: **222 tests — 221 pass,
+0 fail, 1 todo** (the todo is `§11.2` in `tests/history/record.test.js`, a real defect deliberately
+marked `{ todo: true }` so it stays visible). The opt-in browser e2e (`npm run test:browser`)
+passes 8/8. The architecture gate scans **35 files** under `src/` and reports no violations — and
+**fails with exit 2** when a surface file is made to import a rules module, which is what keeps the
+GUI and CLI from silently diverging.
 
 ---
 
 ## 7. What is not done
 
-- **The fun gate is open.** 40 cards, one act, one character play; ~40-100 minutes of content. Balance is *not* tuned — the greedy policy wins ~2% and that is a policy finding, not a verdict on the game.
-- **No renderer yet.** The GUI *controller* exists and is exercised by the dual-surface tests; the visual layer is phase 6.
-- **Content is 40 cards, not 120-150.** Scaling is gated on the human fun verdict.
+- **The fun gate is open.** 44 cards, one act, two characters play; ~40-100 minutes of content. Balance is *not* tuned — the greedy policy wins ~7% over seeded runs (7.5% measured 2026-10-24, 15/200) and that is a policy finding, not a verdict on the game.
+- **~~No renderer yet.~~ Superseded:** the browser renderer exists (`src/web/`) and is the
+  human-facing surface. Since the module refactor (merged 2026-10-24) it is decomposed into
+  focused ES modules — `app.js` is a small entry importing the views, fx, targeting and runtime
+  modules — with `tests/web/module-graph.test.js` guarding the real import graph.
+- **Content is 44 cards, not 120-150.** Scaling is gated on the human fun verdict.
 - `scripts/measure-tokens.mjs` is a dev spike holding **stale hand-written sample strings**; the real ceilings are enforced on engine output by `tests/budget.test.js`.
-- A harmless re-export shim remains at `src/kernel/rules/effects.js` (it could not be deleted — destructive commands are blocked).
+- The old re-export shim at `src/kernel/rules/effects.js` is gone (the module split removed it); the effect vocabulary lives in `src/kernel/rules/vocabulary.js` and the handlers in `src/kernel/rules/effects/index.js`.
 - `package.json` contains a `js-tiktoken` devDependency line that trips a secret-scanner false positive on writes. It is a dev-only dependency; the shipped engine has **zero runtime dependencies**.
 
 ---

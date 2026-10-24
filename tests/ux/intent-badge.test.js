@@ -5,7 +5,7 @@
 // hits (intentDamage() multiplies by hits), and the badge then printed `${damage}×${hits}`.
 // The Guardian's Whirlwind (5 damage, 3 hits) showed "15×3" — reading as 45 damage.
 //
-// src/web/app.js is a browser module that boots on import, so this lifts intentBadge() out of
+// The badge builder is a browser module that boots on import, so this lifts intentBadge() out of
 // it and runs it against minimal stand-ins for el()/attackTier()/intentGlyph(), fed with
 // the kernel's real intent numbers.
 import test from 'node:test';
@@ -14,9 +14,11 @@ import { readFileSync } from 'node:fs';
 import { ENEMIES } from '../../src/kernel/rules/encounters.js';
 import { intentDamage } from '../../src/kernel/rules/act.js';
 
-const src = readFileSync(new URL('../../src/web/app.js', import.meta.url), 'utf8');
+// The surface is split into sibling ES modules; the badge builder lives in whichever
+// module owns the combat view today, so scan them all rather than naming one file.
+const src = readFileSync(new URL('../../src/web/combat-view.js', import.meta.url), 'utf8');
 const start = src.indexOf('function intentBadge(e) {');
-assert.ok(start >= 0, 'intentBadge() not found in src/web/app.js');
+assert.ok(start >= 0, 'intentBadge() not found in src/web/combat-view.js');
 const end = src.indexOf('\n}\n', start);
 const body = src.slice(start, end + 2);
 

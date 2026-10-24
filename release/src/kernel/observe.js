@@ -9,7 +9,7 @@
 // two runs on the same content stay byte-identical.
 //
 // Budget: the dump is designed to stay under 250 tokens (worst of o200k/cl100k) and
-// every action line under 8 — enforced by tests/golden/budget.test.js on measured counts.
+// every action line under 8 — enforced by tests/budget.test.js on measured counts.
 import { ENEMIES, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { availableNodes, NODE_TYPES } from './rules/map.js';
 import { defaultContent } from './content.js';
@@ -62,6 +62,22 @@ export const CUSTOM_SUMMARY = {
 };
 
 /**
+ * Compact token per effect verb — the closed vocabulary, one row each, next to the
+ * abbreviation tables above. A verb with no row renders `?`, same as before.
+ * @type {Record<string, (e: any) => string>}
+ */
+const SUMMARY_OF_VERB = {
+  damage: (e) => (e.hits && e.hits > 1 ? `A${e.amount}x${e.hits}` : `A${e.amount}`),
+  block: (e) => `B${e.amount}`,
+  draw: (e) => `D${e.amount}`,
+  energy: (e) => `E${e.amount}`,
+  status: (e) => `${STATUS_ABBREV[e.status] ?? e.status.toUpperCase()}+${e.amount}`,
+  discard: (e) => `d${e.amount}`,
+  exhaust: () => 'EXH',
+  custom: (e) => CUSTOM_SUMMARY[e.handler] ?? '?',
+};
+
+/**
  * Short effect summary for a card definition, used in hand lines and action lines.
  * Every extra character here is paid on every turn, so it is deliberately terse.
  * @param {any} def card definition
@@ -70,34 +86,8 @@ export const CUSTOM_SUMMARY = {
 export function effectSummary(def) {
   const parts = [];
   for (const e of def.effects) {
-    switch (e.verb) {
-      case 'damage':
-        parts.push(e.hits && e.hits > 1 ? `A${e.amount}x${e.hits}` : `A${e.amount}`);
-        break;
-      case 'block':
-        parts.push(`B${e.amount}`);
-        break;
-      case 'draw':
-        parts.push(`D${e.amount}`);
-        break;
-      case 'energy':
-        parts.push(`E${e.amount}`);
-        break;
-      case 'status':
-        parts.push(`${STATUS_ABBREV[e.status] ?? e.status.toUpperCase()}+${e.amount}`);
-        break;
-      case 'discard':
-        parts.push(`d${e.amount}`);
-        break;
-      case 'exhaust':
-        parts.push('EXH');
-        break;
-      case 'custom':
-        parts.push(CUSTOM_SUMMARY[e.handler] ?? '?');
-        break;
-      default:
-        parts.push('?');
-    }
+    const fmt = SUMMARY_OF_VERB[e.verb];
+    parts.push(fmt ? fmt(e) : '?');
   }
   return parts.join(' ');
 }
@@ -111,16 +101,18 @@ function statusLine(statuses) {
   return keys.map((k) => `${STATUS_ABBREV[k] ?? k.toUpperCase()}${statuses[k]}`).join(' ');
 }
 
-/** Live card definition lookup. Single place where an instance becomes renderable. */
+/** Live card definition lookup. Single place where an instance (or bare id) becomes renderable. */
 let CARD_DEFS = null;
 /** @param {any} content */
 export function _setContentForObservation(content) {
   CARD_DEFS = content.cards;
 }
-function defOf(card) {
+/** The definition of a hand instance OR a bare card id — one lookup, one error message. */
+function defOf(cardOrId) {
   if (CARD_DEFS === null) CARD_DEFS = defaultContent().cards;
-  const def = CARD_DEFS.get(card.cardId);
-  if (!def) throw new Error(`observation: unknown card "${card.cardId}"`);
+  const id = typeof cardOrId === 'string' ? cardOrId : cardOrId.cardId;
+  const def = CARD_DEFS.get(id);
+  if (!def) throw new Error(`observation: unknown card "${id}"`);
   return def;
 }
 
@@ -227,6 +219,8 @@ const pileCardNames = (pile) => (pile ?? []).map((c) => defOf(c).name);
 function rewardBody(state) {
   const lines = ['REWARD — pick one'];
   state.reward.cards.forEach((id) => {
+    // Tolerant on purpose (unlike defOf): a reward id the content no longer knows
+    // still renders, as the raw id, instead of killing the whole dump.
     const def = CARD_DEFS?.get(id) ?? defaultContent().cards.get(id);
     lines.push(` s${state.reward.cards.indexOf(id) + 1} ${def ? def.name : id} ${def ? effectSummary(def) : ''}`);
   });
@@ -281,7 +275,7 @@ function mapBody(state, opts) {
  *
  * Measured worst across all 42 content ids: 7 tokens (`p1 sword_boomerang`). Unlike
  * a name+summary scheme, this form is bounded BY CONSTRUCTION as content grows —
- * the only input is the slot and the card's stable id — and tests/golden/budget.test.js
+ * the only input is the slot and the card's stable id — and tests/budget.test.js
  * fails CI if any shipped id ever breaks the ceiling.
  * @param {any} state
  * @returns {string}
@@ -324,14 +318,6 @@ export function observeActions(state) {
   return lines.join('\n');
 }
 
-/** Card definition lookup by id. */
-function cardDef(id) {
-  if (CARD_DEFS === null) CARD_DEFS = defaultContent().cards;
-  const def = CARD_DEFS.get(id);
-  if (!def) throw new Error(`observation: unknown card id "${id}"`);
-  return def;
-}
-
 /** Status labels for the structured snapshot (same abbreviations as the text dump). */
 function statusPairs(statuses) {
   return Object.entries(statuses ?? {})
@@ -348,20 +334,6 @@ function statusPairs(statuses) {
     }));
 }
 
-/**
- * A DOM-free STRUCTURED view of the state, for renderers that must not reimplement
- * a rule. Every derived fact a screen needs (card name/cost/effect text, enemy
- * intent and its damage, which cards are playable, which nodes are reachable) is
- * computed here, in the kernel, which is the only place allowed to know the rules.
- *
- * The R4 text dump and this snapshot are two renderings of ONE state: a browser view
- * built on snapshots therefore cannot show something the CLI cannot. Purely
- * presentational data (colors, layout) stays in the renderer; anything a player
- * could use to decide stays here.
- * @param {any} state
- * @param {{verbose?: boolean}} [opts]
- * @returns {object} JSON-safe value model
- */
 /** The hero's relic name and switched-off text, for relic-off boon text. */
 function heroRelic(state) {
   return {
@@ -370,12 +342,16 @@ function heroRelic(state) {
   };
 }
 
-export function snapshot(state) {
-  const legal = legalActions(state);
-  // A card that needs a target is offered as ONE action per living enemy (`p1_1`, `p1_2`),
-  // while its hand slot is the bare `p1`. Matching on the exact action id therefore marked
-  // every attackable card unplayable — the whole hand greyed out with energy to spare. The
-  // slot prefix is what a hand tile is playable by, so match on that.
+/**
+ * Legal play actions, grouped the way the hand needs them: which slots are playable
+ * at all, and the aim choices per slot.
+ *
+ * A card that needs a target is offered as ONE action per living enemy (`p1_1`, `p1_2`),
+ * while its hand slot is the bare `p1`. Matching on the exact action id therefore marked
+ * every attackable card unplayable — the whole hand greyed out with energy to spare. The
+ * slot prefix is what a hand tile is playable by, so match on that.
+ */
+function playTargets(legal) {
   const playableSlots = new Set(
     legal.filter((a) => a.kind === 'play').map((a) => String(a.id).replace(/_\d+$/, '')),
   );
@@ -389,11 +365,14 @@ export function snapshot(state) {
     if (!targetsBySlot.has(slotKey)) targetsBySlot.set(slotKey, []);
     targetsBySlot.get(slotKey).push({ index: Number(m[2]), actionId: a.id });
   }
-  const travel = new Map(legal.filter((a) => a.kind === 'travel').map((a) => [a.nodeId, a.id]));
-  const pick = new Map(legal.filter((a) => a.kind === 'pick').map((a) => [a.cardId, a.id]));
+  return { playableSlots, targetsBySlot };
+}
 
-  const hand = (state.combat?.hand ?? []).map((card, i) => {
-    const { def, temper } = temperedView(state, card, cardDef(card.cardId));
+/** The hand section of a snapshot: one tile's worth of facts per card. */
+function snapshotHand(state, legal) {
+  const { playableSlots, targetsBySlot } = playTargets(legal);
+  return (state.combat?.hand ?? []).map((card, i) => {
+    const { def, temper } = temperedView(state, card, defOf(card));
     const hpCost = temperHpCost(temper);
     const slot = `p${i + 1}`;
     const playable = playableSlots.has(slot);
@@ -427,8 +406,11 @@ export function snapshot(state) {
       hint: describePlayability({ cost: card.cost, playable }, state.player.energy),
     };
   });
+}
 
-  const enemies = (state.combat?.enemies ?? [])
+/** The enemies section of a snapshot: intent included, dead enemies omitted. */
+function snapshotEnemies(state) {
+  return (state.combat?.enemies ?? [])
     .filter((e) => !e.dead)
     .map((e) => {
       const def = ENEMIES[e.id];
@@ -452,10 +434,14 @@ export function snapshot(state) {
         },
       };
     });
+}
 
+/** The map section of a snapshot: every node, with availability decided here. */
+function snapshotMap(state, legal) {
+  const travel = new Map(legal.filter((a) => a.kind === 'travel').map((a) => [a.nodeId, a.id]));
   const currentRow = state.floor >= 0 ? state.map.rows[state.floor] : [];
   const nextNodes = availableNodes(state);
-  const map = {
+  return {
     floor: state.floor,
     floorCount: state.map.rows.length,
     current: state.mapNodeId,
@@ -475,27 +461,76 @@ export function snapshot(state) {
     ),
     currentRow: currentRow.map((n) => n.id),
   };
+}
 
-  const reward = state.reward
-    ? {
-        canSkip: legal.some((a) => a.kind === 'skip'),
-        skipId: legal.find((a) => a.kind === 'skip')?.id ?? null,
-        cards: state.reward.cards.map((id) => {
-          const def = cardDef(id);
-          return {
-            cardId: id,
-            name: def.name,
-            flavor: typeof def.flavor === 'string' ? def.flavor : '',
-            cost: def.cost,
-            type: def.type,
-            typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
-            summary: effectSummary(def),
-            description: describeCard(def),
-            actionId: pick.get(id) ?? null,
-          };
-        }),
-      }
-    : null;
+/** The reward section of a snapshot, or null when no reward is open. */
+function snapshotReward(state, legal) {
+  if (!state.reward) return null;
+  const pick = new Map(legal.filter((a) => a.kind === 'pick').map((a) => [a.cardId, a.id]));
+  return {
+    canSkip: legal.some((a) => a.kind === 'skip'),
+    skipId: legal.find((a) => a.kind === 'skip')?.id ?? null,
+    cards: state.reward.cards.map((id) => {
+      const def = defOf(id);
+      return {
+        cardId: id,
+        name: def.name,
+        flavor: typeof def.flavor === 'string' ? def.flavor : '',
+        cost: def.cost,
+        type: def.type,
+        typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
+        summary: effectSummary(def),
+        description: describeCard(def),
+        actionId: pick.get(id) ?? null,
+      };
+    }),
+  };
+}
+
+/** The rest-site section of a snapshot, or null when the player is not resting. */
+function snapshotRest(state, legal) {
+  if (state.phase !== 'rest') return null;
+  return {
+    healId: legal.find((a) => a.kind === 'rest_heal')?.id ?? null,
+    leaveId: legal.find((a) => a.kind === 'rest_leave')?.id ?? null,
+    heal: REST_HEAL,
+    tempers: (state.temperOffers ?? []).map((o, i) => ({
+      actionId: `t${i + 1}`, cardId: o.cardId, cardName: defOf(o.cardId).name,
+      temper: o.temper, temperName: TEMPERS[o.temper].name, text: TEMPERS[o.temper].text,
+    })),
+  };
+}
+
+/** The kindling section of a snapshot, or null when no boon is being chosen. */
+function snapshotKindling(state) {
+  if (state.phase !== 'kindling') return null;
+  return {
+    boons: state.kindling.offers.map((id, i) => ({
+      id, name: BOONS[id].name, text: boonText(id, heroRelic(state)), label: BOONS[id].label, actionId: `k${i + 1}`,
+    })),
+  };
+}
+
+/**
+ * A DOM-free STRUCTURED view of the state, for renderers that must not reimplement
+ * a rule. Every derived fact a screen needs (card name/cost/effect text, enemy
+ * intent and its damage, which cards are playable, which nodes are reachable) is
+ * computed here, in the kernel, which is the only place allowed to know the rules.
+ *
+ * The R4 text dump and this snapshot are two renderings of ONE state: a browser view
+ * built on snapshots therefore cannot show something the CLI cannot. Purely
+ * presentational data (colors, layout) stays in the renderer; anything a player
+ * could use to decide stays here.
+ *
+ * Assembly only: each section has its own builder above, so a new screen section is
+ * one builder plus one line in the return — the shape of the whole snapshot stays
+ * readable at a glance.
+ * @param {any} state
+ * @param {{verbose?: boolean}} [opts]
+ * @returns {object} JSON-safe value model
+ */
+export function snapshot(state) {
+  const legal = legalActions(state);
 
   return {
     phase: state.phase,
@@ -528,7 +563,7 @@ export function snapshot(state) {
           explain: describePower(key, stacks),
         })),
     },
-    hand,
+    hand: snapshotHand(state, legal),
     piles: {
       draw: state.combat?.draw?.length ?? 0,
       discard: state.combat?.discard?.length ?? 0,
@@ -538,21 +573,11 @@ export function snapshot(state) {
       discardCards: pileCardNames(state.combat?.discard),
       exhaustCards: pileCardNames(state.combat?.exhaust),
     },
-    enemies,
-    map,
-    reward,
-    rest: state.phase === 'rest' ? {
-      healId: legal.find((a) => a.kind === 'rest_heal')?.id ?? null,
-      leaveId: legal.find((a) => a.kind === 'rest_leave')?.id ?? null,
-      heal: REST_HEAL,
-      tempers: (state.temperOffers ?? []).map((o, i) => ({
-        actionId: `t${i + 1}`, cardId: o.cardId, cardName: cardDef(o.cardId)?.name ?? o.cardId,
-        temper: o.temper, temperName: TEMPERS[o.temper].name, text: TEMPERS[o.temper].text,
-      })),
-    } : null,
-    kindling: state.phase === 'kindling'
-      ? { boons: state.kindling.offers.map((id, i) => ({ id, name: BOONS[id].name, text: boonText(id, heroRelic(state)), label: BOONS[id].label, actionId: `k${i + 1}` })) }
-      : null,
+    enemies: snapshotEnemies(state),
+    map: snapshotMap(state, legal),
+    reward: snapshotReward(state, legal),
+    rest: snapshotRest(state, legal),
+    kindling: snapshotKindling(state),
     quests: state.quests
       ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))
       : null,

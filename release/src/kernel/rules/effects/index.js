@@ -5,7 +5,7 @@
 // no Date, no Math.random, no I/O, no input mutation. Importing this module registers
 // every handler exactly once; the architecture gate checks the purity of all of them.
 import { registerEffect, damageEnemy, addStatus, addPower, loseHp } from '../vocabulary.js';
-import { instantiate } from '../card-instance.js';
+import { drawIntoHand } from '../draw.js';
 
 /** Bloodletting: pay 3 HP, gain 2 energy. */
 registerEffect('bloodletting', (state, _ctx, _params) => {
@@ -63,36 +63,15 @@ registerEffect('limit_break', (state, _ctx, _params) => {
 /** Offering: pay 6 HP, gain 2 energy, draw 3. */
 registerEffect('offering', (state, ctx, _params) => {
   const player = { ...loseHp(state.player, 6), energy: state.player.energy + 2 };
-  let next = { ...state, player };
-  const drawn = [];
-  let reshuffles = 0;
-  for (let i = 0; i < 3; i += 1) {
-    if (next.combat.draw.length === 0) {
-      if (next.combat.discard.length === 0) break;
-      const shuffled = ctx.rng.shuffle(next.combat.discard);
-      reshuffles += 1;
-      next = { ...next, rngDraws: next.rngDraws + shuffled.draws, combat: { ...next.combat, draw: shuffled.items, discard: [] } };
-    }
-    // The hand copy must carry `cost`, or the tile renders "undefined" and is unusable.
-    const head = instantiate(next.combat.draw[0]);
-    const room = next.combat.hand.length < 10;
-    drawn.push(head);
-    next = {
-      ...next,
-      combat: {
-        ...next.combat,
-        draw: next.combat.draw.slice(1),
-        hand: room ? [...next.combat.hand, head] : next.combat.hand,
-        discard: room ? next.combat.discard : [...next.combat.discard, head],
-      },
-    };
-  }
+  // Same ctx.rng-bound shuffle as the `draw` verb (see rules/draw.js): the stream
+  // semantics of the old inline loop are preserved exactly.
+  const out = drawIntoHand({ ...state, player }, 3, (_s, items) => ctx.rng.shuffle(items));
   return {
-    state: next,
+    state: out.state,
     events: [
       { t: 'self_damage', amount: 6 },
       { t: 'energy', amount: 2 },
-      { t: 'draw', count: drawn.length, uids: drawn.map((c) => c.uid), reshuffles },
+      { t: 'draw', count: out.drawn.length, uids: out.drawn.map((c) => c.uid), reshuffles: out.reshuffles },
     ],
   };
 });

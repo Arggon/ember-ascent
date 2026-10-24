@@ -1,9 +1,14 @@
 // TEMP probe: what would an improved cls: extractor surface as missing? Deleted after Item 1.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const appSrc = readFileSync(join(ROOT, 'src/web/app.js'), 'utf8');
+// The surface is split into sibling ES modules: the cls: expressions the single-file
+// app.js used to hold now live across src/web/*.js (app.js itself is only the boot).
+// Concatenate them in name order; the reported line numbers are of that concatenation.
+const WEB = join(ROOT, 'src/web');
+const appSrc = readdirSync(WEB).filter((f) => f.endsWith('.js')).sort()
+  .map((f) => readFileSync(join(WEB, f), 'utf8')).join('\n');
 const cssSrc = readFileSync(join(ROOT, 'src/web/style.css'), 'utf8');
 
 // The cls VALUE: from just after `cls:` up to the first bracket at depth 0 (the `}` that

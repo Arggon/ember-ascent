@@ -11,7 +11,44 @@
  * carries a silhouette plus its type word.
  *
  * Layout target: comfortable at ~1280px, tolerable down to 800px, no overflow when
- * narrow (the hand and the map wrap rather than scroll sideways).
+ *   narrow (the hand and the map wrap rather than scroll sideways).
+ *
+ * ============================================================================
+ * SECTION ORDER — the order below is LOAD-BEARING, not cosmetic.
+ *
+ * The class vocabulary (what app.js emits) is a runtime contract owned by app.js;
+ * this file styles those names and never renames them. Where two rules share a
+ * selector, the LATER one wins; the file is therefore stratified so each layer only
+ * has to know about the ones above it:
+ *
+ *   §1  Tokens            :root palette, type/spacing scales, motion, fonts.
+ *   §2  Base surface      page frame, HUD, stage pages, enemy cards, intents,
+ *                         hand + card tiles, buttons, map, reward/rest/end panels,
+ *                         toast, live region.
+ *   §3  Motion library    shared @keyframes + micro-feedback classes (flashes).
+ *   §4  Targeting step    legal-target / aimed / pending-card cues.
+ *   §5  Help modal        sheet, glossary.
+ *   §6  FX plumbing       #fx-layer, juice beats, P3 run beats, every per-card fx
+ *                         mark (poses live with the combat stage in §9).
+ *   §7  Responsive tiers  phone / landscape-phone / tablet / laptop overrides.
+ *   §8  UX rev 3          late base-layer additions (hud-step, reward hand, pins).
+ *   §9  Combat stage      layout + figures; the @media screen THEME layers (ember
+ *                         palette, then woodcut prototype, then art phase 2) sit
+ *                         just above it and override §2 by source order.
+ *   §10 Late features     tempers, quests, hero select, mines, hand legibility,
+ *                         run ledger — each self-contained, appended in delivery
+ *                         order with its own banner.
+ *
+ * Two hard rules for anyone editing this file:
+ *   - Never move a rule across one of the @media screen theme boundaries in §9: the
+ *     themes override §2 by source order at equal specificity, so a relocation
+ *     silently changes the computed page.
+ *   - Responsive blocks in §7 that overlap (e.g. max-width:620px vs the later
+ *     min-width:381px + max-width:620px pair) also resolve by order — keep new
+ *     viewport rules in the tier they belong to, after the rules they narrow.
+ *
+ * scripts/check-surface-art.mjs gates this file: every class app.js emits must have
+ * a rule, top-level selectors stay unique, braces balance, no external assets.
  */
 
 :root {
@@ -60,6 +97,12 @@
   --radius: 10px;
   --radius-lg: 14px;
 
+  /* Two composite values used verbatim in more than one place, tokenised so a change
+     stays one edit: the sunken well behind HUD stats (also the resting state the
+     flash keyframes return to), and the raised-panel gradient. */
+  --stat-well: rgba(0, 0, 0, 0.28);
+  --well-grad: linear-gradient(180deg, var(--raised) 0%, #10151f 100%);
+
   --shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 14px 30px rgba(0, 0, 0, 0.55);
 
@@ -73,6 +116,8 @@
 }
 
 * { box-sizing: border-box; }
+
+/* ============================================================ §2 · BASE SURFACE == */
 
 html, body {
   margin: 0;
@@ -106,24 +151,20 @@ html, body {
 
 #hud {
   display: flex;
+  /* Truncation artifact repaired in place: this rule once ended in a declarations
+     line with no terminating semicolons, and the values below are the ones the
+     accident left live (gap 4px 6px, padding 5px 8px, min-height 52px). They are
+     folded in at their winning values; `column-gap: 8px` stays out on purpose — the
+     `gap` shorthand sets both axes, so it changed nothing. */
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-2) var(--sp-3);
-  padding: 10px 14px;
-  background: linear-gradient(180deg, var(--raised) 0%, #10151f 100%);
+  gap: 4px 6px;
+  padding: 5px 8px;
+  min-height: 52px;
+  background: var(--well-grad);
   border: 1px solid var(--edge);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  /* Truncation artifact repaired. This was `column-gap: 8px` with no terminating
-     semicolon, so the parser read `column-gap: 8px flex-wrap: wrap;` as ONE invalid
-     declaration and dropped it, then took the rest of the next line as #hud's own: the
-     tighter gap / padding / min-height are live today only by that accident.
-     `column-gap: 8px` is deliberately NOT reinstated. It was a leftover from a bad merge,
-     and it would have changed nothing anyway: the `gap` shorthand below sets both axes, so
-     `gap: 4px 6px` overrides a column-gap of 8px. Today's computed #hud is already
-     `gap: 4px 6px`, `min-height: 52px`, `flex-wrap: wrap`, and this repair leaves it
-     byte-identical on screen. */
-  flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; min-height: 52px;
 }
 
 .hud-char {
@@ -135,34 +176,27 @@ html, body {
 .stat {
   flex: 0 0 auto;
   white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid transparent;
-  background: rgba(0, 0, 0, 0.28);
-  /* Second instance of the same truncation artifact (found by scripts/dev/css-parse-probe.mjs
-     once the #hud one above was repaired). Same shape: `font-size: var(--fs-2)` with no
-     terminating semicolon, followed by a line of declarations, so the parser dropped
-     `font-size: var(--fs-2) display: inline-flex;` and read the rest as .stat's own. Repair
-     is the single missing semicolon, which restores SOURCE ORDER and therefore the exact
-     cascade these declarations already produced by accident: the later `font-size: var(--fs-3)`
-     still wins, so .stat renders at 13.5px before and after. */
-  font-size: var(--fs-2);
-  display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; font-size: var(--fs-3); font-weight: 800;
+  /* Same repair family as #hud: the missing-semicolon accident left the pill at
+     --fs-3 / weight 800 / gap 4px / padding 4px 8px, and those winning values are
+     folded in here directly. */
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-weight: 800;
+  font-size: var(--fs-3);
+  background: var(--stat-well);
 }
-.stat .glyph { font-size: 0.95em; opacity: 0.9;
-  font-size: 1rem; line-height: 1;
-}
+.stat .glyph { font-size: 1rem; line-height: 1; opacity: 0.9; }
 .stat.hp { color: var(--hp); border-color: rgba(226, 80, 76, 0.35); }
 .stat.energy { color: var(--gold); border-color: rgba(245, 197, 66, 0.34); }
-.stat.block { color: var(--block); border-color: rgba(95, 168, 220, 0.34); 
+.stat.block { color: var(--block); border-color: rgba(95, 168, 220, 0.34);
   background: none
 }
-.stat.dim { color: var(--faint); font-weight: 500; border-color: transparent; background: none; padding-left: 0; 
+.stat.dim { color: var(--faint); font-weight: 500; border-color: transparent; background: none; padding-left: 0;
   display: none
 }
 
@@ -309,39 +343,14 @@ html, body {
   overflow: hidden;
 }
 
-/* Portrait plate: a lit alcove behind the silhouette. No image file — a gradient. */
-.e-art {
-  height: 104px;
-  margin: calc(-1 * var(--sp-3)) calc(-1 * 14px) var(--sp-2);
-  display: grid;
-  place-items: center;
-  background:
-    radial-gradient(120px 80px at 50% 108%, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0) 70%),
-    linear-gradient(180deg, #100d17 0%, #1b1524 100%);
-  border-bottom: 1px solid #32263a;
-}
-.e-silhouette {
-  width: 92px;
-  height: 92px;
-  color: var(--dim);
-  /* Silhouette reads as a shape, not a coloured icon: dark fill, tinted rim light. */
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
-}
-.e-silhouette svg { display: block; width: 100%; height: 100%; }
-.e-silhouette .sl { fill: #07090e; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
-.e-silhouette .dot { fill: currentColor; opacity: 0.85; }
-
-/* Per-enemy rim tint, keyed off the display name in app.js. Purely decorative. */
-.enemy.eh-0 .e-silhouette { color: #8fb6d6; }
-.enemy.eh-1 .e-silhouette { color: #d97a70; }
-.enemy.eh-2 .e-silhouette { color: #b98fe0; }
-.enemy.eh-3 .e-silhouette { color: #8fa9a0; }
-.enemy.eh-4 .e-silhouette { color: #e0b45f; }
+/* Per-enemy rim hue classes (app.js emits `enemy eh-<hue 0..4>`). The illustrated-
+   sprite redesign removed the silhouette plate these used to tint, so they carry no
+   declaration today — the classes stay NAMED here because the emitted vocabulary is
+   a contract (check-surface-art verifies every emitted class has a rule); give one
+   a purpose again by declaring it on .enemy itself. */
+.enemy.eh-0, .enemy.eh-1, .enemy.eh-2, .enemy.eh-3, .enemy.eh-4 { /* intentionally empty */ }
 .enemy.e-boss { border-color: #6b2f3a; }
-.enemy.e-boss .e-silhouette { color: #e2504c; }
-.enemy.e-boss .e-art { border-bottom-color: #4a2028; }
 .enemy.e-elite { border-color: #4a3560; }
-.enemy.e-elite .e-silhouette { color: #c9a0ee; }
 
 .enemy .ename { font-weight: 800; font-size: var(--fs-4); letter-spacing: 0.01em; }
 .enemy .ehp {
@@ -383,7 +392,8 @@ html, body {
 
 /* ---------- Intent banner ----------
    Four visually distinct treatments. Each carries a glyph AND a label, so the kind is
-   never communicated by colour alone. */
+   never communicated by colour alone. (The telegraph itself is the scaled
+   `.intent-badge` token on the combat stage; this banner is the sentence row.) */
 
 .e-intent {
   margin-top: 10px;
@@ -398,18 +408,7 @@ html, body {
   gap: var(--sp-2);
   text-align: left;
 }
-.e-intent .intent-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .e-intent .ilabel { font-size: var(--fs-4); line-height: 1.15; }
-.e-intent .isub {
-  display: block;
-  font-size: var(--fs-1);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--faint);
-  font-weight: 800;
-}
-.intent-glyph { flex: 0 0 auto; width: 40px; height: 30px; }
-.intent-glyph svg { display: block; width: 100%; height: 100%; }
 
 /* attack — a wide crimson strike bar, the number pushed large */
 .e-intent.kind-attack {
@@ -418,8 +417,6 @@ html, body {
   border-left: 4px solid var(--hp);
 }
 .e-intent.kind-attack .ilabel { color: #ffb3a6; font-size: var(--fs-5); letter-spacing: 0.01em; }
-.e-intent.kind-attack .intent-glyph { color: var(--hp); }
-.e-intent.kind-attack .intent-glyph .strike { stroke: var(--hp); }
 
 /* block — steel, shield-shaped, calm */
 .e-intent.kind-block {
@@ -427,7 +424,6 @@ html, body {
   border-color: #2c5570;
 }
 .e-intent.kind-block .ilabel { color: #bfe0f7; }
-.e-intent.kind-block .intent-glyph { color: var(--block); }
 
 /* buff — upward gold chevrons */
 .e-intent.kind-buff {
@@ -435,7 +431,6 @@ html, body {
   border-color: #6a5a22;
 }
 .e-intent.kind-buff .ilabel { color: #ffe0a0; }
-.e-intent.kind-buff .intent-glyph { color: var(--gold); }
 
 /* debuff — downward violet */
 .e-intent.kind-debuff {
@@ -443,11 +438,6 @@ html, body {
   border-color: #4d3a68;
 }
 .e-intent.kind-debuff .ilabel { color: #d8c2f2; }
-.e-intent.kind-debuff .intent-glyph { color: var(--power); }
-
-.e-intent .chev { stroke: currentColor; stroke-width: 6; fill: none; stroke-linecap: round; }
-.e-intent .flw { stroke: currentColor; stroke-width: 2.5; fill: none; opacity: 0.7; }
-.e-intent .shld { fill: rgba(0, 0, 0, 0.35); stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
 
 /* ---------- Hand (card tiles) ---------- */
 
@@ -595,11 +585,6 @@ html, body {
   opacity: 0.34;
 }
 .card .c-art svg { width: 100%; height: 100%; display: block; }
-.card .c-art .m { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
-.card .c-art .mf { fill: currentColor; opacity: 0.14; stroke: none; }
-.card .c-art.p1 { opacity: 0.30; transform: scale(0.68) rotate(-9deg); }
-.card .c-art.p2 { opacity: 0.40; transform: rotate(7deg); }
-.card .c-art.p3 { opacity: 0.34; transform: scale(1.14); }
 
 /* Type mark: promoted from a 15px hint to a 52px outlined watermark inside the head plate. */
 .card .c-type-mark { width: 38px; height: 38px; opacity: 0.9; }
@@ -691,12 +676,8 @@ html, body {
     linear-gradient(45deg, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0) 45%);
   pointer-events: none;
 }
-/* Duplicate of the .cost-gem::after rule above; merged to keep one
-   declaration for this selector. Original second block retained for reference:
-   .cost-gem::after {
-     background: linear-gradient(300deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 55%);
-   }
-*/
+/* (An older second `.cost-gem::after` block existed only to re-declare the gradient;
+   the two pseudos now share the one rule above.) */
 
 .card.is-unplayable .cost-gem { filter: grayscale(0.72) brightness(0.66); }
 
@@ -793,26 +774,31 @@ html, body {
    Rows are drawn as a connected trail: a spine per row, a dimmed state behind you,
    a lit state for what you can reach, and a clearly marked "you are here". */
 
+/* Folded repair, same family as #hud: each of the next four blocks once carried a
+   dangling no-semicolon line; the values below are the ones that accident left
+   winning (grid rows at 8px gaps, the node as a compact 3-column grid). */
 .map {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--sp-4);
-  padding: var(--sp-3) 0;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
   margin: 0 auto;
   max-width: 620px;
-  gap: var(--sp-2); padding: var(--sp-2) 0;
 }
 .map-row {
   position: relative;
-  display: flex;
-  gap: 44px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 330px;
+  margin: 0 auto;
   align-items: center;
+  /* flex-era declarations kept on purpose: the world-map layer re-flips this row to
+     display:flex and leans on them (see `.page-map .map-row` in §9). */
   justify-content: center;
   flex-wrap: wrap;
   padding: 2px 0;
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px; max-width: 330px; margin: 0 auto; align-items: center;
 }
 .map-floor-label {
   position: absolute;
@@ -841,33 +827,33 @@ html, body {
 .node {
   position: relative;
   font-family: inherit;
-  min-width: 104px;
-  min-height: 74px;
-  padding: var(--sp-2) 10px 7px;
-  border-radius: var(--radius);
-  background: linear-gradient(180deg, #151b27, #0f131c);
-  border: 2px solid var(--edge);
   color: var(--faint);
   font-weight: 700;
   cursor: default;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
   /* Already-travelled and unreachable nodes are visibly inert. */
   opacity: 0.55;
-  display: grid; grid-template-columns: 26px minmax(0, 1fr) 16px; align-items: center;
-    gap: 6px; text-align: left; min-height: 44px; min-width: 0; padding: 4px 8px; border-radius: 8px;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+  min-height: 44px;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #151b27, #0f131c);
+  border: 2px solid var(--edge);
+  /* Column-era declarations kept: the world-map layer re-flips this node to a flex
+     pill and reuses them (see `.page-map .node` in §9). */
+  flex-direction: column;
 }
 .node.available {
-  animation: pulse 2.2s ease-in-out infinite;
   cursor: pointer;
   opacity: 1;
   color: var(--ink);
   border-color: var(--gold);
   background: linear-gradient(180deg, #2a2438, #1b2030);
-  box-shadow: 0 0 0 3px rgba(245, 197, 66, 0.16), var(--shadow);
-  animation: none; box-shadow: 0 0 0 2px rgba(245, 197, 66, 0.22), var(--shadow);
+  box-shadow: 0 0 0 2px rgba(245, 197, 66, 0.22), var(--shadow);
 }
 .node.available:hover { filter: brightness(1.14); transform: translateY(-3px); }
 .node.available:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
@@ -878,17 +864,16 @@ html, body {
   box-shadow: 0 0 0 3px rgba(95, 168, 220, 0.22);
   border-left: 3px solid var(--block);
 }
-.node .ntype { display: block; font-size: var(--fs-3); letter-spacing: 0.01em;
-  display: none;
-}
+.node .ntype { display: none; font-size: var(--fs-3); letter-spacing: 0.01em; }
 .node .nsub {
   display: block;
   font-size: var(--fs-1);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--faint);
   font-weight: 800;
-  grid-column: 2; font-size: var(--fs-1); letter-spacing: 0.06em; text-align: left;
+  grid-column: 2;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
 }
 
 /* Per-type silhouettes: a shape per node kind, so the map is readable at a glance. */
@@ -909,28 +894,30 @@ html, body {
 
 /* ---------- Reward / rest / end screens ---------- */
 
+/* Folded repair: a dangling-semicolon line re-declared the hue-tinted background and
+   border over the plain ones; the layered values below are the ones that won. */
 .panel {
-  background: linear-gradient(180deg, var(--raised) 0%, #10151f 100%);
-  border: 1px solid var(--edge);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-hue) 9%, transparent) 0%, rgba(0, 0, 0, 0) 36%),
+    var(--well-grad);
+  border: 1px solid color-mix(in srgb, var(--panel-hue) 30%, var(--edge));
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: var(--sp-4) 20px;
   max-width: 760px;
   margin: 0 auto;
   text-align: center;
-  position: relative; overflow: hidden; --panel-hue: var(--edge);
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--panel-hue) 9%, transparent) 0%, rgba(0, 0, 0, 0) 36%),
-      linear-gradient(180deg, var(--raised) 0%, #10151f 100%);
-    border: 1px solid color-mix(in srgb, var(--panel-hue) 30%, var(--edge));
+  position: relative;
+  overflow: hidden;
+  --panel-hue: var(--edge);
 }
 
+/* Folded repair: the second font-size (--fs-6) is the one that won. */
 .big-title {
   padding: 8px 10px 6px;
   border-radius: var(--radius-lg);
   border-bottom: 1px solid color-mix(in srgb, var(--panel-hue) 30%, transparent);
   background: linear-gradient(180deg, color-mix(in srgb, var(--panel-hue) 16%, transparent), transparent);
-  font-size: var(--fs-5);
   font-size: var(--fs-6);
   font-weight: 900;
   letter-spacing: 0.03em;
@@ -982,18 +969,18 @@ html, body {
   line-height: 1.5;
 }
 
-/* Victory / defeat sigil: a struck medallion, CSS only. */
+/* Victory / defeat sigil: a struck medallion, CSS only.
+   Folded repair: the trailing size/border/opacity lines are the winning values. */
 .demon {
   animation: sigil-in 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) both;
-  width: 96px;
-  height: 96px;
   margin: 0 auto;
   display: grid;
   place-items: center;
   border-radius: 50%;
   position: relative;
   color: var(--win);
-  width: 108px; height: 108px;
+  width: 108px;
+  height: 108px;
 }
 .demon::before {
   content: "";
@@ -1001,10 +988,9 @@ html, body {
   inset: 0;
   border-radius: 50%;
   border: 2px solid currentColor;
-  opacity: 0.5;
-  box-shadow: inset 0 0 26px rgba(255, 255, 255, 0.12);
-  border-width: 3px; opacity: 0.75;
-    box-shadow: inset 0 -10px 22px rgba(0, 0, 0, 0.55), inset 0 6px 16px rgba(255, 255, 255, 0.18);
+  border-width: 3px;
+  opacity: 0.75;
+  box-shadow: inset 0 -10px 22px rgba(0, 0, 0, 0.55), inset 0 6px 16px rgba(255, 255, 255, 0.18);
 }
 .demon .demon-glyph { width: 52px; height: 52px; }
 .demon .demon-glyph svg { display: block; width: 100%; height: 100%; }
@@ -1035,15 +1021,19 @@ html, body {
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
 #toast.info { background: #17222b; border-color: #2f4a5a; color: #cfe8f5; }
 
-/* A brief flash on a value that just changed, so a click has visible feedback. */
-@keyframes flash-up { from { background: rgba(245, 197, 66, 0.4); } to { background: rgba(0, 0, 0, 0.28); } }
-@keyframes flash-hit { from { background: rgba(226, 80, 76, 0.45); } to { background: rgba(0, 0, 0, 0.28); } }
-@keyframes flash-block { from { background: rgba(95, 168, 220, 0.45); } to { background: rgba(0, 0, 0, 0.28); } }
+/* ============================================================ §3 · MOTION LIBRARY ==
+   Shared keyframes and the micro-feedback classes that point at them. */
+
+/* A brief flash on a value that just changed, so a click has visible feedback.
+   Each flash returns to the stat pill's own resting well (--stat-well). */
+@keyframes flash-up { from { background: rgba(245, 197, 66, 0.4); } to { background: var(--stat-well); } }
+@keyframes flash-hit { from { background: rgba(226, 80, 76, 0.45); } to { background: var(--stat-well); } }
+@keyframes flash-block { from { background: rgba(95, 168, 220, 0.45); } to { background: var(--stat-well); } }
 @keyframes fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(245, 197, 66, 0.18), var(--shadow); }
-  50% { box-shadow: 0 0 0 8px rgba(245, 197, 66, 0.05), var(--shadow); }
-}
+/* (`@keyframes pulse` was deleted with the only declaration that named it: the base
+   `.node.available` rule carried `animation: pulse ...` and then `animation: none`
+   on its own next line, so the pulse never ran. The world-map layer styles the
+   reachable node statically instead.) */
 @keyframes settle {
   0% { opacity: 0; transform: scale(0.86); }
   62% { opacity: 1; transform: scale(1.03); }
@@ -1095,7 +1085,8 @@ html, body {
 [class*='stat-jolt'] { animation: juice-jolt 0.4s ease-out both; }
 .enemy[class*='damaged-'] { animation: hit-flash 0.34s ease-out both; }
 
-/* ---------- Targeting: choosing which enemy a card hits ---------- */
+/* ========================================================== §4 · TARGETING STEP ===
+   Choosing which enemy a card hits. */
 
 /* The live region is spoken, never seen. Clipped rather than hidden, because
    display:none would take it out of the accessibility tree and silence it. */
@@ -1134,11 +1125,6 @@ html, body {
 .enemy.aimed {
   border-color: var(--ink);
   box-shadow: var(--shadow-lg), 0 0 0 3px var(--ink) inset;
-}
-.enemy.aimed .e-art {
-  background:
-    radial-gradient(120px 80px at 50% 108%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 70%),
-    linear-gradient(180deg, #171226 0%, #241a33 100%);
 }
 
 /* The living-enemy slot number, ringed. This is the digit the action id carries and the
@@ -1218,7 +1204,30 @@ html, body {
   letter-spacing: 0.01em;
 }
 
-/* ---------- Narrower viewports ---------- */
+/* The cancel affordance shown while a card is awaiting a target. Emitted by app.js as
+   `.cancel-target`; without a rule the button would ship invisible. */
+.cancel-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-2, 0.78rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink, #eef1f8);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed var(--line-hover, var(--dim, #98a2bd));
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.cancel-target:hover { background: rgba(255, 255, 255, 0.12); }
+.cancel-target:focus-visible { outline: 2px solid var(--gold, #f5c542); outline-offset: 2px; }
+
+/* ============================================ §7 · RESPONSITIVE TIERS (early pass) ==
+   The three small width tiers below are the oldest degradation pass; the deliberate
+   phone / landscape-phone / tablet / laptop tiers live further down (see "MOBILE /
+   TOUCH LAYOUT"), where they must stay LATER in the file — they override several of
+   these values at the same specificity, so the order is part of the behaviour. */
 
 @media (max-width: 900px) {
   #app { padding: var(--sp-2) 10px var(--sp-4); }
@@ -1259,24 +1268,7 @@ html, body {
   .big-title { font-size: var(--fs-5); }
 }
 
-/* The cancel affordance shown while a card is awaiting a target. Emitted by app.js as
-   `.cancel-target`; without a rule the button would ship invisible. */
-.cancel-target {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-2, 0.78rem);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--ink, #eef1f8);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px dashed var(--line-hover, var(--dim, #98a2bd));
-  border-radius: 999px;
-  padding: 4px 12px;
-  cursor: pointer;
-}
-.cancel-target:hover { background: rgba(255, 255, 255, 0.12); }
-.cancel-target:focus-visible { outline: 2px solid var(--gold, #f5c542); outline-offset: 2px; }
+/* ============================================================ §5 · HELP MODAL ==== */
 
 /* ------------------------------------------------------------------ help modal -- */
 
@@ -1309,13 +1301,15 @@ html, body {
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65);
 }
 /* `min-height: 0` is what lets a flex child actually shrink and scroll instead of forcing
-   its parent to grow. */
+   its parent to grow. (Folded repair: the dangling line below once re-declared the
+   overscroll and added the gutter + glossary counter — those are the winning values.) */
 .modal-scroll {
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
   display: block;
-  scrollbar-gutter: stable; overscroll-behavior: contain; counter-reset: ht;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  counter-reset: ht;
 }
 .modal-foot {
   flex: 0 0 auto;
@@ -1324,15 +1318,18 @@ html, body {
   padding-top: var(--sp-3);
   margin-top: var(--sp-2);
   border-top: 1px solid var(--edge);
-  border-top: 1px solid var(--edge); box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.45);
 }
 .modal h2 {
   margin: 0 0 var(--sp-3);
   font-size: var(--fs-5);
   font-weight: 800;
   letter-spacing: 0.01em;
-  position: sticky; top: 0; z-index: 2; padding: 4px 0 8px;
-    background: linear-gradient(180deg, var(--raised) 70%, rgba(20, 26, 38, 0));
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 4px 0 8px;
+  background: linear-gradient(180deg, var(--raised) 70%, rgba(20, 26, 38, 0));
 }
 .modal h2.mt { margin-top: 22px; }
 
@@ -1343,9 +1340,8 @@ html, body {
   counter-increment: ht;
 }
 .help-topic .ht-title { font-weight: 800; font-size: var(--fs-3); }
-.help-topic .ht-body { color: var(--dim); font-size: var(--fs-3); line-height: 1.45; margin-top: 2px;
-  font-size: var(--fs-2); line-height: 1.35;
-}
+/* Folded repair: the second size/leading pair is the winning one. */
+.help-topic .ht-body { color: var(--dim); font-size: var(--fs-2); line-height: 1.35; margin-top: 2px; }
 
 .gl-section {
   margin: var(--sp-4) 0 2px;
@@ -1396,7 +1392,7 @@ html, body {
   .gl-meaning { font-size: var(--fs-2); }
 }
 
-/* ================================================================== JUICE ========== --
+/* ============================================================ §6 · FX PLUMBING =====
    The visual-effects layer.
 
    WHY THIS EXISTS: `render()` calls `stageEl.replaceChildren()` after every action, so
@@ -1485,7 +1481,6 @@ html, body {
 .efloat-g1 { font-size: 1.7rem; color: #ffb4ae; }
 .efloat-g2 { font-size: 2.3rem; color: #ff8078; }
 .efloat-g3 { font-size: 3rem; color: #ffe08a; }
-.efloat-heal { color: #8fe3a6; }
 .efloat-block { color: var(--block); }
 /* A hit fully absorbed by block says so in words. It never prints a 0, which would
    contradict a bar that did not move. */
@@ -2091,11 +2086,9 @@ html, body {
      pushed onto one of their own. Both buttons keep their keyboard equivalents (? and n). */
   .spacer { display: none; }
 
-  /* --- Enemies: side by side, art plate shrunk, all decision-critical lines kept --- */
+  /* --- Enemies: side by side, all decision-critical lines kept --- */
   .enemies { flex-wrap: nowrap; gap: 8px; padding: 0; }
   .enemy { flex: 1 1 0; min-width: 0; max-width: none; padding: 6px 7px; border-radius: var(--radius); }
-  .e-art { height: 34px; margin: -6px -7px 5px; }
-  .e-silhouette { width: 30px; height: 30px; }
   .enemy .ename { font-size: var(--fs-3); line-height: 1.15; }
   .enemy .ehp { font-size: var(--fs-2); margin: 1px 0; }
   .hpbar { height: 7px; margin: 3px 0; }
@@ -2106,8 +2099,6 @@ html, body {
      it is the LAST thing reduced and it is never hidden. */
   .e-intent .ilabel { font-size: var(--fs-3); }
   .e-intent.kind-attack .ilabel { font-size: var(--fs-4); }
-  .e-intent .isub { font-size: var(--fs-1); letter-spacing: 0.08em; }
-  .intent-glyph { width: 24px; height: 18px; }
   .target-index { width: 24px; height: 24px; font-size: var(--fs-2); }
   .target-mark { font-size: 1.1rem; }
 
@@ -2205,41 +2196,31 @@ html, body {
   .stage-combat > .section-title:first-child { display: none; }
   .section-title { margin: 0 0 2px; }
   #hud { padding: 4px 8px; }
-  /* Width is plentiful in landscape, so the five cards are allowed to be wider than the
-     92px the portrait row uses — but they still stay on ONE row. */
-  .card-wrap { max-width: 150px; }
-  .card { min-height: 0; padding: 8px 6px 4px; gap: 2px; }
-  .card .ctype { font-size: 0.6rem; letter-spacing: 0.02em; gap: 2px; }
+  /* The enemy row is capped so two enemies do not stretch into two enormous slabs just
+     because the screen is wide. */
+  .enemies { max-width: 620px; margin: 0 auto; }
+  /* Width is plentiful here (844px / 5 cards = ~168px each) and height is the scarce axis,
+     so the cards become WIDE AND SHORT. A 186px-tall card was eating half the screen and
+     still leaving the text at 10.8px — the wrong trade.
+     (Three successively-tighter `.card`/`.card-wrap` passes were folded into these two
+     rules at their final values; the Readability floor note survives below.) */
+  .card-wrap { min-height: 0 !important; max-width: 164px; flex: 1 1 0; }
+  .card { min-height: 0 !important; height: auto; padding: 7px 5px 3px; gap: 1px; }
+  .card .ctype { font-size: 0.6rem; letter-spacing: 0.02em; gap: 2px; padding: 6px 5px 4px; margin: -10px -8px 1px; }
+  .card .c-type-mark { width: 22px; height: 22px; }
   /* Readability floor: the effect sentence must stay legible. It was 0.62rem (9.9px), which
      is below a comfortable phone size; the height it costs is taken back from the decorative
      art plate and the paddings below, never from the text a player has to read. */
   .card .cname { font-size: 0.78rem; padding-left: 11px; }
-  .card .cdesc { font-size: 0.72rem; line-height: 1.12; }
+  .card .cdesc { font-size: 0.74rem; line-height: 1.1; }
   .cost-gem { width: 18px; height: 18px; top: -6px; left: -4px; }
   .cost-gem .gem-core { font-size: 0.66rem; }
-  /* The enemy row is capped so two enemies do not stretch into two enormous slabs just
-     because the screen is wide. */
-  .enemies { max-width: 620px; margin: 0 auto; }
-  .enemy { max-width: 300px; }
-  .e-art { display: none; }
-  /* Width is plentiful here (844px / 5 cards = ~168px each) and height is the scarce axis,
-     so the cards become WIDE AND SHORT. A 186px-tall card was eating half the screen and
-     still leaving the text at 10.8px — the wrong trade. */
-  .card { min-height: 0 !important; height: auto; padding: 6px 7px 4px; gap: 1px; }
-  .card-wrap { min-height: 0 !important; max-width: 164px; flex: 1 1 0; }
-  .card .cdesc { font-size: 0.74rem; line-height: 1.1; }
-  .card .cname { font-size: 0.78rem; }
-  .card .ctype { padding: 6px 5px 4px; margin: -10px -8px 1px; }
-  .card .c-type-mark { width: 22px; height: 22px; }
   .hand { align-items: flex-start; padding: 2px 0 0; }
+  .enemy { max-width: 300px; padding: 5px 7px 5px; gap: 1px; }
   .enemy .ename { font-size: var(--fs-2); }
-  .enemy { padding: 5px 7px 5px; gap: 1px; }
   .e-intent { margin-top: 2px; padding: 3px 6px; }
   .e-intent .ilabel, .e-intent.kind-attack .ilabel { font-size: var(--fs-2); }
-  .intent-glyph { width: 16px; height: 12px; }
   .hpbar { margin: 2px 0; height: 8px; }
-  .card-wrap { min-height: 0; }
-  .card { padding: 7px 5px 3px; }
   /* Only the instructional `.hint` line is dropped: it restates text the Help panel carries
      verbatim, and it costs two rows of a 390px-tall screen. Nothing reporting game state is
      removed — HP, energy, block, step, both pile counts, every intent and End Turn stay. */
@@ -2462,21 +2443,8 @@ html, body {
    margins AFTER the flex lengths, so no cell is ever squeezed below its content: this band can
    neither clip the enemy row nor push `.controls` or `.hint` out of the stage. */
 
-/* --- Tall phones: give the enemy its art plate back ------------------------------------
-   On phones the plate was cut to 34px (decorative, and the first thing to give up height).
-   When height is plentiful it is the cheapest way to make the table look like a table, and
-   it costs the decision-critical text nothing. The gate is 800px of height: the two 800px
-   viewports measured (360x640 at 640, and every 640-700px screen) never match it, and at
-   the gate the measured spare is already >= 144px against ~62px of growth — so the felt gap
-   stays a comfortable size instead of becoming a hole.
-   The plate is a fixed 80px here rather than a live function of viewport height: `height:
-   min(80px, 42%)` resolves the other way round on a short phone (the percentage wins) and
-   measured 87px on a 405px-tall art box, which is not what a tall-phone rule should do. */
-
-@media (max-width: 620px) and (min-height: 800px) {
-  .e-art { height: 96px; margin: -6px -7px 7px; }
-  .e-silhouette { width: 62px; height: 62px; }
-}
+/* --- Tall phones: the enemy figures are sprites now; the old art-plate sizing rule
+   for `.e-art`/`.e-silhouette` was pruned with them (see §2). --- */
 
 /* --- Tablet: five cards on ONE row that fills the width --------------------------------
    Measured: 5 x 150px + 4 x 12px gaps = 798px against 708px of hand width, so the row
@@ -2492,44 +2460,42 @@ html, body {
   .card-wrap { flex: 1 1 128px; min-width: 0; max-width: none; }
 }
 
-/* ================================================== UX REV 3 — surface redesign ==
+/* ================================================== §8 · UX REV 3 — surface redesign ==
    Designer spec (run a647794b). Implemented with duplicates MERGED into the original
    top-level rules rather than re-declared, so the art checker's duplicate rule stays
    meaningful: a re-declaration here would silently override the cascade and hide bugs.
-   New selectors introduced: .hud-step, .enemy::after, .e-head, .node-you, .panel::after.
-   Media blocks are kept whole; the checker does not count rules inside @media. */
+   Selectors introduced here: .hud-step, .node-you, .panel::after (the .e-head rule this
+   pass once added was pruned in the dead-rule sweep — nothing emits that class). */
 
+/* Folded repair (dangling-semicolon family): the mono row of declarations below is
+   what the accident left winning. */
 .hud-step {
   flex: 0 0 auto;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
   font-size: var(--fs-2);
   color: var(--faint);
-  padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--edge);
   background: rgba(255, 255, 255, 0.03);
-  white-space: nowrap;
-  display: inline-flex; align-items: center; gap: 3px; padding: 4px 7px; font-family: var(--mono);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 7px;
+  font-family: var(--mono);
 }
 
 #hud .pill { flex: 1 1 44px; min-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #hud .btn { font-size: var(--fs-2); font-weight: 700; padding: 6px 8px; min-height: 44px; }
 
-#hud .btn.new-run { display: none; }
-
-/* The five rules below were written by a run that was cut off mid-edit: each @media block
+/* The four rules below were written by a run that was cut off mid-edit: each @media block
    opened and never closed, so the parser swallowed everything after the first one. They are
    now closed, and this is exactly the defect the brace check in check-surface-art.mjs exists
-   to catch — five intended mobile rules (single-row HUD, compressed enemy head, the map
-   grid, the reward panel compression and the glossary fix) silently did not apply. */
+   to catch — four intended mobile rules (single-row HUD, the map grid, the reward panel
+   compression and the glossary fix) silently did not apply. */
 @media (max-width: 620px), (max-height: 480px) {
   #hud { flex-wrap: nowrap; gap: 4px; padding: 4px 6px; }
-}
-@media (max-width: 620px), (max-height: 480px) {
-  .e-head { margin: -6px -7px 0; padding: 4px 6px; }
 }
 @media (max-width: 620px), (max-height: 480px) {
   .map-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); align-items: center; column-gap: 10px; row-gap: 6px; }
@@ -2540,7 +2506,6 @@ html, body {
 @media (max-width: 620px), (max-height: 480px) {
   .help-topic { padding: 3px 0 3px 8px; margin-bottom: 5px; border-left-width: 2px; }
 }
-
 
 /* --- design rev 3 additions (selectors that did not previously exist) --- */
 .stat.hp .glyph { color: var(--hp); }
@@ -2593,7 +2558,14 @@ html, body {
   margin-bottom: 2px;
 }
 
-/* ==========================================================================================
+/* ============================================ §9 · COMBAT STAGE & THEME LAYERS ====
+   Three @media screen THEME layers follow (ember palette, then the forge-lit woodcut
+   prototype, then art phase 2), each later one overriding the last at equal
+   specificity, and all of them overriding §2 by source order — which is why they sit
+   here and not next to the rules they restyle. The combat-stage layout, figure and
+   pose rules come after them, keyed by §1--§2 classes plus `.stage-combat` /
+   `.page-combat` compounds.
+   ==========================================================================================
    EMBER THEME — art pass 2 (2026-10-16).
    Presentation only: colours, surfaces, borders, glows and CSS-painted fire. No sizing,
    spacing or layout values change here, so the frozen viewport contract
@@ -2696,31 +2668,14 @@ html, body {
   .stage-combat.sc-targeting > .section-title { color: var(--ember-hot); }
   .page-glyph { color: var(--ember-mid); }
 
-  /* ---------- Enemies: silhouettes standing in front of a fire ---------- */
+  /* ---------- Enemies: sprites standing in front of a fire ---------- */
   .enemy {
     background: linear-gradient(180deg, #22150f 0%, #150d09 100%);
     border-color: #4a2c1c;
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 150, 70, 0.12);
   }
-  .e-art {
-    background:
-      radial-gradient(70% 90% at 50% 100%, rgba(255, 110, 30, 0.42) 0%, rgba(163, 32, 15, 0.18) 45%, rgba(0, 0, 0, 0) 75%),
-      linear-gradient(180deg, #1a0f0a 0%, #2a150c 100%);
-    border-bottom-color: #4a2c1c;
-  }
-  .e-silhouette .sl { fill: #0a0604; }
-  .enemy.eh-0 .e-silhouette { color: #ffb070; }
-  .enemy.eh-1 .e-silhouette { color: #ff7f5c; }
-  .enemy.eh-2 .e-silhouette { color: #e3a6ff; }
-  .enemy.eh-3 .e-silhouette { color: #b6d29a; }
-  .enemy.eh-4 .e-silhouette { color: #ffd36b; }
   .enemy.e-elite { border-color: #6a3f86; }
   .enemy.e-boss { border-color: #a3200f; box-shadow: 0 0 0 1px rgba(255, 60, 30, 0.35), 0 0 30px rgba(255, 60, 20, 0.28), 0 10px 26px rgba(0, 0, 0, 0.6); }
-  .enemy.e-boss .e-art {
-    background:
-      radial-gradient(80% 100% at 50% 100%, rgba(255, 70, 20, 0.6) 0%, rgba(163, 32, 15, 0.3) 45%, rgba(0, 0, 0, 0) 80%),
-      linear-gradient(180deg, #1c0806 0%, #3a0f08 100%);
-  }
   .enemy .ehp { color: #ff8a6a; }
 
   /* Intents: an attack is a flare, block stays ice. */
@@ -2743,8 +2698,6 @@ html, body {
     border-color: var(--card-hue, #ff7a2f);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-hue, #ff7a2f) 50%, transparent), 0 0 24px color-mix(in srgb, var(--card-hue, #ff7a2f) 30%, transparent), 0 12px 26px rgba(0, 0, 0, 0.55);
   }
-  /* Legibility fix: the big background mark sat at 30-40% under the rules text. */
-  .card .c-art.p1, .card .c-art.p2, .card .c-art.p3 { opacity: 0.12; }
   .card .cname { color: var(--ink); }
   .card .cdesc { color: #f2e4d8; }
   .card .cost-gem {
@@ -2783,12 +2736,6 @@ html, body {
   .panel::after { border-color: rgba(255, 157, 58, 0.16); }
   .hand-index { background: var(--char); }
   .enemy.aimed { border-color: var(--ember-hot); box-shadow: 0 0 0 3px var(--ember-hot) inset, 0 0 28px rgba(255, 150, 50, 0.35), var(--shadow-lg); }
-  .enemy.aimed .e-art {
-    background:
-      radial-gradient(70% 100% at 50% 100%, rgba(255, 190, 90, 0.55) 0%, rgba(255, 90, 20, 0.25) 45%, rgba(0, 0, 0, 0) 80%),
-      linear-gradient(180deg, #1f120a 0%, #3a1a0b 100%);
-  }
-  .card .c-art.p1, .card .c-art.p2, .card .c-art.p3 { opacity: 0.08; }
   .fx-card { background: linear-gradient(180deg, #24170f 0%, #150d09 100%); border-color: var(--edge); }
 
   @media (prefers-reduced-motion: reduce) {
@@ -2819,7 +2766,7 @@ html, body {
   .enemy.e-boss .ename { font-family: var(--deco); }
 
   /* --- Type: Cinzel for names and chapter marks only; never body copy. --- */
-  .section-title, .page-num, .card .cname, .ename, .node .ntype, #hud .who, .reward h2, .end h2 {
+  .section-title, .page-num, .card .cname, .ename, .node .ntype {
     font-family: var(--display);
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -2848,24 +2795,12 @@ html, body {
     box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.16);
     opacity: 0.55;
   }
-  .card .c-art .m { stroke-width: 1.3; }
-  .card .c-art .mf { opacity: 0.3; }
   .card .cdesc { color: #f3e3d3; }
   .cost-gem { filter: drop-shadow(0 0 6px rgba(255, 120, 40, 0.55)); z-index: 4; }
 
-  /* --- Enemies: woodcut iron figures, rim-lit by the furnace, ember eyes. --- */
-  .e-silhouette { width: 96px; height: 96px; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)); }
-  .e-silhouette .b { fill: #0b0705; }
-  .e-silhouette .r { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-  .e-silhouette .g { fill: #ffcf6b; stroke: none; filter: drop-shadow(0 0 3px #ff7a2f); }
-  .e-silhouette .gc { fill: none; stroke: #ff7a2f; stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 2px #ff5a1f); }
-  .e-silhouette .gr { fill: none; stroke: rgba(255, 140, 60, 0.35); stroke-width: 1.5; }
-  .enemy.eh-0 .e-silhouette, .enemy.eh-1 .e-silhouette, .enemy.eh-2 .e-silhouette,
-  .enemy.eh-3 .e-silhouette, .enemy.eh-4 .e-silhouette { color: #d98a5c; }
-  .enemy.e-elite .e-silhouette { color: #e0a070; }
-  .enemy.e-boss .e-silhouette { color: #ff8a4a; width: 104px; height: 104px; }
-  .enemy:not(.is-dying) .e-silhouette svg { animation: ea-breathe 4.2s ease-in-out infinite; transform-origin: 50% 100%; }
-  @keyframes ea-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025, 1.035); } }
+  /* --- Enemies: woodcut iron figures, rim-lit by the furnace, ember eyes.
+         (The figure itself is an illustrated sprite — see `.fig .spr` in §9; the old
+         inline-SVG silhouette rules were pruned with the markup that emitted them.) --- */
 
   /* --- Map as a world: a ridge line and a lava river under the path, fog at the edges. --- */
   .page-map.panel {
@@ -2906,23 +2841,6 @@ html, body {
   .node .nsub { text-transform: none; letter-spacing: 0.02em; font-weight: 500; font-family: var(--text); }
   .node.available { border-color: var(--gold); background: rgba(40, 20, 10, 0.9); }
   .node.t-boss { border-color: #7a2414; }
-
-  /* --- Phone landscape (max-height 480): the portrait plate was display:none, so the
-         enemy read as a text box. Bring a 34px portrait back INSIDE the head plate's own
-         padding: absolute, so the card's height does not change. --- */
-  @media (max-height: 480px) {
-    .enemy .e-art {
-      display: block; position: absolute; top: 4px; left: 6px; width: 34px; height: 34px;
-      margin: 0; border: 1px solid #4a2c1c; border-radius: 6px; z-index: 3;
-    }
-    .enemy .e-art .e-silhouette { width: 32px; height: 32px; animation: none; }
-    .enemy .e-art .target-index, .enemy .e-art .target-mark { display: none; }
-    .enemy .e-head { padding-left: 36px; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .enemy .e-silhouette svg { animation: none; }
-  }
 }
 
 /* ==========================================================================================
@@ -3060,7 +2978,7 @@ html, body {
 }
 
 /* ==========================================================================================
-   COMBAT STAGE — presentation only.
+   COMBAT STAGE (§9, layout half) — presentation only.
    The fight is a foundry floor: hero left, enemies on a ground line, hand fanned in the
    dock. Selectors are compounds so they do not redeclare a top-level rule. Fan rotation
    is on `.card`, never on `.card-wrap`, so the hand stays one measured row.
@@ -3359,6 +3277,7 @@ html, body {
 .page-combat .pile-exh { color: var(--faint); font-size: 0.85rem; }
 
 .hitstop .fig,
+.hitstop .hero.is-approach,
 .hitstop .efloat,
 .hitstop .fx-card,
 .hitstop .card { animation-play-state: paused !important; }
@@ -3556,6 +3475,7 @@ html, body {
 }
 @media (prefers-reduced-motion: reduce) {
   .stage-combat .fig,
+  .stage-combat .hero.is-approach,
   .stage-combat .enemy.is-dying,
   .stage-combat .card { animation: none !important; }
   /* The frame layers are motion-only: statically they must never paint, or the hero
@@ -3868,6 +3788,23 @@ html, body {
   100% { transform: none; }
 }
 /* ==== LOTE 1 — mazo inicial y ataques básicos: one movement per card. ==== */
+/* MELEE APPROACH — a stroke that is not a throw or a cast closes the distance: the hero
+   steps INTO the aimed lane for the pose's middle third and steps back by its end, while
+   the pose's own keyframes play the swing on .fig inside. The distance is measured at
+   dispatch (fx.js, from the hero's shoulder to the aimed card) and arrives as
+   --approach-x; unset it degrades to no step, and the pose still plays in place. The
+   duration is the pose hold's own length (--approach-dur), so approach and swing land
+   together; the hit-stop beat pauses both via the .hitstop rule below. */
+.stage-combat .hero.is-approach {
+  animation: hero-approach var(--approach-dur, 480ms) cubic-bezier(0.45, 0, 0.4, 1) both;
+  will-change: transform;
+}
+@keyframes hero-approach {
+  0% { transform: translateX(0); }
+  35% { transform: translateX(var(--approach-x, 0px)); }
+  70% { transform: translateX(var(--approach-x, 0px)); }
+  100% { transform: translateX(0); }
+}
 /* HAMMERFALL (strike): the hammer rises, HOLDS a beat at the apex, then drops straight
    down in front of the hero — a vertical fall, not an arc. The windup frame holds the
    raised hammer, the strike frame lands the crash; dust and a crack open in the lane. */
@@ -6428,6 +6365,12 @@ html, body {
 /* Keywords in rules text: gold for game terms (tooltip = kernel glossary), ember red for costs. */
 .card .cdesc .kw { color: #f5c542; font-weight: 700; cursor: help; }
 .card .cdesc .kw-cost { color: #ff7a5a; cursor: default; }
+
+/* ======================================================= §10 · LATE FEATURES ======
+   Self-contained additions delivered after the stage froze (scene beats, map pins,
+   scene illustrations, kindling, tempers, quests, hero select, the mines biome,
+   combat-hand legibility, run ledger). Each keeps its own banner and its media
+   queries; they append in delivery order and only ever target their own selectors. */
 
 /* ---------- Scene transitions + act title card (fx layer, never intercepts input) ---------- */
 .fx-scene {

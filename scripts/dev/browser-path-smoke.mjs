@@ -1,5 +1,5 @@
 // Replicates what src/web/app.js does: controller -> snapshot -> dispatch
-const { createController } = await import('./src/surface/gui/controller.js');
+const { createController } = await import('../../src/surface/gui/controller.js');
 const ctl = createController({ run: { seed: 42 } });
 let steps = 0;
 while (steps < 600) {

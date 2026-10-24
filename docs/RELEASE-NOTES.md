@@ -16,7 +16,7 @@ climb a single act, fight what is in your way, and face one boss at the end.
 | | |
 |---|---|
 | **Acts** | 1 (eight rows: entry, fights, elites/rests, and a fixed boss row) |
-| **Cards** | **42** — 20 attack, 16 skill, 6 power |
+| **Cards** | **44** — 21 attack, 17 skill, 6 power *(counted in `src/kernel/content/cards.json` on 2026-10-24; the 2026-10-15 build shipped 42)* |
 | **Character** | 1 — the Ashwright, 60 max HP, plus one starting relic (Kindled Heart) |
 | **Enemies** | 6, across 9 encounters (4 weak, 3 strong, 1 elite, 1 boss) |
 | **Boss** | 1 — the Slag Warden |
@@ -122,19 +122,26 @@ From a clean checkout, on Node 24:
 node scripts/build-release.mjs
 ```
 
+> **REBUILT 2026-10-24 after the module refactor (`refactor/integration`).** The browser app is
+> no longer one monolithic `app.js`: it is decomposed into focused ES modules (`app.js` is now a
+> small entry importing the views, fx, targeting and runtime modules), and the build ships all of
+> them. The artifact below therefore has **85 files, not 25**. Every number in this section was
+> re-measured on 2026-10-24.
+
 This regenerates:
 
 - `release/` — the artifact directory, with `index.html` at its top level
 - `release.zip` — the exact file to upload to itch.io
 
 The build has **zero dependencies** (`node:fs`, `node:path`, `node:zlib`, `node:crypto`
-only) and is **byte-reproducible**: three consecutive runs produced the same zip SHA-256.
-Override the output location with `OUT=/some/dir node scripts/build-release.mjs`.
+only) and is **byte-reproducible**: two consecutive runs produced the same zip SHA-256.
+Override the output location with `OUT=/some/dir node scripts/build-release.mjs` (re-verified
+2026-10-24).
 
 To run the artifact locally:
 
 ```bash
-cd release && node scripts/serve.mjs
+cd release && node tools/serve.mjs
 # then open http://localhost:5173/
 ```
 
@@ -142,26 +149,39 @@ cd release && node scripts/serve.mjs
 
 | | |
 |---|---|
-| Files | **25** |
-| Total size | **361,806 bytes (353.3 KiB)** |
-| Zip size | **123,283 bytes (120.4 KiB)** |
-| Zip SHA-256 | `4a6621600c69f409aa83b2733dd9d0374fe591a2badceb45e5a830c6f48ed0db` |
-| Zip root | `index.html`, `app.js`, `style.css`, `tokens.js`, `HOW-TO-RUN-LOCALLY.txt`, `src/`, `scripts/` |
+| Files | **85** |
+| Total size | **3,071,476 bytes (2,999.5 KiB)** |
+| Zip size | **2,480,641 bytes (2,422.5 KiB)** |
+| Zip SHA-256 | `ed79756acf12eb6d15e549ab684623c2e97195d57d61dfa69fdad7df10a53a31` |
+| Zip root | `index.html`, the `src/web` ES modules (`app.js` entry + `actions`, `combat-view`, `map-view`, `reward-view`, `rest-view`, `kindling-view`, `end-view`, `fx`, `fx-signatures`, `targeting`, `runtime`, `hud`, `dom`, `glyphs`, `floats`, `run-history`, `render`, `hero-moves`, `card-art`, `stage-art`), `style.css`, `tokens.js`, `HOW-TO-RUN-LOCALLY.txt`, `assets/`, `fonts/`, `src/`, `tools/` |
 | External requests at runtime | **0** |
 
-The zip contains 25 entries, well inside itch.io's limits (1,000 files, 500 MB
-extracted, 240-character paths). These numbers are from the build of **2026-10-15**, which
-includes the screen-size layout fix; two consecutive runs produced the identical SHA-256 above.
+The zip contains 85 entries, well inside itch.io's limits (1,000 files, 500 MB
+extracted, 240-character paths — the longest path in this artifact is 34 characters). These
+numbers are from the build of **2026-10-24**, which includes the module refactor; two consecutive
+runs produced the identical SHA-256 above, and all **49** runtime `.js` modules in the artifact
+were re-verified serving `200` as `text/javascript` through the artifact's own `tools/serve.mjs`.
 
-One deliberate transformation to note: the build rewrites exactly one import path in `app.js`
-(`'../src/surface/gui/controller.js'` → `'./src/surface/gui/controller.js'`) because the file
-moves from `src/web/` to the zip root. That is why the `app.js` inside the zip is 84,797 bytes while
-`src/web/app.js` is 84,798 — the 1-byte difference is that path, and it is documented in
-`scripts/build-release.mjs`. It is not a stale-file problem.
+> **Rebuild note (2026-10-24).** Running `node scripts/build-release.mjs` from the current
+> sources produces a zip 11 bytes smaller (`5d7a6aa5dc7032c862b7e896c28ddcddb1b02199556c4405c1787212d9462375`):
+> three cross-reference comments in `src/` (`tests/golden/budget.test.js` → `tests/budget.test.js`)
+> were updated after this artifact was built. The bytes that differ are comments only. Re-run the
+> build before uploading if you want the artifact text fully in sync with `src/`.
+
+One deliberate transformation to note: the build rewrites the engine import specifiers of every
+flattened web module (`'../kernel/…'` / `'../surface/…'` → `'./src/kernel/…'` / `'./src/surface/…'`)
+because the modules move from `src/web/` to the zip root. Sources are never touched. (The
+pre-refactor note about a single rewritten path in an 84,798-byte `app.js` described the
+monolithic 2026-10-15 build; `app.js` is now a ~5.4 KB entry importing 18 focused modules.)
 
 ---
 
 ## A note on the card count
+
+> **Addendum 2026-10-24 (reconciled after the module refactor).** The shipped content now contains
+> **44 card definitions — 21 attack / 17 skill / 6 power** — verified by parsing
+> `src/kernel/content/cards.json` (`JSON.parse(...).length === 44`). The "42" below was true of the
+> 2026-10-16 build and the "40" was the planning target; the history is kept as written.
 
 Project documents written earlier describe this as a **"40-card"** vertical slice. The
 shipped content bundle actually contains **42 card definitions**. Both numbers are true
@@ -207,3 +227,11 @@ because a number with its limits stated is more useful than a flattering one.
 Mobile is supported: verified playable at 360x640, 390x844, 414x896 and 844x390 (landscape)
 with 44px touch targets and the hand on one row. Verified against the shipped artifact of
 2026-10-15 (zip SHA-256 `4a6621600c69f409aa83b2733dd9d0374fe591a2badceb45e5a830c6f48ed0db`).
+
+> **Addendum 2026-10-24 (module refactor).** The viewport harness was re-run against the
+> refactored build (`node scripts/dev/viewport-check.mjs`, seed 11): every base viewport passes,
+> and **six rows fail at 130% font scale** (`360x640@130`, `390x844@130`, `412x915@130` and their
+> `+hand10` variants — rules text cut off by the card/rules box, and the HUD hero name truncated
+> from 381px). The same six rows fail identically on `main`, so this is a **pre-existing
+> 130%-font issue, not a refactor regression** — but "mobile verified" above is only fully true
+> at the default font scale until those rows are fixed.

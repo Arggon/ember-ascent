@@ -9,7 +9,7 @@
 //
 // The pattern (fake DOM + `new Function` over a stripped app.js) is copied from
 // scripts/dev/render-reward.mjs, with a real selector engine so assertions mean something.
-import { readFileSync } from 'node:fs';
+import { bundleApp } from '../../tests/web/app-bundle.mjs';
 
 /* ------------------------------------------------------------------ a fake DOM */
 
@@ -37,10 +37,35 @@ class N {
       contains(c) { return list().includes(c); },
     };
   }
-  append(...c) { for (const x of c) if (x != null) this.kids.push(x) && (x.parent = this); }
+  // Non-object kids are raw text (dom.js keywordText appends strings): the real DOM
+  // wraps them as #text nodes — the walker below expects that shape.
+  append(...c) {
+    for (const x of c) if (x != null) {
+      if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); this.kids.push(t); continue; }
+      this.kids.push(x); x.parent = this;
+    }
+  }
+  // src/web grew these two after the module split (map-view.js, combat-view.js cardTile).
+  prepend(...c) {
+    for (const x of c) if (x != null) {
+      if (typeof x !== 'object') { const t = new N('#text'); t.txt = String(x); this.kids.unshift(t); continue; }
+      this.kids.unshift(x); x.parent = this;
+    }
+  }
+  insertBefore(node, ref) {
+    if (ref == null || !this.kids.includes(ref)) { this.kids.push(node); node.parent = this; return node; }
+    node.parent = this;
+    this.kids.splice(this.kids.indexOf(ref), 0, node);
+    return node;
+  }
   appendChild(c) { this.kids.push(c); c.parent = this; return c; }
   replaceChildren(...c) { this.kids = c.filter(Boolean); for (const k of this.kids) k.parent = this; }
+  // fx-add.js's cleanup timer takes effect nodes off the layer with node.remove().
+  remove() { if (this.parent) { const i = this.parent.kids.indexOf(this); if (i >= 0) this.parent.kids.splice(i, 1); this.parent = null; } }
   setAttribute(k, v) { this.a[k] = String(v); }
+  // src/web/fx.js throwLane() measures the card and hero boxes (new after the module
+  // split): answer with a zero box, as there is no layout in this host.
+  getBoundingClientRect() { return { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }; }
   getAttribute(k) { return this.a[k] ?? null; }
   addEventListener(t, f) { (this._h[t] || (this._h[t] = [])).push(f); }
   removeEventListener() {}
@@ -120,8 +145,12 @@ globalThis.URLSearchParams = URLSearchParams;
 /* ------------------------------------------------------------- the app under test */
 
 const HERE = new URL('../../', import.meta.url);
-const src = readFileSync(new URL('src/web/app.js', HERE), 'utf8')
-  .replace(/^import .*$/gm, '');
+// The surface is split into sibling ES modules (src/web/*.js); bundleApp concatenates
+// them back into ONE body — the same evaluation contract this probe always used when
+// app.js held everything — re-binding the kernel/surface imports from the real modules,
+// with createController stubbed by the factory below.
+const { prelude, body, mods } = await bundleApp(new URL('src/web/app.js', HERE), { stubController: true });
+const src = body;
 const ctlMod = await import(new URL('src/surface/gui/controller.js', HERE));
 
 /**
@@ -144,12 +173,13 @@ function buildApp(ctl) {
   };
   const factory = new Function(
     'const __ctl = arguments[0];\n'
+    + 'const __mods = arguments[1];\n'
     + 'function createController(){ return __ctl; }\n'
-    + 'const measure = async () => null;\n'
+    + prelude + '\n'
     + src
     + '\nreturn { render, combatView, clickCard, pickTarget, cancelTargeting, snapshot: () => snap, state: () => ({ pendingSlot, aimed }) };',
   );
-  const api = factory(spy);
+  const api = factory(spy, mods);
   const mine = hk.slice(before);
   return { api, dispatched, press: (key) => { for (const f of mine) f({ key, preventDefault() {} }); } };
 }
@@ -295,8 +325,8 @@ if (A0) {
   B.api.clickCard(A0.card.slot);
   all(B.stage, '.enemy.targeting')[1].click();
   check('clicking enemy 2 dispatched exactly one action', B.dispatched.length === 1, `dispatched=[${B.dispatched.join(', ')}]`);
-  check(`the id carries the target ("${A0.card.slot} 2"), not the old bare "${A0.card.slot}"`,
-    B.dispatched[0] === `${A0.card.slot} 2`, `got "${B.dispatched[0]}"`);
+  check(`the id carries the target ("${A0.card.slot}_2"), the engine's underscore form`,
+    B.dispatched[0] === `${A0.card.slot}_2`, `got "${B.dispatched[0]}"`);
 }
 
 process.stdout.write('\n== C. Escape cancels the step and plays nothing ==\n');
@@ -320,8 +350,8 @@ if (A0) {
   const D = fresh(A0.ctl);
   D.api.clickCard(A0.card.slot);
   D.press('1');
-  check('pressing "1" targeted enemy 1', D.dispatched[0] === `${A0.card.slot} 1`, `dispatched=[${D.dispatched.join(', ')}]`);
-  const D2 = fresh(A0.ctl);
+  check(`pressing "1" targeted enemy 1 (the engine's underscore id form)`, D.dispatched[0] === `${A0.card.slot}_1`, `dispatched=[${D.dispatched.join(', ')}]`);
+  const D2 = fresh(reachAny(SEEDS, 2, ['attack']).ctl);
   D2.api.clickCard(A0.card.slot);
   D2.press('0');
   check('pressing "0" cancelled instead of playing',
@@ -345,7 +375,10 @@ process.stdout.write('\n== E. a single-enemy fight must ask for NO target ==\n')
       const s = ctl.snapshot();
       if (s.phase !== 'combat' || s.enemies.length <= 1) break;
       const single = s.hand.find((c) => c.type === 'attack' && c.playable && !/all/i.test(c.summary || ''));
-      if (single) ctl.dispatch(single.slot);
+      // The engine's own first-target id, not a bare slot: a targeted card with two
+      // enemies alive is `p<N>_<k>` only (a bare `p<N>` is illegal_action, on main as
+      // well as here), so aiming at the first living enemy means targets[0].
+      if (single) ctl.dispatch(single.targets?.[0]?.actionId ?? single.slot);
       else ctl.dispatch('e1');
     }
     const s = ctl.snapshot();
@@ -405,9 +438,13 @@ process.stdout.write('\n== F. a card that takes no target is never given a targe
 
 process.stdout.write('\n== G. targeted play: what the UI submits, and what the engine returns ==\n');
 if (A0) {
-  const G = fresh(A0.ctl);
-  const beforeHp = new Map(A0.snap.enemies.map((e) => [e.index, e.hp]));
-  G.api.clickCard(A0.card.slot);
+  // A controller of this check's own: earlier checks play cards on A0.ctl (the id form
+  // WORKS, so D's pick kills a 11-HP enemy), and a fight the kill has changed must not
+  // decide whether this step arms.
+  const G0 = reachAny(SEEDS, 2, ['attack']);
+  const G = fresh(G0.ctl);
+  const beforeHp = new Map(G0.snap.enemies.map((e) => [e.index, e.hp]));
+  G.api.clickCard(G0.card.slot);
   // Aim at the LAST enemy deliberately: aiming at the first would pass even if the flash
   // were keyed on position rather than identity, which is the behaviour in question.
   const nodes = all(G.stage, '.enemy.targeting');
@@ -416,7 +453,7 @@ if (A0) {
   targetNode.click();
   process.stdout.write(`   UI submitted: ${JSON.stringify(G.dispatched[0] || null)}  (chosen target ${chosen})\n`);
 
-  const after = G.api.snapshot ? G.api.snapshot() : A0.ctl.snapshot();
+  const after = G.api.snapshot ? G.api.snapshot() : G0.ctl.snapshot();
   const afterHp = new Map(after.enemies.map((e) => [e.index, e.hp]));
   const lost = [...beforeHp.entries()].filter(([idx, hp]) =>{const h=afterHp.get(idx); return h!==undefined && h<hp;});
   const damaged = all(G.stage, '.enemy.damaged');
@@ -502,8 +539,9 @@ process.stdout.write('\n== I. renderer-level checks on synthetic snapshots where
   const fakeDuo = {
     snapshot: () => snapshotWith(duo),
     dispatch: (id) => {
-      // The engine's own contract: k is 1-based among the living, in print order.
-      const m = /^p1 (\d+)$/.exec(id);
+      // The engine's contract, as the UI submits it: k is 1-based among the living, in
+      // print order, joined with an UNDERSCORE (`p1_2`) — parsePlayId's documented form.
+      const m = /^p1_(\d+)$/.exec(id);
       if (m) { const at = Number(m[1]) - 1; duo = duo.map((e, i) => (i === at ? { ...e, hp: e.hp - 6 } : e)); }
       return { error: null, events: [], changed: true };
     },
@@ -515,7 +553,7 @@ process.stdout.write('\n== I. renderer-level checks on synthetic snapshots where
   all(I2.stage, '.enemy.targeting')[1].click();  // choose k = 2 -> identity index 2
   const d2 = all(I2.stage, '.enemy.damaged');
   check('two enemies: the second was armed and chosen', armed === 2, `${armed} highlighted`);
-  check('the submitted id carried the chosen k', I2.dispatched[0] === 'p1 2', `dispatched=[${I2.dispatched.join(', ')}]`);
+  check('the submitted id carried the chosen k (underscore form)', I2.dispatched[0] === 'p1_2', `dispatched=[${I2.dispatched.join(', ')}]`);
   check('the flash landed on the chosen enemy (position 1, identity index 2), not the first',
     d2.length === 1 && d2[0].a['data-target-index'] === '2',
     d2.length ? `flashing data-target-index=${d2[0].a['data-target-index']}` : 'none flashed');

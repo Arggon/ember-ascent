@@ -6,6 +6,7 @@
 // coin flip. No wall clock, no Math.random: every choice is a function of rngDraws.
 
 import { intAt } from '../rng.js';
+import { NODE_TYPES } from './map.js';
 
 /** Act-1 enemy definitions. `moves[].damage` is the printed intent number. */
 export const ENEMIES = {
@@ -222,4 +223,63 @@ export function chooseIntent(seed, drawIndex, enemy, history, scriptStep) {
   // Still one rng draw regardless, so draw counts never depend on the branch taken.
   const r = intAt(seed, drawIndex, preferred.length);
   return { moveIndex: preferred[r], draws: 1 };
+}
+
+/**
+ * Roll the per-node encounter table for a generated map: which encounter each combat
+ * node holds, and the HP roll of every enemy it spawns. Moved out of the kernel entry
+ * so the facade builds state and this module owns everything encounter-shaped.
+ *
+ * Draw order is part of the save format (do not reorder): map rows top to bottom,
+ * nodes left to right; one draw for the encounter pick, then one per spawned enemy's
+ * HP. Rest nodes consume nothing — they are fully determined by the map.
+ *
+ * @param {number} seed
+ * @param {number} startDraw first unconsumed draw index
+ * @param {any[][]} rows map rows (rules/map.js generateMap)
+ * @param {Record<string, string[]>} byType encounter pool per node type (BIOMES[biome].byType)
+ * @returns {{table: Record<string, any>, draws: number}} draws = total consumed
+ */
+export function buildEncounterTable(seed, startDraw, rows, byType) {
+  let draws = startDraw;
+  const table = {};
+  for (const row of rows) {
+    for (const node of row) {
+      const pool = byType[node.type];
+      if (!pool) {
+        // Non-combat node (rest): no enemies, no draws consumed. Skipping the draw
+        // keeps the stream aligned to *content that needs randomness*; rest nodes
+        // are fully determined by the map, which is itself seed-derived.
+        table[node.id] = {
+          id: node.id,
+          name: NODE_TYPES[node.type].label,
+          tier: NODE_TYPES[node.type].tier,
+          reward: NODE_TYPES[node.type].reward,
+          elite: false,
+          boss: false,
+          spawn: [],
+        };
+        continue;
+      }
+      const pick = intAt(seed, draws, pool.length);
+      draws += 1;
+      const enc = ENCOUNTERS[pool[pick]];
+      const spawn = enc.enemies.map((enemyId) => {
+        const def = ENEMIES[enemyId];
+        const hpRoll = intAt(seed, draws, def.maxHp[1] - def.maxHp[0] + 1);
+        draws += 1;
+        return { id: enemyId, hp: def.maxHp[0] + hpRoll };
+      });
+      table[node.id] = {
+        id: enc.id,
+        name: enc.stateName ?? enc.name,
+        tier: enc.tier,
+        reward: NODE_TYPES[node.type].reward,
+        elite: Boolean(enc.elite),
+        boss: Boolean(enc.boss),
+        spawn,
+      };
+    }
+  }
+  return { table, draws };
 }
