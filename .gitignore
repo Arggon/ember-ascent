@@ -1,6 +1,8 @@
-node_modules/
+node_modules
+.worktrees/
 .zwork/
 .opencode/
+.zcode/
 .sim/
 sim-out*/
 release.zip
