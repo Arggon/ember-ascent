@@ -164,6 +164,25 @@ export const HERO_MOVES = {
 // Type fallback for cards with no row above, kept identical to the pre-move behaviour.
 export const MOVE_DEFAULTS = { attack: 'strike', skill: 'brace', power: 'brace' };
 /**
+ * The moves that CLOSE DISTANCE: a stroke that is not a thrown weapon or a cast walks the
+ * hero into the enemy lane for the pose's middle third (`.hero.is-approach`, styled in
+ * style.css; the real gap is measured at dispatch in fx.js). The five RANGED attack moves
+ * stay home — `throw`/`twinthrow`/`bloodhammer` fly the hammer itself, `snapcast` is an
+ * ember dart, `bellowspush` is a wind cone — and so does every skill and power stance
+ * (guard/channel/quench and friends), because planting is the point of those cards.
+ * `strike` is the MOVE_DEFAULTS fallback for an unknown attack: a plain stroke closes.
+ * New moves must be added here or the hero will strike from where it stands.
+ */
+export const MELEE_APPROACH_MOVES = new Set([
+  'arccut', 'climbcut', 'collarline', 'colossal', 'dropkick', 'forgeclap', 'haftjab',
+  'hailblows', 'hammerfall', 'headbutt', 'heavy', 'reapsweep', 'rend', 'strike', 'surge',
+  'uppercut', 'wildflail',
+]);
+/** True when a move should carry the hero into the enemy lane. */
+export function isMeleeMove(move) {
+  return MELEE_APPROACH_MOVES.has(move);
+}
+/**
  * Throw choreography per card id, keyed off what each card's own text says:
  * sword_boomerang — Returning Brand, "Heat you threw comes back": the hammer flies AND
  * returns; hemokinesis — Blood Hammer, the hammer first CONDENSES at the hero's chest

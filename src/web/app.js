@@ -22,7 +22,7 @@
 //   combat-view.js   the fight screen (hero, enemies, hand, controls)
 //   map-view.js      the ascent map
 //   reward-view.js / kindling-view.js / rest-view.js / end-view.js  the other screens
-//   render.js        the one paint path and the shared page() wrapper
+//   render.js        the one paint path (the page() frame lives in page-frame.js)
 //
 // All art is CSS or inline SVG built with DOM calls: no image files beyond the local
 // sprites, no external assets, no fonts fetched over the network. Silhouettes and glyphs

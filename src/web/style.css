@@ -3277,6 +3277,7 @@ html, body {
 .page-combat .pile-exh { color: var(--faint); font-size: 0.85rem; }
 
 .hitstop .fig,
+.hitstop .hero.is-approach,
 .hitstop .efloat,
 .hitstop .fx-card,
 .hitstop .card { animation-play-state: paused !important; }
@@ -3474,6 +3475,7 @@ html, body {
 }
 @media (prefers-reduced-motion: reduce) {
   .stage-combat .fig,
+  .stage-combat .hero.is-approach,
   .stage-combat .enemy.is-dying,
   .stage-combat .card { animation: none !important; }
   /* The frame layers are motion-only: statically they must never paint, or the hero
@@ -3786,6 +3788,23 @@ html, body {
   100% { transform: none; }
 }
 /* ==== LOTE 1 — mazo inicial y ataques básicos: one movement per card. ==== */
+/* MELEE APPROACH — a stroke that is not a throw or a cast closes the distance: the hero
+   steps INTO the aimed lane for the pose's middle third and steps back by its end, while
+   the pose's own keyframes play the swing on .fig inside. The distance is measured at
+   dispatch (fx.js, from the hero's shoulder to the aimed card) and arrives as
+   --approach-x; unset it degrades to no step, and the pose still plays in place. The
+   duration is the pose hold's own length (--approach-dur), so approach and swing land
+   together; the hit-stop beat pauses both via the .hitstop rule below. */
+.stage-combat .hero.is-approach {
+  animation: hero-approach var(--approach-dur, 480ms) cubic-bezier(0.45, 0, 0.4, 1) both;
+  will-change: transform;
+}
+@keyframes hero-approach {
+  0% { transform: translateX(0); }
+  35% { transform: translateX(var(--approach-x, 0px)); }
+  70% { transform: translateX(var(--approach-x, 0px)); }
+  100% { transform: translateX(0); }
+}
 /* HAMMERFALL (strike): the hammer rises, HOLDS a beat at the apex, then drops straight
    down in front of the hero — a vertical fall, not an arc. The windup frame holds the
    raised hammer, the strike frame lands the crash; dust and a crack open in the lane. */

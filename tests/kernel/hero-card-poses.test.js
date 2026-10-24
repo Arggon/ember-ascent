@@ -20,8 +20,18 @@ let uid = 0;
 class N {
   constructor(tag) {
     this.tag = tag; this.uid = uid++; this.kids = []; this.parent = null;
-    this.attrs = {}; this._cls = ''; this.txt = ''; this.style = {};
+    this.attrs = {}; this._cls = ''; this.txt = ''; this._sty = {};
     this._ls = {}; this.disabled = false;
+  }
+  // A recording CSSOM stand-in: custom properties go through setProperty (what the
+  // melee approach writes), and plain writes are tolerated and dropped, exactly as
+  // they were when style was a bare object.
+  get style() {
+    const self = this;
+    return {
+      setProperty: (k, v) => { self._sty[k] = String(v); },
+      getPropertyValue: (k) => self._sty[k] ?? '',
+    };
   }
   set className(v) { this._cls = String(v); }
   get className() { return this._cls; }
@@ -110,7 +120,7 @@ let src = body
   .replace(/\bboot\(\)\s*;?\s*$/, '');
 src = src.replace('function toast(msg, kind = \'warn\') {', 'function toast(msg, kind = \'warn\') { __toasts.push(msg);');
 src = 'async function measure(){ return null; }\n' + src;
-src += '\nreturn { render, clickCard, act, get pendingSlot(){return pendingSlot;}, snapGet(){return snap;}, heroMove, heroPose, HERO_MOVES, MOVE_DEFAULTS, HERO_THROWS, signatureFor, animSpeedGet: () => animSpeed, injectBursts: (b) => { bursts = b; } };';
+src += '\nreturn { render, clickCard, act, get pendingSlot(){return pendingSlot;}, snapGet(){return snap;}, heroMove, heroPose, HERO_MOVES, MOVE_DEFAULTS, HERO_THROWS, MELEE_APPROACH_MOVES, isMeleeMove, signatureFor, animSpeedGet: () => animSpeed, injectBursts: (b) => { bursts = b; } };';
 
 const ctlMod = await import('../../src/surface/gui/controller.js');
 const factory = new Function('__ctl', '__toasts', '__mods', `
@@ -134,6 +144,14 @@ function heroFig() {
   const heroFig = figs.find((f) => f.closest('.hero'));
   assert.ok(heroFig, 'the combat stage renders a hero figure');
   return heroFig;
+}
+
+/** The hero's `.hero` container — the node the melee approach moves. */
+function heroNode() {
+  const heroes = byId.stage.querySelectorAll('.hero');
+  const hero = heroes.find((n) => n.closest('.fight') || n.closest('.stage-combat'));
+  assert.ok(hero, 'the combat stage renders a hero container');
+  return hero;
 }
 
 /** Play the card with the given id via the DOM (click, then a target if one is asked). */
@@ -198,6 +216,58 @@ test('QUENCH (defend) pours with its own movement, not the attack one', () => {
   const cls = heroFig().className;
   assert.match(cls, /pose-quench/, 'Quench pours its veil (pose-quench)');
   assert.doesNotMatch(cls, /pose-strike/, 'no attack movement on a block card');
+});
+
+test('a MELEE stroke carries the hero into the enemy lane (.hero.is-approach)', () => {
+  const { api } = startRun(11);
+  playCard(api, 'strike');
+  const hero = heroNode();
+  assert.match(hero.className, /is-approach/, 'a melee stroke steps toward the enemy row');
+  assert.match(hero._sty['--approach-dur'], /ms/, 'the approach rides the pose hold length');
+  // A host with no layout measures a zero box, so the dispatch-measured distance is the
+  // 0px fallback — the point here is that the variable is WRITTEN at all, i.e. the
+  // act() -> dispatchFx() measurement path ran for a melee play.
+  assert.equal(hero._sty['--approach-x'], '0px', 'the measured distance is written even when no layout exists');
+});
+
+test('a THROWN hammer or a cast stays home — no approach on ranged attack moves', () => {
+  const { api } = startRun(11);
+  // Twin Hammers: two hammers FLY (twinthrow) — the hero does not close.
+  api.injectBursts([{ kind: 'card-fly', id: 'twin_strike', type: 'attack', name: 'Twin Hammers', side: 'side-none' }]);
+  api.render();
+  assert.doesNotMatch(heroNode().className, /is-approach/, 'a thrown hammer is ranged: the hero stays planted');
+  // Spark (anger) is a finger-snap cast (snapcast): ranged, no approach.
+  api.injectBursts([{ kind: 'card-fly', id: 'anger', type: 'attack', name: 'Spark', side: 'side-none' }]);
+  api.render();
+  assert.doesNotMatch(heroNode().className, /is-approach/, 'an ember dart is ranged: the hero stays planted');
+  // Blood Hammer (hemokinesis) hurls the hammer itself: ranged, no approach.
+  api.injectBursts([{ kind: 'card-fly', id: 'hemokinesis', type: 'attack', name: 'Blood Hammer', side: 'side-none' }]);
+  api.render();
+  assert.doesNotMatch(heroNode().className, /is-approach/, 'Blood Hammer flies: the hero stays planted');
+});
+
+test('a skill or power stance never approaches — planting is the point', () => {
+  const { api } = startRun(6);
+  playCard(api, 'defend');
+  assert.doesNotMatch(heroNode().className, /is-approach/, 'Quench plants, it does not step');
+  api.injectBursts([{ kind: 'card-fly', id: 'flex', type: 'skill', name: 'Flex', side: 'side-none' }]);
+  api.render();
+  assert.doesNotMatch(heroNode().className, /is-approach/, 'Flex swells in place');
+});
+
+test('the melee-approach set is honest: every move in it animates, and no ranged move sneaks in', () => {
+  const { api } = startRun(11);
+  for (const move of api.MELEE_APPROACH_MOVES) {
+    assert.ok(POSE_DECLS.has(move) || move === 'strike', `melee move "${move}" must be an animated pose (or the type fallback)`);
+  }
+  for (const ranged of ['throw', 'twinthrow', 'snapcast', 'bellowspush', 'bloodhammer']) {
+    assert.equal(api.isMeleeMove(ranged), false, `"${ranged}" is a ranged attack move and must not approach`);
+  }
+  assert.equal(api.isMeleeMove('hammerfall'), true, 'Hammerfall closes');
+  assert.equal(api.isMeleeMove('guard'), false, 'a guard stance stays planted');
+  // The approach itself must really animate: the rule exists and its keyframes too.
+  assert.match(CSS, /\.hero\.is-approach[^{]*\{[^}]*animation:\s*hero-approach/, '.hero.is-approach must animate hero-approach');
+  assert.ok([...CSS.matchAll(/@keyframes\s+([\w-]+)/g)].some((m) => m[1] === 'hero-approach'), '@keyframes hero-approach must be defined');
 });
 
 test('the movement dispatch resolves every shipped card to a pose the stylesheet animates', () => {
