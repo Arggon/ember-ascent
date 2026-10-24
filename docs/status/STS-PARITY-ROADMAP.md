@@ -8,6 +8,11 @@ looping back to development before a slice is committed as done.
 Process rules (standing):
 
 - Orchestrator plans and dispatches; ≤ 2 background subagents run at any time.
+- **A code review never overlaps with development or fixing.** The loop is strictly:
+  dev → manual test → fix-loop (until QA passes) → commit → review of the diff since the
+  last APPROVE point at a fixed HEAD, with NO agent editing the repo while the review
+  runs. REQUEST_CHANGES loops back to development; the fix lands and the new diff is
+  re-reviewed before the next slice's development starts.
 - A slice is DONE only when: unit tests green, `npm run gate` green, surface-art check
   green, Playwright manual verification PASS (with evidence), code review findings fixed.
 - Evidence over assertion: every verdict quotes the actual command output.
@@ -85,3 +90,4 @@ Process rules (standing):
   fallback; P3 dead re-derived temper fallback in hud.js; P3 two-distinct-tempers split
   untested; P3 tempered row missing from e2e; P3 stale "exactly like Help" comment; P3 CSS
   stamp-geometry duplication; P3 (later slice) shared modal focus helper.
+- 2026-10-24 — S2 QA PASS 8/8 (evidence /tmp/s2-qa/); S2 committed 01466a3. S2 review was dispatched in parallel with the S1.1 fixer and STOPPED unfinished per the user's directive: reviews never overlap with active changes. New sequence: S1.1 lands and commits → S2+S1.1 review (diff since 1c16fac) runs solo → verdict loops or S3 dev starts.
