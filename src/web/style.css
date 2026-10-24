@@ -6982,3 +6982,108 @@ html, body {
   .deck-row.tempered { padding-left: 4px; }
   .deck-type { display: none; }
 }
+
+/* ==========================================================================================
+   CARD CODEX (S2) — the read-only "Cards" sheet beside Deck/Help: every card the draft pool
+   can add to the deck, grouped Common → Uncommon → Rare with group counts. Each row is a
+   kernel `cardPool()` fact (describe-layer sentences verbatim) plus, when the deck holds
+   copies, a brass "in deck ×N" chip summed from snapshot.deckCards. Same modal shell as the
+   deck sheet — only the rarity headers and the two-line rows are styled here.
+   ========================================================================================== */
+.codex-modal { max-width: 660px; }
+.codex-group-head {
+  margin: var(--sp-4) 0 var(--sp-1);
+  font-size: var(--fs-4);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.codex-rows { display: flex; flex-direction: column; }
+/* A row is two lines: the card's identity line, then its description at full width. */
+.codex-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 7px;
+  border-bottom: 1px solid rgba(42, 51, 72, 0.55);
+}
+.codex-row:last-child { border-bottom: 0; }
+.codex-line { display: flex; align-items: baseline; gap: var(--sp-2); }
+/* The cost reads as the deck rows' forged plate — the same number the hand tiles charge. */
+.codex-cost {
+  flex: 0 0 auto;
+  min-width: 22px;
+  padding: 1px 0;
+  text-align: center;
+  font-family: var(--num);
+  font-size: var(--fs-3);
+  font-weight: 700;
+  color: var(--ink);
+  background: linear-gradient(180deg, #232c40, #161c2a);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.codex-type {
+  flex: 0 0 auto;
+  width: 4.9em;
+  color: var(--faint);
+  font-family: var(--display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.codex-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: var(--fs-3);
+  letter-spacing: 0.02em;
+}
+/* The rarity tag repeats the group it sits in (the group header is the primary cue; the
+   tag survives scrolling deep into a long group). Hue deepens with the tier. */
+.codex-rarity {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  font-family: var(--display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+}
+.codex-row[data-rarity='common'] .codex-rarity { color: var(--faint); }
+.codex-row[data-rarity='uncommon'] .codex-rarity { color: var(--brass); border-color: rgba(185, 138, 82, 0.55); }
+.codex-row[data-rarity='rare'] .codex-rarity { color: var(--gold); border-color: rgba(245, 197, 66, 0.6); }
+/* Owned copies: the deck sheet's brass, so "you have this" reads the same in both sheets. */
+.codex-indeck {
+  flex: 0 0 auto;
+  padding: 0 7px;
+  font-family: var(--num);
+  font-size: var(--fs-2);
+  font-weight: 700;
+  color: var(--brass);
+  border: 1px solid rgba(185, 138, 82, 0.5);
+  border-radius: 999px;
+}
+.codex-desc {
+  /* Aligned under the name, past the cost plate, so the text column is one straight edge. */
+  padding-left: calc(22px + var(--sp-2));
+  color: var(--dim);
+  font-family: var(--rules);
+  font-size: var(--fs-2);
+  line-height: 1.45;
+}
+/* Phones: the type word yields first (as on the deck rows); cost, name and chip keep their
+   facts, and the description takes the full width. */
+@media (max-width: 620px) {
+  .codex-modal { max-width: none; }
+  .codex-row { padding: 6px 6px 5px; }
+  .codex-type { display: none; }
+  .codex-desc { padding-left: 0; }
+}

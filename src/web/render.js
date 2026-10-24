@@ -42,7 +42,7 @@ import { signatureFor } from './hero-moves.js';
 import { backdropMarkup } from './stage-art.js';
 import { dyingRow } from './floats.js';
 import { endTargeting, pendingCard, pendingSlot } from './targeting.js';
-import { renderHud, helpPanel, helpOpen, HELP_SEEN_KEY, deckPanel, deckOpen } from './hud.js';
+import { renderHud, helpPanel, helpOpen, HELP_SEEN_KEY, deckPanel, deckOpen, codexPanel, codexOpen } from './hud.js';
 import { heroFigure, combatView } from './combat-view.js';
 import { mapView } from './map-view.js';
 import { rewardView } from './reward-view.js';
@@ -245,6 +245,10 @@ export function render() {
   // phase view like the help sheet, and its `.modal-back` covers the stage, so the run
   // underneath stays untouched (and unclickable) while it is open.
   if (deckOpen) stageEl.append(deckPanel());
+  // The S2 card codex, when the player opened it from the HUD. Same placement contract as
+  // the deck sheet: it paints after the phase view and its backdrop covers the stage, so
+  // the run underneath stays untouched (and unclickable) while it is open.
+  if (codexOpen) stageEl.append(codexPanel());
   // The arriving VICTORY or DEFEAT panel takes the caret, so a keyboard player lands on
   // Restart instead of at the top of the document. Best effort, and never a rule.
   if (endFocusPending) {

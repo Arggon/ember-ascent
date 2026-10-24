@@ -1,16 +1,20 @@
-// src/web/hud.js — the top status bar, the help/glossary sheet and the deck viewer.
+// src/web/hud.js — the top status bar, the help/glossary sheet, the deck viewer and the
+// card codex.
 //
 // Every string on the help sheet comes from the kernel (`snap.help`, `snap.glossary`),
 // so the browser can never explain a rule differently from the engine that enforces it.
 // `helpOpen` is written only here (by `toggleHelp`), so it needs no setter — and the same
-// is true of `deckOpen` (by `toggleDeck`): both overlays are presentation state owned by
-// this module and painted by render.js on the next repaint.
+// is true of `deckOpen` (by `toggleDeck`) and `codexOpen` (by `toggleCodex`): all three
+// overlays are presentation state owned by this module and painted by render.js on the
+// next repaint.
 
 import { flash, hudEl, reducedMotion, repaint, snap } from './runtime.js';
 import { capitalize, el } from './dom.js';
 import { freshStatusKeys } from './floats.js';
 import { newGame } from './actions.js';
 import { TEMPER_GLYPH, glyphBox } from './glyphs.js';
+import { cardPool } from '../kernel/index.js';
+import { inDeckCounts } from './deck-counts.js';
 
 /* ------------------------------------------------------------------------- HUD */
 
@@ -62,6 +66,19 @@ export function renderHud() {
       'aria-label': `Deck: ${snap.deckCount} cards`,
     },
     on: { click: () => toggleDeck(true) },
+  }));
+  // S2 card codex: what the REWARDS can add to that deck. The pool is kernel content
+  // (cardPool(), computed once — it never depends on the run), so the button announces
+  // the same count the sheet will list.
+  hudEl.append(el('button', {
+    cls: 'btn ghost',
+    text: 'Cards',
+    attrs: {
+      type: 'button',
+      title: 'Every card the rewards can add to your deck — keyboard: k',
+      'aria-label': `Card codex: ${CODEX_POOL.length} cards`,
+    },
+    on: { click: () => toggleCodex(true) },
   }));
   hudEl.append(el('button', {
     cls: 'btn ghost',
@@ -244,6 +261,95 @@ function deckRow(c) {
   if (c.count > 1) {
     row.append(el('span', { cls: 'deck-count', text: `×${c.count}`, attrs: { title: `${c.count} copies in the deck` } }));
   }
+  return row;
+}
+
+/* ---------------------------------------------------------------- CARD CODEX (S2) */
+
+/**
+ * The draft pool, computed ONCE at load: it is content-derived and phase-independent (the
+ * kernel's `cardPool()`), so no repaint needs to recompute it. Rows arrive sorted by
+ * rarity tier, then cost, then face name, then card id.
+ */
+const CODEX_POOL = cardPool();
+
+/** The rarity groups in the order a new player should meet them; a group with no rows is skipped. */
+const RARITY_GROUPS = [
+  { key: 'common', label: 'Common' },
+  { key: 'uncommon', label: 'Uncommon' },
+  { key: 'rare', label: 'Rare' },
+];
+
+export let codexOpen = false;
+
+export function toggleCodex(open) {
+  codexOpen = open;
+  repaint();
+}
+
+/**
+ * The card codex sheet (S2): every card the draft pool can add to the deck, grouped by
+ * rarity with group counts, read-only. Every row is a fact the kernel's `cardPool()`
+ * published — names, costs, type words and descriptions all through the describe layer —
+ * and the "in deck" chip is a sum of the kernel's own `deckCards` counts, so the sheet can
+ * never show a card the reward deck cannot offer, or a copy the run does not hold. The
+ * shell is the deck sheet's own — `.modal-back` > `.modal` > `.modal-scroll` +
+ * `.modal-foot` — so the page keeps ONE modal system: backdrop click, Escape and Close
+ * all dismiss it, exactly like Help and Deck.
+ */
+export function codexPanel() {
+  const tally = inDeckCounts(snap.deckCards);
+  const back = el('div', { cls: 'modal-back' });
+  back.addEventListener('click', (ev) => { if (ev.target === back) toggleCodex(false); });
+
+  const panel = el('div', { cls: 'modal codex-modal', attrs: { role: 'dialog', 'aria-label': `Card codex: ${CODEX_POOL.length} cards` } });
+  const scroll = el('div', { cls: 'modal-scroll' });
+  scroll.append(el('h2', { text: `Cards (${CODEX_POOL.length})` }));
+  scroll.append(el('p', { cls: 'hint', text: 'Every card a combat reward can add to your deck. Pick with the fight ahead in mind.' }));
+
+  for (const group of RARITY_GROUPS) {
+    const rows = CODEX_POOL.filter((c) => c.rarity === group.key);
+    if (rows.length === 0) continue;
+    scroll.append(el('h3', { cls: 'codex-group-head', text: `${group.label} (${rows.length})` }));
+    const list = el('div', { cls: 'codex-rows' });
+    for (const c of rows) list.append(codexRow(c, tally.get(c.cardId) ?? 0));
+    scroll.append(list);
+  }
+
+  panel.append(scroll);
+  panel.append(el('div', { cls: 'modal-foot' },
+    el('button', {
+      cls: 'btn secondary',
+      text: 'Close  (Esc)',
+      attrs: { type: 'button', title: 'Back to the run (keyboard: Escape)' },
+      on: { click: () => toggleCodex(false) },
+    }),
+  ));
+  back.append(panel);
+  return back;
+}
+
+/**
+ * One codex row: cost, type word, face name, rarity tag, the card's own describe-layer
+ * sentence, and — only when the deck holds at least one copy — the brass "in deck ×N"
+ * chip. Zero copies render no chip: absence is the fact, and 39 zero chips would bury it.
+ */
+function codexRow(c, inDeck) {
+  const row = el('div', { cls: 'codex-row', attrs: { 'data-rarity': c.rarity } });
+  const line = el('div', { cls: 'codex-line' });
+  line.append(el('span', { cls: 'codex-cost', attrs: { title: 'Energy cost' }, text: String(c.cost) }));
+  line.append(el('span', { cls: 'codex-type', text: c.typeLabel }));
+  line.append(el('span', { cls: 'codex-name', text: c.name }));
+  line.append(el('span', { cls: 'codex-rarity', text: c.rarity, attrs: { title: `Rarity: ${c.rarity}` } }));
+  if (inDeck > 0) {
+    line.append(el('span', {
+      cls: 'codex-indeck',
+      text: `in deck ×${inDeck}`,
+      attrs: { title: `${inDeck} ${inDeck === 1 ? 'copy' : 'copies'} in your deck` },
+    }));
+  }
+  row.append(line);
+  row.append(el('div', { cls: 'codex-desc', text: c.description }));
   return row;
 }
 

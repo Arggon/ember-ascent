@@ -12,7 +12,7 @@
 // every action line under 8 — enforced by tests/budget.test.js on measured counts.
 import { ENEMIES, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { availableNodes, NODE_TYPES } from './rules/map.js';
-import { defaultContent } from './content.js';
+import { defaultContent, draftPoolFrom } from './content.js';
 import { actions as legalActions } from './actions.js';
 import { intentLabel, intentDamage, REST_HEAL } from './rules/act.js';
 import { BOONS, boonText } from './rules/kindling.js';
@@ -550,6 +550,49 @@ function snapshotDeck(state) {
   }
   return [...rows.values()].sort((a, b) =>
     (a.cost - b.cost) || byStr(a.name, b.name) || byStr(a.cardId, b.cardId) || byStr(a.temper ?? '', b.temper ?? ''));
+}
+
+/** Rarity tiers in codex order; anything unknown sorts last, so a new tier cannot crash the sheet. */
+const RARITY_TIER = { common: 0, uncommon: 1, rare: 2 };
+
+/**
+ * The card codex (S2): every card the draft pool can add to a deck, one row each,
+ * enriched through the plain-English describe layer — the same sentences the hand tiles
+ * and the reward screen render — so a player can plan a pick before any reward screen.
+ *
+ * WHY A FUNCTION AND NOT A SNAPSHOT FIELD: the pool is content-derived and
+ * phase-independent — no field of the run state touches it — so paying for 39
+ * descriptions on every `snapshot()` (once per action repaint) would buy nothing. A
+ * surface calls this once and owns the result. The SOURCE is `draftPoolFrom` (starters
+ * excluded), so this view cannot list a card the reward deck cannot offer, and the tests
+ * pin the two against each other.
+ *
+ * Rows sort deterministically: rarity tier (common → uncommon → rare), then cost, then
+ * face name, then card id — the same row list from every surface on every machine.
+ * Read-only: it reads the shipped content and allocates fresh rows, never the run state.
+ * @returns {Array<{cardId: string, rarity: string, name: string, cost: number, type: string, typeLabel: string, summary: string, description: string}>}
+ */
+export function cardPool() {
+  const content = defaultContent();
+  return draftPoolFrom(content)
+    .map((id) => content.cards.get(id))
+    .map((def) => ({
+      cardId: def.id,
+      rarity: def.rarity,
+      name: def.name,
+      cost: def.cost,
+      type: def.type,
+      typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
+      // Both renderings, as on the hand tiles: `summary` is the CLI's compact form,
+      // `description` the sentence a human reads.
+      summary: effectSummary(def),
+      description: describeCard(def),
+    }))
+    .sort((a, b) =>
+      ((RARITY_TIER[a.rarity] ?? 9) - (RARITY_TIER[b.rarity] ?? 9))
+      || (a.cost - b.cost)
+      || byStr(a.name, b.name)
+      || byStr(a.cardId, b.cardId));
 }
 
 /**

@@ -12,6 +12,9 @@
 //   6. the S1 master-deck sheet lists the starting deck from the map AND from combat
 //      (read-only: no tempered badge at run start, duplicates counted, Esc/Close both
 //      dismiss it and the run underneath is untouched)
+//   7. the S2 card codex groups the whole draft pool by rarity with counts, shows a known
+//      card's describe-layer sentence, wears the "in deck" chip on an injected copy, and
+//      Escape dismisses it without moving the run
 //
 // RUN. `npm run test:browser`. Deliberately NOT matched by the default `npm test`
 // glob (`tests/**/*.test.js`): this file is `.spec.js` so the default suite stays
@@ -262,6 +265,65 @@ test('deck: the master-deck sheet shows the starting deck from the map, and agai
   await combatSheet.getByRole('button', { name: /Close/ }).click();
   await page.waitForSelector('.modal.deck-modal', { state: 'detached', timeout: 3000 });
   assert.equal(await readState(page).then((s) => s.phase), 'combat', 'the fight must still be running after closing');
+});
+
+/** The S2 card codex, opened from the HUD's Cards control. */
+async function openCodex(page) {
+  const btn = page.locator('#hud button[aria-label^="Card codex:"]');
+  assert.equal(await btn.count(), 1, 'the HUD Cards control must be present (exactly one)');
+  await btn.click();
+  await page.waitForSelector('.modal.codex-modal', { timeout: 3000 });
+}
+
+test('codex: the Cards sheet groups the draft pool by rarity and marks owned copies', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t);
+  await bootToMap(page);
+
+  // The save/load lever (see header): one Slag Surge into the deck, so the sheet can be
+  // pinned against an owned copy. The ironclad starters are not pool cards, so this is
+  // the ONLY owned copy the codex can chip. The lever's own second half (per the roadmap
+  // recipe) is a real action: a bare ctl.load() swaps the session but does not repaint —
+  // `act()` does — so the test travels to the first fight (the deck's CONTENTS are
+  // untouched by travel) and reads the codex from the refreshed paint, in combat, the
+  // same place the S1 deck test reads its sheet.
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.deck.push({ uid: 'e2e-codex-1', cardId: 'ironwave' });
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+  await travelToFight(page);
+
+  const btn = page.locator('#hud button[aria-label^="Card codex:"]');
+  assert.equal(await btn.count(), 1, 'the HUD Cards control must be present (exactly one)');
+  assert.equal(await btn.getAttribute('aria-label'), 'Card codex: 39 cards', 'the control must announce the pool size');
+  await openCodex(page);
+
+  const sheet = page.locator('.modal.codex-modal');
+  assert.equal(await sheet.getAttribute('aria-label'), 'Card codex: 39 cards', 'the sheet must be a labelled dialog');
+  assert.equal(await sheet.locator('h2').textContent(), 'Cards (39)', 'the sheet title carries the pool size');
+  const heads = await sheet.locator('.codex-group-head').allTextContents();
+  assert.deepEqual(heads, ['Common (16)', 'Uncommon (18)', 'Rare (5)'], 'the three rarity groups with their counts');
+  assert.equal(await sheet.locator('.codex-row').count(), 39, 'every pool card is one row');
+
+  // Spot-check one known row: Maul, cost 3, its describe-layer sentence verbatim.
+  const maul = sheet.locator('.codex-row', { hasText: 'Maul' });
+  assert.equal(await maul.count(), 1, 'Maul renders exactly one row');
+  assert.equal(await maul.locator('.codex-name').textContent(), 'Maul');
+  assert.equal(await maul.locator('.codex-cost').textContent(), '3');
+  assert.equal(await maul.locator('.codex-desc').textContent(), 'Deal 32 damage to the enemy.');
+
+  // The injected Slag Surge wears the brass chip; nothing else in this deck is a pool card.
+  const surge = sheet.locator('.codex-row', { hasText: 'Slag Surge' });
+  assert.equal(await surge.locator('.codex-indeck').textContent(), 'in deck ×1');
+  assert.equal(await sheet.locator('.codex-indeck').count(), 1, 'exactly one owned copy to chip');
+
+  // Escape closes it (keyboard affordance); the fight is exactly where it was.
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.modal.codex-modal', { state: 'detached', timeout: 3000 });
+  assert.equal(await readState(page).then((s) => s.phase), 'combat', 'closing the codex must not move the run');
 });
 
 test('combat: a basic attack deals its printed damage without targeting', { timeout: 60000 }, async (t) => {

@@ -41,7 +41,7 @@ import { createController } from '../surface/gui/controller.js';
 import { ctl, seedFromUrl, setCtl, setSnap, snap } from './runtime.js';
 import { biomeChoice, heroChoice, act, newGame } from './actions.js';
 import { cancelTargeting, clickCard, pendingSlot, pickTarget } from './targeting.js';
-import { deckOpen, toggleDeck } from './hud.js';
+import { deckOpen, toggleDeck, codexOpen, toggleCodex } from './hud.js';
 import { render } from './render.js';
 
 /* ------------------------------------------------------------- keyboard bonus */
@@ -59,6 +59,17 @@ document.addEventListener('keydown', (ev) => {
     return;
   }
   if (k === 'd' || k === 'D') { ev.preventDefault(); toggleDeck(true); return; }
+
+  // --- the card codex owns the keyboard while it is open ------------------------------------
+  // The deck sheet's contract again: Escape (or the sheet's own key, k) closes it; every
+  // other key is swallowed, so no card is played and no turn ends behind the overlay.
+  // `k` was chosen because every closer mnemonic is taken — d deck, e end turn, n new run,
+  // r restart — and no key handler in the surface bound it.
+  if (codexOpen) {
+    if (k === 'Escape' || k === 'Esc' || k === 'k' || k === 'K') { ev.preventDefault(); toggleCodex(false); }
+    return;
+  }
+  if (k === 'k' || k === 'K') { ev.preventDefault(); toggleCodex(true); return; }
 
   // --- targeting owns the keyboard while it is active -----------------------------
   if (pendingSlot !== null && snap.phase === 'combat') {
