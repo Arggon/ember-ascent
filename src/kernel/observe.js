@@ -511,6 +511,47 @@ function snapshotKindling(state) {
   };
 }
 
+/** Code-unit comparison, not localeCompare: the sort must be byte-identical everywhere. */
+const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * The master-deck section of a snapshot (S1): every card the run owns, duplicates
+ * aggregated under one row, sorted deterministically by cost, then face name, then card
+ * id, then temper key — the same row list from every surface on every machine.
+ *
+ * Names, costs, type words and temper effects all come from this file's describe layer
+ * (`defOf` / `temperedView` / `CARD_TYPE_LABEL`), so a deck row can never disagree with
+ * the hand tile or the CLI dump about what a card is or what a tempered copy plays.
+ * Read-only by construction: it reads `state.deck` and `state.tempers` and allocates
+ * fresh rows, so the frozen state is never touched.
+ * @param {any} state
+ * @returns {Array<{cardId: string, name: string, cost: number, type: string, typeLabel: string, tempered: boolean, temper: string | null, temperName: string, temperText: string, count: number}>}
+ */
+function snapshotDeck(state) {
+  const rows = new Map();
+  for (const inst of state.deck ?? []) {
+    const def = defOf(inst.cardId);
+    const { temper } = temperedView(state, inst, def);
+    const key = `${inst.cardId}|${temper ?? ''}`;
+    const row = rows.get(key);
+    if (row) { row.count += 1; continue; }
+    rows.set(key, {
+      cardId: inst.cardId,
+      name: def.name,
+      cost: def.cost,
+      type: def.type,
+      typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
+      tempered: temper !== null,
+      temper,
+      temperName: temper ? TEMPERS[temper].name : '',
+      temperText: temper ? TEMPERS[temper].text : '',
+      count: 1,
+    });
+  }
+  return [...rows.values()].sort((a, b) =>
+    (a.cost - b.cost) || byStr(a.name, b.name) || byStr(a.cardId, b.cardId) || byStr(a.temper ?? '', b.temper ?? ''));
+}
+
 /**
  * A DOM-free STRUCTURED view of the state, for renderers that must not reimplement
  * a rule. Every derived fact a screen needs (card name/cost/effect text, enemy
@@ -573,6 +614,10 @@ export function snapshot(state) {
       discardCards: pileCardNames(state.combat?.discard),
       exhaustCards: pileCardNames(state.combat?.exhaust),
     },
+    // S1 master-deck viewer: the whole run deck, aggregated and sorted (snapshotDeck
+    // above). `deckCount` is the fact the HUD badge shows; the rows carry the rest.
+    deckCount: (state.deck ?? []).length,
+    deckCards: snapshotDeck(state),
     enemies: snapshotEnemies(state),
     map: snapshotMap(state, legal),
     reward: snapshotReward(state, legal),

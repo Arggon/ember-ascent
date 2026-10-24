@@ -41,6 +41,7 @@ import { createController } from '../surface/gui/controller.js';
 import { ctl, seedFromUrl, setCtl, setSnap, snap } from './runtime.js';
 import { biomeChoice, heroChoice, act, newGame } from './actions.js';
 import { cancelTargeting, clickCard, pendingSlot, pickTarget } from './targeting.js';
+import { deckOpen, toggleDeck } from './hud.js';
 import { render } from './render.js';
 
 /* ------------------------------------------------------------- keyboard bonus */
@@ -48,6 +49,16 @@ import { render } from './render.js';
 document.addEventListener('keydown', (ev) => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const k = ev.key;
+
+  // --- the deck viewer owns the keyboard while it is open --------------------------
+  // Escape closes it; every other key is swallowed so no card is played, no turn ends and
+  // no run is discarded behind the overlay. (The panel itself is a dialog, so its Close
+  // button and backdrop are the mouse paths out.)
+  if (deckOpen) {
+    if (k === 'Escape' || k === 'Esc' || k === 'd' || k === 'D') { ev.preventDefault(); toggleDeck(false); }
+    return;
+  }
+  if (k === 'd' || k === 'D') { ev.preventDefault(); toggleDeck(true); return; }
 
   // --- targeting owns the keyboard while it is active -----------------------------
   if (pendingSlot !== null && snap.phase === 'combat') {

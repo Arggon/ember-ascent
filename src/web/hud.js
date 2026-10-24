@@ -1,13 +1,16 @@
-// src/web/hud.js — the top status bar and the help/glossary sheet.
+// src/web/hud.js — the top status bar, the help/glossary sheet and the deck viewer.
 //
 // Every string on the help sheet comes from the kernel (`snap.help`, `snap.glossary`),
 // so the browser can never explain a rule differently from the engine that enforces it.
-// `helpOpen` is written only here (by `toggleHelp`), so it needs no setter.
+// `helpOpen` is written only here (by `toggleHelp`), so it needs no setter — and the same
+// is true of `deckOpen` (by `toggleDeck`): both overlays are presentation state owned by
+// this module and painted by render.js on the next repaint.
 
 import { flash, hudEl, reducedMotion, repaint, snap } from './runtime.js';
 import { capitalize, el } from './dom.js';
 import { freshStatusKeys } from './floats.js';
 import { newGame } from './actions.js';
+import { TEMPER_GLYPH, glyphBox } from './glyphs.js';
 
 /* ------------------------------------------------------------------------- HUD */
 
@@ -47,6 +50,19 @@ export function renderHud() {
   }));
 
   hudEl.append(el('span', { cls: 'spacer' }));
+  // S1 master-deck viewer: read-only, reachable wherever the HUD is (map, combat and the
+  // rest phases alike). The count is the kernel's own `deckCount`, so the button can
+  // never disagree with the deck the modal lists.
+  hudEl.append(el('button', {
+    cls: 'btn ghost',
+    text: `Deck (${snap.deckCount ?? (snap.deckCards || []).reduce((n, c) => n + c.count, 0)})`,
+    attrs: {
+      type: 'button',
+      title: 'Your whole deck, duplicates counted — keyboard: d',
+      'aria-label': `Deck: ${snap.deckCount} cards`,
+    },
+    on: { click: () => toggleDeck(true) },
+  }));
   hudEl.append(el('button', {
     cls: 'btn ghost',
     text: 'Help',
@@ -155,6 +171,80 @@ export function helpPanel() {
 
   back.append(panel);
   return back;
+}
+
+/* --------------------------------------------------------------- DECK VIEWER (S1) */
+
+export let deckOpen = false;
+
+export function toggleDeck(open) {
+  deckOpen = open;
+  repaint();
+}
+
+/**
+ * The master-deck sheet (S1): every card the run owns, read-only. Every row is a fact the
+ * kernel's snapshot already published (`snap.deckCards`, aggregated and sorted THERE), so
+ * this viewer can never show a card the run does not own, a cost the engine does not
+ * charge or a temper the rules do not resolve. The shell is the help sheet's own —
+ * `.modal-back` > `.modal` > `.modal-scroll` + `.modal-foot` — so the page keeps ONE
+ * modal system: backdrop click and Escape both close, exactly like Help.
+ */
+export function deckPanel() {
+  const rows = snap.deckCards || [];
+  const count = snap.deckCount ?? rows.reduce((n, c) => n + c.count, 0);
+  const back = el('div', { cls: 'modal-back' });
+  back.addEventListener('click', (ev) => { if (ev.target === back) toggleDeck(false); });
+
+  const panel = el('div', { cls: 'modal deck-modal', attrs: { role: 'dialog', 'aria-label': `Deck: ${count} cards` } });
+  const scroll = el('div', { cls: 'modal-scroll' });
+  scroll.append(el('h2', { text: `Deck (${count})` }));
+
+  if (rows.length === 0) {
+    scroll.append(el('p', { cls: 'hint', text: 'The deck is empty.' }));
+  } else {
+    const list = el('div', { cls: 'deck-rows' });
+    for (const c of rows) list.append(deckRow(c));
+    scroll.append(list);
+  }
+
+  panel.append(scroll);
+  panel.append(el('div', { cls: 'modal-foot' },
+    el('button', {
+      cls: 'btn secondary',
+      text: 'Close  (Esc)',
+      attrs: { type: 'button', title: 'Back to the run (keyboard: Escape)' },
+      on: { click: () => toggleDeck(false) },
+    }),
+  ));
+  back.append(panel);
+  return back;
+}
+
+/**
+ * One deck row: cost, type word, face name, the temper stamp when the copy is tempered,
+ * and ×N when the deck holds duplicates. Same stamp the hand tiles wear (`.ctemper`,
+ * re-styled for rows in the deck section of style.css), so a tempered card is recognised
+ * the same way everywhere.
+ */
+function deckRow(c) {
+  const row = el('div', {
+    cls: 'deck-row' + (c.tempered ? ` tempered temper-${c.temper}` : ''),
+    attrs: c.tempered ? { title: c.temperText || c.temperName } : {},
+  });
+  row.append(el('span', { cls: 'deck-cost', attrs: { title: 'Energy cost' }, text: String(c.cost) }));
+  row.append(el('span', { cls: 'deck-type', text: c.typeLabel }));
+  row.append(el('span', { cls: 'deck-name', text: c.name }));
+  if (c.tempered) {
+    row.append(el('span', { cls: 'ctemper' },
+      glyphBox(TEMPER_GLYPH[c.temper] || 'rune', 't-mark'),
+      el('span', { cls: 't-name', text: c.temperName || c.temperText.split(':')[0] }),
+    ));
+  }
+  if (c.count > 1) {
+    row.append(el('span', { cls: 'deck-count', text: `×${c.count}`, attrs: { title: `${c.count} copies in the deck` } }));
+  }
+  return row;
 }
 
 function stat(kind, glyph, text, isFlash, title) {

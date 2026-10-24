@@ -9,6 +9,9 @@
 //   5. Maul's signature (stage shake + ember shockwave) fires through the REAL
 //      targeting path (card click → numbered targets → enemy click), the regression
 //      for the delayed-fx fix (bfa7bf7) and its coexistence with the hit-stop queue
+//   6. the S1 master-deck sheet lists the starting deck from the map AND from combat
+//      (read-only: no tempered badge at run start, duplicates counted, Esc/Close both
+//      dismiss it and the run underneath is untouched)
 //
 // RUN. `npm run test:browser`. Deliberately NOT matched by the default `npm test`
 // glob (`tests/**/*.test.js`): this file is `.spec.js` so the default suite stays
@@ -205,6 +208,60 @@ test('boot: kindling choice leads to the map with a reachable fight', { timeout:
   const s = await readState(page);
   assert.equal(s.phase, 'map');
   assert.ok((await page.locator('button[aria-label^="Travel to"]').count()) > 0, 'no travel node painted');
+});
+
+/** The S1 deck sheet, opened from wherever the player is. */
+async function openDeck(page) {
+  const btn = page.locator('#hud button[aria-label^="Deck:"]');
+  assert.equal(await btn.count(), 1, 'the HUD Deck control must be present (exactly one)');
+  await btn.click();
+  await page.waitForSelector('.modal.deck-modal', { timeout: 3000 });
+}
+
+test('deck: the master-deck sheet shows the starting deck from the map, and again in combat', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t);
+  await bootToMap(page);
+
+  // MAP PHASE. The control names the count (the kernel's own deckCount), the sheet is a
+  // labelled dialog, and the rows are the starting deck aggregated: Hammerfall ×5,
+  // Quench ×4, Anvil Blow ×1 — nothing tempered at run start.
+  const btn = page.locator('#hud button[aria-label^="Deck:"]');
+  assert.equal(await btn.getAttribute('aria-label'), 'Deck: 10 cards', 'the control must announce the deck size');
+  assert.equal((await btn.textContent()).trim(), 'Deck (10)');
+  await openDeck(page);
+
+  const sheet = page.locator('.modal.deck-modal');
+  assert.equal(await sheet.getAttribute('aria-label'), 'Deck: 10 cards', 'the sheet must be a labelled dialog');
+  assert.equal(await sheet.locator('h2').textContent(), 'Deck (10)', 'the sheet title carries the count');
+  const rows = sheet.locator('.deck-row');
+  assert.equal(await rows.count(), 3, 'the 10-card starting deck must aggregate to 3 rows');
+  const hammer = rows.filter({ hasText: 'Hammerfall' });
+  assert.equal(await hammer.count(), 1, 'exactly one Hammerfall row (duplicates counted, not repeated)');
+  assert.equal(await hammer.locator('.deck-count').textContent(), '×5', 'the five starter strikes read as one ×5 row');
+  assert.equal(await rows.filter({ hasText: 'Quench' }).locator('.deck-count').textContent(), '×4');
+  assert.equal(await rows.filter({ hasText: 'Anvil Blow' }).count(), 1);
+  assert.equal(await sheet.locator('.ctemper').count(), 0, 'nothing in the starting deck may wear a temper stamp');
+  // Deterministic order: cost then name — Hammerfall and Quench share cost 1, so the
+  // cheaper pair leads and the cost-2 Anvil Blow closes the list.
+  const names = await rows.locator('.deck-name').allTextContents();
+  assert.deepEqual(names, ['Hammerfall', 'Quench', 'Anvil Blow']);
+
+  // Escape closes it (keyboard affordance); the map is exactly where it was.
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.modal.deck-modal', { state: 'detached', timeout: 3000 });
+  assert.equal(await readState(page).then((s) => s.phase), 'map', 'closing the sheet must not move the run');
+
+  // COMBAT PHASE. The same control is present in the fight; the deck is the same deck.
+  await travelToFight(page);
+  await openDeck(page);
+  const combatSheet = page.locator('.modal.deck-modal');
+  assert.equal(await combatSheet.locator('.deck-row').count(), 3, 'the deck is unchanged in combat');
+  assert.equal(await combatSheet.locator('.ctemper').count(), 0);
+  // The Close button is the mouse affordance out.
+  await combatSheet.getByRole('button', { name: /Close/ }).click();
+  await page.waitForSelector('.modal.deck-modal', { state: 'detached', timeout: 3000 });
+  assert.equal(await readState(page).then((s) => s.phase), 'combat', 'the fight must still be running after closing');
 });
 
 test('combat: a basic attack deals its printed damage without targeting', { timeout: 60000 }, async (t) => {

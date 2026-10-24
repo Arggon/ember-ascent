@@ -42,7 +42,7 @@ import { signatureFor } from './hero-moves.js';
 import { backdropMarkup } from './stage-art.js';
 import { dyingRow } from './floats.js';
 import { endTargeting, pendingCard, pendingSlot } from './targeting.js';
-import { renderHud, helpPanel, helpOpen, HELP_SEEN_KEY } from './hud.js';
+import { renderHud, helpPanel, helpOpen, HELP_SEEN_KEY, deckPanel, deckOpen } from './hud.js';
 import { heroFigure, combatView } from './combat-view.js';
 import { mapView } from './map-view.js';
 import { rewardView } from './reward-view.js';
@@ -241,6 +241,10 @@ export function render() {
   // step is no longer about anything real, so it ends silently rather than aiming at a
   // stale slot.
   if (helpOpen || !seen) stageEl.append(helpPanel());
+  // The S1 master-deck viewer, when the player opened it from the HUD. It paints AFTER the
+  // phase view like the help sheet, and its `.modal-back` covers the stage, so the run
+  // underneath stays untouched (and unclickable) while it is open.
+  if (deckOpen) stageEl.append(deckPanel());
   // The arriving VICTORY or DEFEAT panel takes the caret, so a keyboard player lands on
   // Restart instead of at the top of the document. Best effort, and never a rule.
   if (endFocusPending) {
