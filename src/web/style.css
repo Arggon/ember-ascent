@@ -6486,11 +6486,15 @@ html, body {
   font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: #f8eee5; text-shadow: 0 1px 0 #000;
 }
-.card .ctemper .t-mark { display: inline-flex; width: 12px; height: 12px; color: var(--tc); }
-.card .ctemper .t-mark svg { width: 100%; height: 100%; }
-.card .ctemper .t-mark .m { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.card .ctemper .t-mark .mf { fill: currentColor; }
-.card .ctemper .t-name { line-height: 1.2; }
+/* The stamp's inner mark + name: ONE rule pair per element for every surface that wears
+   the stamp (hand tiles .card, deck rows), as a shared selector list — so the two can
+   never drift. The outer geometry rules above/below stay per-surface on purpose: a tile
+   stamp is positioned over the plate art, a row stamp is a flex child. */
+.card .ctemper .t-mark, .deck-row .ctemper .t-mark { display: inline-flex; width: 12px; height: 12px; color: var(--tc); }
+.card .ctemper .t-mark svg, .deck-row .ctemper .t-mark svg { width: 100%; height: 100%; }
+.card .ctemper .t-mark .m, .deck-row .ctemper .t-mark .m { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.card .ctemper .t-mark .mf, .deck-row .ctemper .t-mark .mf { fill: currentColor; }
+.card .ctemper .t-name, .deck-row .ctemper .t-name { line-height: 1.2; }
 .card.temper-quenched { box-shadow: 0 0 0 2px #6fb6e4, 0 0 14px rgba(111, 182, 228, 0.45); }
 .card.temper-quenched .ctemper { --tc: #8fd0f2; }
 .card.temper-redhot { box-shadow: 0 0 0 2px #ff6a2a, 0 0 16px rgba(255, 90, 30, 0.55); }
@@ -6935,7 +6939,9 @@ html, body {
 .deck-row.temper-redhot { --tc: #ff6a2a; }
 .deck-row.temper-balanced { --tc: #e8c45a; }
 /* The stamp: the hand tiles' .ctemper look, re-scoped to rows (the .card rules cannot
-   apply here — there is no .card ancestor — so the stamp carries its own geometry). */
+   apply here — there is no .card ancestor — so the stamp carries its own geometry; its
+   inner mark + name and the per-temper hues come from the shared .card/.deck-row rules
+   in the Tempers block, so those cannot drift). */
 .deck-row .ctemper {
   --tc: #ff9d3a;
   flex: 0 0 auto;
@@ -6958,11 +6964,6 @@ html, body {
 .deck-row.temper-quenched .ctemper { --tc: #8fd0f2; }
 .deck-row.temper-redhot .ctemper { --tc: #ff8a4a; }
 .deck-row.temper-balanced .ctemper { --tc: #f5c542; }
-.deck-row .ctemper .t-mark { display: inline-flex; width: 12px; height: 12px; color: var(--tc); }
-.deck-row .ctemper .t-mark svg { width: 100%; height: 100%; }
-.deck-row .ctemper .t-mark .m { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.deck-row .ctemper .t-mark .mf { fill: currentColor; }
-.deck-row .ctemper .t-name { line-height: 1.2; }
 /* Duplicates: a brass chip pinned to the row's right edge, so ×5 reads before the eye
    reaches the next name. */
 .deck-count {

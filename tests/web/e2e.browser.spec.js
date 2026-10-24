@@ -267,6 +267,31 @@ test('deck: the master-deck sheet shows the starting deck from the map, and agai
   assert.equal(await readState(page).then((s) => s.phase), 'combat', 'the fight must still be running after closing');
 });
 
+test('deck: tempered copies injected through the save lever wear their own stamped row', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t);
+  await bootToMap(page);
+  // The lever's second half (per the roadmap recipe): a bare ctl.load() does not repaint,
+  // so the test travels — the running web boot opts runs into tempers, so state.tempers
+  // exists in the save and a uid pushed here can carry a temper.
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.deck.push({ uid: 'e2e-hot-0', cardId: 'strike' }, { uid: 'e2e-hot-1', cardId: 'strike' });
+    save.state.tempers['e2e-hot-0'] = 'redhot';
+    save.state.tempers['e2e-hot-1'] = 'redhot';
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+  await travelToFight(page);
+  await openDeck(page);
+
+  const hot = page.locator('.modal.deck-modal .deck-row.tempered');
+  assert.equal(await hot.count(), 1, 'the tempered pair must aggregate into ONE row of its own');
+  assert.equal(await hot.locator('.ctemper .t-name').textContent(), 'Red-hot', 'the row must wear the temper stamp');
+  assert.equal(await hot.locator('.deck-count').textContent(), '×2', 'the injected pair reads as one ×2 row');
+});
+
 /** The S2 card codex, opened from the HUD's Cards control. */
 async function openCodex(page) {
   const btn = page.locator('#hud button[aria-label^="Card codex:"]');

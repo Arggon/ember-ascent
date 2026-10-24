@@ -522,6 +522,8 @@ const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
  * Names, costs, type words and temper effects all come from this file's describe layer
  * (`defOf` / `temperedView` / `CARD_TYPE_LABEL`), so a deck row can never disagree with
  * the hand tile or the CLI dump about what a card is or what a tempered copy plays.
+ * The ONE exception is an id the content no longer knows: it becomes a placeholder row
+ * (name = the raw id, type "unknown") instead of a throw — see the comment in the body.
  * Read-only by construction: it reads `state.deck` and `state.tempers` and allocates
  * fresh rows, so the frozen state is never touched.
  * @param {any} state
@@ -530,7 +532,32 @@ const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 function snapshotDeck(state) {
   const rows = new Map();
   for (const inst of state.deck ?? []) {
-    const def = defOf(inst.cardId);
+    // Tolerant on purpose (the snapshotReward policy): a deck id the content no longer
+    // knows — a stale save after a rename, or a typo'd id pushed in through the save/load
+    // lever (validateSave never checks cardIds) — must not kill the page now that every
+    // phase's snapshot reads the deck. The unknown id still emits a row, carrying the raw
+    // id as its own name and "unknown" as its type word, so the broken entry stays
+    // VISIBLE instead of being silently dropped, and the rows-sum === deckCount invariant
+    // holds because nothing is skipped. Its neutral cost (0) is a sort key, not a claim.
+    const def = CARD_DEFS?.get(inst.cardId) ?? defaultContent().cards.get(inst.cardId);
+    if (!def) {
+      const key = `${inst.cardId}|`;
+      const row = rows.get(key);
+      if (row) { row.count += 1; continue; }
+      rows.set(key, {
+        cardId: inst.cardId,
+        name: inst.cardId,
+        cost: 0,
+        type: 'unknown',
+        typeLabel: 'unknown',
+        tempered: false,
+        temper: null,
+        temperName: '',
+        temperText: '',
+        count: 1,
+      });
+      continue;
+    }
     const { temper } = temperedView(state, inst, def);
     const key = `${inst.cardId}|${temper ?? ''}`;
     const row = rows.get(key);

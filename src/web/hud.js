@@ -56,14 +56,16 @@ export function renderHud() {
   hudEl.append(el('span', { cls: 'spacer' }));
   // S1 master-deck viewer: read-only, reachable wherever the HUD is (map, combat and the
   // rest phases alike). The count is the kernel's own `deckCount`, so the button can
-  // never disagree with the deck the modal lists.
+  // never disagree with the deck the modal lists — and text and aria-label share one
+  // computed total, so the visible name and the announced name cannot drift apart.
+  const deckTotal = snap.deckCount ?? (snap.deckCards || []).reduce((n, c) => n + c.count, 0);
   hudEl.append(el('button', {
     cls: 'btn ghost',
-    text: `Deck (${snap.deckCount ?? (snap.deckCards || []).reduce((n, c) => n + c.count, 0)})`,
+    text: `Deck (${deckTotal})`,
     attrs: {
       type: 'button',
       title: 'Your whole deck, duplicates counted — keyboard: d',
-      'aria-label': `Deck: ${snap.deckCount} cards`,
+      'aria-label': `Deck: ${deckTotal} cards`,
     },
     on: { click: () => toggleDeck(true) },
   }));
@@ -205,7 +207,8 @@ export function toggleDeck(open) {
  * this viewer can never show a card the run does not own, a cost the engine does not
  * charge or a temper the rules do not resolve. The shell is the help sheet's own —
  * `.modal-back` > `.modal` > `.modal-scroll` + `.modal-foot` — so the page keeps ONE
- * modal system: backdrop click and Escape both close, exactly like Help.
+ * modal system: the backdrop click and the Close button dismiss it exactly like Help,
+ * plus Escape (which Help itself does not have).
  */
 export function deckPanel() {
   const rows = snap.deckCards || [];
@@ -255,7 +258,9 @@ function deckRow(c) {
   if (c.tempered) {
     row.append(el('span', { cls: 'ctemper' },
       glyphBox(TEMPER_GLYPH[c.temper] || 'rune', 't-mark'),
-      el('span', { cls: 't-name', text: c.temperName || c.temperText.split(':')[0] }),
+      // The name alone: the kernel always publishes one for a tempered row, and any
+      // fallback here would re-derive a describe-layer string on the web.
+      el('span', { cls: 't-name', text: c.temperName }),
     ));
   }
   if (c.count > 1) {

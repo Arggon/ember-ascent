@@ -75,6 +75,53 @@ test('the temper flag propagates: tempered copies split into their own row', () 
   assert.equal(plain.temperName, '');
 });
 
+test('two DISTINCT tempers on the same card split into two rows, Quenched sorting before Red-hot', () => {
+  const base = newRun({ seed: 2, tempers: true });
+  const strikes = base.deck.filter((c) => c.cardId === 'strike').map((c) => c.uid);
+  const snap = snapshot({ ...base, tempers: { [strikes[0]]: 'redhot', [strikes[1]]: 'quenched' } });
+
+  const rows = snap.deckCards.filter((r) => r.cardId === 'strike');
+  assert.deepEqual(rows.map((r) => [r.tempered, r.count]), [[false, 3], [true, 1], [true, 1]],
+    'each temper is its own row; only identical (cardId, temper) pairs aggregate');
+  // Cost and name tie, so the temper key decides — code-unit 'q' < 'r'.
+  assert.deepEqual(rows.slice(1).map((r) => r.temper), ['quenched', 'redhot']);
+  assert.deepEqual(rows.slice(1).map((r) => r.temperName), ['Quenched', 'Red-hot']);
+  // The two tempered rows are otherwise identical facts about the same card.
+  assert.equal(rows[1].name, rows[2].name);
+  assert.equal(rows[1].cost, rows[2].cost);
+});
+
+test('a deck entry the content no longer knows snapshots as a placeholder row, without throwing', () => {
+  const state = newRun({ seed: 7 });
+  // The stale-save shape: validateSave never checks cardIds, so this reaches the snapshot.
+  const snap = snapshot({ ...state, deck: [...state.deck, { uid: 'x1', cardId: 'no_such_card' }] });
+  assert.deepEqual(
+    snap.deckCards.find((r) => r.cardId === 'no_such_card'),
+    {
+      cardId: 'no_such_card',
+      name: 'no_such_card', // the raw id, so the broken entry is visible, not invented
+      cost: 0, // a sort key, not a claim about energy
+      type: 'unknown',
+      typeLabel: 'unknown',
+      tempered: false,
+      temper: null,
+      temperName: '',
+      temperText: '',
+      count: 1,
+    },
+  );
+  assert.equal(snap.deckCards.reduce((n, r) => n + r.count, 0), snap.deckCount,
+    'the placeholder must keep the rows-sum === deckCount invariant');
+  // The same broken entry carrying a stale temper must not crash the snapshot either.
+  const staleTemper = snapshot({
+    ...state,
+    deck: [...state.deck, { uid: 'x2', cardId: 'no_such_card' }],
+    tempers: { x2: 'redhot' },
+  });
+  assert.equal(staleTemper.deckCards.find((r) => r.cardId === 'no_such_card').tempered, false);
+  assert.equal(staleTemper.deckCards.reduce((n, r) => n + r.count, 0), staleTemper.deckCount);
+});
+
 test('rows sort deterministically: cost, then face name, then temper', () => {
   const base = newRun({ seed: 2, tempers: true });
   const strike = base.deck.find((c) => c.cardId === 'strike');
