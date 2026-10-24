@@ -6,7 +6,8 @@
 // stepIndex is owned by the top-level step() in kernel/index.js. Nothing in this
 // file mutates it, so one submitted action always means exactly one step increment.
 import { VOCABULARY, damagePlayer } from './vocabulary.js';
-import { instantiate, setCardDefs, cardDefMap } from './card-instance.js';
+import { setCardDefs } from './card-instance.js';
+import { drawIntoHand } from './draw.js';
 import { ENEMIES, chooseIntent } from './encounters.js';
 import { NODE_TYPES, ROWS } from './map.js';
 import { fireHook, endOfTurnStatuses, decayStatuses } from './powers.js';
@@ -27,36 +28,6 @@ export const REWARD_CHOICES = 3;
 
 /** Strip a runtime hand card back to its compact deck-instance form. */
 const toInstance = (c) => ({ uid: c.uid, cardId: c.cardId, perPlay: c.perPlay ?? 0 });
-
-/** Draw `n` cards into the hand, reshuffling the discard pile as needed. Pure. */
-function drawCards(state, n) {
-  let next = state;
-  const uids = [];
-  let reshuffles = 0;
-  for (let k = 0; k < n; k += 1) {
-    if (next.combat.draw.length === 0) {
-      if (next.combat.discard.length === 0) break;
-      const sh = shuffleAt(next.seed, next.rngDraws, next.combat.discard);
-      reshuffles += 1;
-      next = { ...next, rngDraws: next.rngDraws + sh.draws, combat: { ...next.combat, draw: sh.items, discard: [] } };
-    }
-    // Deck instances are stored compactly; the hand copy is decorated with cost so
-    // legality checks and rendering never need to re-read content mid-turn.
-    const head = instantiate(next.combat.draw[0]);
-    const room = next.combat.hand.length < 10;
-    uids.push(head.uid);
-    next = {
-      ...next,
-      combat: {
-        ...next.combat,
-        draw: next.combat.draw.slice(1),
-        hand: room ? [...next.combat.hand, head] : next.combat.hand,
-        discard: room ? next.combat.discard : [...next.combat.discard, head],
-      },
-    };
-  }
-  return { state: next, uids, reshuffles };
-}
 
 /** Card definitions, injected once by the kernel entry so rules never import content. */
 
@@ -136,22 +107,29 @@ export function startCombat(state, node, cardDefs) {
   };
 }
 
+/** The enemy's currently shown move: its moveIndex, or the first move as a fallback. */
+const currentMove = (enemy) => {
+  const def = ENEMIES[enemy.id];
+  return def.moves[enemy.moveIndex] ?? def.moves[0];
+};
+
+/** One hit of an attack move: Strength added, Weak applied. */
+const strikeDamage = (enemy, move) => {
+  let dmg = move.damage + (enemy.statuses?.strength ?? 0);
+  if ((enemy.statuses?.weak ?? 0) > 0) dmg = Math.floor(dmg * 3 / 4);
+  return dmg;
+};
+
 /** The printed intent text for one enemy, e.g. "A11" or "PWR3 B6". */
 export function intentLabel(enemy) {
-  const def = ENEMIES[enemy.id];
-  const move = def.moves[enemy.moveIndex] ?? def.moves[0];
-  return move.label;
+  return currentMove(enemy).label;
 }
 
 /** Damage the enemy's current intent will deal to the player, before player block. */
 export function intentDamage(enemy) {
-  const def = ENEMIES[enemy.id];
-  const move = def.moves[enemy.moveIndex] ?? def.moves[0];
+  const move = currentMove(enemy);
   if (move.kind !== 'attack') return 0;
-  const strength = enemy.statuses?.strength ?? 0;
-  let dmg = move.damage + strength;
-  if ((enemy.statuses?.weak ?? 0) > 0) dmg = Math.floor(dmg * 3 / 4);
-  return dmg * (move.hits ?? 1);
+  return strikeDamage(enemy, move) * (move.hits ?? 1);
 }
 
 /**
@@ -169,9 +147,12 @@ export function beginTurn(state, cardDefs) {
     player: { ...state.player, block: 0, energy: state.energyPerTurn ?? BASE_ENERGY },
   };
 
-  const drawn = drawCards(next, HAND_SIZE);
+  // The turn draw reshuffles at the LIVE counter (see rules/draw.js for why the
+  // shuffle is a callback): every reshuffle inside one turn reads the draws this
+  // loop has already consumed.
+  const drawn = drawIntoHand(next, HAND_SIZE, (s, items) => shuffleAt(s.seed, s.rngDraws, items));
   next = drawn.state;
-  events.push({ t: 'turn_start', turn: next.combat.turn, drawn: drawn.uids, reshuffles: drawn.reshuffles });
+  events.push({ t: 'turn_start', turn: next.combat.turn, drawn: drawn.drawn.map((c) => c.uid), reshuffles: drawn.reshuffles });
 
   const enemies = next.combat.enemies.map((e) => {
     if (e.dead) return e;
@@ -191,6 +172,77 @@ export function beginTurn(state, cardDefs) {
   return { state: next, events };
 }
 
+/** Rebuild the combat with every enemy replaced by `fn(enemy)`. */
+const patchEnemies = (state, fn) => ({
+  ...state,
+  combat: { ...state.combat, enemies: state.combat.enemies.map(fn) },
+});
+
+/** Rebuild the combat with ONE enemy (index `i`) replaced by `fn(enemy)`. */
+const patchEnemyAt = (state, i, fn) => patchEnemies(state, (e, j) => (j === i ? fn(e) : e));
+
+/**
+ * What one enemy does with its chosen move. One runner per move kind, so a new kind
+ * is a table row plus a runner — the enemy-turn loop below never changes. Each
+ * runner owns its events; the loop only sequences them.
+ */
+const MOVE_RUNNERS = {
+  /** attack: hit the player `hits` times for Strength-added, Weak-reduced damage. */
+  attack(state, i, move) {
+    const enemy = state.combat.enemies[i];
+    const dmg = strikeDamage(enemy, move);
+    const events = [];
+    let next = state;
+    const hits = move.hits ?? 1;
+    for (let h = 0; h < hits; h += 1) {
+      const out = damagePlayer(next.player, dmg);
+      next = { ...next, player: out.player };
+      events.push({ t: 'enemy_attack', enemy: i, raw: dmg, dealt: out.dealt, blocked: out.blocked, hp: next.player.hp });
+      if (next.player.hp <= 0) break;
+    }
+    return { state: next, events };
+  },
+
+  /** block: gain the printed Block. */
+  block(state, i, move) {
+    const amount = move.block ?? 0;
+    return {
+      state: patchEnemyAt(state, i, (e) => ({ ...e, block: e.block + amount })),
+      events: [{ t: 'enemy_block', enemy: i, amount }],
+    };
+  },
+
+  /** buff: Strength first, then Block — the printed order is the event order. */
+  buff(state, i, move) {
+    let next = state;
+    const events = [];
+    if (move.strength) {
+      next = patchEnemyAt(next, i, (e) => ({ ...e, statuses: { ...e.statuses, strength: (e.statuses.strength ?? 0) + move.strength } }));
+      events.push({ t: 'enemy_status', enemy: i, status: 'strength', stacks: move.strength });
+    }
+    if (move.block) {
+      next = patchEnemyAt(next, i, (e) => ({ ...e, block: e.block + move.block }));
+      events.push({ t: 'enemy_block', enemy: i, amount: move.block });
+    }
+    return { state: next, events };
+  },
+
+  /** debuff: apply Vulnerable and Weak to the player. */
+  debuff(state, i, move) {
+    let next = state;
+    const events = [];
+    if (move.vulnerable) {
+      next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, vulnerable: (next.player.statuses?.vulnerable ?? 0) + move.vulnerable } } };
+      events.push({ t: 'player_status', status: 'vulnerable', stacks: move.vulnerable });
+    }
+    if (move.weak) {
+      next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, weak: (next.player.statuses?.weak ?? 0) + move.weak } } };
+      events.push({ t: 'player_status', status: 'weak', stacks: move.weak });
+    }
+    return { state: next, events };
+  },
+};
+
 /** Resolve the enemy turn using each enemy's already-chosen intent. */
 export function enemyTurn(state) {
   let next = state;
@@ -198,55 +250,20 @@ export function enemyTurn(state) {
 
   // Enemy block decays at the START of its own turn, so block gained last turn
   // covered the player's turn — which is what makes the Guardian's B20 meaningful.
-  next = { ...next, combat: { ...next.combat, enemies: next.combat.enemies.map((e) => ({ ...e, block: 0 })) } };
-
+  next = patchEnemies(next, (e) => ({ ...e, block: 0 }));
 
   for (let i = 0; i < next.combat.enemies.length; i += 1) {
     const enemy = next.combat.enemies[i];
     if (enemy.dead) continue;
-    const def = ENEMIES[enemy.id];
-    const move = def.moves[enemy.moveIndex] ?? def.moves[0];
-    const strength = enemy.statuses?.strength ?? 0;
-    const weak = (enemy.statuses?.weak ?? 0) > 0;
-
-    if (move.kind === 'attack') {
-      let dmg = move.damage + strength;
-      if (weak) dmg = Math.floor(dmg * 3 / 4);
-      const hits = move.hits ?? 1;
-      for (let h = 0; h < hits; h += 1) {
-        const out = damagePlayer(next.player, dmg);
-        next = { ...next, player: out.player };
-        events.push({ t: 'enemy_attack', enemy: i, raw: dmg, dealt: out.dealt, blocked: out.blocked, hp: next.player.hp });
-        if (next.player.hp <= 0) break;
-      }
-    } else if (move.kind === 'block') {
-      const block = move.block ?? 0;
-      next = { ...next, combat: { ...next.combat, enemies: next.combat.enemies.map((e, j) => (j === i ? { ...e, block: e.block + block } : e)) } };
-      events.push({ t: 'enemy_block', enemy: i, amount: block });
-    } else if (move.kind === 'buff') {
-      if (move.strength) {
-        next = { ...next, combat: { ...next.combat, enemies: next.combat.enemies.map((e, j) => (j === i ? { ...e, statuses: { ...e.statuses, strength: (e.statuses.strength ?? 0) + move.strength } } : e)) } };
-        events.push({ t: 'enemy_status', enemy: i, status: 'strength', stacks: move.strength });
-      }
-      if (move.block) {
-        next = { ...next, combat: { ...next.combat, enemies: next.combat.enemies.map((e, j) => (j === i ? { ...e, block: e.block + move.block } : e)) } };
-        events.push({ t: 'enemy_block', enemy: i, amount: move.block });
-      }
-    } else if (move.kind === 'debuff') {
-      if (move.vulnerable) {
-        next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, vulnerable: (next.player.statuses?.vulnerable ?? 0) + move.vulnerable } } };
-        events.push({ t: 'player_status', status: 'vulnerable', stacks: move.vulnerable });
-      }
-      if (move.weak) {
-        next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, weak: (next.player.statuses?.weak ?? 0) + move.weak } } };
-        events.push({ t: 'player_status', status: 'weak', stacks: move.weak });
-      }
+    const move = currentMove(enemy);
+    const run = MOVE_RUNNERS[move.kind];
+    if (run) {
+      const out = run(next, i, move);
+      next = out.state;
+      events.push(...out.events);
     }
 
-    next = {
-      ...next,
-      combat: { ...next.combat, enemies: next.combat.enemies.map((e, j) => (j === i ? { ...e, moveHistory: [...e.moveHistory, e.moveIndex] } : e)) },
-    };
+    next = patchEnemyAt(next, i, (e) => ({ ...e, moveHistory: [...e.moveHistory, e.moveIndex] }));
     if (next.player.hp <= 0) break;
   }
   return { state: next, events };

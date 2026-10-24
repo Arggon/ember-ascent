@@ -11,8 +11,7 @@
 // `cards.json` remains the single source of truth: it is generated from it by
 // scripts/gen-content.mjs, and tests/content/bundle-drift.test.js re-reads the JSON
 // in Node and deep-compares, so the two can never silently drift.
-import { VERBS } from './rules/vocabulary.js';
-import { registeredEffects } from './rules/vocabulary.js';
+import { VERBS, registeredEffects } from './rules/vocabulary.js';
 import { cardsBundle } from './content/cards.bundle.js';
 
 const REQUIRED_CARD_FIELDS = ['id', 'name', 'cost', 'type', 'rarity', 'target', 'effects'];

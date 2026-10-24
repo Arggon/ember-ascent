@@ -22,8 +22,8 @@ this same origin. No analytics, no telemetry, no external font, no CDN.
 
 Layout:
   index.html            the entry point (open http://localhost:5173/)
-  app.js, stage-art.js, card-art.js, tokens.js, style.css
-                        the page and its modules
+  app.js and its modules (render.js, runtime.js, ...), style.css
+                        the page and its code, split into focused ES modules
   assets/               sprites and backdrops (WebP)
   fonts/                the web fonts and their OFL licence texts
   src/                  the game engine (kernel, surface) that app.js imports
