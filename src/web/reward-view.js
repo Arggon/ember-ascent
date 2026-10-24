@@ -5,7 +5,7 @@ import { el, sceneIllus } from './dom.js';
 import { cardTile } from './combat-view.js';
 import { consumeClick } from './targeting.js';
 import { act } from './actions.js';
-import { page } from './render.js';
+import { page } from './page-frame.js';
 
 export function rewardView() {
   const wrap = el('div');

@@ -274,3 +274,20 @@ export let dealPending = false;
 export let dyingThisPaint = [];
 export function setDealPending(v) { dealPending = v; }
 export function setDyingThisPaint(list) { dyingThisPaint = list; }
+
+/* ------------------------------------------------------------- WIRING HOOKS --------
+ * Two owners sit ABOVE the layers that need to reach them: only render.js may paint, and
+ * only targeting.js may end a targeting step. Having actions.js and the views import
+ * upward would make the module graph cyclic (render imports the views, the views import
+ * actions, actions imports render), so each owner registers itself here once at module
+ * load and the lower layers call the hook. Calls before registration are no-ops, which
+ * can only happen during boot, before any interaction exists.
+ */
+
+/** The one paint path, registered by render.js; the views and actions repaint through it. */
+export let repaint = () => {};
+export function setRepaint(fn) { repaint = fn; }
+
+/** The targeting state reset, registered by targeting.js; actions.js ends steps through it. */
+export let notifyEndTargeting = () => {};
+export function setEndTargeting(fn) { notifyEndTargeting = fn; }

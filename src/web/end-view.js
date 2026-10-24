@@ -9,7 +9,7 @@ import { el } from './dom.js';
 import { glyphBox } from './glyphs.js';
 import { ledgerBlock, ledgerMath, lastRecord, lastUnlock, recognitionText, savedOk, unlockBlock } from './run-history.js';
 import { newGame } from './actions.js';
-import { page } from './render.js';
+import { page } from './page-frame.js';
 
 /* --------------------------------------------------------------------- ENDED */
 

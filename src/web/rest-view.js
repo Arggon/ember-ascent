@@ -3,7 +3,7 @@
 import { arriving, snap } from './runtime.js';
 import { el, keywordText, sceneIllus } from './dom.js';
 import { act } from './actions.js';
-import { page } from './render.js';
+import { page } from './page-frame.js';
 
 /* --------------------------------------------------------------------- REST */
 

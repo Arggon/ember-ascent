@@ -10,7 +10,7 @@ import { snap } from './runtime.js';
 import { el, keywordText, sceneIllus } from './dom.js';
 import { heroMarkup } from './stage-art.js';
 import { HEROES, act, switchHero, switchPath } from './actions.js';
-import { page } from './render.js';
+import { page } from './page-frame.js';
 
 /* ------------------------------------------------------------------ KINDLING */
 

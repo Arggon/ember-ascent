@@ -23,6 +23,8 @@ import {
   flash,
   fxEl,
   noArrival,
+  notifyEndTargeting,
+  repaint,
   runEvents,
   seedFromUrl,
   setBursts,
@@ -53,8 +55,6 @@ import { announce, toast } from './dom.js';
 import { enemyLook } from './glyphs.js';
 import { currentProfile, recordRun, resetRunOutcome } from './run-history.js';
 import { dispatchFx } from './fx.js';
-import { endTargeting } from './targeting.js';
-import { render } from './render.js';
 
 /** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it. */
 export const HEROES = [
@@ -291,7 +291,7 @@ export function act(actionId, targetK = null) {
       setPhaseArriving('rest');
     }
   }
-  render();
+  repaint();
   dispatchFx();
 }
 
@@ -361,8 +361,8 @@ export function newGame(seed = null, opts = {}) {
   setPrevMap(null, null);
   setLastTravel(null);
   setEnteringIds(new Set());
-  endTargeting();
-  render();
+  notifyEndTargeting();
+  repaint();
 }
 
 /**

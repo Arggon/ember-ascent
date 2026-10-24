@@ -37,7 +37,7 @@ import {
   stageEl,
 } from './runtime.js';
 import { el } from './dom.js';
-import { enemyLook, glyphBox } from './glyphs.js';
+import { enemyLook } from './glyphs.js';
 import { signatureFor } from './hero-moves.js';
 import { backdropMarkup } from './stage-art.js';
 import { dyingRow } from './floats.js';
@@ -50,26 +50,10 @@ import { kindlingView } from './kindling-view.js';
 import { restView } from './rest-view.js';
 import { endView } from './end-view.js';
 import { sceneBeat } from './fx.js';
+import { page } from './page-frame.js';
+import { setRepaint } from './runtime.js';
 
 /* ----------------------------------------------------------------------- STAGE */
-
-/**
- * Wrap one phase in an "engraved page": a faint chapter line and a large watermark
- * glyph behind the content. Purely atmospheric — no meaning lives in the watermark.
- * @param {string} kind phase name, used for the class hook
- * @param {string} chapter the faint uppercase line
- * @param {string} mark a GLYPHS key
- * @param {string} extra extra classes for the page element
- * @param {Element[]} kids the real content
- */
-export function page(kind, chapter, mark, extra, kids) {
-  const wrap = el('div', { cls: 'page page-' + kind + (extra ? ' ' + extra : '') },
-    el('span', { cls: 'page-num', text: chapter }),
-  );
-  for (const kid of kids) wrap.append(kid);
-  wrap.append(glyphBox(mark, 'page-glyph'));
-  return wrap;
-}
 
 /**
  * How long the end-of-run panel is held back on the motion path, so the killing blow is a
@@ -88,6 +72,10 @@ export function page(kind, chapter, mark, extra, kids) {
  */
 const COLLAPSE_MS = 500;
 const END_DELAY_MS = 480;
+
+// render.js is the paint sink: nothing imports back into it (the views repaint through the
+// runtime hook), so registering here at load is enough and the graph stays acyclic.
+setRepaint(render);
 
 export function render() {
   // A target step that the battle has moved on from (hand changed, fight over, enemies
