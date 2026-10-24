@@ -14,17 +14,19 @@ Work top to bottom. Checked boxes are things already done and verified in this r
 ## Before you start — the one upload file
 
 - [x] **`release.zip`** exists in this workspace root. That is the artifact.
-- [x] Zip SHA-256 `ed79756acf12eb6d15e549ab684623c2e97195d57d61dfa69fdad7df10a53a31`
-      — 85 entries, **2,480,641 bytes**. Rebuilt 2026-10-24 after the module refactor
-      (`src/web/app.js` is now a small entry importing focused ES modules, so the artifact
-      carries 85 files instead of 25); regenerates byte-for-byte with
-      `node scripts/build-release.mjs` (verified: two runs, same SHA).
+- [x] Zip SHA-256 `64964d19442c4a7e37fb55bbc747c2eb8394468f8e407211779a026a97f5fc03`
+      — 87 entries, **2,483,583 bytes**. Rebuilt 2026-10-24 at `daba4b4` (the refactored
+      module layout plus the melee-approach animation and the ended-screen fix) and
+      **SHIPPED the same day**: `butler push release.zip arggondev/ember-ascent:html
+      --userversion 0.3.2` → build `#2203120` on the `html` channel. Regenerates
+      byte-for-byte with `node scripts/build-release.mjs` (deterministic by design).
 
 > **Note on earlier hashes.** This file previously recorded `b86764e4…`/101,861 B and
 > `../RELEASE-NOTES.md` recorded `72d1dc63…`/104,895 B. Neither matched the zip on disk, which was
-> itself `f629b29c…`/119,618 B and predated the layout fix. All were superseded on 2026-10-15 by
-> `4a662160…`/123,283 B, which is **itself superseded** by the hash above — the artifact of
-> 2026-10-24, and the one you should upload.
+> itself `f629b29c…`/119,618 B and predated the layout fix. Those were superseded on 2026-10-15 by
+> `4a662160…`/123,283 B, then by the module-refactor artifact `ed79756a…`/2,480,641 B (85 entries,
+> 2026-10-24), and **that one by the hash above** — the 0.3.2 build of 2026-10-24, the one that
+> shipped. Earlier versions went up as manual zip uploads; 0.3.2 was the first butler push.
 - [x] **`index.html` is at the zip root** (not nested inside `src/web/`). Verified against
       itch.io's rule that the ZIP must contain `index.html` as the entry point.
 - [x] No file path in the zip exceeds 240 characters; the longest is 34
