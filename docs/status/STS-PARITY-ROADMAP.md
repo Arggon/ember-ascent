@@ -49,8 +49,8 @@ Process rules (standing):
 |---|---|---|---|---|
 | S1 | Master deck viewer | snapshot exposes full deck (id, name, cost, type, tempered, count) | "Deck" button on map+combat → modal overlay, sorted, grouped by count, Esc/click closes | closed — 5b11de9 + fixes 7992e84, QA 7/7, review APPROVE |
 | S2 | Card codex | expose draft pool via public API (`draftPoolFrom` already exists) | "Cards" button → codex modal grouped by rarity with descriptions | closed — 01466a3 + fixes 2ab6834 (per-run truthful codex + tolerance + keyguard), QA 8/8+loop, re-review APPROVE |
-| S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | **in progress** (dev dispatched) |
-| S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | pending |
+| S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | closed — 67084ec, QA 10/10, review APPROVE |
+| S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | **in progress** (dev dispatched; includes negative-gold validation from S3 review) |
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | pending |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | pending |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | pending |
@@ -122,3 +122,10 @@ Process rules (standing):
   determinism, save/reload, legacy-save defaults to 0, end-screen total, deck/codex
   regressions clean, zero console errors. Committed 67084ec; solo review dispatched.
   Roadmap lever recipe corrected: ctl.load takes the parsed object.
+- 2026-10-24 — S3 review (solo, relaunched after a provider usage-limit kill):
+  VERDICT APPROVE. Reviewer verified byte-identical golden regeneration, legacy-save
+  hash stability, once-only grant structure, RNG accounting, and all three test
+  deviations (policy sources untouched at the commit). Two P3s recorded: negative/
+  unbounded gold accepted by validateSave (folded into S4 — spending makes it real),
+  and legacy-log replay drift is silent (doc-grade: note in replay-drift error/docs
+  that engine draw-consumption changes from S3 onward retire old log hashes).
