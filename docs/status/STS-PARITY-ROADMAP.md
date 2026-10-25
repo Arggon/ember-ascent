@@ -51,7 +51,7 @@ Process rules (standing):
 | S2 | Card codex | expose draft pool via public API (`draftPoolFrom` already exists) | "Cards" button → codex modal grouped by rarity with descriptions | closed — 01466a3 + fixes 2ab6834 (per-run truthful codex + tolerance + keyguard), QA 8/8+loop, re-review APPROVE |
 | S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | closed — 67084ec, QA 10/10, review APPROVE |
 | S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | closed — 58aefe6 + fixes af50324, QA 11/11, review APPROVE |
-| S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | pending |
+| S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | committed c83a2d0 — QA PASS 11/11, in review |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | pending |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | pending |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending |
@@ -146,3 +146,12 @@ Process rules (standing):
   family live; strip/restore experiment quoted); P3 shop.js roll-order comment. All
   gates re-verified by the orchestrator at af50324 (273 tests/272 pass/1 todo, gate OK,
   art OK, test:browser 13/13). Committed af50324 — S4 CLOSED.
+- 2026-10-25 — S5 (potions) dev was network-killed THREE times (each resume preserved its
+  work); after the third the orchestrator took over the final verification: full battery
+  green (296 tests/295 pass/1 pre-existing todo, gate OK, art OK, test:browser 14/14 incl.
+  the new belt e2e, sim exit 0, token budgets PASS). Six-potion roster composed from the
+  existing vocabulary; fixed victory roll order (relic heal -> gold -> potion drop ->
+  reward roll); tier bands 40/40/60, boss never, full-belt suppression at 0 draws,
+  combat-only q/d ids, S4.1 tolerance ruling applied. Manual QA PASS 11/11 (evidence
+  /tmp/s5-qa/, 26 screenshots; real drop sampling 37.5% vs 40% band; exact effect math;
+  zero-draw discard proven via rngDraws 67->67). Committed c83a2d0; solo review dispatched.
