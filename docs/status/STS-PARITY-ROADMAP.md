@@ -50,7 +50,7 @@ Process rules (standing):
 | S1 | Master deck viewer | snapshot exposes full deck (id, name, cost, type, tempered, count) | "Deck" button on map+combat → modal overlay, sorted, grouped by count, Esc/click closes | closed — 5b11de9 + fixes 7992e84, QA 7/7, review APPROVE |
 | S2 | Card codex | expose draft pool via public API (`draftPoolFrom` already exists) | "Cards" button → codex modal grouped by rarity with descriptions | closed — 01466a3 + fixes 2ab6834 (per-run truthful codex + tolerance + keyguard), QA 8/8+loop, re-review APPROVE |
 | S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | closed — 67084ec, QA 10/10, review APPROVE |
-| S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | committed 58aefe6 — QA PASS 11/11, in review |
+| S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | closed — 58aefe6 + fixes af50324, QA 11/11, review APPROVE |
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | pending |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | pending |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | pending |
@@ -138,3 +138,11 @@ Process rules (standing):
   removal (19-instance modal), leave-is-final, byte-identical offers across boots,
   negative-gold rejection with exact problems message, legacy/deleted shop-field
   tolerance, zero console errors. Committed 58aefe6; solo review dispatched.
+- 2026-10-25 — S4 review VERDICT: APPROVE (in-memory golden rebuild byte-identical, all
+  economy invariants verified). Fix round S4.1: P2 NaN purse via a validate-accepted
+  no-gold shop save (both spend sites floor at 0, pinned); P3 R6 inversion (torn shop
+  offered a no-op x — enumeration mirrors the handler guard, pinned); P3 surface-art
+  page-* detection was DEAD CODE (fixer proved the prescribed edit inert, made the
+  family live; strip/restore experiment quoted); P3 shop.js roll-order comment. All
+  gates re-verified by the orchestrator at af50324 (273 tests/272 pass/1 todo, gate OK,
+  art OK, test:browser 13/13). Committed af50324 — S4 CLOSED.
