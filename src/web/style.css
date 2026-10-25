@@ -889,11 +889,14 @@ html, body {
 .node.t-elite .ntype-mark { color: var(--power); }
 .node.t-rest .ntype-mark { color: #8fc9a8; }
 .node.t-boss .ntype-mark { color: var(--hp); }
+.node.t-shop .ntype-mark { color: var(--gold); }
 .node.t-boss { border-color: #5a2630; color: #d9a0a0; }
 .node.t-boss.available { border-color: var(--hp); color: var(--ink); box-shadow: 0 0 0 3px rgba(226, 80, 76, 0.2), var(--shadow); }
 .node.t-elite { border-color: #40305a; color: #c0a4dd; }
 .node.t-elite.available { border-color: var(--power); color: var(--ink); box-shadow: 0 0 0 3px rgba(185, 143, 224, 0.2), var(--shadow); }
 .node.t-rest { border-color: #2c4a3a; color: #9fc7b0; }
+.node.t-shop { border-color: #4a3d1e; color: #d9c07a; }
+.node.t-shop.available { border-color: var(--gold); color: var(--ink); box-shadow: 0 0 0 3px rgba(245, 197, 66, 0.2), var(--shadow); }
 
 /* ---------- Reward / rest / end screens ---------- */
 
@@ -1009,6 +1012,63 @@ html, body {
 .demon .demon-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .demon .demon-glyph .mf { fill: currentColor; stroke: none; }
 .demon.lose { color: var(--loss); }
+
+/* ---------- Shop (S4): the vendor's shelves, priced in gold ---------- */
+/* Same engraved page as reward/rest; the hue is the coin's gold, dimmed — a room that
+   takes rather than gives. */
+
+.page-shop { --panel-hue: #b9963f; }
+
+.shop-head { display: flex; align-items: baseline; justify-content: center; gap: var(--sp-3); flex-wrap: wrap; }
+.shop-title { margin: var(--sp-2) 0; }
+/* The purse chip: the same struck coin as the reward spoils, sized up — here it is the
+   room's subject, not a footnote. One kernel value; the HUD shows the same number. */
+.shop-purse { display: inline-flex; align-items: center; gap: 7px; padding: 4px 14px;
+  font-size: var(--fs-4); font-weight: 800; color: var(--gold);
+  border: 1px solid rgba(245, 197, 66, 0.34); border-radius: 999px;
+  background: var(--stat-well); font-variant-numeric: tabular-nums; }
+.shop-purse .coin-glyph { display: inline-flex; width: 17px; height: 17px; }
+.shop-purse .coin-glyph svg { display: block; width: 100%; height: 100%; }
+.shop-purse .coin-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.shop-note { color: var(--dim); font-size: var(--fs-3); margin: 0 auto var(--sp-3); max-width: 560px; line-height: 1.5; }
+
+/* The shelf row: the reward row's layout with the vendor's frame. Tiles that cannot be
+   bought are the hand's inert tiles (same .disabled / aria-disabled language). */
+.shop-grid {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: stretch;
+  padding: 12px 10px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(245, 197, 66, 0.07) 0%, rgba(0, 0, 0, 0) 40%);
+  border: 1px solid rgba(245, 197, 66, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+.shop-grid .card { width: 172px; min-height: 236px; position: relative; }
+
+/* The price badge rides on every tile, top-right opposite the Energy gem. */
+.shop-price {
+  position: absolute; top: 6px; right: 6px;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: var(--fs-2); font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--gold); border: 1px solid rgba(245, 197, 66, 0.4);
+  background: linear-gradient(180deg, rgba(20, 16, 6, 0.92), rgba(12, 10, 4, 0.92));
+}
+.shop-price .coin-glyph { display: inline-flex; width: 11px; height: 11px; }
+.shop-price .coin-glyph svg { display: block; width: 100%; height: 100%; }
+.shop-price .coin-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.shop-price.cannot { color: var(--faint); border-color: var(--edge); text-decoration: line-through; }
+.shop-price.sold { color: var(--faint); border-color: var(--edge); font-style: italic; }
+
+.shop-controls { margin-top: var(--sp-3); display: flex; gap: var(--sp-3); justify-content: center; flex-wrap: wrap; align-items: center; }
+.shop-controls .btn { min-width: 200px; }
+
+/* The removal step's instance list: the temper list's shape, one button per deck card.
+   Copy labels ("copy 2/5") are the uid-precise distinction the kernel's x<n> ids address. */
+.remove-list { margin-top: var(--sp-2); }
+.remove-offer { min-width: 210px; text-align: left; }
+.remove-offer .boon-name { font-size: var(--fs-3); }
+.shop .shop-purse,
+.shop .remove-list { animation: fade-up var(--dur-slow) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
 
 /* ---------- Toast ---------- */
 

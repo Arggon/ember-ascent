@@ -188,15 +188,37 @@ test('a save whose gold is not an integer is refused', () => {
   );
 });
 
+test('a negative purse is refused (S3 review P3 — spending makes debt a real state)', () => {
+  // validateSave names it, and the loader refuses the whole save.
+  const save = JSON.parse(JSON.stringify(saveObject(begin({ seed: 7 }))));
+  save.state.player.gold = -5;
+  assert.ok(
+    validateSave(save).some((p) => p.includes('"gold" must not be negative')),
+    `validateSave names the debt: ${JSON.stringify(validateSave(save))}`,
+  );
+  assert.equal(loadObject(save).ok, false, 'a save in debt does not load');
+  // The engine can never mint one either: the shop only deducts a price the purse
+  // was proven to cover (rules/steps.js buyOffer) — at 10 gold nothing is buyable.
+  const base = newRun({ seed: 3 });
+  const inShop = step({ ...base, floor: 4, mapNodeId: 'r4n0', player: { ...base.player, gold: 10 } }, 'n2').state;
+  assert.equal(inShop.player.gold, 10);
+  for (const o of inShop.shop.offers) assert.ok(o.price > inShop.player.gold);
+  const forced = step(inShop, 'b1');
+  assert.equal(forced.error?.code, 2, 'no b<n> exists at 10 gold — the id is the R6 rejection');
+});
+
 test('gold is granted through the public step on the kill, and the grant is in the events stream', () => {
-  // A Maul-only deck: the second 32-damage swing ends the 40-44 HP opening fight, so a
-  // played card wins the combat and the winning step is the step that pays — the same
-  // single resolveVictory path the end-turn victory takes.
+  // A Maul-only deck: the second 32-damage swing ends the opening fight, so a played
+  // card wins the combat and the winning step is the step that pays — the same single
+  // resolveVictory path the end-turn victory takes. S4 note: the map draw shifted (the
+  // shop now owns row 5's middle slot), so seed 2 opens on Twin Mites; every play is
+  // aimed at the first living enemy, which is what a real player's clicks do.
+  const aim = (st) => (st.combat.enemies.filter((e) => !e.dead).length > 1 ? '_1' : '');
   const base = newRun({ seed: 2 });
   const boosted = { ...base, deck: Array.from({ length: 10 }, (_, i) => ({ uid: `g${i}`, cardId: 'bludgeon' })) };
   let s = step(boosted, 'n1').state;
   const events = [];
-  let out = step(s, 'p1');
+  let out = step(s, `p1${aim(s)}`);
   events.push(...out.events);
   s = out.state;
   for (let g = 0; g < 40 && s.phase === 'combat'; g += 1) {
@@ -206,7 +228,7 @@ test('gold is granted through the public step on the kill, and the grant is in t
     if (s.phase !== 'combat') break;
     const playable = (s.combat.hand ?? []).findIndex((c) => c.cost <= s.player.energy);
     if (playable >= 0) {
-      out = step(s, `p${playable + 1}`);
+      out = step(s, `p${playable + 1}${aim(s)}`);
       events.push(...out.events);
       s = out.state;
     }

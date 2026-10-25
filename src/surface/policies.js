@@ -46,12 +46,14 @@ function randomPolicy() {
   };
 }
 
-/** Where to go next, best first. Rest when hurt; otherwise take the safe fight. */
+/** Where to go next, best first. Rest when hurt; otherwise take the safe fight.
+ *  The shop (S4) ranks last in every mood: no policy prices its wares yet, so walking
+ *  past it is the honest routing rather than an accident of the unknown-type fallback. */
 function routePreference(state) {
   const hpFrac = state.player.hp / state.player.maxHp;
-  if (hpFrac < 0.55) return ['rest', 'combat_weak', 'combat_strong', 'elite'];
-  if (hpFrac > 0.85) return ['combat_strong', 'combat_weak', 'rest', 'elite'];
-  return ['combat_weak', 'combat_strong', 'rest', 'elite'];
+  if (hpFrac < 0.55) return ['rest', 'combat_weak', 'combat_strong', 'elite', 'shop'];
+  if (hpFrac > 0.85) return ['combat_strong', 'combat_weak', 'rest', 'elite', 'shop'];
+  return ['combat_weak', 'combat_strong', 'rest', 'elite', 'shop'];
 }
 
 /**
@@ -108,6 +110,16 @@ function greedyPolicy() {
         // HP is the resource that decides whether the run reaches it at all.
         if (heal && state.player.hp < state.player.maxHp - 2) return { id: heal.id, memory };
         return { id: acts.find((a) => a.kind === 'rest_leave')?.id ?? acts[0].id, memory };
+      }
+
+      if (state.phase === 'shop') {
+        // S4: no purchase heuristic ships in this slice — pricing an offer against the
+        // deck is a future policy slice's work, and the shop's routing rank (last, in
+        // routePreference) means greedy normally walks past it anyway. Leaving at once
+        // is the honest minimal behaviour; in the paid removal step the leave action
+        // does not exist, so the first pick is the only move.
+        const leave = acts.find((a) => a.kind === 'shop_leave');
+        return { id: leave?.id ?? acts[0].id, memory };
       }
 
       if (state.phase === 'map') return { id: chooseTravelId(state, acts), memory };
@@ -183,6 +195,7 @@ function smartPolicy() {
 
       if (state.phase === 'reward') return chooseReward(state, acts, memory);
       if (state.phase === 'rest') return chooseRest(state, acts, memory);
+      if (state.phase === 'shop') return chooseShop(state, acts, memory);
       if (state.phase === 'map') return { id: chooseTravelId(state, acts), memory };
       return chooseCombat(state, acts, memory, ctx);
     },
@@ -211,6 +224,12 @@ function chooseRest(state, acts, memory) {
   const heal = acts.find((a) => a.kind === 'rest_heal');
   if (heal && state.player.hp < state.player.maxHp) return { id: heal.id, memory };
   return { id: acts.find((a) => a.kind === 'rest_leave')?.id ?? acts[0].id, memory };
+}
+
+/** Shop (S4): leave at once — same minimal stance greedy takes; see its branch above. */
+function chooseShop(state, acts, memory) {
+  const leave = acts.find((a) => a.kind === 'shop_leave');
+  return { id: leave?.id ?? acts[0].id, memory };
 }
 
 /**

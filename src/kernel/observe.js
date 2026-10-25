@@ -19,6 +19,7 @@ import { BOONS, boonText } from './rules/kindling.js';
 import { RELICS, relicId } from './rules/relics.js';
 import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
+import { REMOVAL_PRICE } from './rules/shop.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -189,6 +190,8 @@ function body(state, opts) {
       return rewardBody(state);
     case 'rest':
       return restBody(state);
+    case 'shop':
+      return shopBody(state);
     case 'map':
       return mapBody(state, opts);
     case 'kindling':
@@ -266,6 +269,35 @@ function restBody(state) {
   return lines;
 }
 
+/**
+ * S4: the shop dump. Shelf lines carry the price (the action lines deliberately do not —
+ * the same ruling that kept costs out of the combat action lines, and prices gate
+ * legality exactly like Energy does). The removal step lists the whole deck: the pick is
+ * uid-precise, so the list is the offer.
+ */
+function shopBody(state) {
+  const shop = state.shop ?? { offers: [], removal: {} };
+  const lines = ['SHOP — spend or move on'];
+  (shop.offers ?? []).forEach((o, i) => {
+    // Tolerant like rewardBody (defOrNull): an id the content no longer knows renders
+    // as its raw id instead of killing the dump.
+    const def = defOrNull(o.cardId);
+    lines.push(` b${i + 1} ${def ? def.name : o.cardId} ${o.price}g${o.sold ? ' SOLD' : ''}`);
+  });
+  const rem = shop.removal ?? {};
+  if (shop.removing) {
+    lines.push('REMOVE — pick the card that leaves (already paid)');
+    (state.deck ?? []).forEach((c, i) => {
+      const def = defOrNull(c.cardId);
+      lines.push(` x${i + 1} ${def ? def.name : c.cardId}`);
+    });
+  } else if (!rem.done) {
+    lines.push(` x remove a card — ${rem.price ?? REMOVAL_PRICE}g`);
+  }
+  lines.push(` l leave (purse ${state.player.gold ?? 0})`);
+  return lines;
+}
+
 function kindlingBody(state) {
   return ['KINDLING — take one boon (upside and cost)',
     ...state.kindling.offers.map((id, i) => ` k${i + 1} ${id} ${BOONS[id].label}`)];
@@ -339,6 +371,22 @@ export function observeActions(state) {
         break;
       case 'temper':
         lines.push(`${a.id} temper ${a.offer.cardId} ${a.offer.temper}`);
+        break;
+      // S4 shop lines carry NO price, on the same ruling that keeps Energy costs out of
+      // combat lines: the price sits in the SHOP dump above each shelf and it is the
+      // price that gates legality, so the line stays a pure id + name (bounded by
+      // construction as content grows, tests/budget.test.js).
+      case 'shop_buy':
+        lines.push(`${a.id} ${a.cardId}`);
+        break;
+      case 'shop_removal':
+        lines.push(`${a.id} remove_card`);
+        break;
+      case 'shop_remove_pick':
+        lines.push(`${a.id} ${a.cardId}`);
+        break;
+      case 'shop_leave':
+        lines.push(`${a.id} leave`);
         break;
       default:
         lines.push(`${a.id} ?`);
@@ -549,6 +597,99 @@ function snapshotKindling(state) {
   };
 }
 
+/**
+ * S4: the shop section of a snapshot, or null outside the shop phase.
+ *
+ * Everything a shelf tile or the service button needs is decided HERE: `actionId` is
+ * null exactly when the kernel offers no action (sold out, or the purse cannot cover
+ * the price — R6's afford-filter), so a renderer greys a tile out for the same reason
+ * a hand tile greys out for missing Energy, and can never paint a buyable button the
+ * kernel would reject. `affordable`/`sold` are kept as separate facts so the view can
+ * say WHY a tile is inert.
+ *
+ * The removal step lists deck INSTANCES (uid-precise): copies of one card are distinct
+ * choices, distinguished by `copy`/`copies` — the 1-based position of this instance
+ * among the deck's same-cardId-same-temper copies, in deck order (deterministic). The
+ * pick's `index` is the deck position the kernel's `x<n>` action removes.
+ * @param {any} state
+ * @param {any[]} legal
+ */
+function snapshotShop(state, legal) {
+  if (state.phase !== 'shop') return null;
+  const shop = state.shop ?? { offers: [], removal: {}, removing: false };
+  const buys = new Map(legal.filter((a) => a.kind === 'shop_buy').map((a) => [a.index, a.id]));
+  const picks = legal.filter((a) => a.kind === 'shop_remove_pick');
+  const purse = state.player.gold ?? 0;
+  const rem = shop.removal ?? {};
+
+  // Copy census for the removal list: count occurrences per (cardId, temper) key, then
+  // walk the deck again to give each instance its 1-based copy number in deck order.
+  const census = new Map();
+  for (const inst of state.deck ?? []) {
+    const key = `${inst.cardId}|${state.tempers?.[inst.uid] ?? ''}`;
+    census.set(key, (census.get(key) ?? 0) + 1);
+  }
+  const seen = new Map();
+  const deckInstances = (state.deck ?? []).map((inst, i) => {
+    const def = defOrNull(inst.cardId);
+    const temper = state.tempers?.[inst.uid] ?? null;
+    const key = `${inst.cardId}|${temper ?? ''}`;
+    const copy = (seen.get(key) ?? 0) + 1;
+    seen.set(key, copy);
+    return {
+      index: i,
+      actionId: picks[i]?.id ?? null,
+      cardId: inst.cardId,
+      uid: inst.uid,
+      name: def?.name ?? inst.cardId,
+      cost: def?.cost ?? 0,
+      temper,
+      temperName: temper ? TEMPERS[temper]?.name ?? temper : '',
+      copy,
+      copies: census.get(key) ?? 1,
+    };
+  });
+
+  return {
+    purse,
+    offers: (shop.offers ?? []).map((o, i) => {
+      // Tolerant like rewardBody (defOrNull): an unknown shelf id still shows, as a
+      // placeholder row, rather than throwing the whole snapshot away.
+      const def = defOrNull(o.cardId);
+      const actionId = buys.get(i) ?? null;
+      return {
+        index: i,
+        actionId,
+        cardId: o.cardId,
+        name: def?.name ?? o.cardId,
+        flavor: typeof def?.flavor === 'string' ? def.flavor : '',
+        cost: def?.cost ?? 0,
+        type: def?.type ?? 'unknown',
+        typeLabel: def ? (CARD_TYPE_LABEL[def.type] ?? def.type) : 'unknown',
+        rarity: def?.rarity ?? 'unknown',
+        summary: def ? effectSummary(def) : '',
+        description: def ? describeCard(def) : '',
+        price: o.price,
+        sold: Boolean(o.sold),
+        affordable: actionId !== null,
+      };
+    }),
+    removal: {
+      price: rem.price ?? REMOVAL_PRICE,
+      sold: Boolean(rem.sold),
+      done: Boolean(rem.done),
+      // Non-null only when the service can be bought right now (unused, deck > 1,
+      // purse covers it) — same contract as an offer tile's actionId.
+      actionId: legal.find((a) => a.kind === 'shop_removal')?.id ?? null,
+    },
+    removing: Boolean(shop.removing),
+    // Only meaningful while `removing`, but always published: the modal list is just
+    // this array, and an empty array outside the step is no less true.
+    deckInstances,
+    leaveId: legal.find((a) => a.kind === 'shop_leave')?.id ?? null,
+  };
+}
+
 /** Code-unit comparison, not localeCompare: the sort must be byte-identical everywhere. */
 const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -745,6 +886,7 @@ export function snapshot(state) {
     reward: snapshotReward(state, legal),
     rest: snapshotRest(state, legal),
     kindling: snapshotKindling(state),
+    shop: snapshotShop(state, legal),
     quests: state.quests
       ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))
       : null,

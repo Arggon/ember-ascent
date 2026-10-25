@@ -48,6 +48,7 @@ import { mapView } from './map-view.js';
 import { rewardView } from './reward-view.js';
 import { kindlingView } from './kindling-view.js';
 import { restView } from './rest-view.js';
+import { shopView } from './shop-view.js';
 import { endView } from './end-view.js';
 import { sceneBeat } from './fx.js';
 import { page } from './page-frame.js';
@@ -222,6 +223,7 @@ export function render() {
     case 'combat': stageEl.append(combatView()); break;
     case 'reward': stageEl.append(rewardView()); break;
     case 'rest': stageEl.append(restView()); break;
+    case 'shop': stageEl.append(shopView()); break;
     case 'kindling': stageEl.append(kindlingView()); break;
     case 'ended': stageEl.append(endView()); break;
     default: stageEl.append(el('p', { text: `phase ${snap.phase}` }));

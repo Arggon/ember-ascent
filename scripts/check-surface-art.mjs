@@ -88,7 +88,7 @@ function classesFromOptions(src) {
     { re: /type-\$\{card\.type\}/, members: ['attack', 'skill', 'power', 'status', 'curse'] },
     { re: /kind-\$\{kind\}/, members: ['attack', 'block', 'buff', 'debuff'] },
     { re: /page-\$\{kind\}/, members: ['map', 'combat', 'reward', 'rest', 'end'] },
-    { re: /t-\$\{short\}/, members: ['weak', 'strong', 'elite', 'rest', 'boss'] },
+    { re: /t-\$\{short\}/, members: ['weak', 'strong', 'elite', 'rest', 'boss', 'shop'] },
   ];
   for (const m of src.matchAll(/\bcls:\s*/g)) {
     // The WHOLE value, not just its first quoted piece: `cls: a + (cond ? ' b' : '')` emits
@@ -132,7 +132,7 @@ function variants(src) {
     for (const t of ['attack', 'skill', 'power', 'status', 'curse']) out.add(`type-${t}`);
   }
   if (/node t-\$\{short\}/.test(src)) {
-    for (const t of ['weak', 'strong', 'elite', 'rest', 'boss']) out.add(`t-${t}`);
+    for (const t of ['weak', 'strong', 'elite', 'rest', 'boss', 'shop']) out.add(`t-${t}`);
   }
   if (/e-intent kind-\$\{kind\}/.test(src)) {
     for (const t of ['attack', 'block', 'buff', 'debuff']) out.add(`kind-${t}`);

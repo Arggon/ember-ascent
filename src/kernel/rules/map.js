@@ -9,17 +9,27 @@ import { intAt } from '../rng.js';
 
 /** Node kinds and their meaning. `gold` is the inclusive [min, max] the victory path
  *  pays (rules/act.js resolveVictory): the tier decides the range, the seed decides the
- *  spot inside it. A rest node never fights, so it carries no gold row. */
+ *  spot inside it. A rest node never fights, so it carries no gold row. A shop node
+ *  (S4) neither fights nor pays — it is where gold is SPENT (rules/shop.js), so it too
+ *  carries no gold row. */
 export const NODE_TYPES = {
   combat_weak: { id: 'combat_weak', label: 'fight', tier: 1, reward: 'card', gold: [10, 17] },
   combat_strong: { id: 'combat_strong', label: 'fight+', tier: 2, reward: 'card', gold: [25, 35] },
   elite: { id: 'elite', label: 'elite', tier: 3, reward: 'card', gold: [50, 70] },
   rest: { id: 'rest', label: 'rest', tier: 0, reward: 'heal' },
+  shop: { id: 'shop', label: 'shop', tier: 0, reward: 'shop' },
   boss: { id: 'boss', label: 'boss', tier: 4, reward: 'end', gold: [100, 100] },
 };
 
 /** Rows in act 1, including the entry row and the boss row. */
 export const ROWS = 8;
+
+/** S4: where the act's ONE shop sits. The middle slot of row 5 — between the rest rows
+ *  and the elite push, so a player who wants the wares must decide whether to arrive
+ *  hurt. Placed, not rolled: a seeded pool entry the draw could miss would leave some
+ *  runs shopless, and "one shop per act" is a promise about the FORMAT, not about luck. */
+export const SHOP_ROW = 5;
+export const SHOP_SLOT = 1;
 
 /**
  * Generate the act-1 path graph. Deterministic given (seed, starting draw index).
@@ -40,7 +50,7 @@ export function generateMap(seed, startDraw) {
     ['combat_weak', 'combat_strong', 'combat_strong'],
     ['combat_strong', 'combat_strong', 'elite'],
     ['combat_strong', 'elite', 'rest'],
-    ['combat_strong', 'combat_strong', 'rest'],
+    ['combat_strong', 'combat_strong', 'rest'], // row 5: the middle slot IS the shop (SHOP_ROW/SHOP_SLOT)
     ['rest', 'rest', 'elite'],
     null, // row 7 fixed boss
   ];
@@ -50,6 +60,16 @@ export function generateMap(seed, startDraw) {
     const width = row <= 3 ? 2 : 3;
     const nodes = [];
     for (let k = 0; k < width; k += 1) {
+      // S4: the act's single shop takes row 5's middle slot outright — the pool entry
+      // that would have fed this one choice is given over to it. Nothing is random
+      // about the shop's existence, so it consumes NO pool draw (same policy as the
+      // fixed opener and boss rows: randomness is only spent on content that needs
+      // it). Its inventory and prices roll later, at ENTRY time (rules/shop.js), so
+      // a run that never visits pays nothing from the stream.
+      if (row === SHOP_ROW && k === SHOP_SLOT) {
+        nodes.push({ id: `r${row}n${k}`, type: 'shop', next: [] });
+        continue;
+      }
       const pick = intAt(seed, i, pool.length);
       i += 1;
       let type = pool[pick];

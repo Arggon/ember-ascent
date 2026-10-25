@@ -145,12 +145,53 @@ export function validateSave(raw) {
     // S3 gold: OPTIONAL on purpose. A pre-gold save (no `player.gold`) must keep loading
     // with the purse defaulting to 0 at every read (`?? 0` in observe/rules), so the field
     // is never required here and FORMAT_VERSION stays put. When it IS present, it must be
-    // an integer — the purse is whole coins like every other run number (R3).
+    // an integer — the purse is whole coins like every other run number (R3) — and never
+    // negative: spending (S4) makes debt a real state a tampered or corrupt save could
+    // carry, and a purse below zero is refused at load, not repaired (S3 review P3).
     const player = st.player;
     if (player && typeof player === 'object' && !Array.isArray(player)) {
       const gold = /** @type {Record<string, unknown>} */ (player).gold;
       if (gold !== undefined && !Number.isInteger(gold)) {
         problems.push('save.state.player: "gold" must be an integer');
+      }
+      if (Number.isInteger(gold) && gold < 0) {
+        problems.push('save.state.player: "gold" must not be negative');
+      }
+    }
+    // S4 shop: OPTIONAL like every post-v1 field. Absent (a legacy save) means the run
+    // predates shops; its stored map has no shop node, so the phase simply never occurs.
+    // When present it must be an object or null, and every price it carries must be a
+    // non-negative integer — a negative price would PAY the purse on purchase.
+    const shop = /** @type {Record<string, unknown>} */ (st).shop;
+    if (shop !== undefined && shop !== null) {
+      if (typeof shop !== 'object' || Array.isArray(shop)) {
+        problems.push('save.state: "shop" must be an object or null');
+      } else {
+        const offers = /** @type {Record<string, unknown>} */ (shop).offers;
+        if (offers !== undefined && !Array.isArray(offers)) {
+          problems.push('save.state.shop: "offers" must be an array');
+        }
+        if (Array.isArray(offers)) {
+          offers.forEach((o, i) => {
+            if (o && typeof o === 'object' && !Array.isArray(o)) {
+              const price = /** @type {Record<string, unknown>} */ (o).price;
+              if (!Number.isInteger(price) || price < 0) {
+                problems.push(`save.state.shop.offers[${i}]: "price" must be a non-negative integer`);
+              }
+            }
+          });
+        }
+        const removal = /** @type {Record<string, unknown>} */ (shop).removal;
+        if (removal !== undefined && removal !== null) {
+          if (typeof removal !== 'object' || Array.isArray(removal)) {
+            problems.push('save.state.shop: "removal" must be an object or null');
+          } else {
+            const rprice = /** @type {Record<string, unknown>} */ (removal).price;
+            if (!Number.isInteger(rprice) || rprice < 0) {
+              problems.push('save.state.shop: "removal.price" must be a non-negative integer');
+            }
+          }
+        }
       }
     }
   }

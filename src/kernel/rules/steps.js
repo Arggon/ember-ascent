@@ -17,6 +17,7 @@ import { fireHook } from './powers.js';
 import { applyBoon } from './kindling.js';
 import { offerTempers, temperEffects, temperHpCost } from './tempers.js';
 import { findNode } from './map.js';
+import { rollShopInventory, REMOVAL_PRICE } from './shop.js';
 import { shuffleAt, pickAt } from '../rng.js';
 
 /** Play one card from hand and settle the combat if it ended. */
@@ -145,6 +146,27 @@ function travel(state, action, content) {
     }
     return { state: { ...at, phase: 'rest' }, events: [{ t: 'rest_ready', node: node.id }] };
   }
+  // S4: the shop's wares roll HERE, at entry, from the live counter (rules/shop.js for
+  // the full draw accounting — a full inventory is exactly 10 draws). Entry happens
+  // through this one step and re-entry is impossible, so the counter the rolls read is
+  // reproducible from the action log forever; nothing is pre-rolled at map generation,
+  // so a run that never visits pays nothing from the stream.
+  if (node.type === 'shop') {
+    const inv = rollShopInventory(at, content.cards);
+    return {
+      state: {
+        ...at,
+        phase: 'shop',
+        rngDraws: at.rngDraws + inv.draws,
+        shop: {
+          offers: inv.offers,
+          removal: { price: REMOVAL_PRICE, sold: false, done: false },
+          removing: false,
+        },
+      },
+      events: [{ t: 'shop_open', node: node.id }],
+    };
+  }
   throw new Error(`unhandled node type "${node.type}"`);
 }
 
@@ -158,6 +180,71 @@ function pickReward(state, action) {
     state: { ...state, deck: [...state.deck, { uid, cardId }], phase: 'map', reward: null },
     events: [{ t: 'card_taken', cardId, uid }],
   };
+}
+
+/* --------------------------------------------------------------- S4: the shop --
+ * Four handlers, one per shop action kind. The id was matched against the legal list
+ * by step() before any of these run, so affordability and mode are already guaranteed:
+ * an unaffordable offer never produced an id, and a `shop_remove_pick` only exists in
+ * the paid removal step. Each handler still degrades to a no-op on a stale match
+ * rather than throwing — the same defensive shape playCard keeps. */
+
+/** Buy one shelf offer: deduct the price, add the card instance, mark the slot sold. */
+function buyOffer(state, match) {
+  const offer = state.shop?.offers?.[match.index];
+  if (!offer || offer.sold) return { state, events: [] };
+  const uid = `c${state.deck.length}_${state.stepIndex}`;
+  return {
+    state: {
+      ...state,
+      player: { ...state.player, gold: state.player.gold - offer.price },
+      deck: [...state.deck, { uid, cardId: offer.cardId }],
+      shop: { ...state.shop, offers: state.shop.offers.map((o, i) => (i === match.index ? { ...o, sold: true } : o)) },
+    },
+    events: [
+      { t: 'gold_spent', amount: offer.price, what: 'card', cardId: offer.cardId },
+      { t: 'card_bought', cardId: offer.cardId, uid, price: offer.price },
+    ],
+  };
+}
+
+/** Buy the removal service: deduct the flat price and open the removal step. */
+function buyRemoval(state) {
+  const rem = state.shop?.removal;
+  if (!rem || rem.sold || rem.done) return { state, events: [] };
+  return {
+    state: {
+      ...state,
+      player: { ...state.player, gold: state.player.gold - rem.price },
+      shop: { ...state.shop, removal: { ...rem, sold: true }, removing: true },
+    },
+    events: [
+      { t: 'gold_spent', amount: rem.price, what: 'removal' },
+      { t: 'removal_paid', price: rem.price },
+    ],
+  };
+}
+
+/** The removal step's pick: exactly one deck INSTANCE (uid-precise) leaves the deck. */
+function pickRemoval(state, match) {
+  const inst = state.deck?.[match.index];
+  // Hard invariant: a deck of exactly one card cannot shrink further. Unreachable
+  // through legal ids (the service is not sold at deck length 1), guarded here because
+  // the handler is the one place the deck actually shrinks.
+  if (!inst || state.deck.length <= 1) return { state, events: [] };
+  return {
+    state: {
+      ...state,
+      deck: state.deck.filter((_, i) => i !== match.index),
+      shop: { ...state.shop, removing: false, removal: { ...state.shop.removal, done: true } },
+    },
+    events: [{ t: 'card_removed', uid: inst.uid, cardId: inst.cardId }],
+  };
+}
+
+/** Leave the shop — final: the phase closes, the room is consumed with the node. */
+function leaveShop(state) {
+  return { state: { ...state, phase: 'map', shop: null }, events: [{ t: 'shop_left' }] };
 }
 
 /**
@@ -187,4 +274,8 @@ export const STEP_HANDLERS = Object.freeze({
   },
   boon: (state, match) => applyBoon(state, match.boon),
   rest_leave: (state) => ({ state: { ...state, phase: 'map', ...(state.tempers ? { temperOffers: null } : {}) }, events: [{ t: 'rest_left' }] }),
+  shop_buy: buyOffer,
+  shop_removal: buyRemoval,
+  shop_remove_pick: pickRemoval,
+  shop_leave: leaveShop,
 });

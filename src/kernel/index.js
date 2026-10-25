@@ -215,6 +215,13 @@ export function newRun(opts = {}) {
       exhaust: [],
     },
     reward: null,
+    // S4 shop: null everywhere except inside the shop phase, where it carries the
+    // inventory, the removal-service state and the removal flag (rules/shop.js).
+    // Leaving nulls it again; the offers themselves roll at ENTRY time (the travel
+    // step), so nothing is pre-rolled for a shop the run never visits. Legacy saves
+    // predate the field entirely — validateSave keeps it optional and every read is
+    // null-tolerant.
+    shop: null,
   };
 
   // B5 alternate biome: recorded only when not the default, so foundry hashes are unchanged.

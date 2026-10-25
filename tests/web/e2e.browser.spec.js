@@ -18,6 +18,10 @@
 //   8. the S3 gold economy: a victory pays the purse (the reward head's "+N gold" chip
 //      and the HUD readout agree on the same kernel value) and the next victory adds to
 //      it; the run summary names the final purse
+//   9. the S4 shop: the vendor is a labelled map node with five priced shelves and the
+//      purse in view; a click buys a card (the deck sheet agrees mid-shop), the removal
+//      service is a modal pick of deck instances, unaffordable shelves are inert, and
+//      leaving is final
 //
 // RUN. `npm run test:browser`. Deliberately NOT matched by the default `npm test`
 // glob (`tests/**/*.test.js`): this file is `.spec.js` so the default suite stays
@@ -75,8 +79,10 @@ after(() => { child?.kill(); });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** A fresh browser + page with the first-run help dismissed. Caller closes the browser. */
-async function freshPage(t) {
+/** A fresh browser + page with the first-run help dismissed. Caller closes the browser.
+ *  `seed` defaults to 7; a test whose claim is pinned to a specific first fight picks
+ *  its own (the S4 map shift moved every seed's encounter rolls). */
+async function freshPage(t, seed = 7) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 800 },
@@ -85,7 +91,7 @@ async function freshPage(t) {
   t.after(() => { void browser.close(); });
   const page = await ctx.newPage();
   await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
-  await page.goto(`${base}/src/web/index.html?seed=7`);
+  await page.goto(`${base}/src/web/index.html?seed=${seed}`);
   await page.waitForLoadState('domcontentloaded');
   return page;
 }
@@ -110,9 +116,19 @@ const readState = (page) => page.evaluate(() => {
 const readIntents = (page) => page.evaluate(() => window.__dlb.snapshot().enemies
   .map((e) => ({ index: e.index, kind: e.intent.kind, damage: e.intent.damage })));
 
-/** Take the Bellows Breath kindling (4 Energy/turn) and land on the map. */
+/** Take a kindling boon and land on the map. Preference order: Bellows Breath (fast
+ *  fights), then Iron Skin (deck-neutral: the S4 map shift re-rolled the seed-7 offer
+ *  list, and the deck-sheet test pins the untouched 10-card deck), then whatever is
+ *  offered. Ash Purge / Sparkfall change the deck, so they are last resorts. */
 async function bootToMap(page) {
-  await page.getByRole('button', { name: /^Bellows Breath:/ }).click();
+  assert.ok((await page.locator('button.boon').count()) > 0, 'a kindling boon is offered');
+  const preferred = page.getByRole('button', { name: /^Bellows Breath:/ });
+  if ((await preferred.count()) > 0) await preferred.first().click();
+  else {
+    const skin = page.getByRole('button', { name: /^Iron Skin:/ });
+    if ((await skin.count()) > 0) await skin.first().click();
+    else await page.locator('button.boon').first().click();
+  }
   await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
 }
 
@@ -166,9 +182,11 @@ async function leaveReward(page) {
 
 /** The Maul probe needs 2+ enemies with one naturally above 32 HP: Maul's stroke must
  *  NOT kill, or the shockwave beat (759ms) races the victory hold (480ms). Floor-1
- *  fights never qualify, so walk them, skip rewards, and climb until one does. */
+ *  fights never qualify, so walk them, skip rewards, rest-hops, and climb until one
+ *  does. (Budget 16: the S4 map draw shifted every seed's path, and seed 7's qualifies
+ *  on floor 4 at step ~14 — the claim never cared how many fights it took.) */
 async function reachQualifyingFight(page) {
-  for (let step = 0; step < 12; step += 1) {
+  for (let step = 0; step < 16; step += 1) {
     const s = await readState(page);
     if (s.phase === 'combat') {
       if (s.enemies.length > 1 && s.enemies.some((e) => e.hp > 32)) return s;
@@ -177,9 +195,14 @@ async function reachQualifyingFight(page) {
     }
     if (s.phase === 'reward') { await leaveReward(page); continue; }
     if (s.phase === 'map') { await travelToFight(page); continue; }
-    await sleep(600);
+    if (s.phase === 'rest') {
+      await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+      continue;
+    }
+    assert.fail(`the walk ended before a qualifying fight (phase ${s.phase})`);
   }
-  assert.fail('no qualifying fight within 12 steps');
+  assert.fail('no qualifying fight within 16 steps');
 }
 
 /** Transit fight: spend attacks (kills are fine here — no claim is taken from these). */
@@ -411,7 +434,10 @@ test('end turn: the turn advances and the enemy does what its intent announced',
 
 test('kill: the stroke plays against the hold stage, then the reward arrives', { timeout: 240000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
-  const page = await freshPage(t);
+  // Seed 1 deals the exact shape this claim needs (the S4 map draw shift moved seed 7's
+  // opening fight): a single 43-HP Jaw Worm — Maul (32) leaves 11 on turn 1, the second
+  // stroke kills on turn 2.
+  const page = await freshPage(t, 1);
   await bootToMap(page);
   await injectMaulDeck(page);
   await travelToFight(page);
@@ -431,7 +457,7 @@ test('kill: the stroke plays against the hold stage, then the reward arrives', {
     }, 40);
   });
 
-  // Turn 1: Maul (32) leaves the 40-HP Jaw Worm at 8.
+  // Turn 1: Maul (32) leaves the 43-HP Jaw Worm at 11.
   let s = await readState(page);
   if (!s.hand.some((c) => c.cardId === 'bludgeon')) {
     await endTurn(page);
@@ -573,8 +599,10 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
 test('thrown hammers arc from the hero and land on the aimed enemy', { timeout: 300000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   // A fixed seed deals a FIXED hand: probe seeds until one deals the salvo (one redraw
-  // each), then verify the arc on that attempt.
-  for (const seed of [7, 8, 9, 10, 11, 12]) {
+  // each), then verify the arc on that attempt. Seed 13 leads with twin Kiln Mites
+  // (15/10) — the shape the arc probe wants — since the S4 map draw shift re-rolled
+  // every seed's opening fight.
+  for (const seed of [13, 7, 8, 9, 10, 11, 12]) {
     const attempt = await probeHammerArc(t, seed);
     if (!attempt) continue;
     const { arc } = attempt;
@@ -642,7 +670,11 @@ async function probeHammerArc(t, seed) {
 
     const twin = page.locator('button[data-slot][aria-label^="Twin Hammers"][aria-disabled="false"]');
     assert.ok((await twin.count()) > 0, 'Twin Hammers must be playable');
-    await twin.first().click(); // single enemy: one click plays it, no targeting
+    await twin.first().click();
+    // A two-enemy fight engages the aiming step (the salvo must be aimed); a single
+    // enemy plays on the click alone. Either way the hammer flies after the aim.
+    const aiming = page.locator('.enemy.targeting');
+    if ((await aiming.count()) > 0) await aiming.first().click();
     await sleep(2600);
     return { arc: await page.evaluate(() => window.__arc) };
   } finally {
@@ -653,7 +685,7 @@ async function probeHammerArc(t, seed) {
 test('a killing throw holds the victim in its slot until the hammer lands', { timeout: 300000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   // Probe seeds for a two-enemy first fight where the salvo (5x2) kills the weaker foe.
-  for (const seed of [7, 8, 9, 10, 11, 12]) {
+  for (const seed of [13, 7, 8, 9, 10, 11, 12]) {
     const r = await probeKillSlot(t, seed);
     if (!r) continue;
     const { before, mid } = r;
@@ -853,7 +885,7 @@ test('a full run ends on the restart menu, not a blank stage', { timeout: 300000
   await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
   await page.goto(`${base}/src/web/index.html?seed=7`);
   await page.waitForLoadState('domcontentloaded');
-  await page.getByRole('button', { name: /^Bellows Breath:/ }).click();
+  await page.locator('button.boon').first().click(); // any boon; the walk does not care which
   await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
@@ -903,4 +935,159 @@ test('a full run ends on the restart menu, not a blank stage', { timeout: 300000
   // player.gold — the same value the HUD showed from boot).
   const endStats = await page.locator('.end-stats').textContent();
   assert.match(endStats, /· \d+ gold$/, `the run summary names the final purse: ${endStats}`);
+});
+
+// ---------------------------------------------------------------------------
+// 9. the S4 shop: the vendor is a labelled map node; walking in shows five priced
+//    shelves and the purse; a real click buys a card (purse down, deck up, the deck
+//    sheet agrees mid-shop); the removal service is a modal pick of deck INSTANCES;
+//    an unaffordable shelf is inert (the kernel never offered it); leaving is final
+//    and returns to the map with no shop left to enter.
+// ---------------------------------------------------------------------------
+test('shop: the vendor sells a card, removes one, and closes for good', { timeout: 300000 }, async (t) => {
+  if (!chromium) return t.skip('playwright/chromium unavailable');
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: 'reduce', // paint instantly: the walk's assertions are structural
+  });
+  t.after(() => { void browser.close(); });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+  await page.goto(`${base}/src/web/index.html?seed=7`);
+  await page.waitForLoadState('domcontentloaded');
+  await page.locator('button.boon').first().click(); // any boon; the walk does not care which
+  await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    for (let i = 0; i < 10; i += 1) save.state.deck.push({ uid: `e2e-shop-${i}`, cardId: 'bludgeon' });
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+
+  // The walk: rows 0-4 the honest way (real clicks), fights preferred, the injected
+  // Mauls end fights fast; seed 7 reaches floor 4 with a purse that covers the service
+  // plus a cheap shelf, verified against the engine before this test was written.
+  for (let guard = 0; guard < 240; guard += 1) {
+    const st = await readState(page);
+    if (st.phase === 'map' && st.floor === 4) break;
+    if (st.phase === 'map') {
+      const fight = page.locator('button[aria-label*="Skirmish"], button[aria-label*="Hard fight"]').first();
+      if ((await fight.count()) > 0) await fight.click();
+      else await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else if (st.phase === 'combat') {
+      const card = page.locator('button[data-slot][aria-disabled="false"]').first();
+      if ((await card.count()) > 0) {
+        await card.click();
+        const tgt = page.locator('.enemy.targeting').first();
+        if ((await tgt.count()) > 0) await tgt.click();
+        await sleep(700);
+      } else {
+        await endTurn(page);
+        await sleep(1300);
+      }
+    } else if (st.phase === 'reward') {
+      await leaveReward(page);
+    } else if (st.phase === 'rest') {
+      await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else {
+      await sleep(400);
+    }
+  }
+  const staged = await readState(page);
+  assert.equal(staged.phase, 'map', 'the walk reached floor 4');
+  assert.equal(staged.floor, 4, 'standing on row 4: the vendor row is next');
+
+  // The shop node is labelled like any other, and it is the middle choice of row 5.
+  const shopNode = page.locator('button[aria-label*="Shop"]');
+  assert.equal(await shopNode.count(), 1, 'exactly one Shop node is travel-legal');
+  await shopNode.click();
+  await page.waitForSelector('.shop-grid', { timeout: 5000 });
+
+  // The purse chip and the HUD read the same kernel number.
+  const purse = await page.evaluate(() => window.__dlb.snapshot().shop.purse);
+  const hudPurse = Number(/(\d+)$/.exec(await page.locator('#hud .stat.gold').textContent())[1]);
+  assert.equal(purse, hudPurse, 'the shop purse and the HUD agree');
+  assert.ok(purse >= 75, `the walked purse covers the service, got ${purse}`);
+
+  // Five shelves, each carrying a gold price badge.
+  assert.equal(await page.locator('.shop-grid .card').count(), 5, 'five shelves');
+  const badges = await page.locator('.shop-grid .shop-price').allTextContents();
+  assert.equal(badges.length, 5);
+  const prices = badges.map((b) => Number(b.trim()));
+  assert.ok(prices.every((p) => p >= 45 && p <= 165), `prices in the StS bands: ${prices.join(', ')}`);
+
+  // Buy the cheapest affordable shelf with a real click: purse down by its price,
+  // deck up by one, the slot sells out.
+  const before = await page.evaluate(() => ({
+    purse: window.__dlb.snapshot().shop.purse,
+    deck: window.__dlb.snapshot().deckCount,
+  }));
+  const cheapestTile = page.locator('.shop-grid .card[aria-disabled="false"]')
+    .first();
+  const tilePrice = Number((await cheapestTile.locator('.shop-price').textContent()).trim());
+  const boughtName = (await cheapestTile.getAttribute('aria-label')).split('.')[0];
+  await cheapestTile.click();
+  await sleep(400);
+  const after = await page.evaluate(() => ({
+    purse: window.__dlb.snapshot().shop.purse,
+    deck: window.__dlb.snapshot().deckCount,
+    sold: window.__dlb.snapshot().shop.offers.filter((o) => o.sold).length,
+  }));
+  assert.equal(after.purse, before.purse - tilePrice, `the purse paid exactly ${tilePrice}`);
+  assert.equal(after.deck, before.deck + 1, 'the bought card joined the deck');
+  assert.equal(after.sold, 1, 'the bought slot sold out');
+
+  // The deck sheet is accurate MID-SHOP: it already lists what was just bought.
+  await page.locator('#hud button', { hasText: /^Deck \(/ }).click();
+  await page.waitForSelector('.modal', { timeout: 3000 });
+  const sheet = await page.locator('.modal').textContent();
+  assert.ok(sheet.includes(boughtName), `the deck sheet lists the bought ${boughtName}`);
+  await page.keyboard.press('Escape');
+  await sleep(200);
+
+  // The removal service: pay, pick one instance out of the modal list, land back.
+  const rem = page.locator('button[data-action="x"]');
+  assert.equal(await rem.count(), 1, 'the service is a button while the purse covers it');
+  await rem.click();
+  await page.waitForSelector('.remove-list', { timeout: 3000 });
+  const deckNow = await page.evaluate(() => window.__dlb.snapshot().deckCount);
+  const choices = page.locator('.remove-list .boon');
+  assert.equal(await choices.count(), deckNow, 'one choice per deck instance');
+  await choices.first().click();
+  await sleep(400);
+  assert.equal(await page.evaluate(() => window.__dlb.snapshot().deckCount), deckNow - 1,
+    'the picked instance left the deck');
+  await page.waitForSelector('.shop-grid', { timeout: 3000 });
+  assert.equal(await page.locator('button[data-action="x"]').count(), 0, 'one removal per visit');
+  assert.match(await page.locator('.shop-controls').textContent(), /removal service is spent/);
+
+  // The afford-filter: a shelf is inert exactly when its price exceeds the purse, and
+  // after 75 + a purchase something on the shelves must be out of reach.
+  const affordability = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return { purse: s.shop.purse, offers: s.shop.offers.map((o) => ({ price: o.price, affordable: o.affordable })) };
+  });
+  for (const o of affordability.offers) {
+    assert.equal(o.affordable, o.price <= affordability.purse, `a ${o.price}-gold shelf vs purse ${affordability.purse}`);
+  }
+  assert.ok(affordability.offers.some((o) => !o.affordable), 'after paying, some shelf is inert');
+  const inert = page.locator('.shop-grid .card[aria-disabled="true"]');
+  assert.equal(await inert.count(), affordability.offers.filter((o) => !o.affordable).length,
+    'the view greys exactly the unaffordable shelves');
+
+  // Leaving is final: back to the map on the row the shop's exits face, and the shop
+  // is gone from the reachable set.
+  await page.locator('button[data-action="l"]').click();
+  await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+  const left = await readState(page);
+  assert.equal(left.phase, 'map');
+  assert.equal(left.floor, 5, 'the player stands ON the consumed shop node (row 5); travel continues to row 6');
+  assert.equal(await page.locator('button[aria-label*="Shop"]').count(), 0, 'no shop is travel-legal after leaving');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
 });

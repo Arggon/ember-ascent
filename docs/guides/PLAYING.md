@@ -95,6 +95,8 @@ You have **3 energy per turn**, and cards cost 1–2, so you'll typically play 2
 
 **Tempers.** At a campfire you may, instead of resting, temper one of three offered cards for the rest of the run: *Quenched* (also gain 3 Block), *Red-hot* (+50% damage, lose 2 HP when played) or *Balanced* (also draw 1 card, exhausts). A tempered card wears a coloured trim and a badge.
 
+**The Shop.** Every act holds exactly one vendor, mid-climb on floor 6 of the map (a coin marks the node). Its five card offers are seeded from what this run's rewards could still draw — priced by rarity: common 45–60 gold, uncommon 68–82, rare 135–165 — and the purse is the same one your victories fill (every fight pays by tier; you start with 99). Buying is immediate: the gold leaves, the card joins your deck, the slot is sold. A shelf you cannot afford is greyed out and is not even offered to the CLI. The vendor also sells one card *removal* per visit at a flat 75 gold: pay, then pick the exact copy that leaves — three Hammerfalls are three separate choices. Leaving closes the shop for good (the node is consumed like a fought one), so buy everything you want before you walk out. CLI action ids: `b1`–`b5` buy, `x` pay for removal, `x1`–`xn` pick the card to remove, `l` leave.
+
 Killing a low-HP enemy outright is usually better than blocking, because a dead enemy deals no damage next turn.
 
 You are going to lose. A lot. That's the genre — the run ends with `GAME OVER — DEFEAT` and tells you how far you got.

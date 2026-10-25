@@ -72,4 +72,4 @@ test('a mines run plays, the header carries the biome, and replay matches the go
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:109c69e21355abfdeec230415196fdb4d9bb9fad25942a391115e4c71d999225';
+const GOLDEN = 'sha256:0b53f489bd3f6ef7932725742a56850acd61a16f6fb54a33ac42ed94ab089195';

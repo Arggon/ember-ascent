@@ -58,7 +58,11 @@ test('a Red-hot Hammerfall deals 9 and costs 2 HP in a real fight', () => {
   assert.ok(slot >= 0, 'a Hammerfall is in the opening hand');
   const hp0 = s.player.hp;
   const enemyHp0 = s.combat.enemies[0].hp;
-  s = step(s, `p${slot + 1}`).state;
+  // S4 note: the map draw shifted (row 5 now holds the shop), so seed 2's opening fight
+  // became Twin Mites — two LIVING enemies, where the unaimed id does not exist (R6).
+  // The claim is unchanged: one aimed, tempered Hammerfall deals 9 and costs 2 HP.
+  const aim = s.combat.enemies.filter((e) => !e.dead).length > 1 ? '_1' : '';
+  s = step(s, `p${slot + 1}${aim}`).state;
   assert.equal(s.player.hp, hp0 - 2);
   const dealt = enemyHp0 - s.combat.enemies[0].hp;
   assert.ok(dealt >= 9 || s.combat.enemies[0].dead, `dealt ${dealt}`);
@@ -73,7 +77,7 @@ test('log header carries the flag and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:27c053859692d115dfa79fcf5f734d7fdca7487e34e95d9fb55d810f3e1c31ee';
+const GOLDEN = 'sha256:945897fe4d6c821965f1e29654e65943dfcfc495d6012099b56c2be3183455eb';
 
 // ---------------------------------------------------------------------------
 // Visible tempers: every rendering of a tempered card shows what it really plays.
@@ -135,6 +139,9 @@ test('what the card says is what the card does: shown damage equals dealt damage
   const slot = s.combat.hand.findIndex((c) => c.cardId === 'strike');
   const shown = Number(/Deal (\d+) damage/.exec(K.snapshot(s).hand[slot].description)[1]);
   const before = s.combat.enemies[0].hp + s.combat.enemies[0].block;
-  const after = step(s, `p${slot + 1}`).state.combat.enemies[0];
+  // Aimed when the opening fight holds two living enemies (see the S4 note above) —
+  // the aimed id hits exactly enemy 1, which is the enemy this test measures.
+  const aim = s.combat.enemies.filter((e) => !e.dead).length > 1 ? '_1' : '';
+  const after = step(s, `p${slot + 1}${aim}`).state.combat.enemies[0];
   assert.equal(before - (after.hp + after.block), shown);
 });

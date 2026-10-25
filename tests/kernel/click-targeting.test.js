@@ -122,7 +122,10 @@ src = 'async function measure(){ return null; }\n' + src;
 src += '\nreturn { render, clickCard, pickTarget, cancelTargeting, get pendingSlot(){return pendingSlot;}, snapGet(){return snap;} };';
 
 const ctlMod = await import('../../src/surface/gui/controller.js');
-const ctl = ctlMod.createController({ run: { seed: 11 } });
+// S4: the map draw shifted (row 5 now holds the shop), so seed 11's opening fight
+// became a single Cultist. Seed 9 still opens on a two-enemy fight with an aimed
+// Hammerfall at slot 1 — the fixture's actual requirement.
+const ctl = ctlMod.createController({ run: { seed: 9 } });
 ctl.dispatch('n1');
 
 const factory = new Function('__ctl', '__toasts', '__mods', `
@@ -166,7 +169,7 @@ assert.ok(dmg[1] > 0, `clicking enemy 2 must damage enemy 2 (damage was ${JSON.s
 });
 
 test('clicking a card ENTERS targeting rather than cancelling itself', () => {
-  const c = ctlMod.createController({ run: { seed: 11 } });
+  const c = ctlMod.createController({ run: { seed: 9 } });
   c.dispatch('n1');
   const api2 = factory(c, [], importedModules);
   toasts.length = 0;

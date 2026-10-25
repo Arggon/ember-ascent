@@ -6,6 +6,13 @@
 //   p<n> play hand slot n · e1 end turn · c continue · s<n> reward pick · n<n> map node
 //   k<n> kindling boon (opt-in runs only; additive, no existing id changes)
 //   t<n> temper a card at a rest site (opt-in runs only; additive)
+//   b<n> buy shop offer n (S4; additive — the offer list is state.shop.offers, 1-based)
+//   x    buy the card-removal service at a shop (S4; additive — one per visit, flat
+//        price, moves the shop into its removal step)
+//   x<n> during a shop's removal step: remove the n-th deck INSTANCE, 1-based in deck
+//        order (S4; additive — uid-precise because every deck slot is a distinct
+//        instance; three Hammerfalls are three separate choices, listed by uid order)
+//   l    leave the shop — final; the node is consumed like a fight (S4; additive)
 //
 // TARGETED PLAYS (PM Document revision 5). A card whose content declares
 // `target: "enemy"` must be aimed by the player when the choice is real, i.e. when
@@ -33,6 +40,7 @@
 // exactly like any other unknown id. A dead enemy is not in the list and can never be
 // enumerated here.
 import { availableNodes } from './rules/map.js';
+import { REMOVAL_PRICE } from './rules/shop.js';
 import { cardDefMap } from './rules/card-instance.js';
 
 /** Card definitions are injected once at kernel load (rules never import content, R1). */
@@ -112,6 +120,36 @@ export function actions(state) {
     }
     case 'kindling': {
       state.kindling.offers.forEach((boon, i) => out.push({ id: `k${i + 1}`, kind: 'boon', boon }));
+      break;
+    }
+    case 'shop': {
+      // S4: the shop is a room that stays open until the player leaves. The removal
+      // step is MODAL — the service is already paid for, so the only choices that
+      // exist are which deck instance goes (no leaving mid-removal, no buying past
+      // it), which is what keeps "paid" and "picked" from ever drifting apart.
+      const shop = state.shop ?? { offers: [], removal: null };
+      if (shop.removing) {
+        (state.deck ?? []).forEach((inst, i) => {
+          out.push({ id: `x${i + 1}`, kind: 'shop_remove_pick', index: i, cardId: inst.cardId });
+        });
+        break;
+      }
+      const purse = state.player.gold ?? 0;
+      (shop.offers ?? []).forEach((o, i) => {
+        // R6, exactly like an unplayable hand card: an offer the purse cannot cover
+        // (or one already sold) is not an action at all. There is no "buy and bounce",
+        // so no surface can render a button the kernel would reject.
+        if (o.sold || o.price > purse) return;
+        out.push({ id: `b${i + 1}`, kind: 'shop_buy', index: i, cardId: o.cardId, price: o.price });
+      });
+      const rem = shop.removal ?? {};
+      // The service: one per visit, only while it is unused, the deck still holds more
+      // than one card (hard invariant — a deck of exactly 1 is not a deck), and the
+      // purse covers the flat price.
+      if (!rem.sold && !rem.done && (state.deck?.length ?? 0) > 1 && (rem.price ?? REMOVAL_PRICE) <= purse) {
+        out.push({ id: 'x', kind: 'shop_removal', price: rem.price ?? REMOVAL_PRICE });
+      }
+      out.push({ id: 'l', kind: 'shop_leave' });
       break;
     }
     case 'ended':
