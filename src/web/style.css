@@ -6496,11 +6496,20 @@ html, body {
 .card .ctemper .t-mark .mf, .deck-row .ctemper .t-mark .mf { fill: currentColor; }
 .card .ctemper .t-name, .deck-row .ctemper .t-name { line-height: 1.2; }
 .card.temper-quenched { box-shadow: 0 0 0 2px #6fb6e4, 0 0 14px rgba(111, 182, 228, 0.45); }
-.card.temper-quenched .ctemper { --tc: #8fd0f2; }
 .card.temper-redhot { box-shadow: 0 0 0 2px #ff6a2a, 0 0 16px rgba(255, 90, 30, 0.55); }
-.card.temper-redhot .ctemper { --tc: #ff8a4a; box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 0 8px rgba(255, 106, 42, 0.55); }
 .card.temper-balanced { box-shadow: 0 0 0 2px #e8c45a, 0 0 14px rgba(232, 196, 90, 0.45); }
-.card.temper-balanced .ctemper { --tc: #f5c542; }
+/* The per-temper stamp hue (--tc): ONE declaration per hue for every surface that wears
+   the stamp, as a shared selector list exactly like the .t-mark rules above, so the tile
+   and the deck row can never drift. Red-hot's extra glow is the tile's alone and stays
+   card-only, one rule down. */
+.card.temper-quenched .ctemper, .deck-row.temper-quenched .ctemper { --tc: #8fd0f2; }
+.card.temper-redhot .ctemper, .deck-row.temper-redhot .ctemper { --tc: #ff8a4a; }
+.card.temper-balanced .ctemper, .deck-row.temper-balanced .ctemper { --tc: #f5c542; }
+/* Red-hot's extra glow is the tile's alone (the shared hue rule above carries the deck
+   row too, so the glow cannot ride on it). The tile always carries BOTH classes — the
+   views add `tempered` and `temper-X` together, and a stamp exists only inside that
+   branch — so this longer form matches exactly the same elements. */
+.card.tempered.temper-redhot .ctemper { box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 0 8px rgba(255, 106, 42, 0.55); }
 .temper-head { margin: 6px 0 0; color: #cbb59e; font-size: 0.85rem; }
 .temper-list .boon { min-height: 64px; }
 .temper-offer.temper-quenched { border-color: #4f7f99; }
@@ -6961,9 +6970,10 @@ html, body {
   color: #f8eee5;
   text-shadow: 0 1px 0 #000;
 }
-.deck-row.temper-quenched .ctemper { --tc: #8fd0f2; }
-.deck-row.temper-redhot .ctemper { --tc: #ff8a4a; }
-.deck-row.temper-balanced .ctemper { --tc: #f5c542; }
+/* The per-temper STAMP hues are not repeated here: they are declared once, on the shared
+   .card/.deck-row selector lists in the Tempers block (beside the tile's own stamp
+   rules), so the two surfaces cannot drift. Only the row-level border hue above — which
+   has no card-side counterpart — is row-local. */
 /* Duplicates: a brass chip pinned to the row's right edge, so ×5 reads before the eye
    reaches the next name. */
 .deck-count {

@@ -1,18 +1,22 @@
-// S2 Card codex: kernel.cardPool() exposes the draft pool, enriched through the describe
-// layer, and the surface's "in deck" chip sums the kernel's own deck rows.
+// S2 Card codex: kernel.cardPool() is the describe-layer LOOKUP TABLE, and each run's
+// truth is snapshot.draftPool — the ids its rewards actually roll from. The surface's
+// "in deck" chip sums the kernel's own deck rows.
 //
-// Pins: the pool IS draftPoolFrom(content) (39 ids, starters excluded, 16/18/5 by
-// rarity); every row carries the definition's own name/cost/type/rarity and a non-empty
-// description that is the describe layer's sentence verbatim; rows sort deterministically
-// (rarity tier → cost → face name → card id); the in-deck tally sums the kernel's
-// aggregated deck rows per cardId, so a tempered copy counts toward its cardId total.
+// Pins: the table IS draftPoolFrom(shipped content) (39 ids, starters excluded, 16/18/5
+// by rarity); every row carries the definition's own name/cost/type/rarity and a
+// non-empty description that is the describe layer's sentence verbatim; rows sort
+// deterministically (rarity tier → cost → face name → card id); snapshot() publishes the
+// RUN'S draftPool (narrowed profiles make it shorter than the table; a state that
+// predates the field publishes null), and every run id is covered by a table row so the
+// per-run filter can only ever shrink it; the in-deck tally sums the kernel's aggregated
+// deck rows per cardId, so a tempered copy counts toward its cardId total.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { content, loadDescribe, loadKernel } from '../helpers/harness.mjs';
 import { inDeckCounts } from '../../src/web/deck-counts.js';
 
 const K = await loadKernel();
-const { cardPool, newRun, snapshot } = K;
+const { cardPool, contentForProfile, fullyUnlockedProfile, newRun, snapshot } = K;
 const C = await content();
 const { CARD_TYPE_LABEL, describeCard } = await loadDescribe();
 
@@ -68,6 +72,37 @@ test('rows sort deterministically: rarity tier, then cost, then face name, then 
   }
   // Same call, same rows: the order is a pure function of the content.
   assert.deepEqual(cardPool(), pool);
+});
+
+test('snapshot publishes the RUN\'S draftPool — the full table only for an unnarrowed run', () => {
+  // The default content: the run's pool IS the whole shipped draft pool.
+  const full = snapshot(newRun({ seed: 7 }));
+  assert.deepEqual(full.draftPool, C.cardList.filter((c) => c.rarity !== 'starter').map((c) => c.id).sort());
+  assert.equal(full.draftPool.length, 39);
+  // A state that predates the field (validateSave never required draftPool) publishes
+  // null — "pool unknown", NOT an empty pool — so a surface can fall back to the table
+  // instead of lying about an empty codex.
+  const { draftPool: _absent, ...legacy } = newRun({ seed: 7 });
+  assert.equal(snapshot(legacy).draftPool, null);
+});
+
+test('a narrowed run publishes its own pool, and the lookup table covers every id of it', () => {
+  // A fresh profile narrows the content (unlocks.js poolSelection), and rewards roll from
+  // exactly that narrowed set — this is the truth the codex must show, not the table.
+  for (const profile of [null, fullyUnlockedProfile()]) {
+    const narrowed = contentForProfile(profile);
+    const state = newRun({ seed: 7, content: narrowed });
+    const expected = narrowed.cardList.filter((c) => c.rarity !== 'starter').map((c) => c.id).sort();
+    const ids = snapshot(state).draftPool;
+    assert.deepEqual(ids, expected, `${profile === null ? 'fresh' : 'fully unlocked'} profile: snapshot.draftPool must be the run content's own pool`);
+    assert.ok(ids.length < 39, `${profile === null ? 'fresh' : 'fully unlocked'} profile is genuinely narrowed (${ids.length} of 39)`);
+    // The web's filter: cached cardPool() rows kept when their cardId is in the run's
+    // set. It can only shrink the table if — and only if — every run id HAS a row.
+    const tableIds = new Set(cardPool().map((r) => r.cardId));
+    for (const id of ids) assert.ok(tableIds.has(id), `${id} is offerable this run but has no codex row`);
+    assert.equal(cardPool().filter((r) => tableIds.has(r.cardId) && new Set(ids).has(r.cardId)).length, ids.length,
+      'filtering the table to the run ids yields exactly the run ids');
+  }
 });
 
 test('the in-deck tally sums the kernel\'s deck rows per cardId (tempered copies included)', () => {

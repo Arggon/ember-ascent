@@ -345,6 +345,15 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
   assert.equal(await surge.locator('.codex-indeck').textContent(), 'in deck ×1');
   assert.equal(await sheet.locator('.codex-indeck').count(), 1, 'exactly one owned copy to chip');
 
+  // The codex owns the keyboard while it is open (E8b regression): `d` must NOT stack the
+  // deck sheet on top of it and `n` must not start a run behind it — still exactly the one
+  // codex sheet — then Escape recovers below.
+  await page.keyboard.press('d');
+  await page.keyboard.press('n');
+  assert.equal(await page.locator('.modal').count(), 1, 'keys are swallowed while the codex is open');
+  assert.equal(await page.locator('.modal.codex-modal').count(), 1, 'the surviving sheet is still the codex');
+  assert.equal(await page.locator('.modal.deck-modal').count(), 0, 'the deck sheet must not open over the codex');
+
   // Escape closes it (keyboard affordance); the fight is exactly where it was.
   await page.keyboard.press('Escape');
   await page.waitForSelector('.modal.codex-modal', { state: 'detached', timeout: 3000 });

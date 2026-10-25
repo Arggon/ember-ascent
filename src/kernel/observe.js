@@ -116,6 +116,23 @@ function defOf(cardOrId) {
   return def;
 }
 
+/** The id of a bare-id-or-instance value, for the tolerant lookup's fallback text. */
+const cardIdOf = (cardOrId) => (typeof cardOrId === 'string' ? cardOrId : cardOrId.cardId);
+
+/**
+ * The TOLERANT lookup, for ids that arrive from persisted state (deck, piles, reward and
+ * rest offers): a stale save after a rename, or a typo'd id pushed in through the save /
+ * load lever (validateSave never checks cardIds), must degrade to a placeholder instead
+ * of throwing out of snapshot() in any phase. This is exactly the two-step lookup the
+ * text dump's rewardBody has always done; the snapshot builders share it now.
+ * @param {any} cardOrId a card id or an instance ({cardId})
+ * @returns {any|null} the definition, or null when the content does not know the id
+ */
+function defOrNull(cardOrId) {
+  if (CARD_DEFS === null) CARD_DEFS = defaultContent().cards;
+  return CARD_DEFS.get(cardIdOf(cardOrId)) ?? defaultContent().cards.get(cardIdOf(cardOrId)) ?? null;
+}
+
 /**
  * B2: the definition a tempered instance actually plays — the same card with the effect
  * list the kernel resolves (rules/tempers.js temperEffects), so every rendering of it
@@ -213,15 +230,18 @@ function combatBody(state, opts) {
   return lines;
 }
 
-const pileNames = (pile) => (pile.length === 0 ? '-' : pile.map((c) => defOf(c).name).join(', '));
-const pileCardNames = (pile) => (pile ?? []).map((c) => defOf(c).name);
+// Pile renderings tolerate an unknown id the way rewardBody does: the raw id stands in
+// for the name instead of a throw (defOrNull above).
+const pileNames = (pile) => (pile.length === 0 ? '-' : pile.map((c) => defOrNull(c)?.name ?? cardIdOf(c)).join(', '));
+const pileCardNames = (pile) => (pile ?? []).map((c) => defOrNull(c)?.name ?? cardIdOf(c));
 
 function rewardBody(state) {
   const lines = ['REWARD — pick one'];
   state.reward.cards.forEach((id) => {
     // Tolerant on purpose (unlike defOf): a reward id the content no longer knows
-    // still renders, as the raw id, instead of killing the whole dump.
-    const def = CARD_DEFS?.get(id) ?? defaultContent().cards.get(id);
+    // still renders, as the raw id, instead of killing the whole dump. This inline
+    // lookup IS defOrNull; it stays spelled out here as the precedent's home.
+    const def = defOrNull(id);
     lines.push(` s${state.reward.cards.indexOf(id) + 1} ${def ? def.name : id} ${def ? effectSummary(def) : ''}`);
   });
   lines.push(` s0 skip (HP ${state.player.hp}/${state.player.maxHp})`);
@@ -471,16 +491,19 @@ function snapshotReward(state, legal) {
     canSkip: legal.some((a) => a.kind === 'skip'),
     skipId: legal.find((a) => a.kind === 'skip')?.id ?? null,
     cards: state.reward.cards.map((id) => {
-      const def = defOf(id);
+      // Tolerant like rewardBody above (defOrNull): an unknown reward id — a stale save
+      // after a rename — renders as a placeholder row (raw id, cost 0, type "unknown")
+      // instead of throwing the whole snapshot away. It stays VISIBLE, not dropped.
+      const def = defOrNull(id);
       return {
         cardId: id,
-        name: def.name,
-        flavor: typeof def.flavor === 'string' ? def.flavor : '',
-        cost: def.cost,
-        type: def.type,
-        typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
-        summary: effectSummary(def),
-        description: describeCard(def),
+        name: def?.name ?? id,
+        flavor: typeof def?.flavor === 'string' ? def.flavor : '',
+        cost: def?.cost ?? 0,
+        type: def?.type ?? 'unknown',
+        typeLabel: def ? (CARD_TYPE_LABEL[def.type] ?? def.type) : 'unknown',
+        summary: def ? effectSummary(def) : '',
+        description: def ? describeCard(def) : '',
         actionId: pick.get(id) ?? null,
       };
     }),
@@ -495,8 +518,9 @@ function snapshotRest(state, legal) {
     leaveId: legal.find((a) => a.kind === 'rest_leave')?.id ?? null,
     heal: REST_HEAL,
     tempers: (state.temperOffers ?? []).map((o, i) => ({
-      actionId: `t${i + 1}`, cardId: o.cardId, cardName: defOf(o.cardId).name,
-      temper: o.temper, temperName: TEMPERS[o.temper].name, text: TEMPERS[o.temper].text,
+      // Tolerant like rewardBody (defOrNull): an unknown offer id shows its raw id.
+      actionId: `t${i + 1}`, cardId: o.cardId, cardName: defOrNull(o.cardId)?.name ?? o.cardId,
+      temper: o.temper, temperName: TEMPERS[o.temper]?.name ?? o.temper, text: TEMPERS[o.temper]?.text ?? '',
     })),
   };
 }
@@ -532,14 +556,15 @@ const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 function snapshotDeck(state) {
   const rows = new Map();
   for (const inst of state.deck ?? []) {
-    // Tolerant on purpose (the snapshotReward policy): a deck id the content no longer
-    // knows — a stale save after a rename, or a typo'd id pushed in through the save/load
-    // lever (validateSave never checks cardIds) — must not kill the page now that every
-    // phase's snapshot reads the deck. The unknown id still emits a row, carrying the raw
-    // id as its own name and "unknown" as its type word, so the broken entry stays
-    // VISIBLE instead of being silently dropped, and the rows-sum === deckCount invariant
-    // holds because nothing is skipped. Its neutral cost (0) is a sort key, not a claim.
-    const def = CARD_DEFS?.get(inst.cardId) ?? defaultContent().cards.get(inst.cardId);
+    // Tolerant on purpose (rewardBody's policy — the text dump's tolerant lookup, shared
+    // as defOrNull above): a deck id the content no longer knows — a stale save after a
+    // rename, or a typo'd id pushed in through the save/load lever (validateSave never
+    // checks cardIds) — must not kill the page now that every phase's snapshot reads the
+    // deck. The unknown id still emits a row, carrying the raw id as its own name and
+    // "unknown" as its type word, so the broken entry stays VISIBLE instead of being
+    // silently dropped, and the rows-sum === deckCount invariant holds because nothing
+    // is skipped. Its neutral cost (0) is a sort key, not a claim.
+    const def = defOrNull(inst.cardId);
     if (!def) {
       const key = `${inst.cardId}|`;
       const row = rows.get(key);
@@ -583,16 +608,18 @@ function snapshotDeck(state) {
 const RARITY_TIER = { common: 0, uncommon: 1, rare: 2 };
 
 /**
- * The card codex (S2): every card the draft pool can add to a deck, one row each,
- * enriched through the plain-English describe layer — the same sentences the hand tiles
- * and the reward screen render — so a player can plan a pick before any reward screen.
+ * The card codex LOOKUP TABLE: every card the shipped content could ever offer, one row
+ * each, enriched through the plain-English describe layer — the same sentences the hand
+ * tiles and the reward screen render.
  *
- * WHY A FUNCTION AND NOT A SNAPSHOT FIELD: the pool is content-derived and
- * phase-independent — no field of the run state touches it — so paying for 39
- * descriptions on every `snapshot()` (once per action repaint) would buy nothing. A
- * surface calls this once and owns the result. The SOURCE is `draftPoolFrom` (starters
- * excluded), so this view cannot list a card the reward deck cannot offer, and the tests
- * pin the two against each other.
+ * THE TRUTH CONTRACT: what a given RUN can actually be offered is `state.draftPool`
+ * (newRun narrows it to the profile's content, and rules/act.js rollReward picks from
+ * exactly that field), which every snapshot() now publishes as bare ids. A surface
+ * filters THESE rows to that id set, per run; it must never present the unfiltered table
+ * as a run's offerable pool — a narrowed profile makes the truth SHORTER than this
+ * table, never longer. WHY A FUNCTION AND NOT A SNAPSHOT FIELD: the describe work is
+ * content-derived and phase-independent, so it is paid once per surface load, not once
+ * per action repaint.
  *
  * Rows sort deterministically: rarity tier (common → uncommon → rare), then cost, then
  * face name, then card id — the same row list from every surface on every machine.
@@ -688,6 +715,14 @@ export function snapshot(state) {
     // above). `deckCount` is the fact the HUD badge shows; the rows carry the rest.
     deckCount: (state.deck ?? []).length,
     deckCards: snapshotDeck(state),
+    // S2 card codex: the ids THIS run's rewards actually roll from (rules/act.js
+    // rollReward picks from state.draftPool, which newRun narrowed to the profile's
+    // content). Bare ids only — the describe-layer rows live behind the cardPool()
+    // export, and a surface filters those to this set. null (not []) marks a state that
+    // predates the field (validateSave never required it), so a surface can tell
+    // "legacy state, pool unknown" apart from "legitimately empty pool" and degrade to
+    // the full lookup table instead of lying about an empty pool.
+    draftPool: Array.isArray(state.draftPool) ? [...state.draftPool] : null,
     enemies: snapshotEnemies(state),
     map: snapshotMap(state, legal),
     reward: snapshotReward(state, legal),

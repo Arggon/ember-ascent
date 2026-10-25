@@ -69,16 +69,18 @@ export function renderHud() {
     },
     on: { click: () => toggleDeck(true) },
   }));
-  // S2 card codex: what the REWARDS can add to that deck. The pool is kernel content
-  // (cardPool(), computed once — it never depends on the run), so the button announces
-  // the same count the sheet will list.
+  // S2 card codex: what THIS run's rewards can add to that deck — the kernel's lookup
+  // table filtered to the run's own draftPool (runCodexRows), so a narrowed unlock
+  // profile announces the shorter truth, and the button announces the same count the
+  // sheet will list.
+  const codexTotal = runCodexRows().length;
   hudEl.append(el('button', {
     cls: 'btn ghost',
     text: 'Cards',
     attrs: {
       type: 'button',
-      title: 'Every card the rewards can add to your deck — keyboard: k',
-      'aria-label': `Card codex: ${CODEX_POOL.length} cards`,
+      title: 'Every card the rewards can offer this run — keyboard: k',
+      'aria-label': `Card codex: ${codexTotal} cards`,
     },
     on: { click: () => toggleCodex(true) },
   }));
@@ -272,9 +274,10 @@ function deckRow(c) {
 /* ---------------------------------------------------------------- CARD CODEX (S2) */
 
 /**
- * The draft pool, computed ONCE at load: it is content-derived and phase-independent (the
- * kernel's `cardPool()`), so no repaint needs to recompute it. Rows arrive sorted by
- * rarity tier, then cost, then face name, then card id.
+ * The kernel's full-set LOOKUP TABLE, computed ONCE at load: describe-layer rows for every
+ * card the shipped content could ever offer (`cardPool()`), sorted by rarity tier, then
+ * cost, then face name, then card id. NOT the run's offerable pool by itself — a narrowed
+ * unlock profile makes the truth shorter. The per-run filter is `runCodexRows()` below.
  */
 const CODEX_POOL = cardPool();
 
@@ -284,6 +287,24 @@ const RARITY_GROUPS = [
   { key: 'uncommon', label: 'Uncommon' },
   { key: 'rare', label: 'Rare' },
 ];
+const RARITY_GROUP_KEYS = new Set(RARITY_GROUPS.map((g) => g.key));
+
+/**
+ * The codex rows the CURRENT run can actually be offered: the lookup table filtered to
+ * `snap.draftPool` — the exact id set `rules/act.js rollReward` picks this run's rewards
+ * from, which every snapshot publishes. Recomputed per read (a Set over at most 39 cached
+ * rows — no describe work), so a new run's narrowing is live from its first paint. A
+ * snapshot that predates the field (null: a state loaded from a legacy save) falls back
+ * to the whole table — the best a surface can do when the kernel could not say — while an
+ * EMPTY array is taken at its word: "Cards (0)", nothing offerable this run.
+ * @returns {Array<typeof CODEX_POOL[number]>}
+ */
+function runCodexRows() {
+  const ids = snap.draftPool;
+  if (!Array.isArray(ids)) return CODEX_POOL;
+  const offerable = new Set(ids);
+  return CODEX_POOL.filter((c) => offerable.has(c.cardId));
+}
 
 export let codexOpen = false;
 
@@ -293,31 +314,37 @@ export function toggleCodex(open) {
 }
 
 /**
- * The card codex sheet (S2): every card the draft pool can add to the deck, grouped by
- * rarity with group counts, read-only. Every row is a fact the kernel's `cardPool()`
- * published — names, costs, type words and descriptions all through the describe layer —
- * and the "in deck" chip is a sum of the kernel's own `deckCards` counts, so the sheet can
- * never show a card the reward deck cannot offer, or a copy the run does not hold. The
- * shell is the deck sheet's own — `.modal-back` > `.modal` > `.modal-scroll` +
- * `.modal-foot` — so the page keeps ONE modal system: backdrop click, Escape and Close
- * all dismiss it, exactly like Help and Deck.
+ * The card codex sheet (S2): every card THIS run's combat rewards can add to the deck,
+ * grouped by rarity with group counts, read-only. The rows are the kernel's `cardPool()`
+ * lookup filtered to the run's own `snap.draftPool` (so a narrowed profile shows only
+ * what can really be offered), every cell is a describe-layer fact, and the "in deck"
+ * chip is a sum of the kernel's own `deckCards` counts — the sheet can never show a card
+ * the reward deck cannot offer, or a copy the run does not hold. The shell is the deck
+ * sheet's own — `.modal-back` > `.modal` > `.modal-scroll` + `.modal-foot` — so the page
+ * keeps ONE modal system: backdrop click, Escape and Close all dismiss it, exactly like
+ * Help and Deck.
  */
 export function codexPanel() {
+  const rows = runCodexRows();
   const tally = inDeckCounts(snap.deckCards);
   const back = el('div', { cls: 'modal-back' });
   back.addEventListener('click', (ev) => { if (ev.target === back) toggleCodex(false); });
 
-  const panel = el('div', { cls: 'modal codex-modal', attrs: { role: 'dialog', 'aria-label': `Card codex: ${CODEX_POOL.length} cards` } });
+  const panel = el('div', { cls: 'modal codex-modal', attrs: { role: 'dialog', 'aria-label': `Card codex: ${rows.length} cards` } });
   const scroll = el('div', { cls: 'modal-scroll' });
-  scroll.append(el('h2', { text: `Cards (${CODEX_POOL.length})` }));
-  scroll.append(el('p', { cls: 'hint', text: 'Every card a combat reward can add to your deck. Pick with the fight ahead in mind.' }));
+  scroll.append(el('h2', { text: `Cards (${rows.length})` }));
+  scroll.append(el('p', { cls: 'hint', text: 'Every card a combat reward can add to your deck this run. Pick with the fight ahead in mind.' }));
 
-  for (const group of RARITY_GROUPS) {
-    const rows = CODEX_POOL.filter((c) => c.rarity === group.key);
-    if (rows.length === 0) continue;
-    scroll.append(el('h3', { cls: 'codex-group-head', text: `${group.label} (${rows.length})` }));
+  // The three rarity tiers, then a catch-all so the header total can never count a row no
+  // group renders: a rarity the tiers above do not name still shows, under "Other".
+  for (const group of [...RARITY_GROUPS, { key: null, label: 'Other' }]) {
+    const groupRows = group.key === null
+      ? rows.filter((c) => !RARITY_GROUP_KEYS.has(c.rarity))
+      : rows.filter((c) => c.rarity === group.key);
+    if (groupRows.length === 0) continue;
+    scroll.append(el('h3', { cls: 'codex-group-head', text: `${group.label} (${groupRows.length})` }));
     const list = el('div', { cls: 'codex-rows' });
-    for (const c of rows) list.append(codexRow(c, tally.get(c.cardId) ?? 0));
+    for (const c of groupRows) list.append(codexRow(c, tally.get(c.cardId) ?? 0));
     scroll.append(list);
   }
 

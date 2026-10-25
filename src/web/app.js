@@ -50,25 +50,23 @@ document.addEventListener('keydown', (ev) => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const k = ev.key;
 
-  // --- the deck viewer owns the keyboard while it is open --------------------------
-  // Escape closes it; every other key is swallowed so no card is played, no turn ends and
-  // no run is discarded behind the overlay. (The panel itself is a dialog, so its Close
-  // button and backdrop are the mouse paths out.)
+  // --- a sheet owns the keyboard while it is open -------------------------------------------
+  // ONE contract for both sheets: while a sheet is open every key is swallowed except
+  // that sheet's own toggle (d for deck, k for codex) and Escape — so no OTHER sheet, no
+  // card, no turn and no run can be driven from behind an overlay. The open-sheet guards
+  // stand BEFORE the open-toggle lines below: a toggle line that ran first would leak its
+  // key into a sheet that is already open (d used to stack the deck sheet on top of the
+  // codex). (Each panel is a dialog, so its Close button and backdrop are the mouse paths
+  // out.)
   if (deckOpen) {
     if (k === 'Escape' || k === 'Esc' || k === 'd' || k === 'D') { ev.preventDefault(); toggleDeck(false); }
     return;
   }
-  if (k === 'd' || k === 'D') { ev.preventDefault(); toggleDeck(true); return; }
-
-  // --- the card codex owns the keyboard while it is open ------------------------------------
-  // The deck sheet's contract again: Escape (or the sheet's own key, k) closes it; every
-  // other key is swallowed, so no card is played and no turn ends behind the overlay.
-  // `k` was chosen because every closer mnemonic is taken — d deck, e end turn, n new run,
-  // r restart — and no key handler in the surface bound it.
   if (codexOpen) {
     if (k === 'Escape' || k === 'Esc' || k === 'k' || k === 'K') { ev.preventDefault(); toggleCodex(false); }
     return;
   }
+  if (k === 'd' || k === 'D') { ev.preventDefault(); toggleDeck(true); return; }
   if (k === 'k' || k === 'K') { ev.preventDefault(); toggleCodex(true); return; }
 
   // --- targeting owns the keyboard while it is active -----------------------------
