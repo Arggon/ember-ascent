@@ -195,6 +195,13 @@ export function newRun(opts = {}) {
       block: 0,
       energy: 0,
       statuses: {},
+      // S3 gold economy: the run's purse, part of run state and therefore of the hash.
+      // Starts at 99 — Slay the Spire's own opening purse — and only ever grows here:
+      // every combat victory pays by node tier (rules/map.js NODE_TYPES gold ranges, via
+      // rules/act.js resolveVictory). Inert until the shop slice gives it a spender.
+      // Legacy saves from before this field default to 0 at every read (`?? 0`), so no
+      // format bump; validateSave keeps it optional.
+      gold: 99,
     },
     combat: {
       active: false,

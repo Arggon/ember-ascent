@@ -241,7 +241,16 @@ test('the real module graph survives a full run and paints the restart menu', as
   assert.ok(['win', 'loss'].includes(end.ended.outcome), `an outcome is recorded: ${end.ended.outcome}`);
   // THE REGRESSION: the restart menu is on the stage. Before the run-history fix this
   // threw mid-render (ReferenceError in a real graph) and left the stage EMPTY.
-  const restart = buttons().find((n) => /restart/i.test(label(n)));
+  // A WIN arrives on the same paint as a death, so render() holds the collapse beat
+  // before the ended panel paints (render.js's ended-hold); the walk can therefore exit
+  // its loop while the summary is still one timed repaint away. Wait the beat out — the
+  // S3 gold grants shifted this walk's seed-11 run from a defeat (no hold: nothing dies)
+  // onto a boss-killing win (a hold), which is what moved the old single read.
+  let restart = null;
+  for (let i = 0; i < 50 && !restart; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+    restart = buttons().find((n) => /restart/i.test(label(n))) ?? null;
+  }
   assert.ok(restart, 'the ended screen shows a Restart button');
   assert.ok(stageNodes().some((n) => n._cls.split(/\s+/).includes('big-title')), 'the outcome headline is painted');
 });

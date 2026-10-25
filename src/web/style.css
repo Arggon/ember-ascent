@@ -196,6 +196,9 @@ html, body {
 .stat.block { color: var(--block); border-color: rgba(95, 168, 220, 0.34);
   background: none
 }
+/* S3 gold: the purse chip shares the one warm accent with Energy — a coin IS gold — but
+   keeps the standard stat well so the two chips read as different rows, not one repeated. */
+.stat.gold { color: var(--gold); border-color: rgba(245, 197, 66, 0.34); }
 .stat.dim { color: var(--faint); font-weight: 500; border-color: transparent; background: none; padding-left: 0;
   display: none
 }
@@ -930,6 +933,15 @@ html, body {
 
 /* Reward and rest are beats, not forms: a banner line and room to breathe. */
 .reward-head { font-size: var(--fs-5); font-weight: 800; color: var(--gold); margin: 0 0 var(--sp-2); }
+/* S3: the spoils chip sits inside the head, quieter than the headline it answers to —
+   the struck-coin mark plus "+N gold", one kernel value each. */
+.reward-gold { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  margin-left: var(--sp-3); padding: 3px 11px; font-size: var(--fs-3); font-weight: 700;
+  color: var(--gold); border: 1px solid rgba(245, 197, 66, 0.34); border-radius: 999px;
+  background: var(--stat-well); font-variant-numeric: tabular-nums; }
+.reward-gold .coin-glyph { display: inline-flex; width: 14px; height: 14px; }
+.reward-gold .coin-glyph svg { display: block; width: 100%; height: 100%; }
+.reward-gold .coin-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
 .rest-head { font-size: var(--fs-5); font-weight: 800; color: #9fc7b0; margin: 0 0 var(--sp-2); }
 .rest-note { color: var(--dim); font-size: var(--fs-3); margin: 0 0 var(--sp-3); }
 

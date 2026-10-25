@@ -7,13 +7,15 @@
 
 import { intAt } from '../rng.js';
 
-/** Node kinds and their meaning. */
+/** Node kinds and their meaning. `gold` is the inclusive [min, max] the victory path
+ *  pays (rules/act.js resolveVictory): the tier decides the range, the seed decides the
+ *  spot inside it. A rest node never fights, so it carries no gold row. */
 export const NODE_TYPES = {
-  combat_weak: { id: 'combat_weak', label: 'fight', tier: 1, reward: 'card' },
-  combat_strong: { id: 'combat_strong', label: 'fight+', tier: 2, reward: 'card' },
-  elite: { id: 'elite', label: 'elite', tier: 3, reward: 'card' },
+  combat_weak: { id: 'combat_weak', label: 'fight', tier: 1, reward: 'card', gold: [10, 17] },
+  combat_strong: { id: 'combat_strong', label: 'fight+', tier: 2, reward: 'card', gold: [25, 35] },
+  elite: { id: 'elite', label: 'elite', tier: 3, reward: 'card', gold: [50, 70] },
   rest: { id: 'rest', label: 'rest', tier: 0, reward: 'heal' },
-  boss: { id: 'boss', label: 'boss', tier: 4, reward: 'end' },
+  boss: { id: 'boss', label: 'boss', tier: 4, reward: 'end', gold: [100, 100] },
 };
 
 /** Rows in act 1, including the entry row and the boss row. */

@@ -142,6 +142,17 @@ export function validateSave(raw) {
     for (const key of ['phase', 'stepIndex', 'rngDraws', 'contentVersion', 'player', 'act', 'floor']) {
       if (!(key in st)) problems.push(`save.state: missing field "${key}"`);
     }
+    // S3 gold: OPTIONAL on purpose. A pre-gold save (no `player.gold`) must keep loading
+    // with the purse defaulting to 0 at every read (`?? 0` in observe/rules), so the field
+    // is never required here and FORMAT_VERSION stays put. When it IS present, it must be
+    // an integer — the purse is whole coins like every other run number (R3).
+    const player = st.player;
+    if (player && typeof player === 'object' && !Array.isArray(player)) {
+      const gold = /** @type {Record<string, unknown>} */ (player).gold;
+      if (gold !== undefined && !Number.isInteger(gold)) {
+        problems.push('save.state.player: "gold" must be an integer');
+      }
+    }
   }
   const actions = /** @type {Record<string, unknown>} */ (raw).actions;
   if (actions !== undefined && !Array.isArray(actions)) problems.push('save: "actions" must be an array');

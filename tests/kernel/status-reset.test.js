@@ -84,10 +84,14 @@ test('no player status survives into the map phase', () => {
 test('Strength gained DURING a fight still applies for the rest of that fight', () => {
   // The complement of the fix: resetting at combat start must not break the buff itself.
   // Find a fight, apply Strength directly through a real card if one is in hand, and assert
-  // it is still present on the following player turn.
+  // it is still present on the following player turn. One Inflame is pushed into each
+  // probed deck (the save/load lever's shape: travel shuffles and deals it like any real
+  // card) so the probe does not depend on a seed's draw stream dealing a Strength card by
+  // luck — the S3 gold grants shifted every stream, which retired the old pure-probe finds.
   let found = null;
   for (const seed of [1, 2, 3, 5, 8, 13]) {
     let state = newRun({ seed });
+    state = { ...state, deck: [...state.deck, { uid: 'sr-inflame', cardId: 'inflame' }] };
     for (let i = 0; i < 400; i += 1) {
       const snap = snapshot(state);
       if (snap.phase === 'combat') {

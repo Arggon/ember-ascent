@@ -11,7 +11,7 @@ import { drawIntoHand } from './draw.js';
 import { ENEMIES, chooseIntent } from './encounters.js';
 import { NODE_TYPES, ROWS } from './map.js';
 import { fireHook, endOfTurnStatuses, decayStatuses } from './powers.js';
-import { shuffleAt, pickAt } from '../rng.js';
+import { shuffleAt, pickAt, intAt } from '../rng.js';
 import { activeRelic, relicId } from './relics.js';
 
 /** Hand size at the start of each turn. */
@@ -351,7 +351,34 @@ export function resolveVictory(state, cardDefs) {
     events.push({ t: 'heal', who: 'player', amount: healed, source: relicId(state) });
   }
 
+  // S3 GOLD — the spoils, granted exactly ONCE per won fight. Both callers (steps.js
+  // playCard and endTurn here) reach victory through this one function, and it flips the
+  // phase away from `combat` in the same breath (reward / rest / ended), so a re-observe
+  // of the post-victory state can never re-enter it: there is no gold grant action, and
+  // observe/snapshot are read-only. The boss path grants BEFORE the flip to `ended`, so
+  // the run summary reads the final purse.
+  //
+  // RNG ACCOUNTING: exactly ONE u64 draw for a ranged tier (intAt over the inclusive
+  // range), ZERO draws for a flat tier — the boss pays 100 to every seed, so there is
+  // nothing to roll. `rngDraws` advances by exactly `goldDraws`; the card-reward roll
+  // below then reads the counter AFTER the grant, so the grant is part of the format.
   const nodeType = state.combat.nodeType;
+  const goldRange = NODE_TYPES[nodeType]?.gold ?? null;
+  // The grant amount travels into `state.reward.gold` when a card reward opens, so the
+  // reward screen and the text dump can say "+N gold" without re-deriving anything.
+  let goldGained = null;
+  if (goldRange) {
+    const [lo, hi] = goldRange;
+    const goldDraws = hi > lo ? 1 : 0;
+    goldGained = lo + (goldDraws ? intAt(state.seed, state.rngDraws, hi - lo + 1) : 0);
+    next = {
+      ...next,
+      rngDraws: next.rngDraws + goldDraws,
+      player: { ...next.player, gold: (next.player.gold ?? 0) + goldGained },
+    };
+    events.push({ t: 'gold', who: 'player', amount: goldGained, source: nodeType });
+  }
+
   if (nodeType === 'boss') {
     return { state: { ...next, phase: 'ended', outcome: 'win' }, events: [...events, { t: 'run_end', outcome: 'win' }] };
   }
@@ -364,7 +391,12 @@ export function resolveVictory(state, cardDefs) {
   // Roll the reward offer: REWARD_CHOICES distinct cards.
   const elites = nodeType === 'elite' ? 1 : 0;
   const offer = rollReward(next, REWARD_CHOICES + elites);
-  next = { ...next, rngDraws: next.rngDraws + offer.draws, phase: 'reward', reward: { cards: offer.ids, taken: null } };
+  next = {
+    ...next,
+    rngDraws: next.rngDraws + offer.draws,
+    phase: 'reward',
+    reward: { cards: offer.ids, taken: null, gold: goldGained },
+  };
   events.push({ t: 'reward_offered', cards: offer.ids });
   void cardDefs;
   return { state: next, events };

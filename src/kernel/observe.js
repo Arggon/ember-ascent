@@ -172,6 +172,9 @@ function header(state) {
     `HP ${p.hp}/${p.maxHp}`,
     `EN ${p.energy}/${state.energyPerTurn ?? 3}`,
     `BLK ${p.block}`,
+    // S3 gold: the purse sits in the header beside HP/EN/BLK so every phase shows it.
+    // `?? 0` is the legacy-save tolerance (validateSave keeps the field optional).
+    `GOLD ${p.gold ?? 0}`,
     `draw${state.combat?.draw?.length ?? 0} disc${state.combat?.discard?.length ?? 0}`,
     statuses,
   ].filter(Boolean);
@@ -192,7 +195,7 @@ function body(state, opts) {
       return kindlingBody(state);
     case 'ended':
       return [
-        `GAME OVER — ${state.outcome === 'win' ? 'VICTORY' : 'DEFEAT'} | floor ${state.floor + 1} | steps ${state.stepIndex}`,
+        `GAME OVER — ${state.outcome === 'win' ? 'VICTORY' : 'DEFEAT'} | floor ${state.floor + 1} | steps ${state.stepIndex} | gold ${state.player.gold ?? 0}`,
       ];
     default:
       return [`phase ${state.phase}`];
@@ -245,6 +248,12 @@ function rewardBody(state) {
     lines.push(` s${state.reward.cards.indexOf(id) + 1} ${def ? def.name : id} ${def ? effectSummary(def) : ''}`);
   });
   lines.push(` s0 skip (HP ${state.player.hp}/${state.player.maxHp})`);
+  // S3: what this fight just paid and what the purse holds now. Only when the reward
+  // carries the grant: a legacy save's reward predates the field, and printing "+0"
+  // for a spoils the engine never computed would be a lie, not a default.
+  if (typeof state.reward.gold === 'number') {
+    lines.push(` spoils +${state.reward.gold} gold (purse ${state.player.gold ?? 0})`);
+  }
   return lines;
 }
 
@@ -490,6 +499,11 @@ function snapshotReward(state, legal) {
   return {
     canSkip: legal.some((a) => a.kind === 'skip'),
     skipId: legal.find((a) => a.kind === 'skip')?.id ?? null,
+    // S3: the spoils THIS victory paid (`state.reward.gold`, set by the victory path)
+    // and the purse it landed in. null marks "no grant on record" — a legacy save's
+    // reward predates the field — so a surface hides the line instead of printing +0.
+    goldGained: typeof state.reward.gold === 'number' ? state.reward.gold : null,
+    purse: state.player.gold ?? 0,
     cards: state.reward.cards.map((id) => {
       // Tolerant like rewardBody above (defOrNull): an unknown reward id — a stale save
       // after a rename — renders as a placeholder row (raw id, cost 0, type "unknown")
@@ -690,6 +704,9 @@ export function snapshot(state) {
       maxHp: state.player.maxHp,
       block: state.player.block,
       energy: state.player.energy,
+      // S3 gold economy: the run's purse. `?? 0` keeps a pre-gold legacy save reading
+      // as an empty purse instead of undefined leaking into a renderer.
+      gold: state.player.gold ?? 0,
       statuses: statusPairs(state.player.statuses),
       powers: Object.entries(state.powers ?? {})
         .filter(([, v]) => v > 0)

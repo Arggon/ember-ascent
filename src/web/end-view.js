@@ -23,7 +23,10 @@ export function endView() {
   // a number is not an achievement, and a run's meaning is not its arithmetic.
   wrap.append(el('div', { cls: `big-title ${won ? 'win' : 'loss'}`, text: won ? 'VICTORY' : 'DEFEAT' }));
   wrap.append(el('hr', { cls: 'end-rule' }));
-  wrap.append(el('p', { cls: 'end-stats', text: `Reached floor ${e.floor} · ${e.steps} steps · seed ${snap.seed}` }));
+  // S3: the purse the run finished with — the kernel snapshot's own `player.gold`, the same
+  // value the HUD carried from boot to here (grant details live in the record's events).
+  const purse = snap.player.gold ?? 0;
+  wrap.append(el('p', { cls: 'end-stats', text: `Reached floor ${e.floor} · ${e.steps} steps · seed ${snap.seed} · ${purse} gold` }));
 
   const math = lastRecord ? ledgerMath(lastRecord) : null;
   if (math) {

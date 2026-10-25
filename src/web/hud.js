@@ -38,6 +38,11 @@ export function renderHud() {
   hudEl.append(stat('energy', '⚡', `${p.energy}/${snap.energyPerTurn}`, flash.energy,
     `Energy ${p.energy} of ${snap.energyPerTurn}`));
   hudEl.append(stat('block', '⛨', String(p.block), flash.block, `Block ${p.block}`));
+  // S3 gold economy: the purse is a READOUT, not a control — no button, no flash, just the
+  // kernel's own `snap.player.gold` (the same value the CLI dump's GOLD header shows), so
+  // the browser can never disagree with the engine about how rich you are.
+  const purse = p.gold ?? 0;
+  hudEl.append(stat('gold', '◉', String(purse), false, `Gold ${purse}`));
   hudEl.append(el('span', { cls: 'hud-step', text: `step ${snap.stepIndex}` }));
 
   // A status that just landed on the PLAYER gets the same by-kind treatment as an enemy's.

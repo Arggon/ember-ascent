@@ -17,7 +17,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { combatState, loadKernel, loadObserve, loadSession, loadSim, content as contentFixture } from './helpers/harness.mjs';
-import { makePolicy, scoreSmartCard, smartRewardScore, deckNeeds, effectProfile, enemyThreats } from '../src/surface/policies.js';
+import { makePolicy, scoreSmartCard, smartRewardScore, deckNeeds, effectProfile, enemyThreats, combatContext } from '../src/surface/policies.js';
 
 const { newRun, actions } = await loadKernel();
 const { observe } = await loadObserve();
@@ -75,7 +75,13 @@ test('smart never plays an action absent from the kernel legal list', () => {
 test('smart spends Energy instead of idling while a useful card is playable', async () => {
   // The failure this guards: ending the turn with Energy left AND a card in hand that
   // would do something. Blocking into nothing does not count as something (requirement
-  // 4), so the check is against the same scorer the policy uses.
+  // 4), so the check is against the same scorer the policy uses — through the SAME board
+  // builder, too: combatContext is the one place that assembles the scoring context
+  // (race awareness included), and hand-rolling a subset of it here made the checker see
+  // a different fight than the chooser — a lethal incoming turn re-prices every play's
+  // uncovered-lethal penalty, so the two disagreed about "useful". The S3 gold grants
+  // shifted the seed-5 draw stream onto exactly such a corner. Judging every play through
+  // the shared builder is the repair; the assertion itself is unchanged.
   const c = await contentFixture();
   for (const seed of [5, 23, 61]) {
     const policy = makePolicy('smart');
@@ -88,27 +94,11 @@ test('smart spends Energy instead of idling while a useful card is playable', as
       const choice = policy.choose({ session, state, legal: legal(session), stepIndex: state.stepIndex, memory, dump });
       if (state.phase === 'combat' && state.player.energy > 0) {
         const plays = legal(session).filter((a) => a.kind === 'play');
-        const threat = enemyThreats(state, dump).reduce((a, b) => a + b, 0);
-        const live = state.combat.enemies.filter((e) => !e.dead);
+        const base = combatContext(state, dump);
         const useful = plays.filter((a) => {
           const def = c.cards.get(a.cardId);
           if (!def) return false;
-          const s = scoreSmartCard(def, {
-            liveEnemies: live.map((e) => ({ hp: e.hp, block: e.block, incoming: 0 })),
-            incoming: threat,
-            playerHp: state.player.hp,
-            playerMaxHp: state.player.maxHp,
-            playerBlock: state.player.block,
-            playerStrength: state.player.statuses?.strength ?? 0,
-            playerDexterity: state.player.statuses?.dexterity ?? 0,
-            energyLeft: state.player.energy,
-            enemyHpRemaining: live.reduce((n, e) => n + e.hp, 0),
-            enemyBlockRemaining: live.reduce((n, e) => n + e.block, 0),
-            drawableInPiles: state.combat.draw.length + state.combat.discard.length > 0,
-            playableInHand: plays.length,
-            followUpAttacks: 0,
-          });
-          return s.score > 0;
+          return scoreSmartCard(def, base).score > 0;
         });
         if (useful.length > 0) {
           assert.notEqual(choice.id, 'e1', `seed ${seed} step ${steps}: ended the turn with Energy ${state.player.energy} and ${useful.length} useful play(s) available`);

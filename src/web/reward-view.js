@@ -1,4 +1,5 @@
-// src/web/reward-view.js — the spoils screen after a victory: three cards, one choice.
+// src/web/reward-view.js — the spoils screen after a victory: three cards, one choice,
+// and the gold the fight just paid (S3).
 
 import { arriving, snap } from './runtime.js';
 import { el, sceneIllus } from './dom.js';
@@ -6,6 +7,7 @@ import { cardTile } from './combat-view.js';
 import { consumeClick } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
+import { glyphBox } from './glyphs.js';
 
 export function rewardView() {
   const wrap = el('div');
@@ -14,7 +16,20 @@ export function rewardView() {
   // built in `render()`; an incidental repaint inside the phase reproduces the same string
   // and the browser restarts nothing.
   wrap.append(sceneIllus('reward'));
-  wrap.append(el('div', { cls: 'reward-head' + (arriving.reward ? ' reveal' : ''), text: 'Victory — choose a card' }));
+  // S3: the head carries both facts the victory just produced — the choice offered and the
+  // gold paid. The +N is the kernel's own `snap.reward.goldGained` (set in the same breath
+  // as the grant), and `purse` is the total it landed in: one computed value each, never
+  // re-derived here. null goldGained (a legacy save's reward predates the field) hides the
+  // chip instead of printing "+0" for a grant the engine never computed.
+  const head = el('div', { cls: 'reward-head' + (arriving.reward ? ' reveal' : '') });
+  head.append(el('span', { text: 'Victory — choose a card' }));
+  if (snap.reward.goldGained != null) {
+    head.append(el('span', { cls: 'reward-gold', attrs: { title: `Spoils of the fight — purse: ${snap.reward.purse} gold` } },
+      glyphBox('coin', 'coin-glyph'),
+      el('span', { text: `+${snap.reward.goldGained} gold` }),
+    ));
+  }
+  wrap.append(head);
   const row = el('div', { cls: 'hand' + (arriving.reward ? ' reveal-cards' : '') });
   for (const c of snap.reward.cards) {
     // The reward tile's own action: taking a card, not playing one. Marked with `data-action`

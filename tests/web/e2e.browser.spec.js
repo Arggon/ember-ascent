@@ -15,6 +15,9 @@
 //   7. the S2 card codex groups the whole draft pool by rarity with counts, shows a known
 //      card's describe-layer sentence, wears the "in deck" chip on an injected copy, and
 //      Escape dismisses it without moving the run
+//   8. the S3 gold economy: a victory pays the purse (the reward head's "+N gold" chip
+//      and the HUD readout agree on the same kernel value) and the next victory adds to
+//      it; the run summary names the final purse
 //
 // RUN. `npm run test:browser`. Deliberately NOT matched by the default `npm test`
 // glob (`tests/**/*.test.js`): this file is `.spec.js` so the default suite stays
@@ -462,6 +465,53 @@ test('kill: the stroke plays against the hold stage, then the reward arrives', {
   assert.ok(fx.heroInHold > 0, 'the held stage must include the hero figure');
   assert.ok(fx.shake > 0, "Maul's stage shake must fire during the kill");
   assert.ok(fx.shockwave > 0, "Maul's ember shockwave must fire during the kill");
+
+  // S3 GOLD: the victory paid. The reward head carries the "+N gold" chip (the kernel's
+  // own goldGained), the HUD purse is the start purse plus exactly that N — one computed
+  // value each, screen and HUD cannot disagree — and the NEXT victory adds to the same
+  // purse.
+  const chip = page.locator('.reward-gold');
+  assert.equal(await chip.count(), 1, 'the reward head carries exactly one spoils chip');
+  const chipText = await chip.textContent();
+  const gained = Number(/\+(\d+) gold/.exec(chipText)?.[1]);
+  assert.ok(gained >= 10 && gained <= 17, `a floor-0 fight pays the weak tier 10-17, got "${chipText}"`);
+  const purseText = await page.locator('#hud .stat.gold').textContent();
+  assert.equal(Number(/(\d+)$/.exec(purseText)[1]), 99 + gained,
+    `the HUD purse is 99 + the shown spoils (chip "${chipText}", hud "${purseText}")`);
+  assert.match((await chip.getAttribute('title')) ?? '', new RegExp(`purse: ${99 + gained} gold`),
+    'the chip tooltips the same total the HUD shows');
+
+  // A second combat pays again, on top of the first purse.
+  await leaveReward(page);
+  await travelToFight(page);
+  for (let guard = 0; guard < 24; guard += 1) {
+    const st = await readState(page);
+    if (st.phase !== 'combat') break;
+    const maul = page.locator('button[data-slot][aria-label^="Maul"][aria-disabled="false"]');
+    if ((await maul.count()) > 0) {
+      await maul.first().click();
+      if ((await page.locator('.enemy.targeting').count()) > 0) {
+        await page.locator('.enemy[data-target-index]').first().click();
+      }
+      await sleep(1200);
+    } else {
+      await endTurn(page);
+      await sleep(1800);
+    }
+  }
+  let reward2 = null;
+  for (let i = 0; i < 40 && !reward2; i += 1) {
+    await sleep(350);
+    const st = await readState(page);
+    if (st.phase === 'reward') reward2 = st;
+  }
+  assert.ok(reward2, 'the second fight resolves into its reward');
+  const chip2Text = await page.locator('.reward-gold').textContent();
+  const gained2 = Number(/\+(\d+) gold/.exec(chip2Text)?.[1]);
+  assert.ok(gained2 >= 10, `the second spoils chip names its grant, got "${chip2Text}"`);
+  const purse2Text = await page.locator('#hud .stat.gold').textContent();
+  assert.equal(Number(/(\d+)$/.exec(purse2Text)[1]), 99 + gained + gained2,
+    'the second victory adds its spoils to the same purse');
 });
 
 test('signature: Maul fires shake + shockwave through the real targeting path', { timeout: 300000 }, async (t) => {
@@ -849,4 +899,8 @@ test('a full run ends on the restart menu, not a blank stage', { timeout: 300000
   assert.ok(sawBossFight, 'the walk fought the Slag Warden');
   const restartVisible = await page.getByRole('button', { name: /Restart/i }).isVisible();
   assert.ok(restartVisible, 'the restart menu is on the screen after the run ends');
+  // S3: the summary line carries the purse the run finished with (the kernel's own
+  // player.gold — the same value the HUD showed from boot).
+  const endStats = await page.locator('.end-stats').textContent();
+  assert.match(endStats, /· \d+ gold$/, `the run summary names the final purse: ${endStats}`);
 });
