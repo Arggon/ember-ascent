@@ -69,8 +69,11 @@ Process rules (standing):
   - Fresh browser context per scenario (localStorage persists and can resume an old run).
   - State injection lever (frozen kernel): at MAP phase,
     `const s = JSON.parse(window.__dlb.controller().save()); s.deck.push({uid:'x1', cardId:'…'});
-    window.__dlb.controller().load(JSON.stringify(s));` — the travel `act()` shuffles and
-    deals them like real cards. Enemies live at `state.combat.enemies`.
+    window.__dlb.controller().load(s);` — `load` takes the PARSED OBJECT (a string fails
+    with "save: not a JSON object"); the travel `act()` shuffles and
+    deals them like real cards (a bare `load` leaves the painted surface stale until the
+    next `act()`; `window.__dlb.snapshot()` reads engine truth immediately).
+    Enemies live at `state.combat.enemies`.
   - Fixed seed ⇒ fixed deal (`?seed=N`); hand entries are objects `{cardId, cost}`;
     card buttons: `button[data-slot][aria-label^="Face name"][aria-disabled="false"]`;
     face names differ from cardIds (e.g. `strike` renders as "Hammerfall").
@@ -111,3 +114,11 @@ Process rules (standing):
   defOrNull-style tolerance or narrow the claim); (d) nit: cardIdOf duplicates defOf's
   inline id extraction.
 - 2026-10-24 — S3 (gold economy) development dispatched.
+- 2026-10-24 — S3 dev done (255 tests/254 pass/1 pre-existing todo, gate OK, art OK,
+  test:browser 12/12, sim 20-run win-rate inside stored baselines; 21 files incl.
+  regenerated golden fixtures — gold is hash input — and 3 test-only deviations from
+  shifted RNG streams). Manual QA PASS 10/10 (evidence /tmp/s3-qa/): 99 boot purse,
+  +16/+12 in-range grants, 99+16+12 purse math, one-grant-per-kill, same-seed
+  determinism, save/reload, legacy-save defaults to 0, end-screen total, deck/codex
+  regressions clean, zero console errors. Committed 67084ec; solo review dispatched.
+  Roadmap lever recipe corrected: ctl.load takes the parsed object.
