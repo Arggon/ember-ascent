@@ -47,9 +47,9 @@ Process rules (standing):
 
 | # | Slice | Scope kernel | Scope web | Status |
 |---|---|---|---|---|
-| S1 | Master deck viewer | snapshot exposes full deck (id, name, cost, type, tempered, count) | "Deck" button on map+combat → modal overlay, sorted, grouped by count, Esc/click closes | committed 5b11de9 — QA PASS 7/7, review APPROVE; follow-up fixes queued (S1.1) |
-| S2 | Card codex | expose draft pool via public API (`draftPoolFrom` already exists) | "Cards" button → codex modal grouped by rarity with descriptions | pending |
-| S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | pending |
+| S1 | Master deck viewer | snapshot exposes full deck (id, name, cost, type, tempered, count) | "Deck" button on map+combat → modal overlay, sorted, grouped by count, Esc/click closes | closed — 5b11de9 + fixes 7992e84, QA 7/7, review APPROVE |
+| S2 | Card codex | expose draft pool via public API (`draftPoolFrom` already exists) | "Cards" button → codex modal grouped by rarity with descriptions | closed — 01466a3 + fixes 2ab6834 (per-run truthful codex + tolerance + keyguard), QA 8/8+loop, re-review APPROVE |
+| S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | **in progress** (dev dispatched) |
 | S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | pending |
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | pending |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | pending |
@@ -91,3 +91,23 @@ Process rules (standing):
   untested; P3 tempered row missing from e2e; P3 stale "exactly like Help" comment; P3 CSS
   stamp-geometry duplication; P3 (later slice) shared modal focus helper.
 - 2026-10-24 — S2 QA PASS 8/8 (evidence /tmp/s2-qa/); S2 committed 01466a3. S2 review was dispatched in parallel with the S1.1 fixer and STOPPED unfinished per the user's directive: reviews never overlap with active changes. New sequence: S1.1 lands and commits → S2+S1.1 review (diff since 1c16fac) runs solo → verdict loops or S3 dev starts.
+- 2026-10-24 — S1.1 committed 7992e84 (gates re-verified by orchestrator). Solo review of
+  1c16fac..HEAD → REQUEST_CHANGES: P1 the codex listed all 39 cards while rewards draw from
+  the run's narrowed state.draftPool (fresh profile: only 18 offerable); P2 tolerance holes
+  in reward/rest/piles + comment citing the wrong precedent; P3 unknown-rarity rows counted
+  but unrendered; P3 hue literals duplicated. Fix round S2.1 (S2 dev): snapshot publishes
+  draftPool, codex filters per run, defOrNull() tolerance sweep, catch-all group, shared
+  hues. Manual QA passed the truth fix but FAILED E8b (d leaked through the codex overlay
+  — pre-existing guard-order bug in app.js) → looped back → fixed + e2e-pinned.
+  Orchestrator independently re-ran the E8b probe (PASS). Committed 2ab6834. Re-review
+  (7992e84..HEAD, solo): VERDICT APPROVE; backlog items recorded below.
+- BACKLOG (from the S2.1 re-review, non-blocking P3s — fold into a future fix round):
+  (a) Help sheet is a third overlay with NO keyboard guard — d/k stack sheets on it and
+  `n` discards a run behind it (E8b class, pre-existing; guard it or close sheets in
+  newGame); (b) restBody still throws on an unknown temper key, so snapshotRest's new
+  `?.` fallbacks are unreachable through snapshot() — tolerate in restBody or revert the
+  `?.`; (c) "degrade everywhere" overclaims: snapshotHand/combatBody/snapshotEnemies/
+  snapshotMap/kindlingBody still throw on corrupt persisted ids (baseline; either extend
+  defOrNull-style tolerance or narrow the claim); (d) nit: cardIdOf duplicates defOf's
+  inline id extraction.
+- 2026-10-24 — S3 (gold economy) development dispatched.
