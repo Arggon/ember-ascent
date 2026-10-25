@@ -23,6 +23,11 @@
 //     negative purse is refused (S3 review P3, exercised where it bites — spending).
 //   - A real run that walks into the shop, buys, and leaves replays hash-for-hash
 //     through the same log machinery every other run does.
+//   S4.1 review fixes:
+//   - a validate-accepted save with no player.gold (optional field) standing in a shop
+//     buys onto an EMPTY purse — 0, never NaN (which made hash()/serializeSave throw);
+//   - a torn shop (the field absent or null) enumerates only the leave — the service
+//     id is not a legal no-op against the handler's own guard.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadKernel, content as contentFixture } from '../helpers/harness.mjs';
@@ -395,6 +400,45 @@ test('snapshot: shelves carry action/affordable facts, the removal list is uid-p
     assert.deepEqual(arr, Array.from({ length: arr.length }, (_, i) => i + 1), `${cardId}: copy numbers count 1..n in deck order`);
   }
   assert.deepEqual(snap.deckInstances.map((d) => d.actionId), rem.deck.map((_, i) => `x${i + 1}`));
+});
+
+test('a validate-accepted shop save with no player.gold buys at 0 and stays hashable (S4.1 P2)', () => {
+  // The exact P2 shape: validateSave keeps player.gold OPTIONAL, so a pre-gold save may
+  // stand in a shop phase; a 0-price offer is a legal buy from an empty purse. The
+  // deduction read the field bare (`undefined - 0` => NaN), and NaN made canonical() —
+  // hash() and every save — throw. The purse floors at 0 instead.
+  const inShop = shopVisit(3);
+  const blank = JSON.parse(JSON.stringify(saveObject(begin({ seed: 3 }))));
+  const staged = JSON.parse(JSON.stringify({ ...blank, state: inShop, actions: [{ act: 'n2' }] }));
+  delete staged.state.player.gold;
+  for (const o of staged.state.shop.offers) o.price = 0;
+  assert.deepEqual(validateSave(staged), [], `no purse + zero prices validate: ${JSON.stringify(validateSave(staged))}`);
+  const res = loadObject(staged);
+  assert.equal(res.ok, true, `the torn purse loads: ${JSON.stringify(res.problems ?? [])}`);
+  const s = res.session.state;
+  assert.equal(s.player.gold, undefined);
+  const out = step(s, 'b1');
+  assert.equal(out.error, null, 'a free offer is affordable at an empty purse');
+  assert.equal(out.state.player.gold, 0, 'the purse reads 0, never NaN');
+  assert.ok(Number.isInteger(out.state.player.gold));
+  assert.doesNotThrow(() => hash(out.state), 'the bought state must stay hashable');
+  assert.doesNotThrow(() => snapshot(s), 'the shop snapshot must tolerate the missing purse');
+  assert.match(observe(out.state), /GOLD 0/);
+  assert.match(observe(out.state), /purse 0/);
+});
+
+test('a torn shop (field absent or null) offers only the leave, never a legal no-op x (S4.1 P3)', () => {
+  // The id layer must mirror the handler's guard: with the shop field torn (absent or
+  // null), `x` used to be enumerated while buyRemoval refused it — a legal no-op that
+  // bumped stepIndex, inverting the R6 ruling this file pins above.
+  const base = newRun({ seed: 3 });
+  for (const shop of [null, undefined, { offers: [], removal: null }]) {
+    const s = { ...base, phase: 'shop', shop, floor: 4, mapNodeId: 'r5n1' };
+    assert.deepEqual(actions(s).map((a) => a.id), ['l'], `shop ${JSON.stringify(shop)}: no offers, no service, just the exit`);
+    const out = step(s, 'x');
+    assert.equal(out.error?.code, 2, `shop ${JSON.stringify(shop)}: forcing x is the R6 rejection, not a no-op`);
+    assert.equal(out.state, s, 'a rejected x does not move the state');
+  }
 });
 
 test('both heuristic policies leave at once; the random policy survives a full visit', async () => {

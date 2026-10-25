@@ -87,7 +87,7 @@ function classesFromOptions(src) {
   const EXPANSIONS = [
     { re: /type-\$\{card\.type\}/, members: ['attack', 'skill', 'power', 'status', 'curse'] },
     { re: /kind-\$\{kind\}/, members: ['attack', 'block', 'buff', 'debuff'] },
-    { re: /page-\$\{kind\}/, members: ['map', 'combat', 'reward', 'rest', 'end'] },
+    { re: /page-\$\{kind\}/, members: ['map', 'combat', 'reward', 'rest', 'end', 'shop'] },
     { re: /t-\$\{short\}/, members: ['weak', 'strong', 'elite', 'rest', 'boss', 'shop'] },
   ];
   for (const m of src.matchAll(/\bcls:\s*/g)) {
@@ -153,7 +153,13 @@ function variants(src) {
     out.add('is-unplayable');
   }
   if (/demon\$\{won \? '' : ' lose'\}/.test(src)) out.add('lose');
-  if (/page-\$\{kind\}/.test(src)) for (const k of ['map', 'combat', 'reward', 'rest', 'end']) out.add(`page-${k}`);
+  // The page family. page-frame.js emits `'page page-' + kind` — plain concatenation,
+  // not a template literal — so a `page-${kind}` probe alone NEVER fires and no page-*
+  // class was ever required: a stripped `.page-shop` passed the checker (S4.1 review
+  // P3's experiment). Match the real source shape alongside the template form.
+  if (/page-\$\{kind\}/.test(src) || /'page page-' \+ kind/.test(src)) {
+    for (const k of ['map', 'combat', 'reward', 'rest', 'end', 'shop']) out.add(`page-${k}`);
+  }
   if (/pose-\$\{/.test(src)) {
     for (const t of POSE_VALUES) out.add(`pose-${t}`);
   }

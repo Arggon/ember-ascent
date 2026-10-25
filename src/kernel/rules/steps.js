@@ -197,7 +197,10 @@ function buyOffer(state, match) {
   return {
     state: {
       ...state,
-      player: { ...state.player, gold: state.player.gold - offer.price },
+      // `?? 0` — validateSave keeps player.gold optional, so a pre-gold save standing in
+      // a shop (S4.1 review P2) deducts from an empty purse: `undefined - 0` was NaN,
+      // which made canonical() — and therefore hash() and every save — throw.
+      player: { ...state.player, gold: (state.player.gold ?? 0) - offer.price },
       deck: [...state.deck, { uid, cardId: offer.cardId }],
       shop: { ...state.shop, offers: state.shop.offers.map((o, i) => (i === match.index ? { ...o, sold: true } : o)) },
     },
@@ -215,7 +218,9 @@ function buyRemoval(state) {
   return {
     state: {
       ...state,
-      player: { ...state.player, gold: state.player.gold - rem.price },
+      // Same purse floor as buyOffer above (S4.1 review P2): the field is optional on
+      // every save validateSave accepts, so the deduction must not read it bare.
+      player: { ...state.player, gold: (state.player.gold ?? 0) - rem.price },
       shop: { ...state.shop, removal: { ...rem, sold: true }, removing: true },
     },
     events: [

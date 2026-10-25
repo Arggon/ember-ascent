@@ -142,11 +142,14 @@ export function actions(state) {
         if (o.sold || o.price > purse) return;
         out.push({ id: `b${i + 1}`, kind: 'shop_buy', index: i, cardId: o.cardId, price: o.price });
       });
-      const rem = shop.removal ?? {};
       // The service: one per visit, only while it is unused, the deck still holds more
       // than one card (hard invariant — a deck of exactly 1 is not a deck), and the
-      // purse covers the flat price.
-      if (!rem.sold && !rem.done && (state.deck?.length ?? 0) > 1 && (rem.price ?? REMOVAL_PRICE) <= purse) {
+      // purse covers the flat price. `rem` is tested for existence, not defaulted: a
+      // torn save (shop field absent/null) must not enumerate an `x` the handler's own
+      // guard would refuse — that would be a legal no-op, the R6 inversion this file
+      // rules out a few lines up (S4.1 review P3).
+      const rem = shop.removal;
+      if (rem && !rem.sold && !rem.done && (state.deck?.length ?? 0) > 1 && (rem.price ?? REMOVAL_PRICE) <= purse) {
         out.push({ id: 'x', kind: 'shop_removal', price: rem.price ?? REMOVAL_PRICE });
       }
       out.push({ id: 'l', kind: 'shop_leave' });

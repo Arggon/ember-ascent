@@ -10,11 +10,13 @@
 //     convention as a rest site's temper offers. Entry happens through exactly one
 //     action (the travel that opens the node), and re-entry is impossible, so the
 //     counter the rolls read is reproducible from the action log forever.
-//   * A full inventory consumes exactly 2 draws per offer — one `pickAt` pick, one
-//     price roll — so 10 draws for 5 offers; a run whose narrowed draft pool holds
-//     fewer than 5 cards consumes 2 per actual offer. A card whose price would depend
-//     on the branch taken would break that count, so the price is always ONE `intAt`
-//     regardless of rarity (the band only changes the range, never the draw count).
+//   * A full inventory consumes exactly 10 draws in ONE fixed order: the 5 `pickAt`
+//     picks first, THEN 5 price rolls — 2 per offer, but not interleaved per offer.
+//     The order is part of the format (a replay reads the counter positionally); a run
+//     whose narrowed draft pool holds fewer than 5 cards consumes 2 per actual offer.
+//     A card whose price would depend on the branch taken would break that count, so
+//     each price is always ONE `intAt` regardless of rarity (the band only changes the
+//     range, never the draw count).
 //   * The removal service is a FLAT price (StS parity: 75), so buying it consumes no
 //     draw; picking which card leaves is a choice, not a roll — zero draws.
 //
