@@ -22,6 +22,10 @@
 //      purse in view; a click buys a card (the deck sheet agrees mid-shop), the removal
 //      service is a modal pick of deck instances, unaffordable shelves are inert, and
 //      leaving is final
+//  10. the S5 potions: three empty belt slots at boot; a won fight drops a potion into
+//      the belt (seed 1: fight 2, Ember Draught); in the next combat the chip opens the
+//      quaff/discard popover, quaffing consumes the slot and lands the effect on the
+//      engine state, and a discard frees exactly its slot
 //
 // RUN. `npm run test:browser`. Deliberately NOT matched by the default `npm test`
 // glob (`tests/**/*.test.js`): this file is `.spec.js` so the default suite stays
@@ -1090,4 +1094,206 @@ test('shop: the vendor sells a card, removes one, and closes for good', { timeou
   assert.equal(left.floor, 5, 'the player stands ON the consumed shop node (row 5); travel continues to row 6');
   assert.equal(await page.locator('button[aria-label*="Shop"]').count(), 0, 'no shop is travel-legal after leaving');
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+test('potions: the belt fills from a victory, quaffs in combat, and discards', { timeout: 300000 }, async (t) => {
+  if (!chromium) return t.skip('playwright/chromium unavailable');
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: 'reduce',
+  });
+  t.after(() => { void browser.close(); });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  // Seed 1 (verified against the engine before this test was written: with this exact
+  // deck injection and walk policy, the second won fight drops Ember Draught).
+  await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+  await page.goto(`${base}/src/web/index.html?seed=1`);
+  await page.waitForLoadState('domcontentloaded');
+  await page.locator('button.boon').first().click();
+  await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+
+  // BOOT: three empty slots, dim, beside the gold readout — and the kernel agrees.
+  assert.equal(await page.locator('.belt .belt-slot.empty').count(), 3, 'three empty belt slots at boot');
+  assert.equal(await page.locator('.belt .belt-slot.filled').count(), 0, 'nothing filled at boot');
+  assert.deepEqual(await page.evaluate(() => window.__dlb.snapshot().belt), [], 'the kernel belt is empty');
+
+  // Bludgeons end fights fast (the shop test's lever).
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    for (let i = 0; i < 10; i += 1) save.state.deck.push({ uid: `e2e-belt-${i}`, cardId: 'bludgeon' });
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+
+  // Fight until a drop lands in the belt (seed 1: fight 2), real clicks only.
+  let dropped = null;
+  for (let guard = 0; guard < 40 && !dropped; guard += 1) {
+    const st = await readState(page);
+    if (st.phase === 'map') {
+      const fight = page.locator('button[aria-label*="Skirmish"], button[aria-label*="Hard fight"]').first();
+      if ((await fight.count()) > 0) await fight.click();
+      else await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else if (st.phase === 'combat') {
+      const card = page.locator('button[data-slot][aria-disabled="false"]').first();
+      if ((await card.count()) > 0) {
+        await card.click();
+        const tgt = page.locator('.enemy.targeting').first();
+        if ((await tgt.count()) > 0) await tgt.click();
+        await sleep(700);
+      } else {
+        await endTurn(page);
+        await sleep(1300);
+      }
+    } else if (st.phase === 'reward') {
+      await leaveReward(page);
+    } else if (st.phase === 'rest') {
+      await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else {
+      await sleep(400);
+    }
+    dropped = await page.evaluate(() => (window.__dlb.snapshot().belt ?? []).find((r) => r.known) ?? null);
+  }
+  assert.ok(dropped, 'a victory dropped a potion into the belt');
+  assert.equal(await page.locator('.belt .belt-slot.filled').count(), 1, 'the HUD chip lit up');
+  const chipLabel = await page.locator('.belt .belt-slot.filled').first().getAttribute('aria-label');
+  assert.ok(chipLabel.includes(dropped.name), `the chip names the kernel potion (${chipLabel})`);
+  // Off-combat the chip is a readout, not a button.
+  assert.equal(await page.locator('button.belt-slot.filled').count(), 0, 'no quaff button outside combat');
+
+  // The walk may have exited on the reward screen itself (the drop lands the instant the
+  // fight is won): land on the map before travelling on.
+  for (let guard = 0; guard < 12; guard += 1) {
+    const st = await readState(page);
+    if (st.phase === 'map') break;
+    if (st.phase === 'reward') await leaveReward(page);
+    else if (st.phase === 'rest') {
+      await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else await sleep(400);
+  }
+  assert.equal(await readState(page).then((s) => s.phase), 'map', 'back on the map with the filled belt');
+
+  // The next fight: the chip is a BUTTON that opens the quaff/discard popover.
+  const nextFight = page.locator('button[aria-label*="Skirmish"], button[aria-label*="Hard fight"], button[aria-label*="Elite"]').first();
+  if ((await nextFight.count()) === 0) await page.getByRole('button', { name: 'Move on' }).first().click();
+  else await nextFight.click();
+  await sleep(700);
+  const st = await readState(page);
+  assert.equal(st.phase, 'combat', 'the quaff happens inside a fight');
+  const chip = page.locator('button.belt-slot.filled').first();
+  assert.equal(await chip.count(), 1, 'in combat the filled chip is a button');
+  await chip.click();
+  await page.waitForSelector('.belt-modal', { timeout: 3000 });
+  const popoverText = await page.locator('.belt-modal').textContent();
+  assert.ok(popoverText.includes(dropped.name), 'the popover names the potion');
+  // The combat-phase belt row carries the legal forms (the drop-time row was read
+  // off-combat, where quaffIds is legitimately empty).
+  const liveRow = await page.evaluate(() => window.__dlb.snapshot().belt[0] ?? null);
+  assert.ok(liveRow, 'the staged potion is still in the belt');
+  const quaffBtn = page.locator('.belt-modal button.belt-act.quaff');
+  assert.equal(await quaffBtn.count(), liveRow.quaffIds.length, 'one quaff button per legal form');
+
+  // Quaff it: the belt shrinks by the slot and the effect lands on the engine state.
+  const before = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return {
+      belt: s.belt.map((r) => r.potionId),
+      hp: s.player.hp,
+      energy: s.player.energy,
+      block: s.player.block,
+      enemyHp: s.enemies.reduce((n, e) => n + e.hp, 0),
+      phase: s.phase,
+    };
+  });
+  await quaffBtn.first().click();
+  await sleep(700);
+  const after = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return {
+      belt: s.belt.map((r) => r.potionId),
+      hp: s.player.hp,
+      energy: s.player.energy,
+      block: s.player.block,
+      enemyHp: s.enemies.reduce((n, e) => n + e.hp, 0),
+      phase: s.phase,
+      statuses: s.player.statuses.map((x) => x.key),
+    };
+  });
+  assert.equal(after.belt.length, before.belt.length - 1, 'the slot is consumed');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+  if (dropped.potionId === 'ember_draught') {
+    assert.ok(after.enemyHp < before.enemyHp || after.phase !== 'combat', 'the draught dealt its damage');
+  } else if (dropped.potionId === 'stone_skin') {
+    assert.ok(after.block >= before.block + 12, 'the skin raised block');
+  } else if (dropped.potionId === 'ash_salts') {
+    assert.ok(after.hp > before.hp || after.hp === 60, 'the salts healed');
+  } else if (dropped.potionId === 'bellows_fuel') {
+    assert.equal(after.energy, before.energy + 2, 'the fuel added energy');
+  } else if (dropped.potionId === 'whetstone') {
+    assert.ok(after.statuses.includes('strength'), 'the whetstone left Strength');
+  } // purge_flask with nothing to purge: the consumed slot IS the observable.
+
+  // DISCARD: play the quaffed fight out (the same card-then-target flow as the walk —
+  // with two enemies alive a card click opens targeting, and a click that never picks a
+  // target only cancels, so the handler below is what lets the fight actually end),
+  // return to the map, stage a two-slot belt through the save lever, then travel into
+  // the next fight: the travel act() is what repaints the staged belt (the lever note).
+  for (let guard = 0; guard < 120; guard += 1) {
+    const s = await readState(page);
+    if (s.phase !== 'combat') break;
+    const card = page.locator('button[data-slot][aria-disabled="false"]').first();
+    if ((await card.count()) > 0) {
+      await card.click();
+      const tgt = page.locator('.enemy.targeting').first();
+      if ((await tgt.count()) > 0) await tgt.click();
+      await sleep(700);
+    } else {
+      await endTurn(page);
+      await sleep(1300);
+    }
+  }
+  if ((await readState(page)).phase === 'reward') await leaveReward(page);
+  assert.equal(await readState(page).then((s) => s.phase), 'map', 'back on the map to stage the belt');
+  const staged = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.potions = ['stone_skin', 'bellows_fuel'];
+    return { res: ctl.load(save) };
+  });
+  assert.equal(staged.res.ok, true, `the lever load failed: ${JSON.stringify(staged.res.problems)}`);
+  // Walk to the next fight (any row type in between is passed the part-1 way).
+  for (let guard = 0; guard < 40; guard += 1) {
+    const st = await readState(page);
+    if (st.phase === 'combat') {
+      assert.equal(await page.locator('.belt .belt-slot.filled').count(), 2, 'the staged belt renders two chips in the fight');
+      break;
+    }
+    if (st.phase === 'map') {
+      const fight = page.locator('button[aria-label*="Skirmish"], button[aria-label*="Hard fight"], button[aria-label*="Elite"]').first();
+      if ((await fight.count()) > 0) await fight.click();
+      else await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else if (st.phase === 'reward') {
+      await leaveReward(page);
+    } else if (st.phase === 'rest') {
+      await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else {
+      await sleep(400);
+    }
+  }
+  assert.equal(await readState(page).then((s) => s.phase), 'combat', 'a fight for the discard');
+  await page.locator('button.belt-slot.filled').nth(1).click();
+  await page.waitForSelector('.belt-modal', { timeout: 3000 });
+  await page.locator('.belt-modal button.belt-act.discard').click();
+  await sleep(500);
+  const discarded = await page.evaluate(() => window.__dlb.snapshot().belt.map((r) => r.potionId));
+  assert.deepEqual(discarded, ['stone_skin'], 'slot 2 freed, slot 1 untouched');
+  assert.equal(errors.length, 0, `no page errors after the discard: ${errors.join(' | ')}`);
 });

@@ -13,6 +13,7 @@
 // tests/kernel/sha256-parity.test.js pins the output byte-for-byte to node:crypto.
 
 import { sha256Hex } from './sha256.js';
+import { POTION_SLOTS } from './rules/potions.js';
 
 /** Save/log format version. Bumping this makes old saves refuse to load (exit 4). */
 export const FORMAT_VERSION = 1;
@@ -192,6 +193,26 @@ export function validateSave(raw) {
             }
           }
         }
+      }
+    }
+    // S5 potions: OPTIONAL like every post-v1 field — a legacy save without the field
+    // reads as an empty belt at every `?? []`. When present it must be an array of at
+    // most POTION_SLOTS strings: a longer belt is a state the engine can never produce
+    // (the drop suppresses at capacity), so it is refused at load, not repaired — the
+    // same spirit as the negative-gold refusal. The ID STRINGS are NOT checked: ids the
+    // potion table no longer knows degrade everywhere (raw id as the name, no quaff, a
+    // discard offered) — the S2.1/S4.1 tolerance ruling, never a load-time throw.
+    const potions = /** @type {Record<string, unknown>} */ (st).potions;
+    if (potions !== undefined) {
+      if (!Array.isArray(potions)) {
+        problems.push('save.state: "potions" must be an array');
+      } else {
+        if (potions.length > POTION_SLOTS) {
+          problems.push(`save.state: "potions" must hold at most ${POTION_SLOTS} entries`);
+        }
+        potions.forEach((p, i) => {
+          if (typeof p !== 'string') problems.push(`save.state.potions[${i}] must be a string`);
+        });
       }
     }
   }

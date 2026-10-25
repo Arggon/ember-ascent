@@ -22,12 +22,16 @@ const { newRun, step, observe, snapshot, hash, validateSave } = K;
 
 /** A minimal won-combat state for resolveVictory: enough map for the reward lookup.
  *  `rewardOverride` swaps the node's table reward (the 'heal' branch returns BEFORE the
- *  card-reward roll, which is what isolates the gold draw from the offer's draws). */
+ *  card-reward roll, which is what isolates the gold draw from the offer's draws).
+ *  S5: the fixture also carries a FULL potion belt — a full belt suppresses the victory
+ *  drop entirely (rules/potions.js: zero draws), so the heal branch's draw delta stays
+ *  the gold draw ALONE and this file's accounting pins keep measuring gold, not potions. */
 function wonState(over = {}) {
   const base = newRun({ seed: over.seed ?? 7 });
   const reward = over.rewardOverride ?? 'card';
   return {
     ...base,
+    potions: ['stone_skin', 'ash_salts', 'bellows_fuel'],
     rngDraws: over.rngDraws ?? 500,
     player: { ...base.player, ...(over.player ?? {}) },
     combat: {

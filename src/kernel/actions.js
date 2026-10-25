@@ -13,6 +13,18 @@
 //        order (S4; additive — uid-precise because every deck slot is a distinct
 //        instance; three Hammerfalls are three separate choices, listed by uid order)
 //   l    leave the shop — final; the node is consumed like a fight (S4; additive)
+//   q<n>    quaff the n-th BELT slot, 1-based (S5; additive — combat ONLY; both belt
+//        actions exist nowhere else: the belt is display-only on the map, in the shop
+//        and at rest). Consumes the slot; zero draws (rules/potions.js).
+//   q<n>_<k> the AIMED form, exactly the p<n>_<k> convention: a potion whose content
+//        declares `target: "enemy"` (Ember Draught) must be aimed when more than one
+//        enemy is alive; k is the 1-BASED LIVING enemy in state order. With one enemy
+//        alive the plain q<n> is used, and `all`/`self` potions never ask.
+//   d<n>    discard the n-th belt slot (S5; additive — combat ONLY). A free action:
+//        the slot frees, nothing else moves, zero draws. Offered for EVERY belt slot
+//        including one carrying a stale id, so a torn save's corrupt slot can be
+//        cleared; a quaff is offered ONLY for ids the potion table still knows (the
+//        handler would refuse — enumeration mirrors the guard, the S4.1 ruling).
 //
 // TARGETED PLAYS (PM Document revision 5). A card whose content declares
 // `target: "enemy"` must be aimed by the player when the choice is real, i.e. when
@@ -41,6 +53,7 @@
 // enumerated here.
 import { availableNodes } from './rules/map.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
+import { potionDef } from './rules/potions.js';
 import { cardDefMap } from './rules/card-instance.js';
 
 /** Card definitions are injected once at kernel load (rules never import content, R1). */
@@ -99,6 +112,22 @@ export function actions(state) {
         }
       });
       out.push({ id: 'e1', kind: 'end_turn' });
+      // S5: the belt. One quaff (aimed per living enemy when the potion targets and the
+      // choice is real) and one discard per slot — COMBAT ONLY, so this block sits in
+      // the combat case and nowhere else. A stale belt id (a torn save) gets a discard
+      // but no quaff: quaffPotion would refuse it, and an offered-but-refused id is
+      // the legal-no-op inversion S4.1 ruled out.
+      (Array.isArray(state.potions) ? state.potions : []).forEach((potionId, i) => {
+        const def = potionDef(potionId);
+        if (def && def.target === 'enemy' && living.length > 1) {
+          living.forEach((_enemy, k) => {
+            out.push({ id: `q${i + 1}_${k + 1}`, kind: 'quaff', index: i, potionId, targetEnemyIndex: k });
+          });
+        } else if (def) {
+          out.push({ id: `q${i + 1}`, kind: 'quaff', index: i, potionId, targetEnemyIndex: null });
+        }
+        out.push({ id: `d${i + 1}`, kind: 'discard_potion', index: i, potionId });
+      });
       break;
     }
     case 'map': {

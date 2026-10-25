@@ -222,6 +222,12 @@ export function newRun(opts = {}) {
     // predate the field entirely — validateSave keeps it optional and every read is
     // null-tolerant.
     shop: null,
+    // S5 potions: the belt, empty at run start (StS parity). It fills only from
+    // seeded victory drops (rules/potions.js rollPotionDrop, called by the victory
+    // path in rules/act.js) and empties only by quaffing or discarding — both
+    // combat-only steps. Legacy saves predate the field: validateSave keeps it
+    // optional and every read is `?? []`-tolerant (absent = empty belt).
+    potions: [],
   };
 
   // B5 alternate biome: recorded only when not the default, so foundry hashes are unchanged.

@@ -13,6 +13,7 @@ import { NODE_TYPES, ROWS } from './map.js';
 import { fireHook, endOfTurnStatuses, decayStatuses } from './powers.js';
 import { shuffleAt, pickAt, intAt } from '../rng.js';
 import { activeRelic, relicId } from './relics.js';
+import { rollPotionDrop } from './potions.js';
 
 /** Hand size at the start of each turn. */
 export const HAND_SIZE = 5;
@@ -382,6 +383,25 @@ export function resolveVictory(state, cardDefs) {
   if (nodeType === 'boss') {
     return { state: { ...next, phase: 'ended', outcome: 'win' }, events: [...events, { t: 'run_end', outcome: 'win' }] };
   }
+
+  // S5 POTIONS — the drop, rolled exactly once per won fight, AFTER the gold grant and
+  // BEFORE the reward offer (the fixed per-victory order documented in rules/potions.js;
+  // the offer below reads the counter the drop left behind, so the drop is part of the
+  // format). The boss short-circuits above: the run is over, so it never rolls and
+  // never consumes a draw. A full belt suppresses the roll entirely — ZERO draws
+  // (rules/potions.js), which is what makes a 4th potion impossible without stealing
+  // from the stream. `next` is the state the drop read, so the belt updates in place
+  // and the counter advances by exactly the draws the roll consumed (0, 1 or 2).
+  const drop = rollPotionDrop(next, nodeType);
+  if (drop.potion) {
+    next = { ...next, rngDraws: next.rngDraws + drop.draws, potions: drop.belt };
+    events.push({ t: 'potion_drop', potion: drop.potion, beltSize: drop.belt.length, source: nodeType });
+  } else if (drop.draws > 0) {
+    // A miss: the draw is still spent (the roll happened), only the belt is untouched.
+    next = { ...next, rngDraws: next.rngDraws + drop.draws };
+  }
+  // draws === 0 with no potion is the suppressed-full-belt (or no-chance-tier) path:
+  // nothing consumed, nothing changed.
 
   const reward = next.map.encounterTable[state.combat.nodeId]?.reward ?? 'card';
   if (reward === 'heal') {

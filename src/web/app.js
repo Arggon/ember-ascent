@@ -41,7 +41,7 @@ import { createController } from '../surface/gui/controller.js';
 import { ctl, seedFromUrl, setCtl, setSnap, snap } from './runtime.js';
 import { biomeChoice, heroChoice, act, newGame } from './actions.js';
 import { cancelTargeting, clickCard, pendingSlot, pickTarget } from './targeting.js';
-import { deckOpen, toggleDeck, codexOpen, toggleCodex } from './hud.js';
+import { deckOpen, toggleDeck, codexOpen, toggleCodex, beltOpenSlot, toggleBelt } from './hud.js';
 import { render } from './render.js';
 
 /* ------------------------------------------------------------- keyboard bonus */
@@ -64,6 +64,14 @@ document.addEventListener('keydown', (ev) => {
   }
   if (codexOpen) {
     if (k === 'Escape' || k === 'Esc' || k === 'k' || k === 'K') { ev.preventDefault(); toggleCodex(false); }
+    return;
+  }
+  // The S5 quaff/discard popover owns the keyboard while it is open, the same contract:
+  // Escape closes (keeping the potion), everything else is swallowed so no card, no turn
+  // and no run can be driven from behind the overlay (the E8b class). The popover's own
+  // buttons stay natively keyboard-operable (Tab + Enter) without this handler.
+  if (beltOpenSlot !== null) {
+    if (k === 'Escape' || k === 'Esc') { ev.preventDefault(); toggleBelt(null); }
     return;
   }
   if (k === 'd' || k === 'D') { ev.preventDefault(); toggleDeck(true); return; }

@@ -18,6 +18,7 @@ import { applyBoon } from './kindling.js';
 import { offerTempers, temperEffects, temperHpCost } from './tempers.js';
 import { findNode } from './map.js';
 import { rollShopInventory, REMOVAL_PRICE } from './shop.js';
+import { potionDef, quaffEffects } from './potions.js';
 import { shuffleAt, pickAt } from '../rng.js';
 
 /** Play one card from hand and settle the combat if it ended. */
@@ -252,6 +253,73 @@ function leaveShop(state) {
   return { state: { ...state, phase: 'map', shop: null }, events: [{ t: 'shop_left' }] };
 }
 
+/* ------------------------------------------------------------- S5: the potion belt --
+ * Two handlers, one per belt action kind. The id was matched against the legal list by
+ * step() before either runs, so the slot index is in range, the phase is `combat`
+ * (actions() offers belt ids nowhere else) and — for a quaff — the potion id is one
+ * the table still knows (an unknown belt id is offered a discard, never a quaff, the
+ * same enumeration-mirrors-guard ruling as the S4.1 torn shop). Each handler still
+ * degrades to a no-op on a stale match rather than throwing — the same defensive
+ * shape every handler here keeps.
+ *
+ * DRAW ACCOUNTING (rules/potions.js header): NEITHER action consumes a draw. A quaff's
+ * numbers are all fixed; a discard changes nothing but the belt. */
+
+/** Quaff belt slot `match.index` (0-based): the potion leaves the belt and resolves. */
+function quaffPotion(state, match) {
+  const belt = Array.isArray(state.potions) ? state.potions : [];
+  const idx = match.index;
+  const potionId = belt[idx];
+  // No slot, or a slot whose id the table no longer knows: nothing to resolve. A
+  // stale id can only reach here through a torn save — its quaff was never offered.
+  if (potionId === undefined || !potionDef(potionId)) return { state, events: [] };
+  const def = potionDef(potionId);
+
+  // Resolve the aim exactly like playCard: the LIVING enemies in state order. The
+  // aimed form (q<n>_<k>) carries `targetEnemyIndex` = the 0-based LIVING position the
+  // enumeration used — the same field a play action carries. `q<n>` unaimed is null
+  // and falls to the first living enemy; a dead/out-of-range value (impossible through
+  // legal ids — the enumeration only offers living ks) falls the same way.
+  const liveIdx = state.combat.enemies.map((e, i) => (!e.dead ? i : -1)).filter((i) => i !== -1);
+  const aimed = match.targetEnemyIndex !== null && liveIdx[match.targetEnemyIndex] !== undefined
+    ? match.targetEnemyIndex
+    : liveIdx[0] ?? 0;
+
+  // The slot is consumed BEFORE the effect resolves: a potion cannot quaff itself
+  // twice, and the belt the victory path (a killing Ember Draught) reads afterwards
+  // is the post-quaff belt.
+  const spent = {
+    ...state,
+    potions: belt.filter((_, i) => i !== idx),
+  };
+  const out = quaffEffects(spent, potionId, aimed);
+  let next = out.state;
+  const events = [{ t: 'potion_quaffed', slot: idx + 1, potion: potionId, name: def.name }, ...out.events];
+
+  // The same settle-as-playCard tail: an Ember Draught that kills the last enemy must
+  // resolve victory through the ONE implementation, combat_won included (DR-6), or
+  // the fight would hang on an all-dead field with only `e1` left to press.
+  if (next.combat.active && next.combat.enemies.every((e) => e.dead)) {
+    const won = resolveVictory(next, null);
+    return { state: won.state, events: [...events, { t: 'combat_won' }, ...won.events] };
+  }
+  return { state: next, events };
+}
+
+/** Discard belt slot `match.index` (0-based): the slot frees, nothing else moves. */
+function discardPotion(state, match) {
+  const belt = Array.isArray(state.potions) ? state.potions : [];
+  const idx = match.index;
+  if (belt[idx] === undefined) return { state, events: [] };
+  const potionId = belt[idx];
+  return {
+    state: { ...state, potions: belt.filter((_, i) => i !== idx) },
+    // Known potion or stale id alike: the dump names what left, by id — the describe
+    // layer's job to render, and a stale id renders as itself (never a throw).
+    events: [{ t: 'potion_discarded', slot: idx + 1, potion: potionId }],
+  };
+}
+
 /**
  * The registry: action kind -> runner. `step` looks the matched action's kind up here;
  * a kind with no row is the internal-error path (code 1), never a silent no-op.
@@ -283,4 +351,6 @@ export const STEP_HANDLERS = Object.freeze({
   shop_removal: buyRemoval,
   shop_remove_pick: pickRemoval,
   shop_leave: leaveShop,
+  quaff: quaffPotion,
+  discard_potion: discardPotion,
 });

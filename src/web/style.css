@@ -7170,3 +7170,72 @@ html, body {
   .codex-type { display: none; }
   .codex-desc { padding-left: 0; }
 }
+
+/* ==========================================================================================
+   POTION BELT (S5) — the three belt slots beside the gold readout, and the quaff/discard
+   popover. A filled slot is a named glyph chip (mark + name; tooltip = the kernel's own
+   effect sentence); an empty slot is a dim flask. In combat a filled chip is a BUTTON that
+   opens the popover (the shop removal modal's two-choice pattern, scaled to one potion,
+   reusing the shared modal shell); anywhere else the chips are a readout (`.inert`).
+   ========================================================================================== */
+.belt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.belt-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-weight: 800;
+  font-size: var(--fs-3);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--stat-well);
+  white-space: nowrap;
+}
+.belt-slot .belt-glyph { display: inline-flex; width: 14px; height: 14px; }
+.belt-slot .belt-glyph svg { display: block; width: 100%; height: 100%; }
+.belt-slot .belt-glyph .m { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.belt-slot .belt-glyph .mf { fill: currentColor; stroke: none; }
+/* Filled: the potion's own hue family is the warm ember accent — the belt is a spendable,
+   like the purse it sits beside. The chip reads as a chip, not a button, until hover. */
+.belt-slot.filled { color: var(--brass); border-color: rgba(185, 138, 82, 0.45); }
+button.belt-slot.filled { cursor: pointer; font: inherit; font-weight: 800; font-size: var(--fs-3); }
+button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
+  color: var(--gold);
+  border-color: rgba(245, 197, 66, 0.6);
+  outline: none;
+}
+.belt-slot.filled:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+/* Outside combat the chips are a readout: the same look, minus the affordance. */
+.belt-slot.filled.inert { cursor: help; }
+/* Empty: the dim flask, present but unlit — the slot is the promise, not the potion. */
+.belt-slot.empty { color: var(--faint); border-color: var(--edge); opacity: 0.75; }
+.belt-name {
+  overflow: hidden;
+  max-width: 9.5em;
+  text-overflow: ellipsis;
+}
+
+/* The quaff/discard popover: the shared modal shell, one potion wide. */
+.belt-modal { max-width: 480px; }
+.belt-desc {
+  color: var(--dim);
+  font-family: var(--rules);
+  font-size: var(--fs-3);
+  line-height: 1.5;
+}
+.belt-choices { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+.belt-act { justify-content: flex-start; text-align: left; }
+.belt-act.quaff { color: var(--gold); }
+/* The discard reads as the renunciation it is: same shape, cold ink. */
+.belt-act.discard { color: var(--dim); }
+.belt-act.discard:hover, .belt-act.discard:focus-visible { color: var(--ink); }
+/* Phones: the belt yields its names first (the glyphs and tooltips keep the facts), and
+   the popover goes full-width like every other sheet. */
+@media (max-width: 720px) {
+  .belt-name { display: none; }
+  .belt-modal { max-width: none; }
+}

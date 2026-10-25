@@ -31,8 +31,10 @@ test('default run has no tempers and an unchanged hash', () => {
 });
 
 test('a tempers rest offers t1..t3 beside heal and leave, and tempering is permanent', () => {
-  const s = toFirstRest(1);
-  assert.ok(s, 'seed 1 reaches a rest site');
+  // S5: the drop rolls moved every seed's streams, so the driver's first rest now sits
+  // on seed 4 (see the golden test below). The claim is unchanged.
+  const s = toFirstRest(4);
+  assert.ok(s, 'seed 4 reaches a rest site');
   assert.deepEqual(legal(s).map((a) => a.id), ['c', 'e1', 't1', 't2', 't3']);
   const offer = legal(s).find((a) => a.id === 't1').offer;
   const after = submit(s, 't1').session;
@@ -69,7 +71,11 @@ test('a Red-hot Hammerfall deals 9 and costs 2 HP in a real fight', () => {
 });
 
 test('log header carries the flag and replay matches the golden hash', () => {
-  let s = toFirstRest(1);
+  // S5 note: the victory drop roll consumes a draw after every won fight, so the seeded
+  // streams shifted and seed 1's driver no longer reaches a rest site inside 300 steps —
+  // seed 4 does (first rest of its row-3 route). Same driver, same claim.
+  let s = toFirstRest(4);
+  assert.ok(s, 'seed 4 reaches a rest site');
   s = submit(s, 't3').session;
   const parsed = parseLog(renderLog(s));
   assert.equal(parsed.header.tempers, true);
@@ -77,7 +83,7 @@ test('log header carries the flag and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:945897fe4d6c821965f1e29654e65943dfcfc495d6012099b56c2be3183455eb';
+const GOLDEN = 'sha256:001a1eb3a8e0b50badb2220a81ddadf3008d45bdfe95ff6a056fd9b353055ba4';
 
 // ---------------------------------------------------------------------------
 // Visible tempers: every rendering of a tempered card shows what it really plays.

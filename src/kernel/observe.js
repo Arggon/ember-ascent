@@ -20,6 +20,7 @@ import { RELICS, relicId } from './rules/relics.js';
 import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
+import { POTION_SLOTS, potionDef } from './rules/potions.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -176,6 +177,10 @@ function header(state) {
     // S3 gold: the purse sits in the header beside HP/EN/BLK so every phase shows it.
     // `?? 0` is the legacy-save tolerance (validateSave keeps the field optional).
     `GOLD ${p.gold ?? 0}`,
+    // S5 potions: the belt count in every phase's header — the belt is carried across
+    // the run even though its q/d actions only exist in combat. `?? []` is the
+    // legacy-save tolerance (absent field = empty belt).
+    `POTIONS ${(state.potions ?? []).length}/${POTION_SLOTS}`,
     `draw${state.combat?.draw?.length ?? 0} disc${state.combat?.discard?.length ?? 0}`,
     statuses,
   ].filter(Boolean);
@@ -233,6 +238,29 @@ function combatBody(state, opts) {
     lines.push(` exh:  ${state.combat.exhaust.length > 0 ? state.combat.exhaust.map((c) => defOf(c).name).join(', ') : '-'}`);
     lines.push(` deck: ${state.deck.length} cards`);
   }
+  lines.push(...beltBody(state));
+  return lines;
+}
+
+/**
+ * S5: the belt, rendered in COMBAT only (the one phase its q/d actions exist in).
+ * Empty slots are not drawn — the header's `POTIONS n/3` already counts them — and an
+ * unknown belt id renders as its raw id with no effect text (the stale-save degrade,
+ * never a throw). The base q/d ids are shown beside each potion; the AIMED forms
+ * (q<n>_<k>) are the action lines' own job, exactly as aimed plays are.
+ * @param {any} state
+ * @returns {string[]}
+ */
+function beltBody(state) {
+  const belt = state.potions ?? [];
+  if (belt.length === 0) return [];
+  const lines = ['BELT'];
+  belt.forEach((potionId, i) => {
+    const def = potionDef(potionId);
+    const name = def ? def.name : potionId;
+    const summary = def ? `  ${def.summary}` : '';
+    lines.push(` ${i + 1} ${name}${summary}  (quaff q${i + 1}, discard d${i + 1})`);
+  });
   return lines;
 }
 
@@ -387,6 +415,16 @@ export function observeActions(state) {
         break;
       case 'shop_leave':
         lines.push(`${a.id} leave`);
+        break;
+      // S5 belt lines carry the potion id, name-only like every other action line
+      // (the effect text lives in the BELT dump above, the same ruling that keeps
+      // Energy costs out of combat lines). Bounded by construction: the only input
+      // is the slot index and the stable potion id.
+      case 'quaff':
+        lines.push(`${a.id} ${a.potionId}`);
+        break;
+      case 'discard_potion':
+        lines.push(`${a.id} discard ${a.potionId}`);
         break;
       default:
         lines.push(`${a.id} ?`);
@@ -595,6 +633,51 @@ function snapshotKindling(state) {
       id, name: BOONS[id].name, text: boonText(id, heroRelic(state)), label: BOONS[id].label, actionId: `k${i + 1}`,
     })),
   };
+}
+
+/**
+ * S5: the potion belt. Published in EVERY phase (the belt is run state and the HUD
+ * shows it everywhere), while its actions only ever exist in combat — so the action
+ * ids below are resolved from the phase's own legal list and are simply empty outside
+ * combat. Row facts:
+ *   - `known: false` marks a belt id the potion table no longer knows (a torn save).
+ *     It still renders — the raw id is its own name — and offers a DISCARD (so the
+ *     corrupt slot can be cleared) but never a quaff: the handler would refuse it,
+ *     and a refused id is never offered (S4.1).
+ *   - `quaffIds` holds ONE id (q<n>) or one per living enemy (q<n>_1, q<n>_2) when the
+ *     potion must be aimed, in living-enemy order — the same list shape the hand's
+ *     `targets` field uses, so a renderer can drive the choice without re-deriving it.
+ *   - `summary`/`text` are the kernel table's own words, verbatim: no surface
+ *     re-derives what a potion does.
+ * @param {any} state
+ * @param {any[]} legal
+ */
+function snapshotBelt(state, legal) {
+  const quaffs = new Map();
+  const discards = new Map();
+  for (const a of legal) {
+    if (a.kind === 'quaff') {
+      if (!quaffs.has(a.index)) quaffs.set(a.index, []);
+      quaffs.get(a.index).push(a.id);
+    } else if (a.kind === 'discard_potion') {
+      discards.set(a.index, a.id);
+    }
+  }
+  return (Array.isArray(state.potions) ? state.potions : []).map((potionId, i) => {
+    // Tolerant like rewardBody (defOrNull's policy): an unknown id shows itself.
+    const def = potionDef(potionId);
+    return {
+      slot: i + 1,
+      potionId,
+      known: Boolean(def),
+      name: def ? def.name : potionId,
+      summary: def ? def.summary : '',
+      text: def ? def.text : '',
+      target: def ? def.target : 'none',
+      quaffIds: quaffs.get(i) ?? [],
+      discardId: discards.get(i) ?? null,
+    };
+  });
 }
 
 /**
@@ -882,6 +965,10 @@ export function snapshot(state) {
     // the full lookup table instead of lying about an empty pool.
     draftPool: Array.isArray(state.draftPool) ? [...state.draftPool] : null,
     enemies: snapshotEnemies(state),
+    // S5 potion belt: every phase (run state), with the combat-only q/d ids resolved
+    // here so a renderer greys nothing it would have to guess at.
+    belt: snapshotBelt(state, legal),
+    beltSlots: POTION_SLOTS,
     map: snapshotMap(state, legal),
     reward: snapshotReward(state, legal),
     rest: snapshotRest(state, legal),
@@ -900,7 +987,7 @@ export function snapshot(state) {
     help: helpTopics(),
     // Legal actions, verbatim from the kernel, so a view can label its buttons without
     // inventing an id. Includes the R5 line text for parity with the CLI surface.
-    actions: legal.map((a) => ({ id: a.id, kind: a.kind, cardId: a.cardId ?? null, nodeType: a.nodeType ?? null, nodeId: a.nodeId ?? null })),
+    actions: legal.map((a) => ({ id: a.id, kind: a.kind, cardId: a.cardId ?? null, nodeType: a.nodeType ?? null, nodeId: a.nodeId ?? null, potionId: a.potionId ?? null })),
     actionLines: observeActions(state),
     text: observe(state),
   };

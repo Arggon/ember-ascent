@@ -63,6 +63,12 @@ const MARKS = {
   // --- gold (S3): a struck coin, same woodcut stroke family as the marks above ---
   coin: { box: '0 0 20 20', body: '<circle class="m" cx="10" cy="10" r="6.6"/><path class="m" d="M10 6.7 V13.3"/>' },
   broken: { box: '0 0 26 26', body: '<path class="m" d="M12 3 L15 11"/><path class="m" d="M14 15 L8 23"/><path class="m" d="M18 5 L21 12"/>' },
+  // --- potions (S5): a stoppered flask and a drop, same woodcut stroke family. The belt
+  //     reuses existing marks where the shape reads (flame for the draught, the ward for
+  //     stone skin, the blade for the whetstone, the star for energy); an EMPTY slot and
+  //     an unknown potion id both fall back through the flask / rune respectively. ---
+  flask: { box: '0 0 20 20', body: '<path class="m" d="M8 2.5 H12 M9 2.5 V7 L5.5 14.5 C4.8 16.4 6 18 8 18 H12 C14 18 15.2 16.4 14.5 14.5 L11 7 V2.5"/><path class="m" d="M7 12.5 H13"/>' },
+  droplet: { box: '0 0 20 20', body: '<path class="m" d="M10 2.5 C13.2 7 15.5 10.4 15.5 13 A5.5 5.5 0 0 1 4.5 13 C4.5 10.4 6.8 7 10 2.5 Z"/><path class="m" d="M7.4 13 A2.6 2.6 0 0 0 10 15.6"/>' },
 
   // --- enemy illustrations (art-direction rev): forged-iron woodcut. Three layers per
   //     creature: `.b` body (near-black iron), `.r` rim light (currentColor = the creature's
@@ -104,6 +110,18 @@ export function glyphBox(name, cls) {
 /** Card type -> its mark. The three cues are hue, mark and the type word. */
 /** Temper id -> its stamp. */
 export const TEMPER_GLYPH = { quenched: 't-quench', redhot: 't-redhot', balanced: 't-balance' };
+
+/** Potion id -> its belt mark (S5). Presentation only: the belt chip's glyph is chosen
+ *  here from the snapshot's own `potionId`; an unknown id falls back to the generic
+ *  flask in the belt's own code and the rune inside glyphBox, never an empty box. */
+export const POTION_GLYPH = {
+  ember_draught: 'flame',
+  stone_skin: 'ward',
+  ash_salts: 'droplet',
+  bellows_fuel: 'star',
+  whetstone: 'blade',
+  purge_flask: 'flask',
+};
 
 export const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', status: 'hourglass', curse: 'skull' };
 

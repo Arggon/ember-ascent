@@ -11,8 +11,9 @@
 import { flash, hudEl, reducedMotion, repaint, snap } from './runtime.js';
 import { capitalize, el } from './dom.js';
 import { freshStatusKeys } from './floats.js';
-import { newGame } from './actions.js';
-import { TEMPER_GLYPH, glyphBox } from './glyphs.js';
+import { act, newGame } from './actions.js';
+import { cancelTargeting } from './targeting.js';
+import { POTION_GLYPH, TEMPER_GLYPH, glyphBox } from './glyphs.js';
 import { cardPool } from '../kernel/index.js';
 import { inDeckCounts } from './deck-counts.js';
 
@@ -43,6 +44,7 @@ export function renderHud() {
   // the browser can never disagree with the engine about how rich you are.
   const purse = p.gold ?? 0;
   hudEl.append(stat('gold', '◉', String(purse), false, `Gold ${purse}`));
+  hudEl.append(renderBelt());
   hudEl.append(el('span', { cls: 'hud-step', text: `step ${snap.stepIndex}` }));
 
   // A status that just landed on the PLAYER gets the same by-kind treatment as an enemy's.
@@ -101,6 +103,149 @@ export function renderHud() {
     attrs: { type: 'button', title: `New run (seed ${snap.seed}) — keyboard: n` },
     on: { click: () => newGame() },
   }));
+}
+
+/* --------------------------------------------------------------------- BELT (S5) */
+
+/**
+ * The potion belt: exactly `snap.beltSlots` slots beside the gold readout, in every
+ * phase. A FILLED slot is a named glyph chip (mark + name, tooltip = the kernel's own
+ * effect sentence); an EMPTY slot is a dim flask. In combat a filled slot is a BUTTON
+ * that opens the quaff/discard popover (beltPanel below); anywhere else the belt is a
+ * readout — the kernel offers belt actions in `phase === 'combat'` only, so a button
+ * would promise an action the engine would reject. A stale belt id (a torn save)
+ * renders under its raw id with the flask's rune fallback, exactly like the snapshot's
+ * `known: false` row: it stays VISIBLE, never thrown away.
+ * @returns {HTMLElement} the `.belt` group
+ */
+function renderBelt() {
+  const rows = snap.belt ?? [];
+  const slots = snap.beltSlots ?? 3;
+  const belt = el('span', { cls: 'belt', attrs: { role: 'group', 'aria-label': `Potion belt: ${rows.length} of ${slots}` } });
+  for (let i = 0; i < slots; i += 1) {
+    const row = rows[i] ?? null;
+    if (!row) {
+      belt.append(el('span', {
+        cls: 'belt-slot empty',
+        attrs: { title: `Potion slot ${i + 1}: empty`, 'aria-label': `Potion slot ${i + 1}: empty` },
+      }, glyphBox('flask', 'belt-glyph')));
+      continue;
+    }
+    const tip = `${row.name} — ${row.text || 'unknown potion'}${row.known ? '' : ' (unknown potion id in this save)'}`;
+    if (snap.phase === 'combat') {
+      belt.append(el('button', {
+        cls: 'belt-slot filled',
+        attrs: {
+          type: 'button',
+          title: `${tip} — click for quaff / discard`,
+          'aria-label': `Potion slot ${i + 1}: ${row.name}. Open quaff or discard.`,
+          'aria-haspopup': 'dialog',
+          'aria-expanded': String(beltOpenSlot === row.slot),
+        },
+        on: { click: (ev) => { ev.__dlbHandled = true; toggleBelt(row.slot); } },
+      },
+        glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
+        el('span', { cls: 'belt-name', text: row.name }),
+      ));
+    } else {
+      belt.append(el('span', {
+        cls: 'belt-slot filled inert',
+        attrs: { title: `${tip} — quaff and discard work in combat only`, 'aria-label': `Potion slot ${i + 1}: ${row.name}` },
+      },
+        glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
+        el('span', { cls: 'belt-name', text: row.name }),
+      ));
+    }
+  }
+  return belt;
+}
+
+/** The belt slot (its 1-based `slot`) whose popover is open, or null. Written only by
+ *  toggleBelt, like helpOpen/deckOpen/codexOpen: presentation state this module owns. */
+export let beltOpenSlot = null;
+
+/** Open (or close, with null) the quaff/discard popover for one belt slot. Opening one
+ *  slot closes another, and opening cancels a pending card aim — two choice steps open
+ *  at once would let a click land somewhere the player stopped looking at. */
+export function toggleBelt(slot) {
+  if (slot !== null) cancelTargeting();
+  beltOpenSlot = slot;
+  repaint();
+}
+
+/**
+ * The quaff/discard popover (the shop removal modal's two-choice pattern, scaled to one
+ * potion): what the potion is, one Quaff button per legal form — a single one, or one
+ * per living enemy when the potion must be aimed (the kernel's `quaffIds`, in
+ * living-enemy order) — one Discard, and the way out. Every id comes from
+ * `snap.belt[].quaffIds` / `discardId` (null outside combat: the popover only opens
+ * from a combat click), so the popover can never paint a button the kernel would
+ * reject. Acting closes the popover: a spent potion has nothing left to choose.
+ * @returns {HTMLElement} the `.modal-back` sheet
+ */
+export function beltPanel() {
+  const row = (snap.belt ?? []).find((r) => r.slot === beltOpenSlot);
+  const back = el('div', { cls: 'modal-back', attrs: { role: 'dialog', 'aria-label': 'Potion' } });
+  back.addEventListener('click', (ev) => { if (ev.target === back) toggleBelt(null); });
+  if (!row) { toggleBelt(null); return back; }
+
+  const panel = el('div', { cls: 'modal belt-modal', attrs: { role: 'dialog', 'aria-label': `${row.name}: quaff or discard` } });
+  const scroll = el('div', { cls: 'modal-scroll' });
+  scroll.append(el('h2', { text: row.name }));
+  scroll.append(el('p', { cls: 'belt-desc', text: row.text || 'An unknown potion — its id is not in this build\'s table. Discard it to free the slot.' }));
+
+  const choices = el('div', { cls: 'belt-choices' });
+  for (const id of row.quaffIds) {
+    // An aimed potion lists one button per living enemy, named the way the targeting
+    // step names them (position + face + HP), so the two flows read alike.
+    const k = /_(\d+)$/.exec(id);
+    const enemy = k ? snap.enemies[Number(k[1]) - 1] : null;
+    choices.append(el('button', {
+      cls: 'btn belt-act quaff',
+      text: enemy ? `Quaff — ${enemy.name} (${enemy.hp}/${enemy.maxHp})` : 'Quaff',
+      attrs: {
+        type: 'button',
+        'data-action': id,
+        title: enemy ? `Aim at the ${ordinal(Number(k[1]))} living enemy` : row.text,
+        'aria-label': enemy ? `Quaff ${row.name}, aimed at ${enemy.name}, ${enemy.hp} of ${enemy.maxHp} HP` : `Quaff ${row.name}. ${row.text}`,
+      },
+      on: { click: (ev) => { ev.__dlbHandled = true; act(id); toggleBelt(null); } },
+    }));
+  }
+  if (row.discardId) {
+    choices.append(el('button', {
+      cls: 'btn secondary belt-act discard',
+      text: 'Discard',
+      attrs: {
+        type: 'button',
+        'data-action': row.discardId,
+        title: 'Throw it away — the slot frees, nothing else changes',
+        'aria-label': `Discard ${row.name}. The slot frees; nothing else changes.`,
+      },
+      on: { click: (ev) => { ev.__dlbHandled = true; act(row.discardId); toggleBelt(null); } },
+    }));
+  }
+  scroll.append(choices);
+  if (snap.phase !== 'combat') {
+    scroll.append(el('p', { cls: 'hint', text: 'Quaff and discard work in combat only.' }));
+  }
+
+  panel.append(scroll);
+  panel.append(el('div', { cls: 'modal-foot' },
+    el('button', {
+      cls: 'btn secondary',
+      text: 'Close  (Esc)',
+      attrs: { type: 'button', title: 'Keep the potion (keyboard: Escape)' },
+      on: { click: () => toggleBelt(null) },
+    }),
+  ));
+  back.append(panel);
+  return back;
+}
+
+/** 1st/2nd/3rd… for the aim tooltip — presentation wording, not a rule. */
+function ordinal(n) {
+  return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n] ?? 'th'}`;
 }
 
 /* ----------------------------------------------------------------- HELP / GLOSSARY */
