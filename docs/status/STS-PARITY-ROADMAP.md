@@ -52,7 +52,7 @@ Process rules (standing):
 | S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | closed — 67084ec, QA 10/10, review APPROVE |
 | S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | closed — 58aefe6 + fixes af50324, QA 11/11, review APPROVE |
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | closed — c83a2d0, QA 11/11, review APPROVE |
-| S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | committed 69b05eb — orchestrator-run QA 11/11, in review |
+| S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | closed — 69b05eb + fixes d7441b6, QA 11/11, review APPROVE |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | pending |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending |
 | S9 | Content II: enemies + Act 2 | new encounters + second biome/map skeleton | map/act presentation | pending |
@@ -176,3 +176,13 @@ Process rules (standing):
   does NOT advance the session (only dispatch does) — orchestrator backlog candidate.
   Committed 69b05eb; solo review dispatched. NOTE: release/ is stale since daba4b4 —
   rebuild due before the next itch ship (ship-time concern, not per-slice).
+- 2026-10-25 — S6 review VERDICT: APPROVE (delivered on its third resume after provider
+  kills). All load-bearing checks verified clean (draw accounting, composition, R6
+  symmetry incl. resolved/torn paths, policies, golden byte-identical with four
+  offsetting flips, zero event visits in goldens). P2: four validateSave-accepted torn
+  shapes threw in snapshot/observe (S4.1 class) — fixed in S6.1 (d7441b6): both
+  renderings gate lines + coalesce offers through the kernel's own temperOfferOpen
+  guard; all four shapes live-probed by the orchestrator (survive snapshot AND render,
+  ids exactly [v0]). P3s fixed: rightmost comment, '(+0 HP)' -> 'already whole', e2e
+  line-merge. ctl.submit alias confirmed pre-existing/unused -> POLISH backlog.
+  Committed d7441b6 — S6 CLOSED. Six of nine roadmap slices through the full SDLC.
