@@ -193,3 +193,14 @@ Process rules (standing):
   mid-render toggle removed; restBody temper tolerance; guide action table through S6 +
   policy stance notes; cardIdOf/defOf shared extractor; replay_mismatch drift note; Help
   button title honest). Gates at commit: 318/317/1 node, gate OK, art OK, 16/16 browser.
+- 2026-10-25 — POLISH review VERDICT: APPROVE (keydown chain walked in all states, alias
+  pin sound, belt dump consistent by construction, STATUS_KINDS matches engine behavior,
+  guide table typo-free, no format changes). Four P3s -> BACKLOG: (a) first-run Help
+  dismissal paths disagree (Escape sets the flag permanently, backdrop click doesn't —
+  pre-existing wart, divergence frozen by this diff); (b) decayStatuses still hardcodes
+  [vulnerable,weak] — correctly NOT swapped (decay is a different axis than buff/debuff)
+  but needs a cross-reference comment naming the second list; (c) temperOffers elements
+  are never validated — a torn save temperOffers:[null] throws out of BOTH renderings at
+  a rest site (S6.1 class, pre-existing); (d) hud.js stacked JSDoc dedup nit.
+- 2026-10-25 — S7 (relics) development dispatched. Backlog now rides into a future round
+  or S8's fix capacity; the pipeline's next gates are S7's loop, then content scale.
