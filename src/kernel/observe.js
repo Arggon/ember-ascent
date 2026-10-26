@@ -21,7 +21,7 @@ import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
 import { POTION_SLOTS, potionDef } from './rules/potions.js';
-import { eventDef, offerEventChoices } from './rules/events.js';
+import { eventDef, offerEventChoices, temperOfferOpen } from './rules/events.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -350,15 +350,26 @@ function eventBody(state) {
     return lines;
   }
   if (ev?.tempering) {
-    // The smith's modal: same rendering the rest site's temper list keeps.
+    // The smith's modal: same rendering the rest site's temper list keeps. Elements are
+    // coalesced through the kernel's own enumeration guard (S6.1 review P2: a
+    // validate-accepted save may carry null/garbage offer elements, and this loop used
+    // to read `o.cardId` straight out of them) — so the t-numbers rendered here are
+    // exactly the ids actions() enumerates, and a corrupt element is simply absent,
+    // never a throw and never a refused id hinted at.
     lines.push('TEMPER (pick one; the choice is committed)');
-    (Array.isArray(ev.offers) ? ev.offers : []).forEach((o, i) => lines.push(` t${i + 1} ${o.cardId} ${TEMPERS[o.temper]?.label ?? o.temper}`));
+    (Array.isArray(ev.offers) ? ev.offers : []).forEach((o, i) => {
+      if (!temperOfferOpen(o, state)) return;
+      lines.push(` t${i + 1} ${o.cardId} ${TEMPERS[o.temper]?.label ?? o.temper}`);
+    });
     return lines;
   }
   lines.push(` "${def.story}"`);
   if (ev?.resolved) {
     lines.push('RESOLVED');
-    (ev.resolved.lines ?? []).forEach((l) => lines.push(` ${l}`));
+    // Array.isArray, not `?? []`: a torn resolved beat (lines = 42, or a string) is
+    // validateSave-accepted and used to throw straight out of observe() (S6.1 review P2).
+    const beat = Array.isArray(ev.resolved?.lines) ? ev.resolved.lines : [];
+    beat.forEach((l) => lines.push(` ${l}`));
     lines.push(` v0 continue (HP ${state.player.hp}/${state.player.maxHp}, purse ${state.player.gold ?? 0})`);
     return lines;
   }
@@ -858,14 +869,22 @@ function snapshotEvent(state, legal) {
     maxHp: state.player.maxHp,
     tempering: Boolean(ev?.tempering),
     // Only meaningful while `tempering`; published always, like the shop's deck list.
-    offers: (Array.isArray(ev?.offers) ? ev.offers : []).map((o, i) => ({
-      actionId: temperPicks.get(i) ?? null,
-      cardId: o.cardId,
-      cardName: defOrNull(o.cardId)?.name ?? o.cardId,
-      temper: o.temper,
-      temperName: TEMPERS[o.temper]?.name ?? o.temper,
-      text: TEMPERS[o.temper]?.text ?? '',
-    })),
+    // Elements are coalesced through the kernel's own enumeration guard (S6.1 review
+    // P2: a validate-accepted save may carry null/garbage offer elements, and `.map`
+    // used to read `o.cardId` straight out of them). The map runs over the ORIGINAL
+    // indices — so the surviving rows still resolve their `t<n>` actionId from the
+    // same number actions() enumerates — and a refused element emits no row at all:
+    // the view renders only picks the kernel actually offers (S4.1/S5 ruling).
+    offers: (Array.isArray(ev?.offers) ? ev.offers : [])
+      .map((o, i) => (temperOfferOpen(o, state) ? {
+        actionId: temperPicks.get(i) ?? null,
+        cardId: o.cardId,
+        cardName: defOrNull(o.cardId)?.name ?? o.cardId,
+        temper: o.temper,
+        temperName: TEMPERS[o.temper]?.name ?? o.temper,
+        text: TEMPERS[o.temper]?.text ?? '',
+      } : null))
+      .filter(Boolean),
     choices: evald.map((c) => ({
       index: c.index,
       actionId: choices.get(c.index) ?? null,
@@ -877,7 +896,12 @@ function snapshotEvent(state, legal) {
       offered: c.offered,
       reason: c.reason,
     })),
-    resolved: ev?.resolved ? { choice: ev.resolved.choice, lines: [...(ev.resolved.lines ?? [])] } : null,
+    // Array.isArray, not a spread default: a torn beat (lines = 42, or a string) is
+    // validateSave-accepted and `[...(lines ?? [])]` threw straight out of snapshot()
+    // (S6.1 review P2) — the same guard the dump applies to the same field.
+    resolved: ev?.resolved
+      ? { choice: ev.resolved.choice, lines: Array.isArray(ev.resolved?.lines) ? ev.resolved.lines : [] }
+      : null,
     continueId: legal.find((a) => a.kind === 'event_continue')?.id ?? null,
   };
 }

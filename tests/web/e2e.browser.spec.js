@@ -1099,7 +1099,8 @@ test('shop: the vendor sells a card, removes one, and closes for good', { timeou
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
 });
 
-test('potions: the belt fills from a victory, quaffs in combat, and discards', { timeout: 300000 }, async (t) => {  if (!chromium) return t.skip('playwright/chromium unavailable');
+test('potions: the belt fills from a victory, quaffs in combat, and discards', { timeout: 300000 }, async (t) => {
+  if (!chromium) return t.skip('playwright/chromium unavailable');
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 800 },

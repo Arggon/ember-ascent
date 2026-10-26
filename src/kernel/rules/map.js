@@ -79,7 +79,7 @@ export function generateMap(seed, startDraw) {
     for (let k = 0; k < width; k += 1) {
       // S6: each of the act's two events takes its placed slot outright — the pool
       // entry that would have fed this one choice is given over to it (row 2 has only
-      // two slots, so its leftmost is the event; row 6 mirrors the shop's middle).
+      // two slots, so its rightmost is the event; row 6 mirrors the shop's middle).
       // Nothing is random about an event's EXISTENCE, so it consumes NO pool draw
       // (same policy as the fixed opener, the boss and the shop: randomness is only
       // spent on content that needs it). WHICH event it holds rolls later, at ENTRY

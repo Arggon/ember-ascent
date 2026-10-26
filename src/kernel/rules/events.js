@@ -357,14 +357,21 @@ export function resolveChoice(state, match, defs) {
       next = { ...next, player: { ...next.player, hp: next.player.hp + healed } };
       events.push({ t: 'heal', who: 'player', amount: healed, source: 'event' });
     }
-    lines.push(`- The light falls and falls. In its glow you bind your scrapes and breathe (+${healed} HP).`);
+    // The beat says what HAPPENED: the heal phrase is gated exactly like the event it
+    // describes (S6.1 review P3 — a full-health torch printed "+0 HP" beside a
+    // suppressed heal event). The accounting above is untouched.
+    lines.push(healed > 0
+      ? `- The light falls and falls. In its glow you bind your scrapes and breathe (+${healed} HP).`
+      : '- The light falls and falls. You are already whole — the glow finds nothing to mend.');
   } else if (def.id === 'wandering_smith' && choice.slug === 'stories') {
     const healed = Math.min(STORIES_HEAL, next.player.maxHp - next.player.hp);
     if (healed > 0) {
       next = { ...next, player: { ...next.player, hp: next.player.hp + healed } };
       events.push({ t: 'heal', who: 'player', amount: healed, source: 'event' });
     }
-    lines.push(`- The smith talks of old fires and older mistakes. You stand easier (+${healed} HP).`);
+    lines.push(healed > 0
+      ? `- The smith talks of old fires and older mistakes. You stand easier (+${healed} HP).`
+      : '- The smith talks of old fires and older mistakes. You are already whole, and he nods like he knew.');
   } else {
     lines.push('- Nothing happens.');
   }

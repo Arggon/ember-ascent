@@ -287,6 +287,13 @@ test('Collapsed Shaft — climb pays 60 for 12 HP through the fixed paths; the t
   assert.equal(t.player.gold, 50 - TORCH_PRICE);
   assert.equal(t.player.hp, 40 + Math.min(TORCH_HEAL, t.player.maxHp - (40 - 0)), 'the torch heals, clamped to max');
   assert.deepEqual(step(rich, 'v2').events.map((e) => e.t), ['gold_spent', 'heal']);
+  // Full health: the heal event is suppressed, and the beat says so instead of
+  // printing "+0 HP" beside it (S6.1 review P3 — text gated like the accounting).
+  const whole = eventOf('collapsed_shaft', { player: { gold: 50, hp: 60 } });
+  const wholeOut = step(whole, 'v2');
+  assert.deepEqual(wholeOut.events.map((e) => e.t), ['gold_spent'], 'no heal event at full health');
+  assert.ok(!wholeOut.state.event.resolved.lines.some((l) => l.includes('(+0')), 'the beat never prints +0');
+  assert.match(wholeOut.state.event.resolved.lines.join(' '), /already whole/);
   // The torch is a price like any other: a broke player gets no id.
   const broke = eventOf('collapsed_shaft', { player: { gold: TORCH_PRICE - 1 } });
   assert.ok(!actions(broke).some((a) => a.slug === 'torch'));
@@ -348,6 +355,12 @@ test('Wandering Smith — stories heal like a rest site; every card already temp
   assert.equal(s.player.hp, 30 + Math.min(STORIES_HEAL, s.player.maxHp - 30));
   assert.deepEqual(step(s0, 'v2').events.map((e) => e.t), ['heal']);
   assert.equal(step(s0, 'v2').events[0].source, 'event');
+  // Full health: no heal event, and the beat says so instead of "+0 HP" (S6.1 review P3).
+  const whole = eventOf('wandering_smith', { player: { hp: 60 } });
+  const wholeOut = step(whole, 'v2');
+  assert.deepEqual(wholeOut.events.map((e) => e.t), [], 'no heal event at full health');
+  assert.ok(!wholeOut.state.event.resolved.lines.some((l) => l.includes('(+0')), 'the beat never prints +0');
+  assert.match(wholeOut.state.event.resolved.lines.join(' '), /already whole/);
 
   // An all-tempered deck: the modal would be empty, so the choice is never offered.
   const base = newRun({ seed: 2, tempers: true });
@@ -467,6 +480,80 @@ test('validateSave: the event field is optional (object or null), and a legacy s
   }
   assert.equal(sawEvent, false, 'the event phase never occurs on a legacy map');
   assert.notEqual(session.state.phase, 'event');
+});
+
+test('a torn resolved beat (lines = 42, lines = "abc") degrades in BOTH renderings (S6.1 review P2)', () => {
+  // The exact P2 shapes: validateSave checks the event field as object-or-null only,
+  // so a save may stand in the event phase with a resolved beat whose `lines` is not
+  // an array — and `...(lines ?? [])` / `lines.forEach` used to throw straight out of
+  // snapshot()/observe(), bricking the page on load. Each shape rides the
+  // saveObject-mutate-validate-load path a real torn save arrives by.
+  for (const [name, lines] of [['a number', 42], ['a string', 'abc']]) {
+    const inBeat = (() => {
+      let s = eventOf('collapsed_shaft');
+      s = step(s, 'v3').state; // walk past: a resolved beat with real lines
+      return { ...s, event: { ...s.event, resolved: { choice: 2, lines } } };
+    })();
+    const blank = JSON.parse(JSON.stringify(saveObject(begin({ seed: 3 }))));
+    const staged = JSON.parse(JSON.stringify({ ...blank, state: inBeat, actions: [{ act: 'n2' }] }));
+    assert.deepEqual(validateSave(staged), [], `lines = ${name} is validateSave-accepted`);
+    const res = loadObject(staged);
+    assert.equal(res.ok, true, `the torn beat loads: ${JSON.stringify(res.problems ?? [])}`);
+    const s = res.session.state;
+    // Both renderings survive, and both stay SANE: the continue is offered, the beat
+    // is empty rather than lying, and the dump still names the phase.
+    let snap;
+    assert.doesNotThrow(() => { snap = snapshot(s); }, `snapshot survives lines = ${name}`);
+    assert.deepEqual(snap.event.resolved.lines, [], `the beat degrades to no lines (${name})`);
+    assert.equal(snap.event.continueId, 'v0', 'the way out survives');
+    let dump;
+    assert.doesNotThrow(() => { dump = observe(s); }, `observe survives lines = ${name}`);
+    assert.match(dump, /EVENT — The Collapsed Shaft/);
+    assert.match(dump, /RESOLVED/);
+    assert.match(dump, / v0 continue \(HP \d+\/\d+, purse \d+\)/);
+    assert.equal(step(s, 'v0').state.phase, 'map', 'the continue still closes the phase');
+  }
+});
+
+test('a torn temper modal (offers = [null], offers = [42]) degrades in BOTH renderings (S6.1 review P2)', () => {
+  // The other P2 shapes: an offer element that is not an object — `.map`/`.forEach`
+  // used to read `o.cardId` straight out of it and throw. The run must survive both
+  // renderings, keep the run out (no refused id hinted at), and stay escapable.
+  for (const [name, offers] of [['null element', [null]], ['a number element', [42]]]) {
+    const inModal = (() => {
+      let s = eventOf('wandering_smith', { tempers: true });
+      s = step(s, 'v1').state; // a real modal with real offers
+      return { ...s, event: { ...s.event, offers } };
+    })();
+    const blank = JSON.parse(JSON.stringify(saveObject(begin({ seed: 3 }))));
+    const staged = JSON.parse(JSON.stringify({ ...blank, state: inModal, actions: [{ act: 'n2' }] }));
+    assert.deepEqual(validateSave(staged), [], `offers with a ${name} is validateSave-accepted`);
+    const res = loadObject(staged);
+    assert.equal(res.ok, true, `the torn modal loads: ${JSON.stringify(res.problems ?? [])}`);
+    const s = res.session.state;
+    // The action layer never offered a t-id for the garbage (the enumeration guard
+    // predates this review), so the escape hatch is what both renderings agree on.
+    assert.deepEqual(actions(s).map((a) => a.id), ['v0'], `no t-id is enumerated for a ${name}`);
+    let snap;
+    assert.doesNotThrow(() => { snap = snapshot(s); }, `snapshot survives a ${name}`);
+    assert.deepEqual(snap.event.offers, [], `the snapshot coalesces the ${name} away`);
+    assert.equal(snap.event.continueId, 'v0');
+    let dump;
+    assert.doesNotThrow(() => { dump = observe(s); }, `observe survives a ${name}`);
+    assert.match(dump, /TEMPER \(pick one; the choice is committed\)/);
+    assert.ok(!/ t1 /.test(dump), `no t-id is rendered for a ${name}`);
+    // And a valid offer BESIDE the garbage keeps its true index and its pick: the row
+    // numbering here is the same numbering the action ids use.
+    const mixed = { ...s, event: { ...s.event, offers: [offers[0], { uid: 'c0', cardId: 'strike', temper: 'redhot' }] } };
+    assert.deepEqual(actions(mixed).map((a) => a.id), ['t2'], 'the valid offer keeps its slot index');
+    const mixedSnap = snapshot(mixed).event.offers;
+    assert.equal(mixedSnap.length, 1, 'one row for the one valid offer');
+    assert.equal(mixedSnap[0].actionId, 't2', 'resolved from the ORIGINAL index');
+    assert.equal(mixedSnap[0].temperName, 'Red-hot');
+    assert.doesNotThrow(() => observe(mixed), 'the dump survives the mixed modal');
+    assert.match(observe(mixed), / t2 strike RH/);
+    assert.equal(step(mixed, 't2').state.tempers.c0, 'redhot', 'the valid pick still resolves');
+  }
 });
 
 test('both heuristic policies take the free pass-through and continue; the random policy survives any event', () => {
