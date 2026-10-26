@@ -51,8 +51,8 @@ Process rules (standing):
 | S2 | Card codex | expose draft pool via public API (`draftPoolFrom` already exists) | "Cards" button → codex modal grouped by rarity with descriptions | closed — 01466a3 + fixes 2ab6834 (per-run truthful codex + tolerance + keyguard), QA 8/8+loop, re-review APPROVE |
 | S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | closed — 67084ec, QA 10/10, review APPROVE |
 | S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | closed — 58aefe6 + fixes af50324, QA 11/11, review APPROVE |
-| S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | committed c83a2d0 — QA PASS 11/11, in review |
-| S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | pending |
+| S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | closed — c83a2d0, QA 11/11, review APPROVE |
+| S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | **in progress** (dev dispatched) |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | pending |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending |
 | S9 | Content II: enemies + Act 2 | new encounters + second biome/map skeleton | map/act presentation | pending |
@@ -155,3 +155,12 @@ Process rules (standing):
   combat-only q/d ids, S4.1 tolerance ruling applied. Manual QA PASS 11/11 (evidence
   /tmp/s5-qa/, 26 screenshots; real drop sampling 37.5% vs 40% band; exact effect math;
   zero-draw discard proven via rngDraws 67->67). Committed c83a2d0; solo review dispatched.
+- 2026-10-25 — S5 review (resumed once after a network kill): VERDICT APPROVE — golden
+  rebuild byte-identical, 2 outcome flips both loss->win (potions strictly beneficial),
+  lifecycles verified against the shared vocabulary, no interruption seams. Four P3s →
+  backlog: beltBody text dump hints quaff ids the kernel refuses (S4.1 inversion at the
+  text surface); POTION_DEBUFFS hardcoded, not derived from the statuses table (a future
+  frail would silently survive Purge Flask); beltPanel missing-row guard calls a state
+  setter mid-render (latent); policy stance + AGENT-PLAY-GUIDE action table lack
+  q/d and (pre-existing) b/x/l rows. A dedicated POLISH round clears the whole backlog
+  after S6 closes, before S7.
