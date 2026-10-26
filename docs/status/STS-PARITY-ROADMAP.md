@@ -186,3 +186,10 @@ Process rules (standing):
   ids exactly [v0]). P3s fixed: rightmost comment, '(+0 HP)' -> 'already whole', e2e
   line-merge. ctl.submit alias confirmed pre-existing/unused -> POLISH backlog.
   Committed d7441b6 — S6 CLOSED. Six of nine roadmap slices through the full SDLC.
+- 2026-10-25 — POLISH round committed 4f493ca: the entire review backlog cleared in one
+  pass (submit alias deleted + one-dispatch-path pin; Help-sheet keyguard incl. the
+  first-run paint, e2e-pinned + orchestrator-probed live; belt dump quaff hints from the
+  legal list; POTION_DEBUFFS derived from STATUS_KINDS with an invariant pin; beltPanel
+  mid-render toggle removed; restBody temper tolerance; guide action table through S6 +
+  policy stance notes; cardIdOf/defOf shared extractor; replay_mismatch drift note; Help
+  button title honest). Gates at commit: 318/317/1 node, gate OK, art OK, 16/16 browser.
