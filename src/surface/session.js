@@ -311,6 +311,13 @@ export function parseLog(text) {
 
 /**
  * Assert a replayed log against its own recorded hashes (R3, exit 5 on mismatch).
+ *
+ * ON DRIFT: a mismatch on an OLD log is not necessarily corruption. The hash covers
+ * rngDraws (the draw-consumption count), and engine changes that consume draws
+ * differently — S3's gold grant, S5's potion drops, S6's event draws — retire the
+ * hashes every log recorded before them. A pre-S3 log that no longer replays
+ * hash-for-hash is expected drift: regenerate the golden fixtures, never hand-edit a
+ * recorded hash.
  * @param {{header: any, entries: any[], footer: any}} parsed
  * @param {{hashEvery?: number}} [opts]
  * @returns {{ok: boolean, checked: number, skipped: number, mismatches: any[], finalHash: string, footerHash: string}}

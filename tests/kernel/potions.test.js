@@ -27,9 +27,10 @@ import { loadKernel, content as contentFixture } from '../helpers/harness.mjs';
 import { begin, submit, legal, renderLog, parseLog, assertReplay, runHash } from '../../src/surface/session.js';
 import { makePolicy } from '../../src/surface/policies.js';
 import {
-  POTIONS, POTION_DEFS, POTION_SLOTS, DROP_CHANCE, potionDef, rollPotionDrop,
+  POTIONS, POTION_DEFS, POTION_SLOTS, DROP_CHANCE, POTION_DEBUFFS, potionDef, rollPotionDrop,
 } from '../../src/kernel/rules/potions.js';
 import { resolveVictory } from '../../src/kernel/rules/act.js';
+import { STATUSES, STATUS_KINDS } from '../../src/kernel/rules/vocabulary.js';
 import { intAt, pickAt } from '../../src/kernel/rng.js';
 
 const K = await loadKernel();
@@ -299,6 +300,12 @@ test('Purge Flask: debuffs go, buffs stay', () => {
   const clean = step(beltCombat(['purge_flask']), 'q1');
   assert.equal(clean.events.some((e) => e.t === 'status_cleared'), false);
   assert.deepEqual(clean.state.potions, []);
+  // The purge list is DERIVED, not a second copy of the table (S5 review P3): every
+  // status the engine knows is classified exactly once in vocabulary.js, and the
+  // potion's debuffs are that table's debuff half. A future 'frail' breaks this test
+  // until it is classified — it can never silently survive the purge.
+  assert.deepEqual(Object.keys(STATUS_KINDS).sort(), [...STATUSES].sort(), 'every status is classified buff or debuff');
+  assert.deepEqual(POTION_DEBUFFS, STATUSES.filter((s) => STATUS_KINDS[s] === 'debuff'));
 });
 
 /* --------------------------------------------------- slot economy and settle -- */
@@ -398,9 +405,11 @@ test('a stale belt id degrades: raw id as the name, a discard but never a quaff,
   const forced = step(s, 'q1');
   assert.equal(forced.error?.code, 2);
   assert.equal(forced.state, s);
-  // The text dump renders the raw id in the BELT section.
+  // The text dump renders the raw id in the BELT section — and NO quaff hint: the
+  // dump's quaff half comes from the legal list (the S5 review P3 fix), and the
+  // handler refuses a stale id, so only the discard is named.
   assert.match(observe(s), /BELT/);
-  assert.match(observe(s), new RegExp(`1 no_such_flask  \\(quaff q1, discard d1\\)`));
+  assert.match(observe(s), new RegExp(`1 no_such_flask  \\(discard d1\\)`));
 });
 
 test('validateSave: the field is optional, structured, and never id-checked', () => {
@@ -484,7 +493,11 @@ test('the text dump: POTIONS header everywhere, a BELT section in combat, budget
   const dump = observe(s);
   assert.match(dump, /POTIONS 2\/3/);
   assert.match(dump, /BELT/);
-  assert.match(dump, / 1 Ember Draught  A20  \(quaff q1, discard d1\)/);
+  // The quaff hint is the LEGAL list, not the slot's existence (S5 review P3): with two
+  // living enemies the Ember Draught must be aimed — the dump names the q<n>_<k> forms
+  // and never the bare q1 the kernel would refuse — while the self-targeting Purge
+  // Flask keeps its plain q2.
+  assert.match(dump, / 1 Ember Draught  A20  \(quaff q1_1\/q1_2, discard d1\)/);
   assert.match(dump, / 2 Purge Flask  PURGE  \(quaff q2, discard d2\)/);
   // Action lines: name-only like every other line, discard named as the renunciation.
   const dump2 = beltCombat(['ash_salts']);

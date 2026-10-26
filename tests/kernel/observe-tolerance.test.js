@@ -49,6 +49,23 @@ test('a rest-site offer with an unknown id shows its raw id instead of throwing'
   assert.match(offer.text, /Lose 2 HP when played/);
 });
 
+test('a rest offer with an unknown TEMPER key renders in both dump and snapshot (POLISH round)', () => {
+  // The S2.1-era snapshotRest degraded with `?.` fallbacks that were unreachable
+  // through snapshot() because restBody — the dump beside which it renders — threw on
+  // the same state (the backlog note). Both renderings now tolerate the raw key.
+  const base = newRun({ seed: 7, tempers: true });
+  const state = { ...base, phase: 'rest', temperOffers: [{ cardId: 'strike', temper: 'no_such_temper' }] };
+  const snap = snapshot(state);
+  assert.equal(snap.rest.tempers.length, 1);
+  assert.equal(snap.rest.tempers[0].temper, 'no_such_temper', 'the raw key stays visible');
+  assert.equal(snap.rest.tempers[0].temperName, 'no_such_temper', 'the raw key is its own name');
+  assert.equal(snap.rest.tempers[0].text, '');
+  const dump = observe(state);
+  assert.match(dump, /TEMPER \(instead of healing\)/);
+  assert.match(dump, new RegExp(`t1 strike no_such_temper`), 'the dump renders the raw key where the label would sit');
+  assert.doesNotThrow(() => snapshot(state), 'the snapshot never throws on a stale temper key');
+});
+
 test('an unknown id in a pile renders by name-slot without throwing, counts intact', () => {
   const base = newRun({ seed: 7 });
   const combat = {

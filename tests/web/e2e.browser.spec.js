@@ -1418,3 +1418,61 @@ test('event: the wayside tells its story, a choice pays and takes, and the beat 
   assert.equal(await page.locator('button[aria-label*="Wayside"]').count(), 0, 'no wayside is travel-legal after leaving');
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
 });
+
+test('help sheet: the keyboard guard swallows everything but Escape, and the run behind it is intact', { timeout: 120000 }, async (t) => {
+  if (!chromium) return t.skip('playwright/chromium unavailable');
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: 'reduce',
+  });
+  t.after(() => { void browser.close(); });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+  await page.goto(`${base}/src/web/index.html?seed=7`);
+  await page.waitForLoadState('domcontentloaded');
+  await page.locator('button.boon').first().click();
+  await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+
+  const before = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return { seed: s.seed, step: s.stepIndex, phase: s.phase };
+  });
+
+  // Open Help from the HUD. Exactly one sheet is up.
+  await page.getByRole('button', { name: 'Help' }).click();
+  await page.waitForSelector('.modal', { timeout: 3000 });
+  const isHelp = await page.locator('.modal[aria-label="How to play"]').count();
+  assert.equal(isHelp, 1, 'the sheet on stage is the help sheet');
+  assert.equal(await page.locator('.modal').count(), 1, 'exactly one sheet');
+
+  // The E8b class, one layer down: d used to stack the deck sheet on Help, and n used
+  // to discard the run BEHIND it. Both are swallowed now; the sheet and the run stand.
+  await page.keyboard.press('d');
+  await sleep(300);
+  assert.equal(await page.locator('.modal').count(), 1, 'd does not stack a second sheet');
+  assert.equal(await page.locator('.modal[aria-label="How to play"]').count(), 1, 'the help sheet is still the one up');
+  await page.keyboard.press('n');
+  await sleep(300);
+  assert.equal(await page.locator('.modal').count(), 1, 'n does not discard the run behind the sheet');
+  const afterKeys = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return { seed: s.seed, step: s.stepIndex, phase: s.phase };
+  });
+  assert.deepEqual(afterKeys, before, 'the run behind the sheet is untouched');
+
+  // Escape is Help's only key (it has no toggle key of its own): it closes the sheet,
+  // and the released keyboard behaves again — d opens the deck sheet.
+  await page.keyboard.press('Escape');
+  await sleep(200);
+  assert.equal(await page.locator('.modal').count(), 0, 'Escape closes the help sheet');
+  await page.keyboard.press('d');
+  await sleep(300);
+  assert.equal(await page.locator('.modal.deck-modal').count(), 1, 'the released d opens the deck sheet');
+  await page.keyboard.press('Escape');
+  await sleep(200);
+  assert.equal(await page.locator('.modal').count(), 0, 'and Escape closes that too');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});

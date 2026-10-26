@@ -40,7 +40,7 @@
 //
 // Pure: no Date, no Math.random, no I/O; the only entropy is (seed, drawIndex).
 import { intAt } from '../rng.js';
-import { VOCABULARY } from './vocabulary.js';
+import { VOCABULARY, DEBUFFS } from './vocabulary.js';
 
 /** Belt capacity (StS parity: 3). A 4th potion is impossible — suppressed at the drop. */
 export const POTION_SLOTS = 3;
@@ -75,9 +75,11 @@ export const DROP_CHANCE = Object.freeze({
   elite: 60,
 });
 
-/** The status keys a Purge Flask clears: the player's DEBUFFS. Strength, Dexterity and
- *  Metallicize are buffs and stay (the potion's own text says so). */
-export const POTION_DEBUFFS = Object.freeze(['vulnerable', 'weak']);
+/** The status keys a Purge Flask clears: the player's DEBUFFS, derived from the ONE
+ *  buff/debuff classification in rules/vocabulary.js (STATUS_KINDS) rather than a
+ *  second copy of the list beside it — a future status ('frail') is classified THERE
+ *  once, and either lands in the purge or deliberately does not (S5 review P3). */
+export const POTION_DEBUFFS = DEBUFFS;
 
 /**
  * Effect lists per potion id, in the card-effects shape so the shared verbs receive

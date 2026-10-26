@@ -166,6 +166,21 @@ test('a rejection is a no-op on both surfaces, and it is not silently swallowed'
   assert.equal(await cliHash(), beforeCtl, 'both surfaces agree the run is unchanged');
 });
 
+test('the controller exposes exactly one dispatch path — no success-looking submit alias', () => {
+  // The POLISH review (S6 round): an earlier draft aliased `submit: (id) => submit(session, id)`,
+  // which called the real session submit but never reassigned the closed-over session —
+  // every call looked like a success and dropped the run forward. No surface consumed
+  // it, so it was deleted; this pins the absence AND the fact that the one real path
+  // still advances (so the deletion cannot mask a broken dispatch).
+  const ctl = createController({ run: { seed: 0 } });
+  assert.equal(ctl.submit, undefined, 'no submit alias exists to call');
+  const before = ctl.hash();
+  const r = ctl.dispatch('n1');
+  assert.equal(r.error ?? null, null, 'the one dispatch path still works');
+  assert.equal(r.changed, true, 'and the run advanced');
+  assert.notEqual(ctl.hash(), before, 'the session moved with the dispatch');
+});
+
 // --- AC-6.5: the two surfaces must agree on the RUN RECORD, not merely on the hash ---
 //
 // The hashes above prove the two surfaces present one engine. This proves the thing a

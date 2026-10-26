@@ -104,6 +104,11 @@ function statusLine(statuses) {
   return keys.map((k) => `${STATUS_ABBREV[k] ?? k.toUpperCase()}${statuses[k]}`).join(' ');
 }
 
+/** The id of a bare-id-or-instance value — the ONE id extractor here, shared by the
+ *  strict lookup below and the tolerant fallback beside it (POLISH round nit: the
+ *  extraction used to live twice). */
+const cardIdOf = (cardOrId) => (typeof cardOrId === 'string' ? cardOrId : cardOrId.cardId);
+
 /** Live card definition lookup. Single place where an instance (or bare id) becomes renderable. */
 let CARD_DEFS = null;
 /** @param {any} content */
@@ -113,14 +118,11 @@ export function _setContentForObservation(content) {
 /** The definition of a hand instance OR a bare card id — one lookup, one error message. */
 function defOf(cardOrId) {
   if (CARD_DEFS === null) CARD_DEFS = defaultContent().cards;
-  const id = typeof cardOrId === 'string' ? cardOrId : cardOrId.cardId;
+  const id = cardIdOf(cardOrId);
   const def = CARD_DEFS.get(id);
   if (!def) throw new Error(`observation: unknown card "${id}"`);
   return def;
 }
-
-/** The id of a bare-id-or-instance value, for the tolerant lookup's fallback text. */
-const cardIdOf = (cardOrId) => (typeof cardOrId === 'string' ? cardOrId : cardOrId.cardId);
 
 /**
  * The TOLERANT lookup, for ids that arrive from persisted state (deck, piles, reward and
@@ -249,20 +251,33 @@ function combatBody(state, opts) {
  * S5: the belt, rendered in COMBAT only (the one phase its q/d actions exist in).
  * Empty slots are not drawn — the header's `POTIONS n/3` already counts them — and an
  * unknown belt id renders as its raw id with no effect text (the stale-save degrade,
- * never a throw). The base q/d ids are shown beside each potion; the AIMED forms
- * (q<n>_<k>) are the action lines' own job, exactly as aimed plays are.
+ * never a throw). The discard id is the slot's own; the QUAFF half comes from the LEGAL
+ * list (the same computation snapshotBelt does), because the slot's existence alone
+ * hints ids the kernel refuses: a stale id gets no quaff (S4.1), and an aimed potion at
+ * 2+ living enemies offers q<n>_<k>, never the bare q<n>. Slot 1 of a two-enemy fight
+ * reads `(quaff q1_1/q1_2, discard d1)`; a refused quaff leaves only `(discard d<n>)`
+ * (S5 review P3, fixed in the POLISH round). The AIMED forms stay one line each here —
+ * the per-enemy split remains the action lines' job.
  * @param {any} state
  * @returns {string[]}
  */
 function beltBody(state) {
   const belt = state.potions ?? [];
   if (belt.length === 0) return [];
+  const quaffs = new Map();
+  for (const a of legalActions(state)) {
+    if (a.kind !== 'quaff') continue;
+    if (!quaffs.has(a.index)) quaffs.set(a.index, []);
+    quaffs.get(a.index).push(a.id);
+  }
   const lines = ['BELT'];
   belt.forEach((potionId, i) => {
     const def = potionDef(potionId);
     const name = def ? def.name : potionId;
     const summary = def ? `  ${def.summary}` : '';
-    lines.push(` ${i + 1} ${name}${summary}  (quaff q${i + 1}, discard d${i + 1})`);
+    const ids = quaffs.get(i) ?? [];
+    const hint = ids.length > 0 ? `quaff ${ids.join('/')}, discard d${i + 1}` : `discard d${i + 1}`;
+    lines.push(` ${i + 1} ${name}${summary}  (${hint})`);
   });
   return lines;
 }
@@ -295,7 +310,10 @@ function restBody(state) {
   const lines = ['REST — heal or move on', ` HP ${state.player.hp}/${state.player.maxHp}`];
   if (state.temperOffers && state.temperOffers.length > 0) {
     lines.push('TEMPER (instead of healing)');
-    state.temperOffers.forEach((o, i) => lines.push(` t${i + 1} ${o.cardId} ${TEMPERS[o.temper].label}`));
+    // Tolerant like snapshotRest beside which it renders (S2.1 review P3, closed in the
+    // POLISH round): an unknown temper key — a stale save, or an offer the table no
+    // longer knows — renders the raw key instead of throwing out of the dump.
+    state.temperOffers.forEach((o, i) => lines.push(` t${i + 1} ${o.cardId} ${TEMPERS[o.temper]?.label ?? o.temper}`));
   }
   return lines;
 }

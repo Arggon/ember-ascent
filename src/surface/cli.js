@@ -356,7 +356,15 @@ const COMMANDS = {
     if (flags['--assert']) {
       const result = assertReplay(parsed, { hashEvery: flags['--hash-every'] });
       if (!result.ok) {
-        err(`${JSON.stringify({ error: 'replay_mismatch', checked: result.checked, mismatches: result.mismatches })}\n`);
+        // The note is doc-grade (S3 review P3): a mismatch on a PRE-S3 log is expected
+        // drift — engine draw-consumption changes (gold, potion drops, event draws)
+        // retire the recorded hashes. Regenerate the fixtures; never hand-edit a hash.
+        err(`${JSON.stringify({
+          error: 'replay_mismatch',
+          checked: result.checked,
+          mismatches: result.mismatches,
+          note: 'mismatches on pre-S3 logs can be expected drift: engine draw-consumption changes (S3 gold, S5 potion drops, S6 events) retire old recorded hashes — regenerate the golden fixtures, never hand-edit a hash',
+        })}\n`);
         return EXIT.replayMismatch;
       }
       out(flags['--json']

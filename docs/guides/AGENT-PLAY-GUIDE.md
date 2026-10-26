@@ -118,12 +118,23 @@ T1 | HP 60/60 | EN 3/3 | BLK 0 | draw5 disc0
 |---|---|---|
 | `p<n>` | play the card in hand slot *n* | `p1` |
 | `p<n>_<k>` | aim hand card *n* at enemy *k* (multi-enemy fights; 1-based, living enemies) | `p2_1` |
-| `e1` | end turn | `e1` |
-| `c` | continue / confirm | `c` |
-| `s<n>` | pick reward *n* | `s2` |
+| `e1` | end turn (also: leave a rest site) | `e1` |
+| `c` | continue / confirm (take a rest-site heal) | `c` |
+| `s<n>` | pick reward *n* (`s0` skips the offer) | `s2` |
 | `n<n>` | take map node *n* | `n1` |
+| `k<n>` | take kindling boon *n* (opt-in runs) | `k1` |
+| `t<n>` | temper offer *n* (rest site; the smith's event modal uses the same ids) | `t1` |
+| `b<n>` | buy shop shelf *n* | `b1` |
+| `x` | buy the shop's card-removal service | `x` |
+| `x<n>` | (during a paid removal) remove deck instance *n* | `x3` |
+| `l` | leave the shop | `l` |
+| `q<n>` | quaff belt slot *n* (combat only) | `q1` |
+| `q<n>_<k>` | aim the quaff at living enemy *k* (aimed potions, 2+ enemies) | `q1_1` |
+| `d<n>` | discard belt slot *n* (combat only; frees the slot) | `d1` |
+| `v<n>` | choose an event's choice *n* | `v1` |
+| `v0` | continue past an event's resolved beat | `v0` |
 
-IDs are **stable within a state** and are the only thing an agent must emit to act.
+IDs are **stable within a state** and are the only thing an agent must emit to act. An id whose requirement is unmet (an unaffordable shelf, a belt with no such slot, a choice the purse cannot cover) simply does not exist in the legal list — forcing it is the one rejection path, never a no-op.
 
 ---
 

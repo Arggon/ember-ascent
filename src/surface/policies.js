@@ -150,7 +150,9 @@ function greedyPolicy() {
 
       if (state.phase === 'map') return { id: chooseTravelId(state, acts), memory };
 
-      // Combat.
+      // Combat. (The belt's q/d ids are legal in this phase but never chosen here: the
+      // chooser scores only `play` actions, belt consumables are unpriced — the same
+      // stance the shop and the event's v/t/v0 ids get from their own branches above.)
       const live = state.combat.enemies.filter((e) => !e.dead);
       const incoming = memory.incoming ?? 0;
       const plays = acts.filter((a) => a.kind === 'play');
@@ -266,6 +268,10 @@ function chooseShop(state, acts, memory) {
  * made on the new board with the same scoring function. That is what makes "cover only
  * what is needed", "stop blocking once the enemy is dead" and "never leave Energy
  * unspent while a useful card is playable" fall out of one rule instead of three.
+ *
+ * The belt's q/d ids are legal in this phase but never chosen here — the scoring ranks
+ * `play` actions only, and belt consumables are unpriced (the shop's b/x/l and the
+ * event's v/t/v0 get the same stance from their own dedicated branches).
  */
 function chooseCombat(state, acts, memory, ctx) {
   const plays = acts.filter((a) => a.kind === 'play');

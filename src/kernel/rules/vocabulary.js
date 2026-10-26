@@ -16,6 +16,27 @@ import { drawIntoHand } from './draw.js';
 /** Debuff/buff counters the engine understands. */
 export const STATUSES = ['strength', 'vulnerable', 'weak', 'dexterity', 'metallicize'];
 
+/**
+ * The ONE classification of that table (S5 review P3, single-sourced in the POLISH
+ * round): which counters are BUFFS the player wants to keep and which are DEBUFFS a
+ * Purge Flask clears. Every STATUSES member must appear here — a new status ('frail',
+ * say) is a broken row in this table until it is classified, which is what keeps it
+ * from silently surviving the purge. rules/potions.js derives POTION_DEBUFFS from the
+ * debuff half instead of carrying its own copy of the list.
+ */
+export const STATUS_KINDS = Object.freeze({
+  strength: 'buff',
+  dexterity: 'buff',
+  metallicize: 'buff',
+  vulnerable: 'debuff',
+  weak: 'debuff',
+});
+
+/** The debuff half of the table, in STATUSES order. Derived, never maintained twice. */
+export const DEBUFFS = Object.freeze(
+  STATUSES.filter((s) => STATUS_KINDS[s] === 'debuff'),
+);
+
 /** Persistent powers, each with finite stacks, fired from hooks in rules/powers.js. */
 export const POWERS = ['combust', 'dark_embrace', 'feel_no_pain', 'rupture'];
 

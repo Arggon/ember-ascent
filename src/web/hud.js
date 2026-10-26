@@ -94,7 +94,9 @@ export function renderHud() {
   hudEl.append(el('button', {
     cls: 'btn ghost',
     text: 'Help',
-    attrs: { type: 'button', title: 'How to play, and what every abbreviation means — keyboard: ?' },
+    // No keyboard binding opens Help (the old "keyboard: ?" title named a key that was
+    // never wired — POLISH round nit); Escape is how the OPEN sheet closes (app.js).
+    attrs: { type: 'button', title: 'How to play, and what every abbreviation means (Escape closes it)' },
     on: { click: () => toggleHelp(true) },
   }));
   hudEl.append(el('button', {
@@ -173,6 +175,13 @@ export function toggleBelt(slot) {
   repaint();
 }
 
+/** The paint sink's silent setter (render.js only): drops a stale slot flag WITHOUT a
+ *  repaint. beltPanel runs mid-render and must never set flags itself (S5 review P3),
+ *  so the stale-flag clear lives where the other one-paint flags are consumed. */
+export function setBeltOpenSlot(slot) {
+  beltOpenSlot = slot;
+}
+
 /**
  * The quaff/discard popover (the shop removal modal's two-choice pattern, scaled to one
  * potion): what the potion is, one Quaff button per legal form — a single one, or one
@@ -187,7 +196,13 @@ export function beltPanel() {
   const row = (snap.belt ?? []).find((r) => r.slot === beltOpenSlot);
   const back = el('div', { cls: 'modal-back', attrs: { role: 'dialog', 'aria-label': 'Potion' } });
   back.addEventListener('click', (ev) => { if (ev.target === back) toggleBelt(null); });
-  if (!row) { toggleBelt(null); return back; }
+  // A missing row (a stale slot index after a repaint raced the click) renders as the
+  // bare backdrop and NOTHING else: this function runs mid-render, so calling
+  // toggleBelt(null) here used to flip a state flag DURING the paint — a nested
+  // repaint against a half-built stage, with the next action's backdrop left stale.
+  // The flag is presentation state; the next repaint (the next act() or hover) clears
+  // it through the normal path, and an empty backdrop covers the stage meanwhile.
+  if (!row) return back;
 
   const panel = el('div', { cls: 'modal belt-modal', attrs: { role: 'dialog', 'aria-label': `${row.name}: quaff or discard` } });
   const scroll = el('div', { cls: 'modal-scroll' });
@@ -360,7 +375,8 @@ export function toggleDeck(open) {
  * charge or a temper the rules do not resolve. The shell is the help sheet's own —
  * `.modal-back` > `.modal` > `.modal-scroll` + `.modal-foot` — so the page keeps ONE
  * modal system: the backdrop click and the Close button dismiss it exactly like Help,
- * plus Escape (which Help itself does not have).
+ * and Escape closes either (app.js's sheet guards; the S1.1-era note that Help had no
+ * Escape predates the keyguard round).
  */
 export function deckPanel() {
   const rows = snap.deckCards || [];
