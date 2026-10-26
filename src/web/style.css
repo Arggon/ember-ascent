@@ -1070,6 +1070,76 @@ html, body {
 .shop .shop-purse,
 .shop .remove-list { animation: fade-up var(--dur-slow) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
 
+/* ---------- Event (S6): the wayside story, its choices, the resolved beat ---------- */
+/* Same engraved page as shop/rest; the hue is the rune's violet — a story at the side
+   of the road, neither fight nor vendor. */
+
+.page-event { --panel-hue: #9d86c9; }
+
+.event-head { margin: var(--sp-2) 0; text-align: center; }
+
+/* The map node: the rune mark, cool against the fight nodes' warm silhouettes. */
+.node.t-event .ntype-mark { color: #9d86c9; }
+.node.t-event { border-color: #3c3352; color: #b3a3d9; }
+.node.t-event.available { border-color: #b3a3d9; color: var(--ink); box-shadow: 0 0 0 3px rgba(157, 134, 201, 0.2), var(--shadow); }
+
+.event-story {
+  color: var(--ink); font-size: var(--fs-4); line-height: 1.65; font-style: italic;
+  margin: var(--sp-2) auto var(--sp-3); max-width: 620px; text-align: center;
+}
+.event-note { color: var(--dim); font-size: var(--fs-3); margin: 0 auto var(--sp-3); max-width: 560px; line-height: 1.5; text-align: center; }
+
+/* The choice list: the boon list's shape (the temper offers' family), stacked wide so
+   each choice carries its effect sentence and its cost chips without squeezing. */
+.event-choices { display: flex; flex-direction: column; gap: 10px; align-items: center; width: 100%; }
+.event-choice {
+  width: min(560px, 100%); min-height: 64px; text-align: left;
+  display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
+  position: relative;
+}
+.event-choice.dim, .event-choice[disabled] { opacity: 0.55; cursor: not-allowed; transform: none; }
+.event-choice.dim:hover, .event-choice[disabled]:hover { border-color: var(--edge); box-shadow: none; transform: none; }
+/* The reason a dimmed choice is dim: a fact, not a mystery (the shop's inert-shelf contract). */
+.event-reason { font-size: 0.78rem; color: #c96a5a; font-style: italic; }
+.event-reason:empty { display: none; }
+
+/* Cost chips ride the choice's right edge: a struck coin for gold, a droplet for HP —
+   the belt chip's glyph family, so the same resource wears the same mark everywhere. */
+.event-chips { position: absolute; top: 8px; right: 10px; display: inline-flex; gap: 6px; }
+.event-cost {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: var(--fs-2); font-weight: 800; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--edge); background: var(--stat-well);
+}
+.event-cost.gold { color: var(--gold); }
+.event-cost.hp { color: #e0836f; }
+.event-cost-glyph { display: inline-flex; width: 11px; height: 11px; }
+.event-cost-glyph svg { display: block; width: 100%; height: 100%; }
+.event-cost-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The resolved beat: the kernel's own result sentences, listed plainly, then Continue. */
+.event-result { list-style: none; margin: var(--sp-2) auto; padding: 10px 16px; max-width: 560px;
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid rgba(157, 134, 201, 0.3); border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(157, 134, 201, 0.08) 0%, rgba(0, 0, 0, 0) 45%); }
+.event-result li { color: var(--ink); font-size: var(--fs-3); line-height: 1.5; }
+
+.event .event-story,
+.event .event-choices { animation: fade-up var(--dur-slow) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .event .event-story, .event .event-choices { animation: none; }
+}
+
+/* Phones: the cost chips come down into the flow, the story keeps its width. */
+@media (max-width: 640px) {
+  .event-choice { padding-right: 8px; }
+  .event-chips { position: static; margin-top: 2px; }
+  .event-story { font-size: var(--fs-3); }
+}
+
+
+
 /* ---------- Toast ---------- */
 
 #toast {

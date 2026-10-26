@@ -689,7 +689,10 @@ async function probeHammerArc(t, seed) {
 test('a killing throw holds the victim in its slot until the hammer lands', { timeout: 300000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   // Probe seeds for a two-enemy first fight where the salvo (5x2) kills the weaker foe.
-  for (const seed of [13, 7, 8, 9, 10, 11, 12]) {
+  // (S6 moved the map draw again: rows 2 and 6 hold the events, so the old sweep's
+  // openers changed. Seed 56 opens on louses 12/10 — the weaker second, the shape the
+  // slot-hold pins; 55's tie puts the victim first and the survivor on the wrong side.)
+  for (const seed of [56, 55, 13, 7, 8, 9, 10, 11, 12]) {
     const r = await probeKillSlot(t, seed);
     if (!r) continue;
     const { before, mid } = r;
@@ -1096,8 +1099,7 @@ test('shop: the vendor sells a card, removes one, and closes for good', { timeou
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
 });
 
-test('potions: the belt fills from a victory, quaffs in combat, and discards', { timeout: 300000 }, async (t) => {
-  if (!chromium) return t.skip('playwright/chromium unavailable');
+test('potions: the belt fills from a victory, quaffs in combat, and discards', { timeout: 300000 }, async (t) => {  if (!chromium) return t.skip('playwright/chromium unavailable');
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 800 },
@@ -1296,4 +1298,122 @@ test('potions: the belt fills from a victory, quaffs in combat, and discards', {
   const discarded = await page.evaluate(() => window.__dlb.snapshot().belt.map((r) => r.potionId));
   assert.deepEqual(discarded, ['stone_skin'], 'slot 2 freed, slot 1 untouched');
   assert.equal(errors.length, 0, `no page errors after the discard: ${errors.join(' | ')}`);
+});
+
+test('event: the wayside tells its story, a choice pays and takes, and the beat closes for good', { timeout: 300000 }, async (t) => {
+  if (!chromium) return t.skip('playwright/chromium unavailable');
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: 'reduce', // paint instantly: the walk's assertions are structural
+  });
+  t.after(() => { void browser.close(); });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+  await page.goto(`${base}/src/web/index.html?seed=1`);
+  await page.waitForLoadState('domcontentloaded');
+  await page.locator('button.boon').first().click();
+  await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-event-${i}`, cardId: 'bludgeon' });
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+
+  // The walk: rows 0-1 the honest way (the injected Mauls end fights fast), until the
+  // player stands on row 1 with the row-2 wayside in reach.
+  for (let guard = 0; guard < 240; guard += 1) {
+    const st = await readState(page);
+    if (st.phase === 'map' && st.floor === 1) break;
+    if (st.phase === 'map') {
+      const fight = page.locator('button[aria-label*="Skirmish"], button[aria-label*="Hard fight"]').first();
+      if ((await fight.count()) > 0) await fight.click();
+      else await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else if (st.phase === 'combat') {
+      const card = page.locator('button[data-slot][aria-disabled="false"]').first();
+      if ((await card.count()) > 0) {
+        await card.click();
+        const tgt = page.locator('.enemy.targeting').first();
+        if ((await tgt.count()) > 0) await tgt.click();
+        await sleep(700);
+      } else {
+        await endTurn(page);
+        await sleep(1300);
+      }
+    } else if (st.phase === 'reward') {
+      await leaveReward(page);
+    } else if (st.phase === 'rest') {
+      await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else {
+      await sleep(400);
+    }
+  }
+  const staged = await readState(page);
+  assert.equal(staged.floor, 1, 'standing on row 1: the wayside row is next');
+
+  // The wayside node is labelled like any other, and exactly one is travel-legal.
+  const wayside = page.locator('button[aria-label*="Wayside"]');
+  assert.equal(await wayside.count(), 1, 'exactly one Wayside node is travel-legal');
+  await wayside.click();
+  await page.waitForSelector('.event-choices', { timeout: 5000 });
+
+  // The story and its facts: title, story text, one button per offered choice, and the
+  // view greys exactly the choices the kernel offers no id for. The WHICH-event draw
+  // reads the live counter after the walk's fights, so the test pins the CONTRACT, not
+  // a story id: the kernel's own answer drives the choice and the effect assertions.
+  const ev = await page.evaluate(() => window.__dlb.snapshot().event);
+  assert.ok(ev.known, `a known story opened, got ${ev.eventId}`);
+  assert.ok((await page.locator('.event-story').textContent()).length > 40, 'the story is on the page');
+  const buttons = await page.locator('.event-choices .boon').all();
+  assert.equal(buttons.length, ev.choices.length, 'one button per choice');
+  for (let i = 0; i < ev.choices.length; i += 1) {
+    const dimmed = await buttons[i].isDisabled();
+    assert.equal(dimmed, ev.choices[i].actionId === null,
+      `${ev.choices[i].slug}: the view greys exactly what the kernel refuses`);
+  }
+
+  // Choose by preference — a choice whose effect is exact and visible in the HUD:
+  //   climb (Shaft): gold +60, HP -12 — stoke (Forge): HP -8 (floored at 1), deck +1.
+  // Anything else (the other events) still resolves; only the exact numbers yield.
+  const pref = ev.choices.find((c) => c.slug === 'climb' && c.actionId) ? 'climb'
+    : (ev.choices.find((c) => c.slug === 'stoke' && c.actionId) ? 'stoke' : null);
+  const before = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return { gold: s.player.gold, hp: s.player.hp, deck: s.deckCount };
+  });
+  if (pref) {
+    await page.locator(`button[aria-label^="${pref === 'climb' ? 'Climb down' : 'Stoke it awake'}"]`).click();
+  } else {
+    await page.locator('.event-choices .boon[aria-disabled="false"]').first().click();
+  }
+  await page.waitForSelector('.event-result', { timeout: 5000 });
+  const after = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return { gold: s.player.gold, hp: s.player.hp, deck: s.deckCount, phase: s.phase, lines: s.event.resolved.lines };
+  });
+  if (pref === 'climb') {
+    assert.equal(after.gold, before.gold + 60, 'the shaft paid 60 gold');
+    assert.equal(after.hp, before.hp - 12, 'the shaft took 12 HP');
+    assert.ok(after.lines.some((l) => /60 gold/.test(l)), `the beat names the gold: ${JSON.stringify(after.lines)}`);
+  } else if (pref === 'stoke') {
+    assert.equal(after.hp, Math.max(1, before.hp - 8), 'the coals took their 8 HP (never killing)');
+    assert.equal(after.deck, before.deck + 1, 'the gained card joined the deck');
+  } else {
+    assert.ok(after.lines.length > 0, 'the beat carries the kernel\u2019s own results');
+  }
+  assert.equal(after.phase, 'event', 'the resolved beat holds the phase open');
+
+  // The beat's only way out is the continue; it closes the room and the run moves on.
+  await page.locator('button[data-action="v0"]').click();
+  await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+  const left = await readState(page);
+  assert.equal(left.phase, 'map', 'the continue returns to the map');
+  assert.equal(await page.locator('button[aria-label*="Wayside"]').count(), 0, 'no wayside is travel-legal after leaving');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
 });

@@ -59,7 +59,10 @@ test('a real quests run advances and composes with kindling and tempers', () => 
 });
 
 test('log header carries the flag and replay matches the golden hash', () => {
-  const s = drive({ seed: 1, quests: true }, 120);
+  // S6 moved the map (rows 2 and 6 hold the events), so seed 1's route no longer
+  // reaches the elite its Hunter quest needs inside 120 steps; seed 7 finishes all
+  // three. Same driver, same claim.
+  const s = drive({ seed: 7, quests: true }, 120);
   const parsed = parseLog(renderLog(s));
   assert.equal(parsed.header.quests, true);
   assert.equal(s.events.filter((e) => e.t === 'quest_done').length, 3, 'the golden run finishes three quests (Elite Hunter completes since the DR-6 combat_won fix)');
@@ -67,4 +70,4 @@ test('log header carries the flag and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:d669dff9bb480dd7883496ade8d33b405c6e6c5c0303e13a3c5289ae3885f0d2';
+const GOLDEN = 'sha256:a9154414623b4890f9efa7f72a1532cb66b3be218a453563be5b10ff7dfeaef0';

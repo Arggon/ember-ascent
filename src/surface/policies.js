@@ -47,13 +47,15 @@ function randomPolicy() {
 }
 
 /** Where to go next, best first. Rest when hurt; otherwise take the safe fight.
- *  The shop (S4) ranks last in every mood: no policy prices its wares yet, so walking
- *  past it is the honest routing rather than an accident of the unknown-type fallback. */
+ *  The shop (S4) and the event (S6) rank last in every mood: no policy prices the
+ *  vendor's wares, and an event's gamble (HP for gold, gold for cards) is not worth
+ *  pricing blind — walking past is the honest routing rather than an accident of the
+ *  unknown-type fallback. */
 function routePreference(state) {
   const hpFrac = state.player.hp / state.player.maxHp;
-  if (hpFrac < 0.55) return ['rest', 'combat_weak', 'combat_strong', 'elite', 'shop'];
-  if (hpFrac > 0.85) return ['combat_strong', 'combat_weak', 'rest', 'elite', 'shop'];
-  return ['combat_weak', 'combat_strong', 'rest', 'elite', 'shop'];
+  if (hpFrac < 0.55) return ['rest', 'combat_weak', 'combat_strong', 'elite', 'shop', 'event'];
+  if (hpFrac > 0.85) return ['combat_strong', 'combat_weak', 'rest', 'elite', 'shop', 'event'];
+  return ['combat_weak', 'combat_strong', 'rest', 'elite', 'shop', 'event'];
 }
 
 /**
@@ -68,6 +70,24 @@ function chooseTravelId(state, acts) {
     .filter((a) => a.kind === 'travel')
     .sort((x, y) => (order.indexOf(x.nodeType) + 1 || 99) - (order.indexOf(y.nodeType) + 1 || 99))[0];
   return best?.id ?? acts[0].id;
+}
+
+/**
+ * The event phase's choice, both heuristic policies share (S6). No purchase heuristic
+ * ships for the wayside either: the stance is the shop's leave-at-once minimalism —
+ * take a zero-cost, no-HP-loss choice if one exists (every event carries at least one,
+ * so the phase always resolves), else the first offered; then the continue. The
+ * temper modal and the resolved beat carry only their own exits, and this helper's
+ * fallthrough (first offered) resolves both without a special case.
+ * Zero-cost is read from the ACTION's own fields (`cost`/`hpLoss`), so no policy
+ * re-derives a requirement the kernel already evaluated.
+ */
+function chooseEventId(acts) {
+  const choices = acts.filter((a) => a.kind === 'event_choice');
+  const free = choices.filter((a) => !a.cost && !a.hpLoss);
+  if (free.length > 0) return free[0].id;
+  if (choices.length > 0) return choices[0].id;
+  return acts[0]?.id ?? null;
 }
 
 /**
@@ -120,6 +140,12 @@ function greedyPolicy() {
         // does not exist, so the first pick is the only move.
         const leave = acts.find((a) => a.kind === 'shop_leave');
         return { id: leave?.id ?? acts[0].id, memory };
+      }
+
+      if (state.phase === 'event') {
+        // S6: the shared minimal stance (see chooseEventId) — a free pass-through if
+        // one exists, else the first offered choice, else the phase's own exit.
+        return { id: chooseEventId(acts), memory };
       }
 
       if (state.phase === 'map') return { id: chooseTravelId(state, acts), memory };
@@ -196,6 +222,7 @@ function smartPolicy() {
       if (state.phase === 'reward') return chooseReward(state, acts, memory);
       if (state.phase === 'rest') return chooseRest(state, acts, memory);
       if (state.phase === 'shop') return chooseShop(state, acts, memory);
+      if (state.phase === 'event') return { id: chooseEventId(acts), memory };
       if (state.phase === 'map') return { id: chooseTravelId(state, acts), memory };
       return chooseCombat(state, acts, memory, ctx);
     },

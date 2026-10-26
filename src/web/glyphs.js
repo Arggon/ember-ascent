@@ -129,8 +129,9 @@ export const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', sta
 export const INTENT_GLYPH = { attack: 'strike', block: 'shieldWide', buff: 'chevUp', debuff: 'chevDown' };
 
 /** Node type (after stripping the `combat_` prefix) -> its silhouette. The shop (S4)
- *  wears the coin — it is the one node that never fights and only trades. */
-export const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', rest: 'flame', boss: 'horns', shop: 'coin' };
+ *  wears the coin — it is the one node that never fights and only trades. The event
+ *  (S6) wears the rune — the wayside story nobody can name from the road. */
+export const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', rest: 'flame', boss: 'horns', shop: 'coin', event: 'rune' };
 
 /** Node type -> the words a player reads on the map. Presentation only: the kernel's
  *  own label ("fight", "fight+") still drives the title and the travel banner. The second
@@ -138,6 +139,7 @@ export const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', re
 export const NODE_WORDS = {
   weak: ['Skirmish', 'card reward'], strong: ['Hard fight', 'card reward'], elite: ['Elite', 'card reward'],
   rest: ['Campfire', 'heal'], boss: ['Slag Warden', 'final fight'], shop: ['Shop', 'buy · remove'],
+  event: ['Wayside', 'a choice'],
 };
 
 /**

@@ -21,6 +21,7 @@ import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
 import { POTION_SLOTS, potionDef } from './rules/potions.js';
+import { eventDef, offerEventChoices } from './rules/events.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -197,6 +198,8 @@ function body(state, opts) {
       return restBody(state);
     case 'shop':
       return shopBody(state);
+    case 'event':
+      return eventBody(state);
     case 'map':
       return mapBody(state, opts);
     case 'kindling':
@@ -331,6 +334,46 @@ function kindlingBody(state) {
     ...state.kindling.offers.map((id, i) => ` k${i + 1} ${id} ${BOONS[id].label}`)];
 }
 
+/**
+ * S6: the event dump. The story and every choice (with its cost and, when unmet, the
+ * REQUIREMENT reason — the same dimmed-but-visible contract the shop's inert shelves
+ * keep) render here; the resolved beat lists the concrete results and the continue.
+ * A story id the roster no longer knows (a torn save) degrades: the raw id stands in
+ * for the name, no story, and the continue line is the whole body — never a throw.
+ */
+function eventBody(state) {
+  const ev = state.event ?? null;
+  const def = eventDef(ev?.id);
+  const lines = [`EVENT — ${def ? def.name : (ev?.id ?? 'the wayside')}`];
+  if (!def) {
+    lines.push(` v0 continue (HP ${state.player.hp}/${state.player.maxHp}, purse ${state.player.gold ?? 0})`);
+    return lines;
+  }
+  if (ev?.tempering) {
+    // The smith's modal: same rendering the rest site's temper list keeps.
+    lines.push('TEMPER (pick one; the choice is committed)');
+    (Array.isArray(ev.offers) ? ev.offers : []).forEach((o, i) => lines.push(` t${i + 1} ${o.cardId} ${TEMPERS[o.temper]?.label ?? o.temper}`));
+    return lines;
+  }
+  lines.push(` "${def.story}"`);
+  if (ev?.resolved) {
+    lines.push('RESOLVED');
+    (ev.resolved.lines ?? []).forEach((l) => lines.push(` ${l}`));
+    lines.push(` v0 continue (HP ${state.player.hp}/${state.player.maxHp}, purse ${state.player.gold ?? 0})`);
+    return lines;
+  }
+  offerEventChoices(state, CARD_DEFS ?? defaultContent().cards).forEach((c) => {
+    const cost = [
+      c.cost !== null ? `${c.cost}g` : null,
+      c.hpLoss !== null ? `${c.hpLoss} HP` : null,
+    ].filter(Boolean).join(' ');
+    // Unmet requirements render, dimmed by the surface, with the WHY; they carry no id.
+    const tag = c.offered ? '' : ` [${c.reason}]`;
+    lines.push(` v${c.index + 1} ${c.label}${cost ? ` — ${cost}` : ''}${tag}`);
+  });
+  return lines;
+}
+
 function mapBody(state, opts) {
   const lines = [`MAP — floor ${state.floor + 1}/${state.map.rows.length}`];
   if (state.quests) lines.push(`QUESTS ${state.quests.map((q) => `${q.id} ${q.done ? 'DONE' : `${q.progress}/${QUESTS[q.id].goal}`}`).join(' | ')}`);
@@ -425,6 +468,18 @@ export function observeActions(state) {
         break;
       case 'discard_potion':
         lines.push(`${a.id} discard ${a.potionId}`);
+        break;
+      // S6 event lines: id + the choice's stable slug (bounded by construction, the
+      // same ruling as every other line — costs and requirements live in the EVENT
+      // dump above, and they gate legality exactly like Energy does).
+      case 'event_choice':
+        lines.push(`${a.id} ${a.slug}`);
+        break;
+      case 'event_temper':
+        lines.push(`${a.id} temper ${a.offer.cardId} ${a.offer.temper}`);
+        break;
+      case 'event_continue':
+        lines.push(`${a.id} continue`);
         break;
       default:
         lines.push(`${a.id} ?`);
@@ -773,6 +828,60 @@ function snapshotShop(state, legal) {
   };
 }
 
+/**
+ * S6: the event section of a snapshot, or null outside the event phase.
+ *
+ * The ONE offer table (rules/events.js offerEventChoices) decides everything a choice
+ * button needs: `actionId` is null exactly when the kernel offers no action (an unmet
+ * requirement — the same afford-filter contract as a shop shelf), `reason` is the
+ * WHY the dimmed button shows, and `cost`/`hpLoss` are the price chips' facts. The
+ * resolved beat carries the kernel's own result lines; the temper modal's offers ride
+ * beside them. A torn save (unknown story id, or the field null) degrades: `known`
+ * is false, the story is empty, no choices, and `continueId` is still the way out.
+ * @param {any} state
+ * @param {any[]} legal
+ */
+function snapshotEvent(state, legal) {
+  if (state.phase !== 'event') return null;
+  const ev = state.event ?? null;
+  const def = eventDef(ev?.id);
+  const choices = new Map(legal.filter((a) => a.kind === 'event_choice').map((a) => [a.index, a.id]));
+  const temperPicks = new Map(legal.filter((a) => a.kind === 'event_temper').map((a) => [a.index, a.id]));
+  const evald = def ? offerEventChoices(state, CARD_DEFS ?? defaultContent().cards) : [];
+  return {
+    eventId: def ? def.id : (ev?.id ?? null),
+    known: Boolean(def),
+    name: def ? def.name : (ev?.id ?? 'the wayside'),
+    story: def ? def.story : '',
+    purse: state.player.gold ?? 0,
+    hp: state.player.hp,
+    maxHp: state.player.maxHp,
+    tempering: Boolean(ev?.tempering),
+    // Only meaningful while `tempering`; published always, like the shop's deck list.
+    offers: (Array.isArray(ev?.offers) ? ev.offers : []).map((o, i) => ({
+      actionId: temperPicks.get(i) ?? null,
+      cardId: o.cardId,
+      cardName: defOrNull(o.cardId)?.name ?? o.cardId,
+      temper: o.temper,
+      temperName: TEMPERS[o.temper]?.name ?? o.temper,
+      text: TEMPERS[o.temper]?.text ?? '',
+    })),
+    choices: evald.map((c) => ({
+      index: c.index,
+      actionId: choices.get(c.index) ?? null,
+      slug: c.slug,
+      label: c.label,
+      effect: c.effect,
+      cost: c.cost,
+      hpLoss: c.hpLoss,
+      offered: c.offered,
+      reason: c.reason,
+    })),
+    resolved: ev?.resolved ? { choice: ev.resolved.choice, lines: [...(ev.resolved.lines ?? [])] } : null,
+    continueId: legal.find((a) => a.kind === 'event_continue')?.id ?? null,
+  };
+}
+
 /** Code-unit comparison, not localeCompare: the sort must be byte-identical everywhere. */
 const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -974,6 +1083,9 @@ export function snapshot(state) {
     rest: snapshotRest(state, legal),
     kindling: snapshotKindling(state),
     shop: snapshotShop(state, legal),
+    // S6 event: null outside the phase; the wayside story, its choice table, and the
+    // resolved beat inside it.
+    event: snapshotEvent(state, legal),
     quests: state.quests
       ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))
       : null,

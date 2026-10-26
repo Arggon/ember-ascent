@@ -208,7 +208,12 @@ test('the real module graph survives a full run and paints the restart menu', as
     // real timer, which a synchronous walk would never let fire.
     await new Promise((r) => setTimeout(r, 10));
     if (phase === 'map') {
-      const travel = buttons().filter((n) => label(n).startsWith('Travel to'));
+      // S6: the row-2 event is now its row's LAST node, so the old "last travel" rule
+      // would stumble into the wayside and gamble the walk on an event choice. The
+      // walk's job is the restart-menu regression, so it routes AROUND events the way
+      // its node order always routed around the shop; the event screen has its own
+      // dedicated e2e in tests/web/e2e.browser.spec.js.
+      const travel = buttons().filter((n) => label(n).startsWith('Travel to') && !/Wayside/i.test(label(n)));
       const boss = travel.find((n) => /boss/i.test(label(n)));
       click(boss ?? travel[travel.length - 1]);
     } else if (phase === 'combat') {

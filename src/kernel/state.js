@@ -215,6 +215,17 @@ export function validateSave(raw) {
         });
       }
     }
+    // S6 events: OPTIONAL like every post-v1 field. Absent (a legacy save) means the
+    // run predates events; its stored map has no event node, so the phase simply never
+    // occurs. When present it must be an object or null. The INNER fields (the story
+    // id, the modal offers, the resolved beat) are NOT shape-checked here, on the same
+    // ruling as the potion ids: a story id the roster no longer knows degrades at the
+    // surfaces (raw id as the name, no choices, the `v0` continue still enumerated so
+    // the run can never softlock inside the phase) — never a load-time throw.
+    const event = /** @type {Record<string, unknown>} */ (st).event;
+    if (event !== undefined && event !== null && (typeof event !== 'object' || Array.isArray(event))) {
+      problems.push('save.state: "event" must be an object or null');
+    }
   }
   const actions = /** @type {Record<string, unknown>} */ (raw).actions;
   if (actions !== undefined && !Array.isArray(actions)) problems.push('save: "actions" must be an array');

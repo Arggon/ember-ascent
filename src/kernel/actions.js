@@ -25,6 +25,30 @@
 //        including one carrying a stale id, so a torn save's corrupt slot can be
 //        cleared; a quaff is offered ONLY for ids the potion table still knows (the
 //        handler would refuse — enumeration mirrors the guard, the S4.1 ruling).
+//   v<n>    choose the n-th choice at an event (S6; additive). `v` is free in this
+//        file's key inventory (p/e/c/s/n/k/t/b/x/l/q/d are taken; the web keyboard
+//        layer binds none of it) and reads as the wayside "vignette": an event is a
+//        story the run walks past. n indexes the event's CHOICE SLOTS in roster order
+//        (1-based) — a choice whose requirement is unmet (gold, belt room, deck floor,
+//        an empty pool) emits NO id but keeps its slot, so ids can be non-contiguous
+//        (b3 is legal with no b2, exactly like the shop's shelves). The R6 mirror: an
+//        unmet requirement means the id does not exist, and forcing it is the one
+//        legal-no-op rejection.
+//   v0    the resolved beat's continue (S6; additive). After a choice resolves the
+//        phase stays `event` with exactly one action: the way out. `0` is the family's
+//        meta index, the same convention `s0` (skip) established. It is ALSO the torn
+//        save's escape hatch: an event id the roster no longer knows (or a torn event
+//        field) degrades to no choices and this one continue, so a run can never
+//        softlock inside a story nobody can read (the S2.1/S4.1/S5 tolerance ruling).
+//   t<n>  during a smith's temper MODAL: temper the n-th offer (S6; additive kind
+//        `event_temper`). The id letter is the rest site's own `t<n>` — id letters may
+//        name two kinds as long as ONE state never offers both (the `e1` precedent:
+//        end_turn and rest_leave) — and the offer builder is the rest site's own
+//        (rules/tempers.js offerTempers), so a smith temper is byte-identical to a
+//        rest temper in shape, numbers and draws.
+//   c     is NOT reused for the continue: it means rest_continue historically, and the
+//        event's way out stays inside its own `v` family (v0), so a reader never has
+//        to ask which phase's continue an id names.
 //
 // TARGETED PLAYS (PM Document revision 5). A card whose content declares
 // `target: "enemy"` must be aimed by the player when the choice is real, i.e. when
@@ -54,6 +78,7 @@
 import { availableNodes } from './rules/map.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
 import { potionDef } from './rules/potions.js';
+import { eventDef, offerEventChoices, temperOfferOpen } from './rules/events.js';
 import { cardDefMap } from './rules/card-instance.js';
 
 /** Card definitions are injected once at kernel load (rules never import content, R1). */
@@ -182,6 +207,50 @@ export function actions(state) {
         out.push({ id: 'x', kind: 'shop_removal', price: rem.price ?? REMOVAL_PRICE });
       }
       out.push({ id: 'l', kind: 'shop_leave' });
+      break;
+    }
+    case 'event': {
+      // S6: three modes, mutually exclusive and total. The enumeration mirrors the
+      // resolvers' own guards (the S4.1 ruling): every id offered here resolves, and
+      // the ways out always exist, so a torn save can never strand a run inside the
+      // phase.
+      const ev = state.event ?? null;
+      const offers = Array.isArray(ev?.offers) ? ev.offers : [];
+      if (ev && ev.tempering) {
+        // The smith's MODAL: the offer is rolled and committed, so the only actions
+        // are the picks (no leaving mid-temper — the paid-removal precedent). Each
+        // pick is enumerated only for an offer the resolver will accept; a torn
+        // modal (no valid offer at all) degrades to the continue rather than
+        // stranding the run — the S4.1/S5 ruling, never a refused id.
+        const picks = [];
+        offers.forEach((offer, i) => {
+          if (temperOfferOpen(offer, state)) picks.push({ id: `t${i + 1}`, kind: 'event_temper', index: i, offer });
+        });
+        if (picks.length > 0) out.push(...picks);
+        else out.push({ id: 'v0', kind: 'event_continue' });
+        break;
+      }
+      if (!eventDef(ev?.id) || ev?.resolved) {
+        // Unknown roster id (a torn save) or the resolved beat: exactly one continue.
+        out.push({ id: 'v0', kind: 'event_continue' });
+        break;
+      }
+      // A fresh, known event: one id per OFFERED choice, at its roster slot. The
+      // unmet-requirement choices are skipped here (no id, no R6 inversion — the
+      // resolver would not refuse them, it would just never see them) but stay
+      // visible through snapshotEvent's offer table.
+      offerEventChoices(state, cardDefs()).forEach((c) => {
+        if (!c.offered) return;
+        out.push({
+          id: `v${c.index + 1}`,
+          kind: 'event_choice',
+          index: c.index,
+          eventId: ev.id,
+          slug: c.slug,
+          cost: c.cost,
+          hpLoss: c.hpLoss,
+        });
+      });
       break;
     }
     case 'ended':

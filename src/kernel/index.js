@@ -228,6 +228,13 @@ export function newRun(opts = {}) {
     // combat-only steps. Legacy saves predate the field: validateSave keeps it
     // optional and every read is `?? []`-tolerant (absent = empty belt).
     potions: [],
+    // S6 events: null everywhere except inside the event phase, where it carries the
+    // drawn story id, the modal temper state and the resolved beat's lines
+    // (rules/events.js). The WHICH-event draw happens at ENTRY time (the travel
+    // step), so nothing is pre-rolled for an event the run never visits. Legacy
+    // saves predate the field — validateSave keeps it optional and every read is
+    // null-tolerant (an unknown story id degrades to a continue-only phase).
+    event: null,
   };
 
   // B5 alternate biome: recorded only when not the default, so foundry hashes are unchanged.

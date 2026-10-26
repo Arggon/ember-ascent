@@ -87,8 +87,11 @@ function classesFromOptions(src) {
   const EXPANSIONS = [
     { re: /type-\$\{card\.type\}/, members: ['attack', 'skill', 'power', 'status', 'curse'] },
     { re: /kind-\$\{kind\}/, members: ['attack', 'block', 'buff', 'debuff'] },
-    { re: /page-\$\{kind\}/, members: ['map', 'combat', 'reward', 'rest', 'end', 'shop'] },
-    { re: /t-\$\{short\}/, members: ['weak', 'strong', 'elite', 'rest', 'boss', 'shop'] },
+    // S6: the event joins the page family and the map-node family (the S4.1 ruling:
+    // a new kind goes into BOTH the expansion table here and the variants() probe
+    // below, because the page-* detection is LIVE now).
+    { re: /page-\$\{kind\}/, members: ['map', 'combat', 'reward', 'rest', 'end', 'shop', 'event'] },
+    { re: /t-\$\{short\}/, members: ['weak', 'strong', 'elite', 'rest', 'boss', 'shop', 'event'] },
   ];
   for (const m of src.matchAll(/\bcls:\s*/g)) {
     // The WHOLE value, not just its first quoted piece: `cls: a + (cond ? ' b' : '')` emits
@@ -132,7 +135,7 @@ function variants(src) {
     for (const t of ['attack', 'skill', 'power', 'status', 'curse']) out.add(`type-${t}`);
   }
   if (/node t-\$\{short\}/.test(src)) {
-    for (const t of ['weak', 'strong', 'elite', 'rest', 'boss', 'shop']) out.add(`t-${t}`);
+    for (const t of ['weak', 'strong', 'elite', 'rest', 'boss', 'shop', 'event']) out.add(`t-${t}`);
   }
   if (/e-intent kind-\$\{kind\}/.test(src)) {
     for (const t of ['attack', 'block', 'buff', 'debuff']) out.add(`kind-${t}`);
@@ -158,7 +161,7 @@ function variants(src) {
   // class was ever required: a stripped `.page-shop` passed the checker (S4.1 review
   // P3's experiment). Match the real source shape alongside the template form.
   if (/page-\$\{kind\}/.test(src) || /'page page-' \+ kind/.test(src)) {
-    for (const k of ['map', 'combat', 'reward', 'rest', 'end', 'shop']) out.add(`page-${k}`);
+    for (const k of ['map', 'combat', 'reward', 'rest', 'end', 'shop', 'event']) out.add(`page-${k}`);
   }
   if (/pose-\$\{/.test(src)) {
     for (const t of POSE_VALUES) out.add(`pose-${t}`);

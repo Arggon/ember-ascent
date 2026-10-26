@@ -18,6 +18,7 @@ import { applyBoon } from './kindling.js';
 import { offerTempers, temperEffects, temperHpCost } from './tempers.js';
 import { findNode } from './map.js';
 import { rollShopInventory, REMOVAL_PRICE } from './shop.js';
+import { rollEventAt, resolveChoice, resolveTemper, continueEvent } from './events.js';
 import { potionDef, quaffEffects } from './potions.js';
 import { shuffleAt, pickAt } from '../rng.js';
 
@@ -168,6 +169,22 @@ function travel(state, action, content) {
       events: [{ t: 'shop_open', node: node.id }],
     };
   }
+  // S6: the event's STORY rolls HERE, at entry, from the live counter — exactly ONE
+  // draw (which event the wayside holds; rules/events.js for the full accounting).
+  // The same convention as the shop's inventory: entry happens through this one step,
+  // re-entry is impossible, and a run that never visits pays nothing from the stream.
+  if (node.type === 'event') {
+    const roll = rollEventAt(at);
+    return {
+      state: {
+        ...at,
+        phase: 'event',
+        rngDraws: at.rngDraws + roll.draws,
+        event: { id: roll.id, nodeId: node.id, resolved: null, tempering: false, offers: null },
+      },
+      events: [{ t: 'event_open', node: node.id, event: roll.id }],
+    };
+  }
   throw new Error(`unhandled node type "${node.type}"`);
 }
 
@@ -252,6 +269,17 @@ function pickRemoval(state, match) {
 function leaveShop(state) {
   return { state: { ...state, phase: 'map', shop: null }, events: [{ t: 'shop_left' }] };
 }
+
+/* ------------------------------------------------------------ S6: the event wayside --
+ * Three registry rows; the mechanics live in rules/events.js (the same shape the shop
+ * keeps: handlers here stay thin, the domain module owns the numbers). The id was
+ * matched against the legal list by step() before any of these run, so a chosen choice
+ * was offered, its guards held, and a temper pick only exists inside the open modal.
+ * Each handler still degrades to a no-op on a stale match rather than throwing.
+ *
+ * DRAW ACCOUNTING (rules/events.js header): the choice resolution draws happen inside
+ * resolveChoice/openTemper, which advance the counter themselves; the continue and the
+ * modal's pick are choices, not rolls — zero draws. */
 
 /* ------------------------------------------------------------- S5: the potion belt --
  * Two handlers, one per belt action kind. The id was matched against the legal list by
@@ -351,6 +379,9 @@ export const STEP_HANDLERS = Object.freeze({
   shop_removal: buyRemoval,
   shop_remove_pick: pickRemoval,
   shop_leave: leaveShop,
+  event_choice: (state, match, content) => resolveChoice(state, match, content.cards),
+  event_temper: (state, match) => resolveTemper(state, match),
+  event_continue: continueEvent,
   quaff: quaffPotion,
   discard_potion: discardPotion,
 });

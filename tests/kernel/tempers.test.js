@@ -31,10 +31,10 @@ test('default run has no tempers and an unchanged hash', () => {
 });
 
 test('a tempers rest offers t1..t3 beside heal and leave, and tempering is permanent', () => {
-  // S5: the drop rolls moved every seed's streams, so the driver's first rest now sits
-  // on seed 4 (see the golden test below). The claim is unchanged.
-  const s = toFirstRest(4);
-  assert.ok(s, 'seed 4 reaches a rest site');
+  // S5 moved the drop rolls and S6 moved the map again, so the driver's first rest now
+  // sits on seed 1 (see the golden test below). The claim is unchanged.
+  const s = toFirstRest(1);
+  assert.ok(s, 'seed 1 reaches a rest site');
   assert.deepEqual(legal(s).map((a) => a.id), ['c', 'e1', 't1', 't2', 't3']);
   const offer = legal(s).find((a) => a.id === 't1').offer;
   const after = submit(s, 't1').session;
@@ -71,11 +71,11 @@ test('a Red-hot Hammerfall deals 9 and costs 2 HP in a real fight', () => {
 });
 
 test('log header carries the flag and replay matches the golden hash', () => {
-  // S5 note: the victory drop roll consumes a draw after every won fight, so the seeded
-  // streams shifted and seed 1's driver no longer reaches a rest site inside 300 steps —
-  // seed 4 does (first rest of its row-3 route). Same driver, same claim.
-  let s = toFirstRest(4);
-  assert.ok(s, 'seed 4 reaches a rest site');
+  // S5 note: the victory drop roll consumes a draw after every won fight, and S6 moved
+  // the map again — the seeded streams shifted and earlier seeds' drivers no longer
+  // reach a rest site inside 300 steps; seed 1 does. Same driver, same claim.
+  let s = toFirstRest(1);
+  assert.ok(s, 'seed 1 reaches a rest site');
   s = submit(s, 't3').session;
   const parsed = parseLog(renderLog(s));
   assert.equal(parsed.header.tempers, true);
@@ -83,15 +83,16 @@ test('log header carries the flag and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:001a1eb3a8e0b50badb2220a81ddadf3008d45bdfe95ff6a056fd9b353055ba4';
+const GOLDEN = 'sha256:cdccc1d280deac15b266f8c4ca42b83df13b3ced339aaadc2cf5470fba69a686';
 
 // ---------------------------------------------------------------------------
 // Visible tempers: every rendering of a tempered card shows what it really plays.
 // ---------------------------------------------------------------------------
 
-/** Seed-2 opening hand with one Red-hot Hammerfall and one Balanced Quench. */
+/** Seed-6 opening hand with one Red-hot Hammerfall and one Balanced Quench
+ *  (S6 moved the map draw: seed 2's opening hand no longer holds the defend). */
 function temperedOpening() {
-  const base = newRun({ seed: 2, tempers: true });
+  const base = newRun({ seed: 6, tempers: true });
   const strikes = base.deck.filter((c) => c.cardId === 'strike');
   const defend = base.deck.find((c) => c.cardId === 'defend');
   const tempers = {};

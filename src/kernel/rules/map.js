@@ -18,6 +18,10 @@ export const NODE_TYPES = {
   elite: { id: 'elite', label: 'elite', tier: 3, reward: 'card', gold: [50, 70] },
   rest: { id: 'rest', label: 'rest', tier: 0, reward: 'heal' },
   shop: { id: 'shop', label: 'shop', tier: 0, reward: 'shop' },
+  // S6: a wayside story. It neither fights nor pays by tier — it is where gold, HP,
+  // cards and potions change hands by CHOICE (rules/events.js), so it carries no gold
+  // row and its encounter-table entry spawns nothing.
+  event: { id: 'event', label: 'event', tier: 0, reward: 'event' },
   boss: { id: 'boss', label: 'boss', tier: 4, reward: 'end', gold: [100, 100] },
 };
 
@@ -30,6 +34,19 @@ export const ROWS = 8;
  *  runs shopless, and "one shop per act" is a promise about the FORMAT, not about luck. */
 export const SHOP_ROW = 5;
 export const SHOP_SLOT = 1;
+
+/** S6: where the act's TWO events sit. Row 2's rightmost slot and row 6's middle slot
+ *  (mirroring the shop's placed-middle precedent). Placed, not rolled: a seeded pool
+ *  entry the draw could miss would leave some runs eventless, and "two events per act"
+ *  is a promise about the FORMAT, not about luck — the same ruling the shop's placement
+ *  made. NEITHER slot is its row's first node: a deterministic walker that takes the
+ *  first travel (the built-in policies rank the event last, exactly like the shop; the
+ *  test drivers do the same by construction) walks past the wayside instead of being
+ *  forced into it, while full-row linking keeps it reachable from every approach. */
+export const EVENT_NODES = Object.freeze([
+  Object.freeze({ row: 2, slot: 1 }),
+  Object.freeze({ row: 6, slot: 1 }),
+]);
 
 /**
  * Generate the act-1 path graph. Deterministic given (seed, starting draw index).
@@ -47,11 +64,11 @@ export function generateMap(seed, startDraw) {
   const poolByRow = [
     null, // row 0 fixed
     ['combat_weak', 'combat_weak', 'combat_strong'],
-    ['combat_weak', 'combat_strong', 'combat_strong'],
+    ['combat_weak', 'combat_weak', 'combat_strong'], // row 2: slot 1 IS the first event (EVENT_NODES)
     ['combat_strong', 'combat_strong', 'elite'],
     ['combat_strong', 'elite', 'rest'],
     ['combat_strong', 'combat_strong', 'rest'], // row 5: the middle slot IS the shop (SHOP_ROW/SHOP_SLOT)
-    ['rest', 'rest', 'elite'],
+    ['rest', 'rest', 'elite'], // row 6: the middle slot IS the second event (EVENT_NODES)
     null, // row 7 fixed boss
   ];
 
@@ -60,6 +77,18 @@ export function generateMap(seed, startDraw) {
     const width = row <= 3 ? 2 : 3;
     const nodes = [];
     for (let k = 0; k < width; k += 1) {
+      // S6: each of the act's two events takes its placed slot outright — the pool
+      // entry that would have fed this one choice is given over to it (row 2 has only
+      // two slots, so its leftmost is the event; row 6 mirrors the shop's middle).
+      // Nothing is random about an event's EXISTENCE, so it consumes NO pool draw
+      // (same policy as the fixed opener, the boss and the shop: randomness is only
+      // spent on content that needs it). WHICH event it holds rolls later, at ENTRY
+      // time (rules/events.js), so a run that never visits pays nothing from the stream.
+      const placed = EVENT_NODES.find((e) => e.row === row && e.slot === k);
+      if (placed) {
+        nodes.push({ id: `r${row}n${k}`, type: 'event', next: [] });
+        continue;
+      }
       // S4: the act's single shop takes row 5's middle slot outright — the pool entry
       // that would have fed this one choice is given over to it. Nothing is random
       // about the shop's existence, so it consumes NO pool draw (same policy as the
