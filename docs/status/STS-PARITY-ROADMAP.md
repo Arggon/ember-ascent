@@ -52,7 +52,7 @@ Process rules (standing):
 | S3 | Gold | `player.gold`, per-tier gold rewards auto-granted on victory | HUD gold readout; reward screen shows gold line | closed — 67084ec, QA 10/10, review APPROVE |
 | S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | closed — 58aefe6 + fixes af50324, QA 11/11, review APPROVE |
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | closed — c83a2d0, QA 11/11, review APPROVE |
-| S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | **in progress** (dev dispatched) |
+| S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | committed 69b05eb — orchestrator-run QA 11/11, in review |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | pending |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending |
 | S9 | Content II: enemies + Act 2 | new encounters + second biome/map skeleton | map/act presentation | pending |
@@ -164,3 +164,15 @@ Process rules (standing):
   setter mid-render (latent); policy stance + AGENT-PLAY-GUIDE action table lack
   q/d and (pre-existing) b/x/l rows. A dedicated POLISH round clears the whole backlog
   after S6 closes, before S7.
+- 2026-10-25 — S6 (events) dev done in ONE clean pass (24 files; 314 tests/313 pass/1 todo,
+  gate OK, art OK, test:browser 15/15 incl. event e2e, sim exit 0; golden regen
+  byte-identical, four offsetting flips). The S6 QA agent was network-killed TWICE with
+  zero evidence collected, so the ORCHESTRATOR ran the manual QA inline: 11/11 PASS
+  (placement r2n1/r6n1; peddler story screen; afford-filter dimmed-with-reason + exact
+  kernel ids; bottle −40 gold with beat+continue; determinism across fresh boots
+  (Bellows Fuel twice); smith temper modal on seed 1 with deck-stamp proof; sell reason
+  surfaced; belt inert on map; torn saves degrade to 'the wayside' + self-heal via R6;
+  15/15 + 314/313/1 re-run at the tree). Harness lesson recorded: ctl.submit() alias
+  does NOT advance the session (only dispatch does) — orchestrator backlog candidate.
+  Committed 69b05eb; solo review dispatched. NOTE: release/ is stale since daba4b4 —
+  rebuild due before the next itch ship (ship-time concern, not per-slice).
