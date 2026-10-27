@@ -55,7 +55,7 @@ Process rules (standing):
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | closed — 69b05eb + fixes d7441b6, QA 11/11, review APPROVE |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending (feeds the unlock meta) |
-| S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | pending — direct answer to "relics reset after winning" |
+| S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | committed 2ef8ce5 — QA orchestrator-run 10/10, review next |
 | S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | closed — 641731a + d08da32 + c4a0ace, re-review APPROVE |
 
 ## Verification recipes (subagents: use these verbatim)
@@ -276,3 +276,17 @@ Process rules (standing):
   Cinder Foreman; the e2e matches bosses by type class, label-independent), plus the
   last stale stage-4 comment, the event-slot placement pin, and the roadmap record
   corrected. S9 CLOSED — eight of ten roadmap slices through the full SDLC.
+- 2026-10-25 — S10 (relic meta-unlocks) dev done in one clean pass: RELIC_UNLOCK_TABLE
+  (wins 0/1/3/7/10/15 -> 5/6/8/10/12/13 relics, tier-ordered, rares last), pure pool
+  derivation (zero draws — goldens byte-identical, no regen), drops/offers pool-gated,
+  a fresh profile's warden vault honestly EMPTY, end-screen milestone narration, legacy
+  full-table, torn-pool tolerance. FOUND AND FIXED a real pre-existing bug: the page's
+  first boot ignored profile narrowing entirely (cards AND relics) — boot is newGame()
+  now and the codex e2e pins the honest narrowed first visit. Gates at the tree: 363/362/1
+  node (+18 tests), gate OK, art OK, 18/18 browser, sim exit 0. The QA dispatch died
+  silently (no artifacts), so the orchestrator ran the manual QA inline: 10/10 PASS —
+  fresh pool/codex, empty vault + climb, doctored veteran (12 relics, 3 rare offers at
+  BOTH wardens, ended act 2), milestone narration verbatim ("Your climbs unlocked:
+  Ember Heart." / "Relics in play: 6 of 13."), persistence (next run pool 6), legacy
+  full-table (elite dropped an uncommon a fresh pool could never yield), torn pool
+  never drops/offers the ghost, zero console errors. Committed 2ef8ce5; solo review next.
