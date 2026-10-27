@@ -56,7 +56,7 @@ Process rules (standing):
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending (feeds the unlock meta) |
 | S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | pending — direct answer to "relics reset after winning" |
-| S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | committed 641731a + fixes d08da32 — review REQUEST_CHANGES addressed, re-review next |
+| S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | closed — 641731a + d08da32 + c4a0ace, re-review APPROVE |
 
 ## Verification recipes (subagents: use these verbatim)
 
@@ -264,6 +264,15 @@ Process rules (standing):
   at load, the delta pinned at the measured 54 (12 layout + 10 spacer + 32 encounter
   rolls), docs updated, act-2 placement x60 + ACT2_GOLD bands + acts validation +
   act-2-skip kernel tests added, e2e guard raised / both wardens matched, and the
-  act-2 boss node no longer claims to be the Slag Warden. Gates at d08da32: 345/344/1
+  (NOTE: the act-2 boss-node label claim in that round was FALSE — the edit had not
+  landed; caught by the re-review, see below.) Gates at d08da32: 345/344/1
   node, gate OK, art OK, 17/17 browser, sim exit 0 (greedy 5% across two acts —
   expected; policies carry no climb heuristics). Re-review dispatched.
+- 2026-10-25 — S9 re-review VERDICT: APPROVE (P1 verified fixed empirically — honest
+  558-out counter; byte-stable goldens; all P2s closed; the tautology called out as
+  "the same assertion-vs-evidence pattern"). Its own P2 caught my false boss-label
+  claim: the map-view edit had never landed. Fixed for real in c4a0ace with LIVE
+  EVIDENCE this time (the two-act walk announces Travel to Slag Warden then Travel to
+  Cinder Foreman; the e2e matches bosses by type class, label-independent), plus the
+  last stale stage-4 comment, the event-slot placement pin, and the roadmap record
+  corrected. S9 CLOSED — eight of ten roadmap slices through the full SDLC.
