@@ -1539,7 +1539,7 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
     if (phase === 'ended') break;
     if (phase === 'map') {
       const elite = page.locator('button[aria-label="Travel to Elite"]').first();
-      const boss = page.locator('button[aria-label*="Warden"]').first();
+      const boss = page.locator('button.node.available.t-boss').first();
       if ((await boss.count()) > 0) await boss.click();
       else if ((await elite.count()) > 0) await elite.click();
       else await page.locator('button[aria-label^="Travel to"]').last().click();

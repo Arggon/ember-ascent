@@ -16,7 +16,9 @@ test('act-2 layout: exactly one shop (row 4 slot 1) and two events (rows 3/5), a
     assert.equal(shops[0].id, `r${ACT2_SHOP_ROW}n${ACT2_SHOP_SLOT}`, `seed ${seed}: the shop owns its placed slot`);
     assert.equal(events.length, ACT2_EVENT_NODES.length, `seed ${seed}: two act-2 waysides`);
     for (const ev of events) {
-      assert.ok(ACT2_EVENT_NODES.some((p) => p.row === Number(ev.id.slice(1, ev.id.indexOf('n')))), `seed ${seed}: the wayside sits on a documented row`);
+      const row = Number(ev.id.slice(1, ev.id.indexOf('n')));
+      const slot = Number(ev.id.slice(ev.id.indexOf('n') + 1));
+      assert.ok(ACT2_EVENT_NODES.some((p) => p.row === row && p.slot === slot), `seed ${seed}: the wayside sits on a documented row AND slot (${ev.id})`);
     }
     assert.equal(flat.some((n) => n.type === 'boss'), true, `seed ${seed}: the act-2 boss row exists`);
   }

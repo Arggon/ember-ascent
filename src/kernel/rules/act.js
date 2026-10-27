@@ -467,9 +467,9 @@ export function resolveVictory(state, cardDefs) {
   //    it replaces; the run's fate (act transition 4b, or the ended win) moves to the
   //    pick/skip step (rules/steps.js settleBossVictory). The reward carries `boss: true`
   //    and the flat tier's gold; cards are omitted. S9: the offers roll from the
-  //    not-held rare pool exactly as before — the act-2 boss therefore offers 2 rares
-  //    when the act-1 boss relic was TAKEN (3 when it was skipped): pickAt pays only
-  //    for the picks it makes, the documented tolerance, now reachable through play.
+  //    not-held rare pool — five rares exist, so BOTH bosses of a two-act climb offer
+  //    a real three (act 2 holds four after act 1's pick); pickAt pays min(3, pool),
+  //    the documented tolerance, fewer only for a torn save.
   if (nodeType === 'boss') {
     const offer = rollBossRelicOffers(next);
     next = {
