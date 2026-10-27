@@ -53,7 +53,7 @@ Process rules (standing):
 | S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | closed — 58aefe6 + fixes af50324, QA 11/11, review APPROVE |
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | closed — c83a2d0, QA 11/11, review APPROVE |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | closed — 69b05eb + fixes d7441b6, QA 11/11, review APPROVE |
-| S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | committed 190a3e8 — orchestrator-run QA 11/11, in review |
+| S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending |
 | S9 | Content II: enemies + Act 2 | new encounters + second biome/map skeleton | map/act presentation | pending |
 
@@ -217,3 +217,17 @@ Process rules (standing):
   relics), hooks live (Lantern energy 4 turn 1, Forge Iron block 4, Hearth Ash rest
   delta 16 = 8+8), torn relic ids degrade (raw id shown, chip counts known only),
   Walk away -> victory keeping drops. Committed 190a3e8; solo review dispatched.
+- 2026-10-25 — S7 review ran INLINE (the subagent provider saturated: three consecutive
+  congestion kills while the orchestrator session stayed healthy). VERDICT: APPROVE.
+  Verified at HEAD: the victory-chain doc matches the code stage-for-stage (boss
+  early-return skips potion/reward; exactly 3 offer draws; elite +2); Kindled Heart
+  clamps per-relic in acquisition order; Deep Well reconciles — the hook widens
+  HAND_SIZE and the NORMAL accounted draw step spends the draws (no relic hook draws
+  outside startCombat); Gold Vein in-chain with gold events; Flask Grip after the
+  potion resolves; dropPool filters held (starter included); bossOfferOpen re-checks
+  at pick; state.js refuses non-array/duplicate relics, tolerates unknown ids;
+  relicRows emits known:false raw-id rows; golden rebuild byte-identical at HEAD;
+  spec fixes present. P3 (backlog): relicRows' starting flag is positional (relics[0]
+  of a torn save mislabels); nit: single-tier-exhaust drop path costs 1 draw
+  (documented in-code, unreachable through play). Committed state clean — S7 CLOSED.
+  Seven of nine roadmap slices through the full SDLC.
