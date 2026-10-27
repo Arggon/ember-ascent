@@ -56,7 +56,7 @@ Process rules (standing):
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending (feeds the unlock meta) |
 | S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | pending — direct answer to "relics reset after winning" |
-| S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | committed 641731a — QA orchestrator-run, review next |
+| S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | committed 641731a + fixes d08da32 — review REQUEST_CHANGES addressed, re-review next |
 
 ## Verification recipes (subagents: use these verbatim)
 
@@ -255,3 +255,15 @@ Process rules (standing):
   Gates at commit 641731a: 341/340/1 node, gate OK, art OK, 17/17 browser, sim
   exit 0 (token budgets PASS). Solo review next (subagent if infra recovered,
   else inline).
+- 2026-10-25 — S9 review VERDICT: REQUEST_CHANGES (the subagent infra recovered). P1:
+  beginNextAct double-counted the pre-transition stream into rngDraws (500-in ->
+  1070-out; replay self-consistent but the format's counter lied). P2: torn acts>=3
+  crashed step() at the climb; the transition draw pin was a tautology (mine — it
+  would have caught the P1); stale 3-rares docs x3; the brief's missing tests. All
+  fixed in d08da32: the counter is the absolute index alone, acts>ACT_COUNT refused
+  at load, the delta pinned at the measured 54 (12 layout + 10 spacer + 32 encounter
+  rolls), docs updated, act-2 placement x60 + ACT2_GOLD bands + acts validation +
+  act-2-skip kernel tests added, e2e guard raised / both wardens matched, and the
+  act-2 boss node no longer claims to be the Slag Warden. Gates at d08da32: 345/344/1
+  node, gate OK, art OK, 17/17 browser, sim exit 0 (greedy 5% across two acts —
+  expected; policies carry no climb heuristics). Re-review dispatched.
