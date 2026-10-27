@@ -54,8 +54,8 @@ Process rules (standing):
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | closed — c83a2d0, QA 11/11, review APPROVE |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | closed — 69b05eb + fixes d7441b6, QA 11/11, review APPROVE |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
-| S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending (feeds the unlock meta) |
-| S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | committed 2ef8ce5 — QA orchestrator-run 10/10, review next |
+| S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | **in progress** (dev dispatched) |
+| S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | closed — 2ef8ce5, QA 10/10, review APPROVE (5 P3s → backlog) |
 | S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | closed — 641731a + d08da32 + c4a0ace, re-review APPROVE |
 
 ## Verification recipes (subagents: use these verbatim)
@@ -290,3 +290,14 @@ Process rules (standing):
   Ember Heart." / "Relics in play: 6 of 13."), persistence (next run pool 6), legacy
   full-table (elite dropped an uncommon a fresh pool could never yield), torn pool
   never drops/offers the ghost, zero console errors. Committed 2ef8ce5; solo review next.
+- 2026-10-25 — S10 review VERDICT: APPROVE (boot-fix blast radius verified — newGame
+  ordering sound, no double-run; pool derivation pure; replay pins the header pool so
+  ledger drift is structurally impossible; wins fold only on wins, race-free; the S2
+  honesty sweep found no surface anywhere listing an ungated relic or card). Five P3s
+  → BACKLOG: act.js stage-4 comment now contradicts the meta gate; parseLog doesn't
+  shape-check header.relicPool (escalates to exit 1 instead of the corruptSave class —
+  pre-existing for biome too); countAfter omits the starter argument (latent, both
+  starters in row 0 today); the newRun pool door skips the duplicate check (doctrine
+  symmetry); the history screen's persistent unlock line never learned relics. S10
+  CLOSED — ALL TEN SYSTEM/CONTENT SLICES S1-S7+S9+S10 + POLISH through the full SDLC.
+  Remaining roadmap: S8 (content scale), the release/ rebuild, the backlog.
