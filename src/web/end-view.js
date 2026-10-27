@@ -25,8 +25,12 @@ export function endView() {
   wrap.append(el('hr', { cls: 'end-rule' }));
   // S3: the purse the run finished with — the kernel snapshot's own `player.gold`, the same
   // value the HUD carried from boot to here (grant details live in the record's events).
+  // S7: beside it, the relic count the run carried to its end (`snap.ended.relics`, the
+  // kernel's own number — the same one the CLI dump's summary line shows; an ended record
+  // that predates the field falls back to the snapshot's live relic rows).
   const purse = snap.player.gold ?? 0;
-  wrap.append(el('p', { cls: 'end-stats', text: `Reached floor ${e.floor} · ${e.steps} steps · seed ${snap.seed} · ${purse} gold` }));
+  const relicCount = e.relics ?? (snap.relics ?? []).length;
+  wrap.append(el('p', { cls: 'end-stats', text: `Reached floor ${e.floor} · ${e.steps} steps · seed ${snap.seed} · ${purse} gold · ${relicCount} relic${relicCount === 1 ? '' : 's'}` }));
 
   const math = lastRecord ? ledgerMath(lastRecord) : null;
   if (math) {

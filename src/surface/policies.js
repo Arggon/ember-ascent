@@ -91,6 +91,21 @@ function chooseEventId(acts) {
 }
 
 /**
+ * The boss relic's choice, both heuristic policies share (S7). Minimal and honest:
+ * take the FIRST offered relic (r1 — the roll's order is the kernel's own, so "first"
+ * is deterministic) and NEVER skip: StS's boss relic is a strict free pick, and a
+ * policy that walks away from free value would be pricing a relic it has no model for.
+ * The relic cards' long-run value is not scored (the same unpriced stance the shop's
+ * shelves take); the guarantee the stance buys is that the phase always resolves.
+ */
+function chooseRelicPickId(acts) {
+  const picks = acts.filter((a) => a.kind === 'relic_pick');
+  if (picks.length > 0) return picks[0].id;
+  const skip = acts.find((a) => a.kind === 'skip');
+  return skip?.id ?? acts[0]?.id ?? null;
+}
+
+/**
  * The heuristic the balance data is generated with.
  *
  * Priority order, in plain terms: take a kill when one exists; block only as much
@@ -108,6 +123,9 @@ function greedyPolicy() {
       if (state.phase === 'ended') return { id: null, memory };
 
       if (state.phase === 'reward') {
+        // S7: the boss's relic offers resolve before any card logic — a boss reward
+        // carries no cards, and the pick (or the never-taken skip) ends the run.
+        if (state.reward?.relicOffers != null) return { id: chooseRelicPickId(acts), memory };
         const picks = acts.filter((a) => a.kind === 'pick');
         const skip = acts.find((a) => a.kind === 'skip');
         if (picks.length === 0) return { id: skip?.id ?? acts[0].id, memory };
@@ -233,6 +251,9 @@ function smartPolicy() {
 
 /** Reward: take the card the DECK needs, not the card with the biggest number. */
 function chooseReward(state, acts, memory) {
+  // S7: the boss's relic offers (a boss reward carries no cards) — first offered, never
+  // skipped; see chooseRelicPickId for the stance.
+  if (state.reward?.relicOffers != null) return { id: chooseRelicPickId(acts), memory };
   const picks = acts.filter((a) => a.kind === 'pick');
   const skip = acts.find((a) => a.kind === 'skip');
   if (picks.length === 0) return { id: skip?.id ?? acts[0].id, memory };

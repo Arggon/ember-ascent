@@ -16,7 +16,7 @@ import { defaultContent, draftPoolFrom } from './content.js';
 import { actions as legalActions } from './actions.js';
 import { intentLabel, intentDamage, REST_HEAL } from './rules/act.js';
 import { BOONS, boonText } from './rules/kindling.js';
-import { RELICS, relicId } from './rules/relics.js';
+import { RELICS, relicId, relicList, relicDef } from './rules/relics.js';
 import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
@@ -184,6 +184,10 @@ function header(state) {
     // the run even though its q/d actions only exist in combat. `?? []` is the
     // legacy-save tolerance (absent field = empty belt).
     `POTIONS ${(state.potions ?? []).length}/${POTION_SLOTS}`,
+    // S7 relics: the held count in every phase's header, like the belt. The NAMES live
+    // in the snapshot's `relics` rows (and the verbose map body) — the header stays a
+    // count, the same compact ruling the GOLD/POTIONS chips keep.
+    `RELICS ${relicList(state).length}`,
     `draw${state.combat?.draw?.length ?? 0} disc${state.combat?.discard?.length ?? 0}`,
     statuses,
   ].filter(Boolean);
@@ -208,7 +212,8 @@ function body(state, opts) {
       return kindlingBody(state);
     case 'ended':
       return [
-        `GAME OVER — ${state.outcome === 'win' ? 'VICTORY' : 'DEFEAT'} | floor ${state.floor + 1} | steps ${state.stepIndex} | gold ${state.player.gold ?? 0}`,
+        // S7: the relic count joins the summary — what the run carried, beside the purse.
+        `GAME OVER — ${state.outcome === 'win' ? 'VICTORY' : 'DEFEAT'} | floor ${state.floor + 1} | steps ${state.stepIndex} | gold ${state.player.gold ?? 0} | relics ${relicList(state).length}`,
       ];
     default:
       return [`phase ${state.phase}`];
@@ -288,7 +293,16 @@ const pileNames = (pile) => (pile.length === 0 ? '-' : pile.map((c) => defOrNull
 const pileCardNames = (pile) => (pile ?? []).map((c) => defOrNull(c)?.name ?? cardIdOf(c));
 
 function rewardBody(state) {
-  const lines = ['REWARD — pick one'];
+  // S7: the BOSS reward — the warden's three relic offers replace the cards (StS
+  // parity), so the header and the lines name relics. Tolerant like the card rows
+  // (defOrNull's policy): an id the relic table no longer knows renders as its raw id
+  // with no text, and offers no r-id will ever enumerate (the R6 mirror).
+  const offers = Array.isArray(state.reward.relicOffers) ? state.reward.relicOffers : [];
+  const lines = [offers.length > 0 ? 'REWARD — claim the warden\u2019s relic' : 'REWARD — pick one'];
+  offers.forEach((id, i) => {
+    const def = relicDef(id);
+    lines.push(` r${i + 1} ${def ? def.name : id}${def ? `  ${def.summary}` : ''}`);
+  });
   state.reward.cards.forEach((id) => {
     // Tolerant on purpose (unlike defOf): a reward id the content no longer knows
     // still renders, as the raw id, instead of killing the whole dump. This inline
@@ -296,12 +310,18 @@ function rewardBody(state) {
     const def = defOrNull(id);
     lines.push(` s${state.reward.cards.indexOf(id) + 1} ${def ? def.name : id} ${def ? effectSummary(def) : ''}`);
   });
-  lines.push(` s0 skip (HP ${state.player.hp}/${state.player.maxHp})`);
+  lines.push(` s0 ${offers.length > 0 ? 'walk away' : 'skip'} (HP ${state.player.hp}/${state.player.maxHp})`);
   // S3: what this fight just paid and what the purse holds now. Only when the reward
   // carries the grant: a legacy save's reward predates the field, and printing "+0"
   // for a spoils the engine never computed would be a lie, not a default.
   if (typeof state.reward.gold === 'number') {
     lines.push(` spoils +${state.reward.gold} gold (purse ${state.player.gold ?? 0})`);
+  }
+  // S7: an elite's GUARANTEED drop, named like the gold beside it. Only when the reward
+  // carries it — a pre-S7 reward (or a fight that dropped nothing) prints no relic line.
+  if (typeof state.reward.relic === 'string') {
+    const def = relicDef(state.reward.relic);
+    lines.push(` spoils relic: ${def ? def.name : state.reward.relic}${def ? ` (${def.summary})` : ''}`);
   }
   return lines;
 }
@@ -510,6 +530,11 @@ export function observeActions(state) {
       case 'event_continue':
         lines.push(`${a.id} continue`);
         break;
+      // S7 relic lines: id + the stable relic id (name-only, the same ruling as every
+      // other action line — the offer's words live in the REWARD dump above).
+      case 'relic_pick':
+        lines.push(`${a.id} ${a.relicId}`);
+        break;
       default:
         lines.push(`${a.id} ?`);
     }
@@ -539,6 +564,31 @@ function heroRelic(state) {
     name: defaultContent().characters.get(state.character)?.relicName ?? 'relic',
     offText: RELICS[relicId(state)]?.offText ?? 'stops working',
   };
+}
+
+/**
+ * S7: the held-relics rows, published in EVERY phase (the relics are run state and the
+ * HUD chip shows them everywhere). Row facts mirror the belt's: `known: false` marks an
+ * id the relic table no longer knows (a torn save) — it still renders, the raw id is
+ * its own name, and it contributes no hooks (relicSum skips it). `text` is the kernel
+ * table's own sentence, verbatim; `tier` feeds the codex-style hue a surface may paint.
+ * @param {any} state
+ */
+function relicRows(state) {
+  return relicList(state).map((id, i) => {
+    const def = relicDef(id);
+    return {
+      slot: i + 1,
+      relicId: id,
+      known: Boolean(def),
+      name: def ? def.name : id,
+      summary: def ? def.summary : '',
+      text: def ? def.text : '',
+      tier: def ? def.tier : 'unknown',
+      // relics[0] is the starter the kindling Iron Skin boon can switch off.
+      starting: i === 0,
+    };
+  });
 }
 
 /**
@@ -666,6 +716,11 @@ function snapshotMap(state, legal) {
 function snapshotReward(state, legal) {
   if (!state.reward) return null;
   const pick = new Map(legal.filter((a) => a.kind === 'pick').map((a) => [a.cardId, a.id]));
+  // S7: the boss's relic offers. The r-ids resolve here from the SAME legal list the
+  // dump reads, so an offer the kernel refuses (unknown id, already held — unreachable
+  // through play) carries `actionId: null` and a surface greys it out for the same
+  // reason a shop shelf greys out; `known: false` marks a torn id rendering as itself.
+  const relicPicks = new Map(legal.filter((a) => a.kind === 'relic_pick').map((a) => [a.index, a.id]));
   return {
     canSkip: legal.some((a) => a.kind === 'skip'),
     skipId: legal.find((a) => a.kind === 'skip')?.id ?? null,
@@ -674,6 +729,31 @@ function snapshotReward(state, legal) {
     // reward predates the field — so a surface hides the line instead of printing +0.
     goldGained: typeof state.reward.gold === 'number' ? state.reward.gold : null,
     purse: state.player.gold ?? 0,
+    // S7 boss: the offer rows, the phase flag the view heads with, and the pick that
+    // ends the run. null offers (a card reward, or a legacy save) degrade to [].
+    boss: Boolean(state.reward.boss),
+    relicOffers: (Array.isArray(state.reward.relicOffers) ? state.reward.relicOffers : []).map((id, i) => {
+      const def = relicDef(id);
+      return {
+        index: i,
+        actionId: relicPicks.get(i) ?? null,
+        relicId: id,
+        known: Boolean(def),
+        name: def ? def.name : id,
+        summary: def ? def.summary : '',
+        text: def ? def.text : '',
+        tier: def ? def.tier : 'unknown',
+        affordable: relicPicks.has(i),
+      };
+    }),
+    // An elite's GUARANTEED drop, the spoils line's fact — null when this fight
+    // dropped nothing (or the reward predates the field), so a surface hides the chip.
+    relicGained: typeof state.reward.relic === 'string'
+      ? (() => {
+        const def = relicDef(state.reward.relic);
+        return { relicId: state.reward.relic, known: Boolean(def), name: def ? def.name : state.reward.relic, summary: def ? def.summary : '', text: def ? def.text : '' };
+      })()
+      : null,
     cards: state.reward.cards.map((id) => {
       // Tolerant like rewardBody above (defOrNull): an unknown reward id — a stale save
       // after a rename — renders as a placeholder row (raw id, cost 0, type "unknown")
@@ -1120,6 +1200,9 @@ export function snapshot(state) {
     // here so a renderer greys nothing it would have to guess at.
     belt: snapshotBelt(state, legal),
     beltSlots: POTION_SLOTS,
+    // S7 relics: every phase (run state) — the held rows with names, tiers and the
+    // kernel's own effect sentences; the HUD chip and any relic readout paints these.
+    relics: relicRows(state),
     map: snapshotMap(state, legal),
     reward: snapshotReward(state, legal),
     rest: snapshotRest(state, legal),
@@ -1131,7 +1214,8 @@ export function snapshot(state) {
     quests: state.quests
       ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))
       : null,
-    ended: state.phase === 'ended' ? { outcome: state.outcome, floor: state.floor + 1, steps: state.stepIndex } : null,
+    // S7: the summary gains the relic count — what the run carried to its end.
+    ended: state.phase === 'ended' ? { outcome: state.outcome, floor: state.floor + 1, steps: state.stepIndex, relics: relicList(state).length } : null,
     // The plain-English layer, computed from this same state. A human surface paints
     // `description` / `text` / `glossary`; the compact fields above stay untouched for
     // the CLI. One state, two renderings, one place that knows the rules.

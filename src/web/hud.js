@@ -45,6 +45,7 @@ export function renderHud() {
   const purse = p.gold ?? 0;
   hudEl.append(stat('gold', '◉', String(purse), false, `Gold ${purse}`));
   hudEl.append(renderBelt());
+  hudEl.append(renderRelics());
   hudEl.append(el('span', { cls: 'hud-step', text: `step ${snap.stepIndex}` }));
 
   // A status that just landed on the PLAYER gets the same by-kind treatment as an enemy's.
@@ -105,6 +106,34 @@ export function renderHud() {
     attrs: { type: 'button', title: `New run (seed ${snap.seed}) — keyboard: n` },
     on: { click: () => newGame() },
   }));
+}
+
+/* ------------------------------------------------------------------ RELICS (S7) */
+
+/**
+ * The relic readout: ONE chip beside the belt — the kindled-heart glyph and the held
+ * count, with the full list (name + the kernel's own effect sentence, one per relic)
+ * in the tooltip, exactly the belt's readout contract. A READOUT, not a control: no
+ * button, no flash — relics act through hooks, never through a click. A torn save's
+ * unknown id still counts (the kernel lists it) and shows itself as "(unknown relic)".
+ * @returns {HTMLElement} the `.relics` group
+ */
+function renderRelics() {
+  const rows = snap.relics ?? [];
+  const tip = rows.length === 0
+    ? 'Relics: none held yet — elites always drop one, and the warden offers three.'
+    : rows.map((r) => `${r.name} — ${r.text || 'unknown relic'}${r.known ? '' : ' (unknown relic id in this save)'}`).join('\n');
+  return el('span', {
+    cls: 'relics' + (rows.length === 0 ? ' none' : ''),
+    attrs: {
+      title: tip,
+      // The announced form carries the same list the tooltip shows, so a screen reader
+      // hears exactly what a sighted reader hovers.
+      'aria-label': `Relics: ${rows.length} held${rows.length > 0 ? `: ${rows.map((r) => r.name).join(', ')}` : ''}`,
+    },
+  },
+  glyphBox('relic', 'relic-glyph'),
+  el('span', { cls: 'relic-count', text: String(rows.length) }));
 }
 
 /* --------------------------------------------------------------------- BELT (S5) */

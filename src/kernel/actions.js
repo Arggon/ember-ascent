@@ -40,6 +40,20 @@
 //        save's escape hatch: an event id the roster no longer knows (or a torn event
 //        field) degrades to no choices and this one continue, so a run can never
 //        softlock inside a story nobody can read (the S2.1/S4.1/S5 tolerance ruling).
+//   r<n>  claim the n-th relic the BOSS offers (S7; additive kind `relic_pick`). The
+//        boss victory opens a `reward` phase whose `relicOffers` replace the cards
+//        (StS parity: the boss grants no card); `n` indexes the OFFER SLOTS 1-based.
+//        The R6 mirror, exactly the shop's shelves and the event's choices: an offer
+//        the table no longer knows, or one the run ALREADY holds (a torn save — the
+//        roll itself filters held relics, so this is unreachable through play), emits
+//        NO id, and the row stays visible with its raw id. A pick ends the run in
+//        victory (rules/steps.js pickRelic); zero draws (rules/relics.js header).
+//   s0    reused for the boss relic's SKIP (S7; the same id, one new meaning). The
+//        id-letter split is legal because ONE state never offers both meanings — the
+//        `e1` precedent: a boss reward has `relicOffers` and no cards, a card reward
+//        the reverse. StS lets you walk away from the boss relic; skipping still ends
+//        the run in victory. (On a card reward, `s0` keeps its S3 meaning: skip to the
+//        map, reward closed.)
 //   t<n>  during a smith's temper MODAL: temper the n-th offer (S6; additive kind
 //        `event_temper`). The id letter is the rest site's own `t<n>` — id letters may
 //        name two kinds as long as ONE state never offers both (the `e1` precedent:
@@ -78,6 +92,7 @@
 import { availableNodes } from './rules/map.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
 import { potionDef } from './rules/potions.js';
+import { bossOfferOpen } from './rules/relics.js';
 import { eventDef, offerEventChoices, temperOfferOpen } from './rules/events.js';
 import { cardDefMap } from './rules/card-instance.js';
 
@@ -162,6 +177,15 @@ export function actions(state) {
       break;
     }
     case 'reward': {
+      // S7: the boss's relic OFFER shares the phase with the card reward it replaces.
+      // Enumeration mirrors the resolver's own guard (bossOfferOpen — the S4.1 ruling):
+      // an unknown or already-held offer emits no id, and the torn offer's row stays
+      // visible in the snapshot with its raw id. The offers roll 3 distinct not-held
+      // rares, so through play this is exactly r1..r3 plus the skip.
+      (Array.isArray(state.reward?.relicOffers) ? state.reward.relicOffers : []).forEach((offerId, i) => {
+        if (!bossOfferOpen(offerId, state)) return;
+        out.push({ id: `r${i + 1}`, kind: 'relic_pick', index: i, relicId: offerId });
+      });
       state.reward.cards.forEach((id, i) => out.push({ id: `s${i + 1}`, kind: 'pick', cardId: id }));
       out.push({ id: 's0', kind: 'skip' });
       break;

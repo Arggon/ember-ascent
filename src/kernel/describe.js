@@ -533,6 +533,7 @@ export function helpTopics() {
     { title: 'Killing an enemy stops it attacking', body: 'Dead enemies never act again, and their announced intent goes away with them. Attacking the enemy that is about to hit you hardest is often the best move.' },
     { title: 'Read the enemy intent', body: 'The line under each enemy says what it will do on its next turn — for example "Will attack for 11". Plan your Block around it.' },
     { title: 'Kindled Heart', body: 'After each fight you win, Kindled Heart restores 6 HP. It is the Ashwright starting relic.' },
+    { title: 'Relics', body: 'Relics are passive treasures, listed beside your potion belt. An elite always drops one, and the warden offers three at the end — take one, or walk away. Two relics can share an effect and both apply.' },
   ];
 }
 

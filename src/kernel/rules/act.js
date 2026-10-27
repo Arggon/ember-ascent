@@ -12,7 +12,9 @@ import { ENEMIES, chooseIntent } from './encounters.js';
 import { NODE_TYPES, ROWS } from './map.js';
 import { fireHook, endOfTurnStatuses, decayStatuses } from './powers.js';
 import { shuffleAt, pickAt, intAt } from '../rng.js';
-import { activeRelic, relicId } from './relics.js';
+import {
+  activeRelicDefs, relicId, firstTurnDrawOf, rollEliteRelicDrop, rollBossRelicOffers, gainRelic,
+} from './relics.js';
 import { rollPotionDrop } from './potions.js';
 
 /** Hand size at the start of each turn. */
@@ -93,17 +95,37 @@ export function startCombat(state, node, cardDefs) {
   };
 
   const turn = beginTurn(base, cardDefs);
-  // A first-turn Energy relic (B4 Cyan Lantern): extra Energy on the first turn of every fight.
-  const lantern = activeRelic(state)?.firstTurnEnergy ?? 0;
-  if (lantern > 0) {
-    turn.state = { ...turn.state, player: { ...turn.state.player, energy: turn.state.player.energy + lantern } };
-    turn.events.push({ t: 'energy', who: 'player', amount: lantern, source: relicId(state) });
+  // S7 RELIC OPENING — after the opening hand is drawn, every working relic fires its
+  // combat-start hook ONCE, in ACQUISITION ORDER (a fixed order, part of the format):
+  // per relic, Block, then Strength, then Energy. Each contribution carries its own
+  // event (the relic's id as the source, where the verb takes one), so two relics
+  // sharing a hook — Cyan Lantern + Slag Crown is +2 Energy on turn 1 — both land,
+  // visibly and deterministically. Zero draws: every relic number is fixed. Iron Skin's
+  // relicOff excludes relics[0] only (activeRelicDefs).
+  let events = turn.events;
+  let after = turn.state;
+  for (const { id, def } of activeRelicDefs(state)) {
+    if (def.combatStartBlock > 0) {
+      after = { ...after, player: { ...after.player, block: after.player.block + def.combatStartBlock } };
+      events = [...events, { t: 'block', who: 'player', amount: def.combatStartBlock, source: id }];
+    }
+    if (def.combatStartStrength > 0) {
+      after = {
+        ...after,
+        player: { ...after.player, statuses: { ...after.player.statuses, strength: (after.player.statuses.strength ?? 0) + def.combatStartStrength } },
+      };
+      events = [...events, { t: 'player_status', status: 'strength', stacks: def.combatStartStrength, source: id }];
+    }
+    if (def.firstTurnEnergy > 0) {
+      after = { ...after, player: { ...after.player, energy: after.player.energy + def.firstTurnEnergy } };
+      events = [...events, { t: 'energy', who: 'player', amount: def.firstTurnEnergy, source: id }];
+    }
   }
   return {
-    state: turn.state,
+    state: after,
     events: [
       { t: 'combat_start', node: node.id, encounter: encounter.id, enemies: enemies.map((e) => ({ id: e.id, hp: e.hp })) },
-      ...turn.events,
+      ...events,
     ],
   };
 }
@@ -142,6 +164,11 @@ export function intentDamage(enemy) {
  */
 export function beginTurn(state, cardDefs) {
   const events = [];
+  // S7 Deep Well: +1 card on the FIRST turn of each combat only (turn 1 is the one
+  // beginTurn is producing here — startCombat calls it on the fresh combat). The extra
+  // card rides the ordinary draw, so its reshuffles consume exactly the draws it needs
+  // (rules/draw.js); no relic hook ever draws outside this call.
+  const handSize = HAND_SIZE + (state.combat.turn === 0 ? firstTurnDrawOf(state) : 0);
   let next = {
     ...state,
     combat: { ...state.combat, turn: state.combat.turn + 1, hand: [] },
@@ -151,7 +178,7 @@ export function beginTurn(state, cardDefs) {
   // The turn draw reshuffles at the LIVE counter (see rules/draw.js for why the
   // shuffle is a callback): every reshuffle inside one turn reads the draws this
   // loop has already consumed.
-  const drawn = drawIntoHand(next, HAND_SIZE, (s, items) => shuffleAt(s.seed, s.rngDraws, items));
+  const drawn = drawIntoHand(next, handSize, (s, items) => shuffleAt(s.seed, s.rngDraws, items));
   next = drawn.state;
   events.push({ t: 'turn_start', turn: next.combat.turn, drawn: drawn.drawn.map((c) => c.uid), reshuffles: drawn.reshuffles });
 
@@ -331,8 +358,29 @@ export function endTurn(state, cardDefs) {
 }
 
 /**
- * After a won combat: heal via relic, then decide the next phase
- * (card reward for fights, or back to the map for a rest node).
+ * After a won combat — THE FIXED PER-VICTORY ORDER (part of the format; every roll reads
+ * the counter the stage before it left behind, so the whole chain is reproducible from
+ * the action log forever):
+ *
+ *   1. RELIC HEAL      per working relic, acquisition order, each clamped by the HP the
+ *                      relics before it left; per-relic `heal` events. 0 draws.
+ *   2. TIER GOLD       the node tier's spoils (S3). 0 draws flat (boss 100), 1 ranged.
+ *   3. RELIC GOLD      per working relic, acquisition order (Gold Vein). 0 draws.
+ *   4. BOSS BRANCH     the warden's relic OFFER replaces the card reward (StS parity:
+ *                      no cards on the boss). The 3 offers roll NOW — exactly 3 draws
+ *                      while the not-held rare pool holds 3 — and the phase opens as
+ *                      `reward`; the run ends at the pick (`r<n>`) or the skip (`s0`)
+ *                      in rules/steps.js, NOT here. Never reaches stages 5-7.
+ *   5. POTION DROP     S5's roll. 0..2 draws (0 when the belt is full).
+ *   6. ELITE RELIC DROP  elite fights only, GUARANTEED (StS parity): exactly 2 draws —
+ *                      one d100 band (lowest 70 common, rest uncommon) + one uniform pick
+ *                      over that tier's not-held pool — 0 only when both pools are empty
+ *                      (impossible through play, free by the potions ruling). Acquisition
+ *                      goes through gainRelic, the ONE path, so acquisition passives
+ *                      (Ember Heart's max HP) fire here exactly as on the boss pick.
+ *   7. REWARD ROLL     the card offer (S3's convention: read the counter everything
+ *                      above left behind). 3 draws, 4 on an elite.
+ *
  * @param {any} state
  * @param {Map<string, any>} cardDefs
  * @returns {{state: any, events: any[]}}
@@ -345,28 +393,31 @@ export function resolveVictory(state, cardDefs) {
   // documented rule that they last only the fight. Caught by tests/kernel/status-reset.test.js.
   let next = { ...state, combat: { ...state.combat, active: false, enemies: [] }, player: { ...state.player, statuses: {} } };
 
-  // Only a relic with a post-fight heal (the Kindled Heart) heals; Iron Skin switches it off.
-  const healed = Math.min(state.player.maxHp - state.player.hp, activeRelic(state)?.healAfterFight ?? 0);
-  if (healed > 0) {
-    next = { ...next, player: { ...next.player, hp: next.player.hp + healed } };
-    events.push({ t: 'heal', who: 'player', amount: healed, source: relicId(state) });
+  // 1. RELIC HEAL (S7): every working relic's healAfterFight, in acquisition order.
+  //    Per-relic events keep the B4 shape (one relic held = byte-identical to before);
+  //    a Kindled Heart + Ash Crown run heals 6 then 3, each clamped by what is left.
+  //    Iron Skin's relicOff excludes relics[0] only (activeRelicDefs).
+  for (const { id, def } of activeRelicDefs(state)) {
+    const healed = Math.min(def.healAfterFight ?? 0, next.player.maxHp - next.player.hp);
+    if (healed > 0) {
+      next = { ...next, player: { ...next.player, hp: next.player.hp + healed } };
+      events.push({ t: 'heal', who: 'player', amount: healed, source: id });
+    }
   }
 
-  // S3 GOLD — the spoils, granted exactly ONCE per won fight. Both callers (steps.js
+  // 2. S3 GOLD — the spoils, granted exactly ONCE per won fight. Both callers (steps.js
   // playCard and endTurn here) reach victory through this one function, and it flips the
   // phase away from `combat` in the same breath (reward / rest / ended), so a re-observe
   // of the post-victory state can never re-enter it: there is no gold grant action, and
-  // observe/snapshot are read-only. The boss path grants BEFORE the flip to `ended`, so
-  // the run summary reads the final purse.
+  // observe/snapshot are read-only. The grant amount travels into `state.reward.gold` when
+  // a reward opens, so the reward screen and the text dump can say "+N gold" without
+  // re-deriving anything.
   //
   // RNG ACCOUNTING: exactly ONE u64 draw for a ranged tier (intAt over the inclusive
   // range), ZERO draws for a flat tier — the boss pays 100 to every seed, so there is
-  // nothing to roll. `rngDraws` advances by exactly `goldDraws`; the card-reward roll
-  // below then reads the counter AFTER the grant, so the grant is part of the format.
+  // nothing to roll. `rngDraws` advances by exactly `goldDraws`.
   const nodeType = state.combat.nodeType;
   const goldRange = NODE_TYPES[nodeType]?.gold ?? null;
-  // The grant amount travels into `state.reward.gold` when a card reward opens, so the
-  // reward screen and the text dump can say "+N gold" without re-deriving anything.
   let goldGained = null;
   if (goldRange) {
     const [lo, hi] = goldRange;
@@ -380,18 +431,37 @@ export function resolveVictory(state, cardDefs) {
     events.push({ t: 'gold', who: 'player', amount: goldGained, source: nodeType });
   }
 
-  if (nodeType === 'boss') {
-    return { state: { ...next, phase: 'ended', outcome: 'win' }, events: [...events, { t: 'run_end', outcome: 'win' }] };
+  // 3. RELIC GOLD (S7): Gold Vein's after-fight gold, per working relic in acquisition
+  //    order, right after the tier spoils — both gold grants read as one purse update
+  //    sequence. Zero draws; the event is the gold verb with the relic id as its source.
+  for (const { id, def } of activeRelicDefs(state)) {
+    const gain = def.goldAfterFight ?? 0;
+    if (gain > 0) {
+      next = { ...next, player: { ...next.player, gold: (next.player.gold ?? 0) + gain } };
+      events.push({ t: 'gold', who: 'player', amount: gain, source: id });
+    }
   }
 
-  // S5 POTIONS — the drop, rolled exactly once per won fight, AFTER the gold grant and
-  // BEFORE the reward offer (the fixed per-victory order documented in rules/potions.js;
-  // the offer below reads the counter the drop left behind, so the drop is part of the
-  // format). The boss short-circuits above: the run is over, so it never rolls and
-  // never consumes a draw. A full belt suppresses the roll entirely — ZERO draws
-  // (rules/potions.js), which is what makes a 4th potion impossible without stealing
-  // from the stream. `next` is the state the drop read, so the belt updates in place
-  // and the counter advances by exactly the draws the roll consumed (0, 1 or 2).
+  // 4. BOSS BRANCH (S7) — the offer, rolled at victory time exactly like the card offer
+  //    it replaces; the ended transition moves to the pick/skip step (rules/steps.js).
+  //    The reward carries `boss: true` and the flat tier's gold; cards are omitted.
+  if (nodeType === 'boss') {
+    const offer = rollBossRelicOffers(next);
+    next = {
+      ...next,
+      rngDraws: next.rngDraws + offer.draws,
+      phase: 'reward',
+      reward: { cards: [], relicOffers: offer.offers, taken: null, gold: goldGained, boss: true },
+    };
+    events.push({ t: 'reward_offered', cards: [], relics: offer.offers });
+    void cardDefs;
+    return { state: next, events };
+  }
+
+  // 5. S5 POTIONS — the drop, rolled exactly once per won fight, AFTER the gold grants
+  // and BEFORE the reward offer (stage 7 reads the counter the drop left behind). A full
+  // belt suppresses the roll entirely — ZERO draws (rules/potions.js), which is what
+  // makes a 4th potion impossible without stealing from the stream.
   const drop = rollPotionDrop(next, nodeType);
   if (drop.potion) {
     next = { ...next, rngDraws: next.rngDraws + drop.draws, potions: drop.belt };
@@ -403,19 +473,41 @@ export function resolveVictory(state, cardDefs) {
   // draws === 0 with no potion is the suppressed-full-belt (or no-chance-tier) path:
   // nothing consumed, nothing changed.
 
+  // 6. ELITE RELIC DROP (S7) — guaranteed, 2 draws, AFTER the potion drop (the brief's
+  //    fixed position; the reward roll below then reads the counter it left behind).
+  //    The gained relic rides the reward as `relic` so the spoils line can name it.
+  let relicGained = null;
+  if (nodeType === 'elite') {
+    const roll = rollEliteRelicDrop(next);
+    next = { ...next, rngDraws: next.rngDraws + roll.draws };
+    if (roll.relic) {
+      const got = gainRelic(next, roll.relic, 'elite');
+      next = got.state;
+      events.push(...got.events);
+      relicGained = roll.relic;
+    }
+  }
+
   const reward = next.map.encounterTable[state.combat.nodeId]?.reward ?? 'card';
   if (reward === 'heal') {
     return { state: { ...next, phase: 'rest' }, events: [...events, { t: 'rest_ready' }] };
   }
 
-  // Roll the reward offer: REWARD_CHOICES distinct cards.
+  // 7. Roll the reward offer: REWARD_CHOICES distinct cards, one more on an elite.
   const elites = nodeType === 'elite' ? 1 : 0;
   const offer = rollReward(next, REWARD_CHOICES + elites);
   next = {
     ...next,
     rngDraws: next.rngDraws + offer.draws,
     phase: 'reward',
-    reward: { cards: offer.ids, taken: null, gold: goldGained },
+    reward: {
+      cards: offer.ids,
+      taken: null,
+      gold: goldGained,
+      // Present exactly when this elite dropped one — the spoils line's fact, like
+      // `gold` above; a legacy save's reward predates the field and stays null-gated.
+      ...(relicGained ? { relic: relicGained } : {}),
+    },
   };
   events.push({ t: 'reward_offered', cards: offer.ids });
   void cardDefs;

@@ -10,10 +10,12 @@
 // Draw accounting — a deliberate decision, part of the format:
 //   * The DROP rolls at victory time, from the live counter, in rules/act.js
 //     resolveVictory — the same convention as the gold grant it sits beside. The order
-//     within one victory is FIXED and part of the format: relic heal (no draws) ->
-//     gold grant (0..1 draws) -> boss check -> POTION DROP (0..2 draws) -> reward
-//     offer roll. Every later roll therefore reads the counter AFTER the drop, so the
-//     drop is reproducible from the action log forever.
+//     within one victory is FIXED and part of the format (the full chain lives in
+//     rules/act.js resolveVictory's header): relic heal (0 draws) -> tier gold (0..1)
+//     -> relic gold (0) -> boss branch (the chain ENDS there with the relic offer) ->
+//     POTION DROP (0..2 draws) -> elite relic drop (elite fights: 2) -> reward offer
+//     roll. Every later roll therefore reads the counter AFTER the drop, so the drop is
+//     reproducible from the action log forever.
 //   * A victory on a fight tier with belt room consumes exactly ONE draw: the drop
 //     roll `intAt(seed, counter, 100)`. The band convention is the LOWEST `chance`
 //     values of the 100 equally likely results: the drop hits when the roll is
@@ -27,8 +29,9 @@
 //     Getting a 4th potion is impossible (StS parity), and "impossible" must not cost
 //     the stream anything — a suppressed victory consumes the same draws it did before
 //     the potion system existed at that step.
-//   * The boss NEVER rolls (the run ends; nothing is consumed) — checked BEFORE the
-//     drop in act.js, exactly like the gold path's flat-tier short-circuit.
+//   * The boss NEVER rolls a potion (the victory branch ends the chain at the relic
+//     offer; nothing is consumed) — checked BEFORE the drop in act.js, exactly like the
+//     gold path's flat-tier short-circuit.
 //   * Quaff and discard consume ZERO draws. Every potion number is fixed (no per-potion
 //     variance); the belt carries ids, not rolled values.
 //

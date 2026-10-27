@@ -15,8 +15,7 @@ import { poolSelection } from './unlocks.js';
 import { generateMap, ROWS } from './rules/map.js';
 import { buildEncounterTable, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { DEFAULT_RELIC } from './rules/relics.js';
-import { actions as legalActions } from './actions.js';
-import { _setCardDefs, BASE_ENERGY, HAND_SIZE, REST_HEAL, REWARD_CHOICES } from './rules/act.js';
+import { actions as legalActions } from './actions.js';import { _setCardDefs, BASE_ENERGY, HAND_SIZE, REST_HEAL, REWARD_CHOICES } from './rules/act.js';
 import { offerBoons } from './rules/kindling.js';
 import { rollQuests, advanceQuests } from './rules/quests.js';
 // One row per action kind: what step() dispatches to (the mechanics live in rules).
@@ -239,9 +238,15 @@ export function newRun(opts = {}) {
 
   // B5 alternate biome: recorded only when not the default, so foundry hashes are unchanged.
   if (biome !== DEFAULT_BIOME) state.biome = biome;
-  // B4 second hero: a character whose relic is not the Kindled Heart records it, so the
-  // default (Ashwright) state keeps no new field and every existing hash is unchanged.
-  if (character.startingRelic && character.startingRelic !== DEFAULT_RELIC) state.relic = character.startingRelic;
+  // S7 RELICS: every run carries its held relics as an ARRAY in acquisition order —
+  // relics[0] is the character's starting relic (the kindling Iron Skin boon's "{relic}").
+  // The B4-era singular `state.relic` field is GONE from fresh states: every read goes
+  // through rules/relics.js relicList(), which tolerates a legacy save by falling back
+  // to `[state.relic ?? DEFAULT_RELIC]`. A relic gained later (the elite drop, the boss
+  // pick) appends; the order is part of the format. The field is unconditionally present
+  // on fresh states — a deliberate format change, exactly like S3's gold — so every S7
+  // hash differs from S6's, and the goldens are regenerated against the new format.
+  state.relics = [character.startingRelic ?? DEFAULT_RELIC];
   // B1 Kindling (opt-in). Only an opted-in run gains the extra fields and draws, so the
   // default state — and every existing golden hash — is byte-identical to before.
   if (opts.kindling === true) {

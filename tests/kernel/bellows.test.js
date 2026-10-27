@@ -22,16 +22,19 @@ function drive(opts, n) {
   return s;
 }
 
-test('an Ashwright run carries no relic field and keeps its hash', () => {
+test('an Ashwright run starts with exactly the Kindled Heart (S7 relic array)', () => {
   const a = newRun({ seed: 4 });
+  // S7: the B4-era singular `state.relic` field is gone from fresh states; every run
+  // carries the held relics as an ARRAY, relics[0] the character's starter.
   assert.equal('relic' in a, false);
+  assert.deepEqual(a.relics, ['burning_blood']);
   assert.equal(hash(a), hash(newRun({ seed: 4, character: 'ironclad' })));
 });
 
 test('the Bellows Keeper starts with 54 HP, his deck and the Cyan Lantern', () => {
   const r = newRun({ seed: 4, character: 'bellows' });
   assert.equal(r.player.maxHp, 54);
-  assert.equal(r.relic, 'cyan_lantern');
+  assert.deepEqual(r.relics, ['cyan_lantern']);
   const ids = r.deck.map((c) => c.cardId);
   assert.equal(ids.length, 10);
   assert.ok(ids.includes('gust') && ids.includes('fan_flames'));
@@ -76,4 +79,4 @@ test('log header carries the hero and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:834053bed00fc520dc24b86ed050d0b9d29f208b6dabf29f2c1225aaf7c147ac';
+const GOLDEN = 'sha256:97cde0ae8988ddf7b173142d84e14c89db1b7600418d62e2efe9a65ab808005c';

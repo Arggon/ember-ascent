@@ -139,10 +139,13 @@ test('drop rates sit at their tiers across seeds: 40 / 40 / 60 percent, boss nev
   assert.ok(rates.combat_strong > 0.25 && rates.combat_strong < 0.55, `strong drop rate ${rates.combat_strong} near 40%`);
   assert.ok(rates.elite > 0.45 && rates.elite < 0.75, `elite drop rate ${rates.elite} near 60%`);
   assert.ok(rates.elite > rates.combat_weak, 'the elite tier outrates the fight tiers');
-  // The boss is short-circuited before the drop: no potion, no draw, run ends.
+  // The boss is short-circuited before the drop (S7: its victory opens the relic offer
+  // instead of ending the run, and the potion stage is never reached): no potion, no
+  // drop draws — the offer roll's 3 draws are the relic system's, not the belt's.
   const boss = resolveVictory(wonState({ nodeType: 'boss' }), null);
-  assert.equal(boss.state.phase, 'ended');
-  assert.deepEqual(boss.state.potions, [], 'the boss never rolls');
+  assert.equal(boss.state.phase, 'reward');
+  assert.deepEqual(boss.state.potions, [], 'the boss never rolls a potion');
+  assert.equal(boss.state.rngDraws - 500, 3, 'only the relic offer roll consumed draws');
 });
 
 test('draw accounting: miss = 1, hit = 2, full belt = 0, and the offer reads the post-drop counter', () => {

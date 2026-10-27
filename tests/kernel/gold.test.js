@@ -15,6 +15,7 @@ import { loadKernel } from '../helpers/harness.mjs';
 import { begin, submit, legal, runHash, saveObject, loadObject } from '../../src/surface/session.js';
 import { resolveVictory, REWARD_CHOICES } from '../../src/kernel/rules/act.js';
 import { NODE_TYPES } from '../../src/kernel/rules/map.js';
+import { relicDef } from '../../src/kernel/rules/relics.js';
 import { intAt, pickAt } from '../../src/kernel/rng.js';
 
 const K = await loadKernel();
@@ -80,34 +81,60 @@ test('each combat tier pays inside its range from exactly one seeded draw', () =
     assert.equal(gold.amount, lo + intAt(s.seed, s.rngDraws, hi - lo + 1),
       `${tier}: the amount is intAt at the pre-grant counter`);
     // Isolated accounting: the 'heal' branch returns BEFORE the card-reward roll, so the
-    // whole rngDraws delta there is the gold draw alone — exactly one.
+    // heal branch's rngDraws delta is the gold draw alone on the fight tiers. S7: an
+    // ELITE additionally drops its guaranteed relic AFTER the potion stage — exactly 2
+    // more draws (tier band + uniform pick; rules/relics.js) even with this full belt,
+    // so the elite's delta is 1 + 2 = 3.
     const restOnly = resolveVictory(wonState({ nodeType: tier, rewardOverride: 'heal' }), null);
-    assert.equal(restOnly.state.rngDraws - s.rngDraws, 1, `${tier}: exactly one draw consumed`);
-    // And the card reward rolls from the counter AFTER the grant, so the grant is part
-    // of the format the offer is reproducible from. Elites draw one extra card, exactly
+    assert.equal(restOnly.state.rngDraws - s.rngDraws, tier === 'elite' ? 3 : 1,
+      `${tier}: exactly the documented draws consumed`);
+    // And the card reward rolls from the counter AFTER everything the chain consumed
+    // (gold 1, belt-full potion 0, elite relic drop 2), so each stage is part of the
+    // format the offer is reproducible from. Elites draw one extra card, exactly
     // as resolveVictory computes the offer size.
     assert.equal(out.state.phase, 'reward', `${tier}: the fight hands over to the reward`);
     assert.equal(out.state.reward.gold, gold.amount, `${tier}: the reward carries the spoils for the "+N" line`);
     const offerCount = REWARD_CHOICES + (tier === 'elite' ? 1 : 0);
+    const chainDraws = 1 + (tier === 'elite' ? 2 : 0);
     assert.deepEqual(
       out.state.reward.cards,
-      pickAt(s.seed, s.rngDraws + 1, s.draftPool, offerCount).picked,
-      `${tier}: the offer reads the post-grant counter`,
+      pickAt(s.seed, s.rngDraws + chainDraws, s.draftPool, offerCount).picked,
+      `${tier}: the offer reads the post-chain counter`,
     );
     assert.match(observe(out.state), new RegExp(`spoils \\+${gold.amount} gold \\(purse ${out.state.player.gold}\\)`));
+    // S7: an elite's spoils carry the relic (the drop is guaranteed), the fight tiers'
+    // spoils name none. The reward row and the dump's spoils line agree.
+    if (tier === 'elite') {
+      assert.ok(typeof out.state.reward.relic === 'string' && out.state.relics.includes(out.state.reward.relic),
+        'elite: the dropped relic is held and named in the reward');
+      assert.match(observe(out.state), new RegExp(`spoils relic: ${relicDef(out.state.reward.relic).name}`),
+        'the spoils line names the gained relic');
+    } else {
+      assert.equal(out.state.reward.relic, undefined, `${tier}: no relic line`);
+    }
   }
 });
 
-test('the boss pays a flat 100 before the run ends, consuming no draw', () => {
+test('the boss pays a flat 100, then opens the relic OFFER (S7) — zero gold draws, three offer draws', () => {
   const s = wonState({ nodeType: 'boss', player: { gold: 42 } });
   const out = resolveVictory(s, null);
   const gold = out.events.find((e) => e.t === 'gold');
   assert.deepEqual(gold, { t: 'gold', who: 'player', amount: 100, source: 'boss' });
   assert.equal(out.state.player.gold, 142, 'the grant lands on the purse');
-  assert.equal(out.state.rngDraws, s.rngDraws, 'a flat tier rolls nothing: zero draws consumed');
-  assert.equal(out.state.phase, 'ended', 'the boss grant happens BEFORE the flip to ended');
-  assert.equal(out.state.outcome, 'win');
-  assert.match(observe(out.state), /gold 142/);
+  // S7: the flat tier still rolls NOTHING for gold, but the victory now rolls the boss's
+  // three relic offers — exactly 3 draws (pickAt over the not-held rare pool) — and the
+  // phase opens as `reward` instead of ending: the run ends at the pick or the skip
+  // (rules/steps.js), one step later than pre-S7.
+  assert.equal(out.state.rngDraws, s.rngDraws + 3, 'gold 0 draws + the 3-offer roll');
+  assert.equal(out.state.phase, 'reward', 'the boss grant happens BEFORE the flip to reward');
+  assert.equal(out.state.reward.boss, true, 'the reward is the boss relic offer');
+  assert.deepEqual(out.state.reward.cards, [], 'the boss grants no card (StS parity)');
+  assert.equal(out.state.reward.gold, 100, 'the reward carries the spoils');
+  assert.equal(out.state.relics.length, 1, 'nothing is held yet — the pick is the player\u2019s');
+  assert.equal(out.state.outcome, null, 'the run has not ended until the offer resolves');
+  assert.match(observe(out.state), /GOLD 142/, 'the header carries the purse in the offer phase');
+  assert.match(observe(out.state), /spoils \+100 gold/, 'the spoils line carries the grant');
+  assert.match(observe(out.state), /REWARD — claim the warden/);
   assert.equal(snapshot(out.state).player.gold, 142);
 });
 

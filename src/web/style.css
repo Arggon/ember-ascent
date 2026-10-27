@@ -7242,6 +7242,49 @@ html, body {
 }
 
 /* ==========================================================================================
+   RELICS (S7) — the HUD's one readout chip beside the belt, the elite spoils chip on the
+   reward head, and the warden's offer buttons. A relic acts through HOOKS, never through a
+   click, so the chip is a readout (title/aria carry the list); the offers are the kindling
+   boon buttons' own `.boon` shell with a relic tint, and an offer the kernel refuses is
+   `.inert` (visible, unclickable, honest).
+   ========================================================================================== */
+.relics {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  font-weight: 800;
+  font-size: var(--fs-3);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 130, 40, 0.4);
+  background: var(--stat-well);
+  color: #ff9d3a;
+  white-space: nowrap;
+  cursor: help;
+}
+.relics.none { color: var(--faint); border-color: var(--edge); opacity: 0.75; }
+.relics .relic-glyph { display: inline-flex; width: 14px; height: 14px; }
+.relics .relic-glyph svg { display: block; width: 100%; height: 100%; }
+.relics .relic-glyph .m { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.relic-count { font-variant-numeric: tabular-nums; }
+
+/* The elite's gained relic on the reward head: the spoils chip's own shape, tinted to the
+   relic accent instead of the coin's gold. */
+.reward-relic { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  margin-left: var(--sp-3); padding: 3px 11px; font-size: var(--fs-3); font-weight: 700;
+  color: #ff9d3a; border: 1px solid rgba(255, 130, 40, 0.34); border-radius: 999px;
+  background: var(--stat-well); }
+.reward-relic .coin-glyph { display: inline-flex; width: 14px; height: 14px; }
+.reward-relic .coin-glyph svg { display: block; width: 100%; height: 100%; }
+.reward-relic .coin-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The warden's offers reuse the boon shell; the relic tint and the inert row are the only
+   additions. An inert offer stays VISIBLE (the raw name reads) but promises no click. */
+.relic-offer { border-color: rgba(255, 130, 40, 0.4); }
+.relic-offer.inert { opacity: 0.55; cursor: not-allowed; border-style: dashed; }
+.relic-offer.inert:hover, .relic-offer.inert:focus-visible { border-color: rgba(255, 130, 40, 0.4); transform: none; box-shadow: none; }
+
+/* ==========================================================================================
    POTION BELT (S5) — the three belt slots beside the gold readout, and the quaff/discard
    popover. A filled slot is a named glyph chip (mark + name; tooltip = the kernel's own
    effect sentence); an empty slot is a dim flask. In combat a filled chip is a BUTTON that

@@ -26,6 +26,10 @@
 //      the belt (seed 1: fight 2, Ember Draught); in the next combat the chip opens the
 //      quaff/discard popover, quaffing consumes the slot and lands the effect on the
 //      engine state, and a discard frees exactly its slot
+//  11. the S7 relics: one HUD readout chip (count + the held names in its tooltip); an
+//      elite victory always drops a relic (the spoils chip, the chip counting to 2); the
+//      boss offers three relic buttons instead of cards, taking one ends the run in
+//      victory, and the run summary names the relic count
 //
 // RUN. `npm run test:browser`. Deliberately NOT matched by the default `npm test`
 // glob (`tests/**/*.test.js`): this file is `.spec.js` so the default suite stays
@@ -939,9 +943,10 @@ test('a full run ends on the restart menu, not a blank stage', { timeout: 300000
   const restartVisible = await page.getByRole('button', { name: /Restart/i }).isVisible();
   assert.ok(restartVisible, 'the restart menu is on the screen after the run ends');
   // S3: the summary line carries the purse the run finished with (the kernel's own
-  // player.gold — the same value the HUD showed from boot).
+  // player.gold — the same value the HUD showed from boot). S7: beside it, the relic
+  // count the run carried to its end (the boss pick adds the third one on this walk).
   const endStats = await page.locator('.end-stats').textContent();
-  assert.match(endStats, /· \d+ gold$/, `the run summary names the final purse: ${endStats}`);
+  assert.match(endStats, /· \d+ gold · \d+ relics?$/, `the run summary names the purse and the relic count: ${endStats}`);
 });
 
 // ---------------------------------------------------------------------------
@@ -1391,7 +1396,9 @@ test('event: the wayside tells its story, a choice pays and takes, and the beat 
   if (pref) {
     await page.locator(`button[aria-label^="${pref === 'climb' ? 'Climb down' : 'Stoke it awake'}"]`).click();
   } else {
-    await page.locator('.event-choices .boon[aria-disabled="false"]').first().click();
+    // Affordable event choices carry no `disabled` attribute (the view greys with
+    // disabled="disabled" exactly when the kernel refuses) — this is the enabled form.
+    await page.locator('.event-choices .boon:not([disabled])').first().click();
   }
   await page.waitForSelector('.event-result', { timeout: 5000 });
   const after = await page.evaluate(() => {
@@ -1475,4 +1482,124 @@ test('help sheet: the keyboard guard swallows everything but Escape, and the run
   await sleep(200);
   assert.equal(await page.locator('.modal').count(), 0, 'and Escape closes that too');
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+// ---------------------------------------------------------------------------
+// 11. the S7 relics: the HUD carries a readout chip from boot (count + names in the
+//     tooltip); an ELITE victory always drops a relic (the spoils chip on the reward
+//     head, the HUD chip counting to 2); the BOSS victory offers three relic buttons
+//     instead of cards, taking one ends the run in victory, and the summary names the
+//     relic count. Real clicks only; the injected deck ends fights fast.
+// ---------------------------------------------------------------------------
+test('relics: the chip counts up on an elite drop and the warden offers three', { timeout: 300000 }, async (t) => {
+  if (!chromium) return t.skip('playwright/chromium unavailable');
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: 'reduce', // paint instantly: the walk's assertions are structural
+  });
+  t.after(() => { void browser.close(); });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+  await page.goto(`${base}/src/web/index.html?seed=7`);
+  await page.waitForLoadState('domcontentloaded');
+
+  // Boot: exactly one held relic (the hero's starter), counted by the HUD chip.
+  await page.locator('button.boon').first().click();
+  await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+  const chip = page.locator('.relics');
+  assert.equal(await chip.count(), 1, 'the HUD carries one relic readout');
+  assert.equal(await chip.locator('.relic-count').textContent(), '1', 'one held relic at boot');
+  const chipLabel = await chip.getAttribute('aria-label');
+  assert.match(chipLabel, /Relics: 1 held: Kindled Heart|Cyan Lantern/, `the chip names the starter: ${chipLabel}`);
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    for (let i = 0; i < 12; i += 1) save.state.deck.push({ uid: `e2e-relic-${i}`, cardId: 'bludgeon' });
+    // The naive auto-player bleeds out at the row-6 elite (deterministically, hp 71 ->
+    // 9 by floor 5): a padded HP pool removes the attrition coin-flip without touching
+    // what this test claims — the drop chain, the chip, the offers, the ended win.
+    save.state.player.maxHp = 999;
+    save.state.player.hp = 999;
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+
+  // The walk: elites preferred, then fights, then the boss — real clicks only. Claims
+  // are taken on the way: the elite's spoils chip, the HUD count, the boss's three
+  // offers, and the summary's relic count at the end.
+  let sawEliteSpoils = null;
+  let bossOffers = 0;
+  for (let guard = 0; guard < 400; guard += 1) {
+    const phase = await page.evaluate(() => window.__dlb.snapshot().phase);
+    if (phase === 'ended') break;
+    if (phase === 'map') {
+      const elite = page.locator('button[aria-label="Travel to Elite"]').first();
+      const boss = page.locator('button[aria-label="Travel to Slag Warden"]').first();
+      if ((await boss.count()) > 0) await boss.click();
+      else if ((await elite.count()) > 0) await elite.click();
+      else await page.locator('button[aria-label^="Travel to"]').last().click();
+      await sleep(500);
+    } else if (phase === 'combat') {
+      const card = page.locator('button[data-slot][aria-disabled="false"]').first();
+      if ((await card.count()) > 0) {
+        await card.click();
+        const tgt = page.locator('.enemy.targeting').first();
+        if ((await tgt.count()) > 0) await tgt.click();
+        await sleep(700);
+      } else {
+        await endTurn(page);
+        await sleep(1300);
+      }
+    } else if (phase === 'reward') {
+      const spoils = page.locator('.reward-relic');
+      if ((await spoils.count()) > 0 && sawEliteSpoils === null) {
+        sawEliteSpoils = (await spoils.first().textContent()).trim();
+        assert.equal(await chip.locator('.relic-count').textContent(), '2',
+          'the elite drop lit the HUD chip to 2');
+      }
+      const offers = page.locator('.relic-offer');
+      if ((await offers.count()) > 0) {
+        bossOffers = await offers.count();
+        assert.equal(bossOffers, 3, 'the warden offers exactly three relics');
+        const head = await page.locator('.reward-head span').first().textContent();
+        assert.match(head, /warden/, `the boss reward head names the relic: ${head}`);
+        await offers.first().click(); // take the first offer — the policies' stance
+        await sleep(900);
+        continue;
+      }
+      await leaveReward(page);
+    } else if (phase === 'rest') {
+      await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else if (phase === 'event') {
+      // A wayside sits on some seed-7 paths: take the free choice, then continue.
+      // Affordable choices carry no `disabled` attribute (dimmed ones carry
+      // disabled="disabled"), so :not([disabled]) is the enabled-selector form.
+      await page.locator('.event-choices .boon:not([disabled])').first().click();
+      await page.waitForSelector('.event-result, button[data-action="v0"]', { timeout: 5000 });
+      const cont = page.locator('button[data-action="v0"]').first();
+      if (await cont.count()) { await cont.click(); await sleep(500); }
+    } else {
+      await sleep(400);
+    }
+  }
+  await sleep(1000);
+  assert.equal(errors.length, 0, `no page errors during the walk: ${errors.join(' | ')}`);
+  assert.ok(sawEliteSpoils, 'an elite victory showed its spoils relic chip on the reward head');
+  assert.equal(await page.evaluate(() => window.__dlb.snapshot().phase), 'ended', 'taking the boss relic ended the run');
+  const outcome = await page.evaluate(() => window.__dlb.snapshot().ended.outcome);
+  assert.equal(outcome, 'win', 'taking the relic ends the run in victory');
+  // The elite count is path-dependent (the walk prefers elites and seed 7 can offer
+  // two), so the total is derived from the kernel, not hardcoded: starter + N elites
+  // + the boss pick, chip and summary both agreeing with it.
+  const held = await page.evaluate(() => window.__dlb.snapshot().relics.map((r) => ({ id: r.relicId, starting: r.starting })));
+  assert.ok(held.length >= 3, `starter + at least one elite drop + the boss pick: ${JSON.stringify(held)}`);
+  assert.equal(held[0].starting, true, 'the starter leads the acquisition order');
+  assert.equal(held[held.length - 1].starting, false, 'the boss pick closed the run');
+  assert.equal(await chip.locator('.relic-count').textContent(), String(held.length), 'the chip counts every held relic');
+  const endStats = await page.locator('.end-stats').textContent();
+  assert.match(endStats, new RegExp(`· ${held.length} relics$`), `the summary counts the relics: ${endStats}`);
 });

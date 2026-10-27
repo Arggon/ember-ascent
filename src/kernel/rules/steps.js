@@ -20,6 +20,7 @@ import { findNode } from './map.js';
 import { rollShopInventory, REMOVAL_PRICE } from './shop.js';
 import { rollEventAt, resolveChoice, resolveTemper, continueEvent } from './events.js';
 import { potionDef, quaffEffects } from './potions.js';
+import { activeRelicDefs, restHealBonusOf, bossOfferOpen, gainRelic } from './relics.js';
 import { shuffleAt, pickAt } from '../rng.js';
 
 /** Play one card from hand and settle the combat if it ended. */
@@ -200,6 +201,37 @@ function pickReward(state, action) {
   };
 }
 
+/* ---------------------------------------------------------------- S7: relic picks --
+ * The boss's relic OFFER resolves here. The id was matched against the legal list by
+ * step() before this runs, so the offer exists, the table knows it, and it is not
+ * already held (actions.js mirrors gainRelic's own guards — the S4.1 ruling). The
+ * handler still degrades to a no-op on a stale match rather than throwing.
+ *
+ * DRAW ACCOUNTING (rules/relics.js header): a pick is a CHOICE, not a roll — zero draws.
+ * gainRelic is the ONE acquisition path, so Ember Heart's max-HP passive applies here
+ * exactly as it does on the elite drop. Taking (or skipping) is what ENDS the run: the
+ * boss victory opened this reward phase instead of `ended`, and this handler closes it
+ * with the win the victory earned — `run_end` fires HERE, one step later than pre-S7. */
+
+/** Take one relic offer: acquire it, then end the run in victory. */
+function pickRelic(state, match) {
+  const offer = (Array.isArray(state.reward?.relicOffers) ? state.reward.relicOffers : [])[match.index];
+  if (!bossOfferOpen(offer, state)) return { state, events: [] };
+  const got = gainRelic(state, offer, 'boss');
+  return {
+    state: { ...got.state, phase: 'ended', outcome: 'win', reward: null },
+    events: [...got.events, { t: 'run_end', outcome: 'win' }],
+  };
+}
+
+/** Leave a relic offer without taking it (the boss's `s0`): the run still ends in victory. */
+function skipBossRelic(state) {
+  return {
+    state: { ...state, phase: 'ended', outcome: 'win', reward: null },
+    events: [{ t: 'relic_skipped' }, { t: 'run_end', outcome: 'win' }],
+  };
+}
+
 /* --------------------------------------------------------------- S4: the shop --
  * Four handlers, one per shop action kind. The id was matched against the legal list
  * by step() before any of these run, so affordability and mode are already guaranteed:
@@ -324,6 +356,17 @@ function quaffPotion(state, match) {
   let next = out.state;
   const events = [{ t: 'potion_quaffed', slot: idx + 1, potion: potionId, name: def.name }, ...out.events];
 
+  // S7 Flask Grip: every held relic's quaffBlock lands AFTER the potion resolves, one
+  // `block` event per relic (acquisition order — the same per-relic convention the
+  // combat-start hooks keep). Zero draws: the hook is a fixed number, like every relic.
+  for (const { id, def: relic } of activeRelicDefs(next)) {
+    const block = relic.quaffBlock ?? 0;
+    if (block > 0) {
+      next = { ...next, player: { ...next.player, block: next.player.block + block } };
+      events.push({ t: 'block', who: 'player', amount: block, source: id });
+    }
+  }
+
   // The same settle-as-playCard tail: an Ember Draught that kills the last enemy must
   // resolve victory through the ONE implementation, combat_won included (DR-6), or
   // the fight would hang on an all-dead field with only `e1` left to press.
@@ -358,12 +401,23 @@ export const STEP_HANDLERS = Object.freeze({
   end_turn: (state, _match, content) => endTurn(state, content.cards),
   travel,
   pick: pickReward,
-  skip: (state) => ({ state: { ...state, phase: 'map', reward: null }, events: [{ t: 'reward_skipped' }] }),
+  // S7: `s0` means two skips, split by the reward's own shape — the OLD skip (cards on
+  // the table) walks back to the map; the BOSS skip (relic offers, cards omitted) walks
+  // away from the warden's relic and ends the run in victory. One state never offers
+  // both (the `e1` id-letter precedent): a boss reward has no cards, a card reward has
+  // no relic offers. Skipping the boss relic is legal (StS parity) and still a win —
+  // the relic was optional; the victory was not.
+  skip: (state) => (state.reward?.boss
+    ? skipBossRelic(state)
+    : { state: { ...state, phase: 'map', reward: null }, events: [{ t: 'reward_skipped' }] }),
+  relic_pick: pickRelic,
   rest_heal: (state) => {
-    const healed = Math.min(REST_HEAL, state.player.maxHp - state.player.hp);
+    // S7 Hearth Ash / Ash Crown: the held relics' restHealBonus folds into the ONE rest
+    // heal (one `heal` event, source 'rest' — the total is the fact). Zero extra draws.
+    const heal = Math.min(REST_HEAL + restHealBonusOf(state), state.player.maxHp - state.player.hp);
     return {
-      state: { ...state, player: { ...state.player, hp: state.player.hp + healed }, phase: 'map', ...(state.tempers ? { temperOffers: null } : {}) },
-      events: [{ t: 'heal', who: 'player', amount: healed, source: 'rest' }],
+      state: { ...state, player: { ...state.player, hp: state.player.hp + heal }, phase: 'map', ...(state.tempers ? { temperOffers: null } : {}) },
+      events: [{ t: 'heal', who: 'player', amount: heal, source: 'rest' }],
     };
   },
   temper: (state, match) => {

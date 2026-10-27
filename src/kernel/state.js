@@ -226,6 +226,30 @@ export function validateSave(raw) {
     if (event !== undefined && event !== null && (typeof event !== 'object' || Array.isArray(event))) {
       problems.push('save.state: "event" must be an object or null');
     }
+    // S7 relics: OPTIONAL like every post-v1 field — a legacy save without it reads, at
+    // every `relicList()` read, as exactly its B4-era singular relic (`state.relic`) or
+    // the Ashwright default. When present it must be an array of strings with NO
+    // duplicates: the drop tables filter held relics (a relic can never drop twice), so
+    // a duplicate is a state the engine can never produce and is refused at load, not
+    // repaired — the same spirit as the negative-gold and over-capacity-belt refusals.
+    // The ID STRINGS are NOT checked against the table: ids the relic roster no longer
+    // knows degrade everywhere (raw id as the name, no hooks, no drop-pool presence) —
+    // the S2.1/S4.1/S5 tolerance ruling, never a load-time throw.
+    const relics = /** @type {Record<string, unknown>} */ (st).relics;
+    if (relics !== undefined) {
+      if (!Array.isArray(relics)) {
+        problems.push('save.state: "relics" must be an array');
+      } else {
+        relics.forEach((r, i) => {
+          if (typeof r !== 'string') problems.push(`save.state.relics[${i}] must be a string`);
+        });
+        const seen = new Set();
+        relics.forEach((r, i) => {
+          if (typeof r === 'string' && seen.has(r)) problems.push(`save.state.relics[${i}]: duplicate relic "${r}"`);
+          if (typeof r === 'string') seen.add(r);
+        });
+      }
+    }
   }
   const actions = /** @type {Record<string, unknown>} */ (raw).actions;
   if (actions !== undefined && !Array.isArray(actions)) problems.push('save: "actions" must be an array');
