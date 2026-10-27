@@ -53,7 +53,7 @@ Process rules (standing):
 | S4 | Shop | `shop` node type + phase; deterministic prices; buy card, remove-card service, leave | shop view (buy grid, service buttons, gold readout) | closed — 58aefe6 + fixes af50324, QA 11/11, review APPROVE |
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | closed — c83a2d0, QA 11/11, review APPROVE |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | closed — 69b05eb + fixes d7441b6, QA 11/11, review APPROVE |
-| S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | pending |
+| S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | committed 190a3e8 — orchestrator-run QA 11/11, in review |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending |
 | S9 | Content II: enemies + Act 2 | new encounters + second biome/map skeleton | map/act presentation | pending |
 
@@ -204,3 +204,16 @@ Process rules (standing):
   a rest site (S6.1 class, pre-existing); (d) hud.js stacked JSDoc dedup nit.
 - 2026-10-25 — S7 (relics) development dispatched. Backlog now rides into a future round
   or S8's fix capacity; the pipeline's next gates are S7's loop, then content scale.
+- 2026-10-25 — S7 (relics) dev was network-killed three times; the orchestrator took over
+  the finish: the new relics e2e had three TEST bugs (no event branch — the seed-7
+  wayside trapped the walk; a dead `[aria-disabled="false"]` selector — affordable event
+  buttons simply lack `disabled`, the S6 e2e's fallback was the same latent bug; a
+  hardcoded chip count where the elite-preferring path yields 4). Fixed in the spec,
+  probed live, suites green (341/340/1 node, 17/17 browser). The S7 QA agent then hit a
+  provider quota kill with zero artifacts, so the orchestrator ran the manual QA inline:
+  11/11 PASS — chip+starter (Kindled Heart), two elite drops from the common pool with
+  kernel-verbatim tooltips (Cyan Lantern, Forge Iron), exactly 3 rare boss offers
+  (Deep Well/Slag Crown/Ash Crown), pick -> ended win with HUD/summary agreeing (4
+  relics), hooks live (Lantern energy 4 turn 1, Forge Iron block 4, Hearth Ash rest
+  delta 16 = 8+8), torn relic ids degrade (raw id shown, chip counts known only),
+  Walk away -> victory keeping drops. Committed 190a3e8; solo review dispatched.
