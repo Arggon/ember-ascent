@@ -10,7 +10,7 @@
 //
 // Budget: the dump is designed to stay under 250 tokens (worst of o200k/cl100k) and
 // every action line under 8 — enforced by tests/budget.test.js on measured counts.
-import { ENEMIES, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
+import { ENEMIES, BIOMES, currentBiome, startBiomeIds } from './rules/encounters.js';
 import { availableNodes, NODE_TYPES } from './rules/map.js';
 import { defaultContent, draftPoolFrom } from './content.js';
 import { actions as legalActions } from './actions.js';
@@ -213,7 +213,9 @@ function body(state, opts) {
     case 'ended':
       return [
         // S7: the relic count joins the summary — what the run carried, beside the purse.
-        `GAME OVER — ${state.outcome === 'win' ? 'VICTORY' : 'DEFEAT'} | floor ${state.floor + 1} | steps ${state.stepIndex} | gold ${state.player.gold ?? 0} | relics ${relicList(state).length}`,
+        // S9: an act beyond the first is named, so "floor 8" cannot be mistaken for the
+        // act-1 summit. A legacy save (act 1, no field) prints the line unchanged.
+        `GAME OVER — ${state.outcome === 'win' ? 'VICTORY' : 'DEFEAT'} | floor ${state.floor + 1} | steps ${state.stepIndex} | gold ${state.player.gold ?? 0} | relics ${relicList(state).length}${(state.act ?? 1) > 1 ? ` | act ${state.act}` : ''}`,
       ];
     default:
       return [`phase ${state.phase}`];
@@ -425,6 +427,9 @@ function eventBody(state) {
 
 function mapBody(state, opts) {
   const lines = [`MAP — floor ${state.floor + 1}/${state.map.rows.length}`];
+  // S9: from act 2 on, the map names its act — the dump must say WHICH climb the
+  // floors belong to now that the run outlives its first summit.
+  if ((state.act ?? 1) > 1) lines.splice(0, 1, `MAP — act ${state.act} — floor ${state.floor + 1}/${state.map.rows.length}`);
   if (state.quests) lines.push(`QUESTS ${state.quests.map((q) => `${q.id} ${q.done ? 'DONE' : `${q.progress}/${QUESTS[q.id].goal}`}`).join(' | ')}`);
   lines.push('NEXT');
   availableNodes(state).forEach((n, i) => {
@@ -1147,9 +1152,19 @@ export function snapshot(state) {
     turn: state.combat?.turn ?? 0,
     energyPerTurn: state.energyPerTurn ?? 3,
     character: state.character,
-    biome: state.biome ?? DEFAULT_BIOME,
-    biomeName: BIOMES[state.biome ?? DEFAULT_BIOME].name,
-    biomes: Object.entries(BIOMES).map(([id, b]) => ({ id, name: b.name })),
+    // S9: which act the run is standing in, and how long the climb is. `acts` is null
+    // on a legacy save (the field postdates S9) so a surface can tell the runs apart.
+    act: state.act ?? 1,
+    acts: state.acts ?? null,
+    // The CURRENT act's biome (S9): the run's own biome in act 1, the deep act-2 biome
+    // after the transition — derived kernel-side (rules/encounters.js currentBiome),
+    // because state.biome stays the STARTING biome (the log header's meaning).
+    biome: currentBiome(state),
+    biomeName: BIOMES[currentBiome(state)].name,
+    // S9: the START paths — every biome but the act-2 one (rules/encounters.js
+    // startBiomeIds). The kindling picker renders these; the full table (including the
+    // Deeps) stays in the public BIOMES export.
+    biomes: startBiomeIds().map((id) => ({ id, name: BIOMES[id].name })),
     characterName: defaultContent().characters.get(state.character)?.name ?? state.character,
     relicName: defaultContent().characters.get(state.character)?.relicName ?? '',
     difficulty: state.difficulty,
@@ -1214,8 +1229,10 @@ export function snapshot(state) {
     quests: state.quests
       ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))
       : null,
-    // S7: the summary gains the relic count — what the run carried to its end.
-    ended: state.phase === 'ended' ? { outcome: state.outcome, floor: state.floor + 1, steps: state.stepIndex, relics: relicList(state).length } : null,
+    // S7: the summary gains the relic count — what the run carried to its end. S9:
+    // beside them, the act the run ended in (the climb's last chapter, for the end
+    // screen's flavor; a legacy save reads as act 1).
+    ended: state.phase === 'ended' ? { outcome: state.outcome, floor: state.floor + 1, steps: state.stepIndex, relics: relicList(state).length, act: state.act ?? 1 } : null,
     // The plain-English layer, computed from this same state. A human surface paints
     // `description` / `text` / `glossary`; the compact fields above stay untouched for
     // the CLI. One state, two renderings, one place that knows the rules.

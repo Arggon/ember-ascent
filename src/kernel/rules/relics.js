@@ -70,6 +70,8 @@ export const DEEP_WELL_DRAW = 1;
 export const ASH_CROWN_HEAL = 3;
 /** Slag Crown's Strength at combat start (its Energy row is LANTERN_ENERGY-sized). */
 export const SLAG_CROWN_STRENGTH = 2;
+export const CINDER_WARD_BLOCK = 6;
+export const ASH_LEDGER_GAIN = 20;
 
 /** A state with no `relic` field carries this one (Ashwright runs keep their old hashes). */
 export const DEFAULT_RELIC = 'burning_blood';
@@ -151,6 +153,21 @@ export const RELICS = Object.freeze({
     summary: `E+1 turn 1 PWR+${SLAG_CROWN_STRENGTH}`,
     text: `On the first turn of each combat, gain ${LANTERN_ENERGY} Energy and ${SLAG_CROWN_STRENGTH} Strength.`,
     firstTurnEnergy: LANTERN_ENERGY, combatStartStrength: SLAG_CROWN_STRENGTH,
+  },
+  // S9: two more rares so the ACT-2 warden's offer is a real three-choice — the rare
+  // pool must outlive act 1's pick (5 rares, one taken per boss, two bosses). Both
+  // compose existing hooks; no new mechanics, no new draws.
+  cinder_ward: {
+    tier: 'rare', name: 'Cinder Ward',
+    summary: `B${CINDER_WARD_BLOCK} turn 1`,
+    text: `At the start of each combat, gain ${CINDER_WARD_BLOCK} Block.`,
+    combatStartBlock: CINDER_WARD_BLOCK,
+  },
+  ash_ledger: {
+    tier: 'rare', name: 'Ash Ledger',
+    summary: `GOLD+${ASH_LEDGER_GAIN}/fight`,
+    text: `After each combat, gain ${ASH_LEDGER_GAIN} gold.`,
+    goldAfterFight: ASH_LEDGER_GAIN,
   },
 });
 

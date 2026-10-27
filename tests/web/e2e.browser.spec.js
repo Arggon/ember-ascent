@@ -1532,6 +1532,8 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
   // offers, and the summary's relic count at the end.
   let sawEliteSpoils = null;
   let bossOffers = 0;
+  let climbedPre = null; // the max-HP the hero carried INTO the first boss pick
+  let firstPickDone = false;
   for (let guard = 0; guard < 400; guard += 1) {
     const phase = await page.evaluate(() => window.__dlb.snapshot().phase);
     if (phase === 'ended') break;
@@ -1561,15 +1563,47 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
           'the elite drop lit the HUD chip to 2');
       }
       const offers = page.locator('.relic-offer');
+      // The boss reward paints a beat after the kernel flips (the kill-hold): poll the
+      // painted DOM for the offers before deciding — leaveReward's '0' hotkey would
+      // otherwise walk away from the warden's offer unseen. (The walk still climbs —
+      // but this test's claims ride the offer screen.)
+      const bossTruth = await page.evaluate(() => Boolean(window.__dlb.controller().snapshot().reward?.boss));
+      for (let w = 0; bossTruth && (await offers.count()) === 0 && w < 10; w += 1) await sleep(300);
       if ((await offers.count()) > 0) {
         bossOffers = await offers.count();
-        assert.equal(bossOffers, 3, 'the warden offers exactly three relics');
+        assert.equal(bossOffers, 3, 'the warden offers exactly three relics (five rares hold out across both acts)');
         const head = await page.locator('.reward-head span').first().textContent();
         assert.match(head, /warden/, `the boss reward head names the relic: ${head}`);
-        await offers.first().click(); // take the first offer — the policies' stance
+        // First pick only: assert the CLIMB (S9) — act 2 opens, the hero heals full with
+        // the +5 bonus, and nothing held is lost. The SECOND boss pick ends the run.
+        if (climbedPre === null) {
+          climbedPre = await page.evaluate(() => window.__dlb.snapshot().player.maxHp);
+          const heldBefore = await page.evaluate(() => window.__dlb.snapshot().relics.length);
+          await offers.first().click(); // take the first offer — the policies' stance
+          await sleep(900);
+          const climbed = await page.evaluate(() => {
+            const s = window.__dlb.controller().snapshot();
+            return { phase: s.phase, act: s.act, acts: s.acts, biome: s.biomeName, chapter: document.querySelector('.page-num')?.textContent ?? null, maxHp: s.player.maxHp, hp: s.player.hp, held: s.relics.length };
+          });
+          assert.equal(climbed.phase, 'map', 'act 2 opens on the map');
+          assert.equal(climbed.act, 2, 'the act advanced');
+          assert.equal(climbed.biome, 'The Kiln Deeps', 'act 2 walks its own biome');
+          assert.match(climbed.chapter, /Kiln Deeps/, `the map chapter names act 2: ${climbed.chapter}`);
+          assert.equal(climbed.maxHp, climbedPre + 5, 'the climb bonus');
+          assert.equal(climbed.hp, climbed.maxHp, 'the climb heals full');
+          assert.equal(climbed.held, heldBefore + 1, 'the picked relic crossed the climb');
+          firstPickDone = true;
+          continue;
+        }
+        await offers.first().click(); // the act-2 pick — the run ends in victory below
         await sleep(900);
         continue;
       }
+      // Card reward: skip it — but only when kernel truth still says a NON-boss reward.
+      // In a stale-paint window a blind '0' (the s0 hotkey) lands on the warden's offer
+      // and walks away from it unseen; the offer branch above must own that pick.
+      const truthNow = await page.evaluate(() => { const s = window.__dlb.controller().snapshot(); return { phase: s.phase, boss: !!s.reward?.boss }; });
+      if (truthNow.phase === 'reward' && truthNow.boss) continue; // the offer is painting; loop re-enters above
       await leaveReward(page);
     } else if (phase === 'rest') {
       await page.getByRole('button', { name: 'Move on' }).first().click();
@@ -1589,17 +1623,19 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
   await sleep(1000);
   assert.equal(errors.length, 0, `no page errors during the walk: ${errors.join(' | ')}`);
   assert.ok(sawEliteSpoils, 'an elite victory showed its spoils relic chip on the reward head');
-  assert.equal(await page.evaluate(() => window.__dlb.snapshot().phase), 'ended', 'taking the boss relic ended the run');
-  const outcome = await page.evaluate(() => window.__dlb.snapshot().ended.outcome);
-  assert.equal(outcome, 'win', 'taking the relic ends the run in victory');
-  // The elite count is path-dependent (the walk prefers elites and seed 7 can offer
-  // two), so the total is derived from the kernel, not hardcoded: starter + N elites
-  // + the boss pick, chip and summary both agreeing with it.
+  assert.ok(firstPickDone, 'the act-1 boss pick climbed into act 2 (asserted at the pick)');
+  // The run ends at the ACT-2 boss in victory — the kernel's settled shape, proven in
+  // the browser: the summary carries the act and the relic count.
+  assert.equal(await page.evaluate(() => window.__dlb.snapshot().phase), 'ended', 'the act-2 boss pick ended the run');
+  const ended = await page.evaluate(() => { const s = window.__dlb.snapshot(); return { outcome: s.ended.outcome, act: s.ended.act, relics: s.ended.relics }; });
+  assert.equal(ended.outcome, 'win', 'the act-2 pick ends the run in victory');
+  assert.equal(ended.act, 2, 'the summary names act 2');
   const held = await page.evaluate(() => window.__dlb.snapshot().relics.map((r) => ({ id: r.relicId, starting: r.starting })));
-  assert.ok(held.length >= 3, `starter + at least one elite drop + the boss pick: ${JSON.stringify(held)}`);
+  assert.equal(ended.relics, held.length, 'the ended count matches the held rows');
+  assert.ok(held.length >= 4, `starter + elite drops + two boss picks: ${JSON.stringify(held)}`);
   assert.equal(held[0].starting, true, 'the starter leads the acquisition order');
-  assert.equal(held[held.length - 1].starting, false, 'the boss pick closed the run');
   assert.equal(await chip.locator('.relic-count').textContent(), String(held.length), 'the chip counts every held relic');
   const endStats = await page.locator('.end-stats').textContent();
+  assert.match(endStats, /Act 2 · floor/, `the summary names the act: ${endStats}`);
   assert.match(endStats, new RegExp(`· ${held.length} relics$`), `the summary counts the relics: ${endStats}`);
 });

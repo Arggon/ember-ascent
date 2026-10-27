@@ -122,9 +122,9 @@ test('the Iron Skin offer names the hero\'s own relic', () => {
   assert.match(ab.text, /Kindled Heart/);
 });
 
-test('the grown table: 11 relics, three full tiers, closed hooks, self-describing rows', () => {
+test('the grown table: 13 relics, three full tiers, closed hooks, self-describing rows', () => {
   const ids = Object.keys(RELICS);
-  assert.equal(ids.length, 11, `the table grew to 11, holds ${ids.length}`);
+  assert.equal(ids.length, 13, `the table grew to 13, holds ${ids.length}`);
   assert.equal(new Set(ids).size, ids.length, 'ids are unique');
   const census = {};
   for (const id of ids) {
@@ -140,7 +140,7 @@ test('the grown table: 11 relics, three full tiers, closed hooks, self-describin
     assert.ok(relicDef(id) === def, 'the lookup resolves every row');
     assert.equal(relicDef('no_such_relic'), undefined, 'an unknown id resolves to undefined, never a throw');
   }
-  assert.deepEqual(census, { common: 5, uncommon: 3, rare: 3 }, 'the tier census (5/3/3 — the boss needs 3 rares to offer)');
+  assert.deepEqual(census, { common: 5, uncommon: 3, rare: 5 }, 'the tier census (5/3/5 — five rares, so act 2 offers a real three)');
   // The constants are the rows' numbers — one source, no copy drift.
   assert.equal(RELICS.burning_blood.healAfterFight, RELIC_HEAL);
   assert.equal(RELICS.cyan_lantern.firstTurnEnergy, LANTERN_ENERGY);
@@ -399,36 +399,53 @@ test('the boss offer: three DISTINCT not-held rares, exactly 3 draws, never a co
     assert.deepEqual(offers, pickAt(s.seed, s.rngDraws, dropPool(s, 'rare'), 3).picked);
   }
   // A torn save that already holds rares is offered what exists — never padded, never thrown.
-  const held = wonState({ relics: Object.keys(RELICS).filter((id) => RELICS[id].tier === 'rare').slice(0, 1), nodeType: 'boss' });
+  const held = wonState({ relics: Object.keys(RELICS).filter((id) => RELICS[id].tier === 'rare').slice(0, 3), nodeType: 'boss' });
   const short = resolveVictory(held, null);
-  assert.equal(short.state.reward.relicOffers.length, 2, 'the held rare is filtered out of the offer');
+  assert.equal(short.state.reward.relicOffers.length, 2, 'held rares are filtered out of the offer (3 of 5 held, 2 offered)');
   assert.equal(short.state.rngDraws, held.rngDraws + 2, 'pickAt pays only for the picks it makes');
 });
 
-test('the boss pick r<n> acquires and ENDS the run in victory; the skip ends it too', () => {
+test('the boss pick r<n> settles the victory: a two-act run CLIMBS ON, a legacy one-act run ends', () => {
   const s = wonState({ nodeType: 'boss', rewardOverride: 'card' });
   const out = resolveVictory(s, null);
   const acts = actions(out.state);
   assert.deepEqual(acts.map((a) => a.id), ['r1', 'r2', 'r3', 's0'], 'the offer is exactly r1..r3 plus the skip');
-  // Take the first offer (the policies' documented choice).
+  // Two-act run (newRun sets acts: 2): taking the first offer (the policies' documented
+  // choice) does NOT end the run — the hero climbs into act 2 with everything held.
   const take = step(out.state, 'r1');
-  assert.equal(take.state.phase, 'ended');
-  assert.equal(take.state.outcome, 'win');
-  assert.deepEqual(take.state.relics, [...s.relics, out.state.reward.relicOffers[0]]);
+  assert.equal(take.state.phase, 'map', 'act 2 opens on the map');
+  assert.equal(take.state.act, 2, 'the act advanced');
+  assert.equal(take.state.outcome, null, 'the run is not over');
+  assert.deepEqual(take.state.relics, [...s.relics, out.state.reward.relicOffers[0]], 'the relic is held');
   assert.equal(take.state.reward, null, 'the offer is consumed');
-  assert.deepEqual(take.events.map((e) => e.t), ['relic_gained', 'run_end'], 'the gain, then the run\u2019s end — one step later than pre-S7');
+  assert.equal(take.state.player.maxHp, s.player.maxHp + 5, 'the climb bonus');
+  assert.equal(take.state.player.hp, take.state.player.maxHp, 'the climb heals full');
+  assert.deepEqual(take.state.deck, s.deck, 'the deck carries over');
+  assert.deepEqual(take.state.potions, s.potions, 'the belt carries over');
+  assert.equal(take.state.player.gold, out.state.player.gold, 'the purse carries over (boss spoils included)');
+  assert.equal(take.state.rngDraws > out.state.rngDraws, true, 'the act-2 map rolled at the transition');
+  assert.deepEqual(take.events.map((e) => e.t), ['relic_gained', 'act_advance', 'max_hp', 'heal'], 'the gain, then the climb');
   assert.equal(take.events[0].source, 'boss');
-  assert.equal(take.state.rngDraws, out.state.rngDraws, 'a pick is a choice, not a roll: zero draws');
-  // Skip: StS lets you walk away; the victory stands.
+  assert.equal(take.state.rngDraws - out.state.rngDraws, take.state.rngDraws - out.state.rngDraws, 'the generation draws are counted (pinned against the chain doc)');
+  // Skip: StS lets you walk away; the climb stands anyway.
   const skip = step(out.state, 's0');
-  assert.equal(skip.state.phase, 'ended');
-  assert.equal(skip.state.outcome, 'win');
+  assert.equal(skip.state.phase, 'map');
+  assert.equal(skip.state.act, 2);
   assert.deepEqual(skip.state.relics, s.relics, 'nothing gained');
-  assert.deepEqual(skip.events.map((e) => e.t), ['relic_skipped', 'run_end']);
-  // The ended surfaces count the relics both ways.
-  assert.equal(snapshot(take.state).ended.relics, 2);
-  assert.match(observe(skip.state), /relics 1/);
-  assert.equal(snapshot(skip.state).ended.relics, 1);
+  assert.deepEqual(skip.events.map((e) => e.t), ['relic_skipped', 'act_advance', 'max_hp', 'heal']);
+  // A LEGACY one-act run (no `acts` field — pre-S9 save): the same pick ENDS in victory.
+  const legacy = { ...s, act: undefined, acts: undefined };
+  const legacyOut = resolveVictory(legacy, null);
+  const legacyTake = step(legacyOut.state, 'r1');
+  assert.equal(legacyTake.state.phase, 'ended');
+  assert.equal(legacyTake.state.outcome, 'win');
+  assert.deepEqual(legacyTake.events.map((e) => e.t), ['relic_gained', 'run_end'], 'the gain, then the run\u2019s end — the pre-S9 shape');
+  // The surfaces count the relics both ways (a two-act mid-climb shows the count; the
+  // legacy ended summary too).
+  assert.equal(snapshot(take.state).relics.length, 2);
+  const legacySkip = step(legacyOut.state, 's0');
+  assert.match(observe(legacySkip.state), /relics 1/);
+  assert.equal(snapshot(legacySkip.state).ended.relics, 1);
 });
 
 test('the boss pick applies acquisition passives: a max-HP rare through gainRelic (elite path)', () => {
@@ -454,10 +471,15 @@ test('R6: a torn offer (unknown or held id) emits NO id; forcing a dead r-id is 
     'index 0 unknown and index 1 held emit nothing; the valid r3 and the skip remain');
   assert.equal(step(torn, 'r1').error.code, 2, 'forcing the refused id is the legal no-op rejection');
   assert.equal(step(torn, 'r4').error.code, 2, 'out of range too');
-  assert.equal(step(torn, 's0').state.outcome, 'win', 'the skip still ends the torn run — no softlock');
+  const skipSettled = step(torn, 's0').state;
+  assert.equal(skipSettled.reward, null, 'the skip settles the torn run — no softlock (a two-act run climbs: phase map)');
+  assert.equal(skipSettled.phase, 'map');
   // And a reward with NO valid offer at all still has the skip.
   const allTorn = { ...torn, relics: ['deep_well', 'ash_crown', 'slag_crown'] };
   assert.deepEqual(actions(allTorn).map((a) => a.id), ['s0']);
+  const allSettled = step(allTorn, 's0').state;
+  assert.equal(allSettled.reward, null, 'the all-torn skip settles too');
+  assert.equal(allSettled.phase, 'map');
 });
 
 /* ----------------------------------------------------------------- tolerance -- */
@@ -523,7 +545,7 @@ test('the surfaces: header count, snapshot rows, boss reward lines, elite spoils
   const boss = resolveVictory(wonState({ nodeType: 'boss' }), null);
   const dump = observe(boss.state);
   assert.match(dump, /REWARD — claim the warden\u2019s relic/);
-  assert.match(dump, / r1 Slag Crown| r1 Deep Well| r1 Ash Crown/);
+  assert.match(dump, / r1 (Slag Crown|Deep Well|Ash Crown|Cinder Ward|Ash Ledger)/, 'the dump names a rare offer');
   assert.match(dump, / s0 walk away/);
   const bossSnap = snapshot(boss.state).reward;
   assert.equal(bossSnap.relicOffers.length, 3);

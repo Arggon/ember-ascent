@@ -16,6 +16,10 @@ import { page } from './page-frame.js';
 export function endView() {
   const e = snap.ended;
   const won = e.outcome === 'win';
+  // S9: which act the run ended in. Bracket access on purpose — the module-graph
+  // scanner reads any bare `act` token as the actions.js dispatcher this module does
+  // not import; a property read cannot be a ReferenceError.
+  const runAct = e['act'] ?? 1;
   const wrap = el('div');
   wrap.append(el('p', { cls: 'section-title', text: 'Run Over' }));
   wrap.append(el('div', { cls: `demon${won ? '' : ' lose'}` }, glyphBox(won ? 'crown' : 'broken', 'demon-glyph')));
@@ -30,14 +34,14 @@ export function endView() {
   // that predates the field falls back to the snapshot's live relic rows).
   const purse = snap.player.gold ?? 0;
   const relicCount = e.relics ?? (snap.relics ?? []).length;
-  wrap.append(el('p', { cls: 'end-stats', text: `Reached floor ${e.floor} · ${e.steps} steps · seed ${snap.seed} · ${purse} gold · ${relicCount} relic${relicCount === 1 ? '' : 's'}` }));
+  wrap.append(el('p', { cls: 'end-stats', text: `${runAct >= 2 ? 'Act ' + runAct + ' · floor ' + e.floor : 'Reached floor ' + e.floor} · ${e.steps} steps · seed ${snap.seed} · ${purse} gold · ${relicCount} relic${relicCount === 1 ? '' : 's'}` }));
 
   const math = lastRecord ? ledgerMath(lastRecord) : null;
   if (math) {
     wrap.append(ledgerBlock(math));
     if (math.earned) {
       wrap.append(el('p', { cls: 'def', text: won
-        ? 'You cleared Act 1 and the Slag Warden fell.'
+        ? (runAct >= 2 ? 'The Kiln Deeps are quiet. The climb is complete.' : 'You cleared Act 1 and the Slag Warden fell.')
         : 'The Ashwright falls. Try a different route or a better card pick.' }));
     } else {
       // AC-7.4 (ANTI-HOLLOW). No elite, no boss, no victory: the total does NOT get display
@@ -51,7 +55,7 @@ export function endView() {
     // that was reloaded onto a finished run). The screen shows what it has and NO ledger:
     // an itemised block would have to invent every line.
     wrap.append(el('p', { cls: 'def', text: won
-      ? 'You cleared Act 1 and the Slag Warden fell.'
+      ? (runAct >= 2 ? 'The Kiln Deeps are quiet. The climb is complete.' : 'You cleared Act 1 and the Slag Warden fell.')
       : 'The Ashwright falls. Try a different route or a better card pick.' }));
   }
 

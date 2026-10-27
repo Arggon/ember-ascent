@@ -51,7 +51,10 @@ export function mapView(travel = null) {
   wrap.append(map);
   requestAnimationFrame(() => drawRoutes(map));
   wrap.append(el('p', { cls: 'hint', text: 'Click a glowing node to travel. Fight something weak, risk an elite, or rest.' }));
-  return page('map', 'I — The Path', 'route', 'panel', [wrap]);
+  // S9: the climb is two acts — the map's chapter names the one you are walking.
+  const actNo = snap.act ?? 1;
+  const chapter = actNo >= 2 ? 'II — The Kiln Deeps' : 'I — The Path';
+  return page('map', chapter, 'route', 'panel', [wrap]);
 }
 
 /** B3 Ember quests: one compact chip per quest, progress as text and as a bar. */

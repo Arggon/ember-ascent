@@ -12,7 +12,7 @@ import { freezeDeep, hash as hashState, canonical } from './state.js';
 import { loadContent, defaultContent, draftPoolFrom } from './content.js';
 // Imported as a VALUE as well as re-exported below: `contentForProfile` calls it.
 import { poolSelection } from './unlocks.js';
-import { generateMap, ROWS } from './rules/map.js';
+import { generateMap, ROWS, ACT_COUNT } from './rules/map.js';
 import { buildEncounterTable, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { DEFAULT_RELIC } from './rules/relics.js';
 import { actions as legalActions } from './actions.js';import { _setCardDefs, BASE_ENERGY, HAND_SIZE, REST_HEAL, REWARD_CHOICES } from './rules/act.js';
@@ -163,6 +163,8 @@ export function newRun(opts = {}) {
 
   // Map generation consumes the first draws of the stream, then the deck is built.
   // Order matters and is part of the format: do not reorder these two blocks.
+  // (S9: only ACT 1's map is generated here. Act 2's map rolls later, at the act
+  // transition, from the live counter — rules/act.js beginNextAct documents the draws.)
   const mapGen = generateMap(seed, 0);
   const deck = character.startingDeck.map((cardId, i) => ({ uid: `c${i}`, cardId }));
   // Deck order is fixed by the character definition, so only its LENGTH advances the
@@ -176,9 +178,13 @@ export function newRun(opts = {}) {
     difficulty,
     stepIndex: 0,
     rngDraws: draws,
-    // Single act in the slice (requirements §7.1), but the field is real from day one:
-    // validateSave() checks it, and R10's per-act metrics anchor on it.
+    // S9: the run climbs TWO acts. `act` is where the run is standing; `acts` is the
+    // declared length of the climb — the field the boss pick reads to decide between
+    // the act transition (rules/act.js beginNextAct) and the ended win. A legacy save
+    // predates `acts` and reads as a one-act run at every `?? 1`, so its act-1 boss
+    // still ends it in victory (validateSave keeps the field optional).
     act: 1,
+    acts: ACT_COUNT,
     phase: 'map',
     outcome: null,
     floor: -1,

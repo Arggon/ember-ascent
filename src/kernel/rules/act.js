@@ -8,8 +8,8 @@
 import { VOCABULARY, damagePlayer } from './vocabulary.js';
 import { setCardDefs } from './card-instance.js';
 import { drawIntoHand } from './draw.js';
-import { ENEMIES, chooseIntent } from './encounters.js';
-import { NODE_TYPES, ROWS } from './map.js';
+import { ENEMIES, chooseIntent, buildEncounterTable, BIOMES, ACT2_BIOME } from './encounters.js';
+import { generateMap, goldBand } from './map.js';
 import { fireHook, endOfTurnStatuses, decayStatuses } from './powers.js';
 import { shuffleAt, pickAt, intAt } from '../rng.js';
 import {
@@ -27,6 +27,8 @@ export const REST_HEAL = 8;
 export { RELIC_HEAL, LANTERN_ENERGY } from './relics.js';
 /** Reward choice count after a normal fight; elites offer one more. */
 export const REWARD_CHOICES = 3;
+/** S9: max HP gained on entering act 2 (with the full heal that follows it). */
+export const ACT_HP_BONUS = 5;
 
 
 /** Strip a runtime hand card back to its compact deck-instance form. */
@@ -364,13 +366,28 @@ export function endTurn(state, cardDefs) {
  *
  *   1. RELIC HEAL      per working relic, acquisition order, each clamped by the HP the
  *                      relics before it left; per-relic `heal` events. 0 draws.
- *   2. TIER GOLD       the node tier's spoils (S3). 0 draws flat (boss 100), 1 ranged.
+ *   2. TIER GOLD       the node tier's spoils (S3), at the CURRENT act's band (S9:
+ *                      goldBand(nodeType, act) — act 1 is the NODE_TYPES table, act 2
+ *                      pays +30%). 0 draws flat (a boss pays its act's flat purse), 1
+ *                      ranged.
  *   3. RELIC GOLD      per working relic, acquisition order (Gold Vein). 0 draws.
  *   4. BOSS BRANCH     the warden's relic OFFER replaces the card reward (StS parity:
- *                      no cards on the boss). The 3 offers roll NOW — exactly 3 draws
- *                      while the not-held rare pool holds 3 — and the phase opens as
- *                      `reward`; the run ends at the pick (`r<n>`) or the skip (`s0`)
- *                      in rules/steps.js, NOT here. Never reaches stages 5-7.
+ *                      no cards on the boss). The offers roll NOW — exactly 3 draws
+ *                      while the not-held rare pool holds 3 (the act-2 boss offers 2
+ *                      when the act-1 boss relic was TAKEN: the pool filters held relics,
+ *                      and pickAt pays only for the picks it makes — the existing
+ *                      tolerance, reachable through normal play for the first time).
+ *                      The phase opens as `reward`; the run's fate is sealed at the
+ *                      pick (`r<n>`) or the skip (`s0`) in rules/steps.js, NOT here.
+ *                      Never reaches stages 5-7.
+ *   4b. ACT TRANSITION (S9, at the pick/skip — rules/steps.js settleBossVictory):
+ *                      the LAST act's boss ends the run in victory; an earlier act's
+ *                      boss CLIMBS ON through beginNextAct — act +1, +5 max HP, a full
+ *                      heal into the new max, and a fresh map for the next biome. Deck,
+ *                      gold, potions, relics and every opt-in (kindling, tempers,
+ *                      quests) persist untouched; the offer, the combat and the finished
+ *                      act's map are left behind. Draw accounting is documented on
+ *                      beginNextAct below.
  *   5. POTION DROP     S5's roll. 0..2 draws (0 when the belt is full).
  *   6. ELITE RELIC DROP  elite fights only, GUARANTEED (StS parity): exactly 2 draws —
  *                      one d100 band (lowest 70 common, rest uncommon) + one uniform pick
@@ -379,7 +396,8 @@ export function endTurn(state, cardDefs) {
  *                      goes through gainRelic, the ONE path, so acquisition passives
  *                      (Ember Heart's max HP) fire here exactly as on the boss pick.
  *   7. REWARD ROLL     the card offer (S3's convention: read the counter everything
- *                      above left behind). 3 draws, 4 on an elite.
+ *                      above left behind). 3 draws, 4 on an elite — 5 on an ACT-2 elite
+ *                      (S9's escalation: the deeper act's elites pay one extra choice).
  *
  * @param {any} state
  * @param {Map<string, any>} cardDefs
@@ -413,11 +431,14 @@ export function resolveVictory(state, cardDefs) {
   // a reward opens, so the reward screen and the text dump can say "+N gold" without
   // re-deriving anything.
   //
+  // S9: the band is the CURRENT act's (rules/map.js goldBand) — act 1 pays the NODE_TYPES
+  // table, act 2 pays +30%. `?? 1` is the legacy-save read (no `act` field = act 1).
+  //
   // RNG ACCOUNTING: exactly ONE u64 draw for a ranged tier (intAt over the inclusive
-  // range), ZERO draws for a flat tier — the boss pays 100 to every seed, so there is
-  // nothing to roll. `rngDraws` advances by exactly `goldDraws`.
+  // range), ZERO draws for a flat tier — a boss pays its act's flat purse to every seed,
+  // so there is nothing to roll. `rngDraws` advances by exactly `goldDraws`.
   const nodeType = state.combat.nodeType;
-  const goldRange = NODE_TYPES[nodeType]?.gold ?? null;
+  const goldRange = goldBand(nodeType, state.act ?? 1);
   let goldGained = null;
   if (goldRange) {
     const [lo, hi] = goldRange;
@@ -443,8 +464,12 @@ export function resolveVictory(state, cardDefs) {
   }
 
   // 4. BOSS BRANCH (S7) — the offer, rolled at victory time exactly like the card offer
-  //    it replaces; the ended transition moves to the pick/skip step (rules/steps.js).
-  //    The reward carries `boss: true` and the flat tier's gold; cards are omitted.
+  //    it replaces; the run's fate (act transition 4b, or the ended win) moves to the
+  //    pick/skip step (rules/steps.js settleBossVictory). The reward carries `boss: true`
+  //    and the flat tier's gold; cards are omitted. S9: the offers roll from the
+  //    not-held rare pool exactly as before — the act-2 boss therefore offers 2 rares
+  //    when the act-1 boss relic was TAKEN (3 when it was skipped): pickAt pays only
+  //    for the picks it makes, the documented tolerance, now reachable through play.
   if (nodeType === 'boss') {
     const offer = rollBossRelicOffers(next);
     next = {
@@ -493,9 +518,11 @@ export function resolveVictory(state, cardDefs) {
     return { state: { ...next, phase: 'rest' }, events: [...events, { t: 'rest_ready' }] };
   }
 
-  // 7. Roll the reward offer: REWARD_CHOICES distinct cards, one more on an elite.
+  // 7. Roll the reward offer: REWARD_CHOICES distinct cards, one more on an elite — and
+  //    one more again on an ACT-2 elite (S9's escalation; a legacy save reads as act 1).
   const elites = nodeType === 'elite' ? 1 : 0;
-  const offer = rollReward(next, REWARD_CHOICES + elites);
+  const deepElites = state.act >= 2 && nodeType === 'elite' ? 1 : 0;
+  const offer = rollReward(next, REWARD_CHOICES + elites + deepElites);
   next = {
     ...next,
     rngDraws: next.rngDraws + offer.draws,
@@ -523,4 +550,66 @@ export function resolveVictory(state, cardDefs) {
 function rollReward(state, count) {
   const picked = pickAt(state.seed, state.rngDraws, state.draftPool, count);
   return { ids: picked.picked, draws: picked.draws };
+}
+
+/* ------------------------------------------------------------------ S9: the climb --
+ * The act transition. Called by rules/steps.js settleBossVictory when the boss relic
+ * pick/skip lands on a run with acts left (state.acts > state.act): a LEGACY save has
+ * no `acts` field and reads as a one-act run at the `?? 1` below, so its act-1 boss
+ * still ends in victory exactly as before S9 — the back-compat branch is this
+ * comparison and nothing else.
+ *
+ * WHAT CHANGES: the act number, the hero (max HP +5, then a FULL heal into the new
+ * max — StS's between-acts gift), and the map (a fresh walk in the next act's biome).
+ * WHAT PERSISTS UNTOUCHED: deck, gold, potions, relics, draft pool, energyPerTurn,
+ * powers, and every opt-in (kindling, tempers, quests) — the whole point of the
+ * longer climb is that the run is a build-around. The finished act's map, the boss's
+ * reward and the combat are simply left behind: state.map holds the CURRENT act only.
+ *
+ * EVENT ORDER (part of the format): act_advance, then the max_hp grant, then the
+ * heal — the flip is announced before the gift that rides it, and the heal reads the
+ * NEW max, so a relic-worn hero heals exactly (old max + 5) - hp, always positive.
+ *
+ * DRAW ACCOUNTING — the generation draws at the transition, from the LIVE counter, in
+ * the same style and order as newRun's act-1 generation (rules/encounters.js
+ * buildEncounterTable): (a) the act-2 map layout rolls first (generateMap — one draw
+ * per rolled node; the fixed opener, the boss and the placed shop/events consume
+ * nothing), then (b) the same +deck.length spacer newRun keeps between its own map
+ * and encounter rolls — a format spacer with no consumer, mirrored so the two sites
+ * read alike — then (c) the encounter table rolls per node in row order: ONE draw for
+ * the encounter pick, ONE per spawned enemy's HP roll. The counter the rolls read is
+ * whatever the whole act-1 victory chain left behind, reproducible from the action
+ * log forever; a replay that reaches the same pick re-derives the same act-2 map.
+ *
+ * Pure: returns a fresh state; the only entropy is the seed stream, counted. */
+export function beginNextAct(state) {
+  const nextAct = (state.act ?? 1) + 1;
+  const byType = BIOMES[ACT2_BIOME].byType;
+  const gen = generateMap(state.seed, state.rngDraws, nextAct);
+  const { table: encounterTable, draws } = buildEncounterTable(state.seed, state.rngDraws + gen.draws + (state.deck?.length ?? 0), gen.rows, byType);
+
+  const maxHp = state.player.maxHp + ACT_HP_BONUS;
+  const healed = Math.max(0, maxHp - state.player.hp);
+  const events = [
+    { t: 'act_advance', act: nextAct },
+    { t: 'max_hp', who: 'player', amount: ACT_HP_BONUS, source: 'act_transition' },
+    ...(healed > 0 ? [{ t: 'heal', who: 'player', amount: healed, source: 'act_transition' }] : []),
+  ];
+  return {
+    state: {
+      ...state,
+      rngDraws: state.rngDraws + gen.draws + draws,
+      act: nextAct,
+      phase: 'map',
+      outcome: null,
+      floor: -1,
+      mapNodeId: null,
+      map: { rows: gen.rows, encounterTable },
+      reward: null,
+      event: null,
+      shop: null,
+      player: { ...state.player, maxHp, hp: maxHp },
+    },
+    events,
+  };
 }

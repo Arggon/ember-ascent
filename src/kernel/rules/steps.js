@@ -12,7 +12,7 @@
 // through the seed stream with every draw counted into rngDraws.
 import { parsePlayId } from '../actions.js';
 import { VOCABULARY } from './vocabulary.js';
-import { startCombat, endTurn, resolveVictory, REST_HEAL } from './act.js';
+import { startCombat, endTurn, resolveVictory, REST_HEAL, beginNextAct } from './act.js';
 import { fireHook } from './powers.js';
 import { applyBoon } from './kindling.js';
 import { offerTempers, temperEffects, temperHpCost } from './tempers.js';
@@ -207,29 +207,45 @@ function pickReward(state, action) {
  * already held (actions.js mirrors gainRelic's own guards — the S4.1 ruling). The
  * handler still degrades to a no-op on a stale match rather than throwing.
  *
- * DRAW ACCOUNTING (rules/relics.js header): a pick is a CHOICE, not a roll — zero draws.
- * gainRelic is the ONE acquisition path, so Ember Heart's max-HP passive applies here
- * exactly as it does on the elite drop. Taking (or skipping) is what ENDS the run: the
- * boss victory opened this reward phase instead of `ended`, and this handler closes it
- * with the win the victory earned — `run_end` fires HERE, one step later than pre-S7. */
+ * DRAW ACCOUNTING (rules/relics.js header): a pick is a CHOICE, not a roll — zero draws
+ * for the pick itself; the ACT TRANSITION it may trigger consumes its own documented
+ * draws (rules/act.js beginNextAct). gainRelic is the ONE acquisition path, so Ember
+ * Heart's max-HP passive applies here exactly as it does on the elite drop. Taking
+ * (or skipping) is what settles the run: the boss victory opened this reward phase
+ * instead of `ended`, and this handler closes it — one step later than pre-S7. */
 
-/** Take one relic offer: acquire it, then end the run in victory. */
+/**
+ * S9: what a settled boss pick/skip MEANS. A run with acts left climbs on (beginNextAct:
+ * act flip, +5 max HP, full heal, a fresh map); the LAST act's boss — or a LEGACY save,
+ * which has no `acts` field and reads as a one-act run at the `?? 1` — ends the run in
+ * victory, exactly as every boss did before S9. The old `run_end` event fires HERE, on
+ * the final act only.
+ * @param {any} state the post-acquisition state (reward still open)
+ * @param {any[]} events the pick/skip's own events, in order
+ * @returns {{state: any, events: any[]}}
+ */
+function settleBossVictory(state, events) {
+  if ((state.acts ?? 1) > (state.act ?? 1)) {
+    const next = beginNextAct(state);
+    return { state: next.state, events: [...events, ...next.events] };
+  }
+  return {
+    state: { ...state, phase: 'ended', outcome: 'win', reward: null },
+    events: [...events, { t: 'run_end', outcome: 'win' }],
+  };
+}
+
+/** Take one relic offer: acquire it, then settle the run (climb on, or end in victory). */
 function pickRelic(state, match) {
   const offer = (Array.isArray(state.reward?.relicOffers) ? state.reward.relicOffers : [])[match.index];
   if (!bossOfferOpen(offer, state)) return { state, events: [] };
   const got = gainRelic(state, offer, 'boss');
-  return {
-    state: { ...got.state, phase: 'ended', outcome: 'win', reward: null },
-    events: [...got.events, { t: 'run_end', outcome: 'win' }],
-  };
+  return settleBossVictory(got.state, got.events);
 }
 
-/** Leave a relic offer without taking it (the boss's `s0`): the run still ends in victory. */
+/** Leave a relic offer without taking it (the boss's `s0`): the run settles anyway. */
 function skipBossRelic(state) {
-  return {
-    state: { ...state, phase: 'ended', outcome: 'win', reward: null },
-    events: [{ t: 'relic_skipped' }, { t: 'run_end', outcome: 'win' }],
-  };
+  return settleBossVictory(state, [{ t: 'relic_skipped' }]);
 }
 
 /* --------------------------------------------------------------- S4: the shop --
@@ -403,14 +419,14 @@ export const STEP_HANDLERS = Object.freeze({
   pick: pickReward,
   // S7: `s0` means two skips, split by the reward's own shape — the OLD skip (cards on
   // the table) walks back to the map; the BOSS skip (relic offers, cards omitted) walks
-  // away from the warden's relic and ends the run in victory. One state never offers
-  // both (the `e1` id-letter precedent): a boss reward has no cards, a card reward has
-  // no relic offers. Skipping the boss relic is legal (StS parity) and still a win —
-  // the relic was optional; the victory was not.
+  // away from the warden's relic and settles the run: climb on to the next act (S9) or
+  // end in victory (the last act — and every legacy save). One state never offers both
+  // (the `e1` id-letter precedent): a boss reward has no cards, a card reward has no
+  // relic offers. Skipping the boss relic is legal (StS parity) — the relic was
+  // optional; the victory (or the climb) was not.
   skip: (state) => (state.reward?.boss
     ? skipBossRelic(state)
-    : { state: { ...state, phase: 'map', reward: null }, events: [{ t: 'reward_skipped' }] }),
-  relic_pick: pickRelic,
+    : { state: { ...state, phase: 'map', reward: null }, events: [{ t: 'reward_skipped' }] }),  relic_pick: pickRelic,
   rest_heal: (state) => {
     // S7 Hearth Ash / Ash Crown: the held relics' restHealBonus folds into the ONE rest
     // heal (one `heal` event, source 'rest' — the total is the fact). Zero extra draws.

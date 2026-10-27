@@ -143,6 +143,25 @@ export function validateSave(raw) {
     for (const key of ['phase', 'stepIndex', 'rngDraws', 'contentVersion', 'player', 'act', 'floor']) {
       if (!(key in st)) problems.push(`save.state: missing field "${key}"`);
     }
+    // S9 acts: `act` must be a whole act number >= 1, and the OPTIONAL `acts` (the
+    // declared length of the climb, present only on runs from S9 onward) must be an
+    // integer >= 1 with act <= acts. A state standing in act 3 of a two-act climb is
+    // one the engine can never produce, so it is refused at load, not repaired — the
+    // same spirit as the negative-gold and over-capacity-belt refusals. An ABSENT
+    // `acts` is a legacy save: it reads as a one-act run at every `?? 1`, so its
+    // act-1 boss still ends it in victory.
+    const act = /** @type {Record<string, unknown>} */ (st).act;
+    if (!Number.isInteger(act) || act < 1) {
+      problems.push('save.state: "act" must be an integer >= 1');
+    }
+    const acts = /** @type {Record<string, unknown>} */ (st).acts;
+    if (acts !== undefined) {
+      if (!Number.isInteger(acts) || acts < 1) {
+        problems.push('save.state: "acts" must be an integer >= 1');
+      } else if (Number.isInteger(act) && act > acts) {
+        problems.push(`save.state: "act" ${act} must not exceed "acts" ${acts}`);
+      }
+    }
     // S3 gold: OPTIONAL on purpose. A pre-gold save (no `player.gold`) must keep loading
     // with the purse defaulting to 0 at every read (`?? 0` in observe/rules), so the field
     // is never required here and FORMAT_VERSION stays put. When it IS present, it must be

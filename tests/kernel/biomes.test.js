@@ -29,7 +29,12 @@ test('the public entry exports the biome table with names and encounter pools', 
 test('the snapshot names the run\'s biome and lists the choices', () => {
   assert.equal(snapshot(newRun({ seed: 1 })).biomeName, 'The Foundry');
   assert.equal(snapshot(newRun({ seed: 1, biome: 'mines' })).biomeName, 'The Cinder Mines');
-  assert.deepEqual(snapshot(newRun({ seed: 1 })).biomes.map((b) => b.id), Object.keys(K.BIOMES));
+  // S9: the snapshot's `biomes` are the START paths — every biome but the act-2 one
+  // (the Deeps are where the climb GOES, not where it begins). The full table still
+  // carries all three, and the act-2 biome is exactly the one excluded.
+  assert.deepEqual(snapshot(newRun({ seed: 1 })).biomes.map((b) => b.id), ['foundry', 'mines']);
+  assert.ok(!snapshot(newRun({ seed: 1 })).biomes.some((b) => b.id === 'kiln'));
+  assert.deepEqual(Object.keys(K.BIOMES), ['foundry', 'mines', 'kiln']);
 });
 
 test('no other file keeps its own biome list or biome name', () => {
