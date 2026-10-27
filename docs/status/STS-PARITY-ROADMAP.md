@@ -54,8 +54,9 @@ Process rules (standing):
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | closed — c83a2d0, QA 11/11, review APPROVE |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | closed — 69b05eb + fixes d7441b6, QA 11/11, review APPROVE |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
-| S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending |
-| S9 | Content II: enemies + Act 2 | new encounters + second biome/map skeleton | map/act presentation | pending |
+| S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending (feeds the unlock meta) |
+| S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | pending — direct answer to "relics reset after winning" |
+| S9 | Content II: enemies + Act 2 | new encounters + second biome/map skeleton | map/act presentation | **in progress** — REPRIORITIZED per user feedback: relics (and gold/deck) only make sense if the climb is long enough to build around |
 
 ## Verification recipes (subagents: use these verbatim)
 
@@ -231,3 +232,9 @@ Process rules (standing):
   of a torn save mislabels); nit: single-tier-exhaust drop path costs 1 draw
   (documented in-code, unreachable through play). Committed state clean — S7 CLOSED.
   Seven of nine roadmap slices through the full SDLC.
+- 2026-10-25 — USER FEEDBACK: "relics has no sense if the game gets reset after winning it."
+  Accepted — the structural answer is (a) a LONGER CLIMB: relics/deck/gold accumulate
+  across acts within a run (S9 reprioritized ahead of S8; Act 2 makes build-around real),
+  and (b) META-PROGRESSION: the existing profile unlock system (which already narrows the
+  card pool by lifetime play) extends to relics (new S10) so winning runs permanently
+  grows what future runs can hold. Dispatching S9 now.
