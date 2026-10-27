@@ -275,6 +275,30 @@ export function validateSave(raw) {
         });
       }
     }
+    // S10 relic POOL: OPTIONAL like every post-v1 field. Absent (a pre-S10 save, or a
+    // run begun without profile info) reads as the FULL table at every drop read — the
+    // one-rule fallback rules/relics.js documents. When present it must be an array of
+    // strings with NO duplicates: the pool is a set of offerable ids (dropPool filters
+    // by membership), so a duplicate would be a state the derivation can never produce
+    // and is refused at load, not repaired — the relics-array ruling beside it. The ID
+    // STRINGS are NOT checked against the table: an id the roster no longer knows (or
+    // one the profile has not unlocked) simply matches nothing and degrades like every
+    // other unknown id — never a load-time throw.
+    const relicPool = /** @type {Record<string, unknown>} */ (st).relicPool;
+    if (relicPool !== undefined) {
+      if (!Array.isArray(relicPool)) {
+        problems.push('save.state: "relicPool" must be an array');
+      } else {
+        relicPool.forEach((id, i) => {
+          if (typeof id !== 'string') problems.push(`save.state.relicPool[${i}] must be a string`);
+        });
+        const seenPool = new Set();
+        relicPool.forEach((id, i) => {
+          if (typeof id === 'string' && seenPool.has(id)) problems.push(`save.state.relicPool[${i}]: duplicate pool id "${id}"`);
+          if (typeof id === 'string') seenPool.add(id);
+        });
+      }
+    }
   }
   const actions = /** @type {Record<string, unknown>} */ (raw).actions;
   if (actions !== undefined && !Array.isArray(actions)) problems.push('save: "actions" must be an array');

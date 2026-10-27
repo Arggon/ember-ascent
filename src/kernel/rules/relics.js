@@ -39,13 +39,23 @@
 //     falls to the other tier (still 1 pick draw); only when BOTH pools are empty —
 //     impossible through play, reachable through a torn save — is nothing granted, and the
 //     suppressed roll costs NOTHING (the potions ruling: "impossible" is free).
-//   * BOSS: THREE offers from the not-held RARE pool (pickAt 3 — min(3, pool) draws;
-//     five rares exist and each boss takes at most one, so both bosses of a two-act
-//     climb offer three; fewer picks only if a torn save already held rares, never
-//     more). The player picks 1 (action `r<n>`) or skips (`s0`, StS lets you walk
-//     away). The roll
-//     happens at VICTORY time, like the card offer it replaces; the pick itself is a
-//     choice, not a roll — zero draws.
+//   * BOSS: min(3, pool) offers from the not-held RARE pool (pickAt — exactly that many
+//     draws; the full table holds five rares and each boss takes at most one, so a
+//     FULL-POOL two-act climb offers three at both wardens). The player picks 1 (action
+//     `r<n>`) or skips (`s0`, StS lets you walk away). The roll happens at VICTORY time,
+//     like the card offer it replaces; the pick itself is a choice, not a roll — zero
+//     draws.
+//
+// THE POOL (S10). `state.relicPool` is the ids THIS run's drops and offers draw from —
+// the relic analogue of `state.draftPool`, derived by the kernel entry (index.js
+// newRun) from the profile's lifetime WINS through unlocks.js RELIC_UNLOCK_TABLE. It
+// gates SUPPLY, never effect strength: a relic already unlocked plays exactly as it
+// always did (AC-9.3's option-not-power, relic-shaped). ONE tolerance rule covers every
+// absent-field case — a pre-S10 save, and a run begun without profile info (the
+// harness/golden path, like a save file's `relicPool` being optional) — such a state
+// reads the FULL table, the pre-S10 behavior, at every read (relicList-style `??`
+// fallback). The ids are NOT checked against the table: a stale id in a torn pool
+// simply matches nothing and degrades like every other unknown id.
 //
 // Pure: no Date, no Math.random, no I/O; the only entropy is (seed, drawIndex), counted.
 import { intAt, pickAt } from '../rng.js';
@@ -176,6 +186,9 @@ export const RELICS = Object.freeze({
 /** id -> definition. The ONE lookup; unknown ids yield undefined (never a throw). */
 const RELIC_DEFS = new Map(Object.entries(RELICS));
 
+/** The shipped relic total, derived from the table — the "n of 13" denominators. */
+export const RELIC_TOTAL = Object.keys(RELICS).length;
+
 /** The hook keys the table is allowed to carry — the closed menu, pinned by tests. */
 export const RELIC_HOOKS = Object.freeze([
   'healAfterFight', 'firstTurnEnergy', 'combatStartBlock', 'combatStartStrength',
@@ -241,15 +254,29 @@ export const goldAfterFightOf = (state) => relicSum(state, 'goldAfterFight');
 export const quaffBlockOf = (state) => relicSum(state, 'quaffBlock');
 
 /**
+ * The run's drop/offer pool (S10): the ids THIS run can be offered. THE one read — an
+ * absent `relicPool` field (a pre-S10 save, or a run begun without profile info) is the
+ * FULL table, the pre-S10 behavior; a torn non-array degrades the same way. Never throws.
+ * @param {any} state
+ * @returns {string[]}
+ */
+export function relicPoolList(state) {
+  return Array.isArray(state?.relicPool) ? state.relicPool : Object.keys(RELICS);
+}
+
+/**
  * The drop pool: every relic of `tier` the run does NOT already hold (a relic can never
- * drop twice), in TABLE order — the order is part of the format, like the potion roster's.
+ * drop twice) and MAY hold (S10: membership in the run's own pool — a fresh profile's
+ * elite cannot roll a relic its wins have not unlocked), in TABLE order — the order is
+ * part of the format, like the potion roster's; the pool filters, it never re-orders.
  * @param {any} state
  * @param {string} tier
  * @returns {string[]}
  */
 export function dropPool(state, tier) {
   const held = new Set(relicList(state));
-  return Object.keys(RELICS).filter((id) => RELICS[id].tier === tier && !held.has(id));
+  const pool = new Set(relicPoolList(state));
+  return Object.keys(RELICS).filter((id) => RELICS[id].tier === tier && !held.has(id) && pool.has(id));
 }
 
 /**
@@ -273,11 +300,13 @@ export function rollEliteRelicDrop(state) {
 }
 
 /**
- * The boss's THREE-offer roll: distinct picks from the not-held RARE pool, no dupes.
- * pickAt consumes exactly `min(3, pool.length)` draws; five rares exist (S9 grew the
- * tier so act 2's warden offers a real three after act 1's pick), rares never drop on
- * elites, and the starter is not rare — through play both bosses offer exactly 3. A
- * run short of rares (a torn save) is offered what exists — never padded, never thrown.
+ * The boss's offer roll: distinct picks from the not-held RARE pool, no dupes —
+ * min(3, pool) offers, exactly that many draws. THE HONESTY RULE (S10): the count is
+ * never padded. A FULL pool (five rares, each boss takes at most one) offers a real
+ * three at both wardens of a two-act climb; a gated pool offers what the profile has
+ * unlocked — a fresh profile's warden offers NOTHING, and that zero is true (the
+ * unlock table, not the roll, decides when the vault fills). A run short of rares
+ * through a torn save is offered what exists — never padded, never thrown.
  * @param {any} state the boss-victory state
  * @returns {{offers: string[], draws: number}}
  */
@@ -290,14 +319,24 @@ export function rollBossRelicOffers(state) {
  * Is this boss offer one the resolver will actually accept? The ONE validity guard:
  * actions.js enumerates an `r<n>` only for offers that pass it, and pickRelic re-checks
  * it — the same enumeration-mirrors-guard ruling as temperOfferOpen (a refused id is
- * never offered; an offered id always resolves). A torn offer (an id the table no longer
- * knows, or one the run already holds) degrades to a shorter offer row, never a no-op.
+ * never offered; an offered id always resolves). S10 adds the pool clause: a KNOWN,
+ * not-held id outside the run's own relic pool is a relic this run can never be
+ * offered (the pool is what the roll draws from), so it emits no id and takes no pick —
+ * the meta gate enforced at the resolver, not just at the roll. Absent pool = full
+ * table (the legacy read), so the clause is inert there. A torn offer (an id the table
+ * no longer knows, or one the run already holds) degrades to a shorter offer row,
+ * never a no-op.
  * @param {any} offer
  * @param {any} state
  * @returns {boolean}
  */
 export function bossOfferOpen(offer, state) {
-  return Boolean(offer && RELIC_DEFS.get(offer) && !relicList(state).includes(offer));
+  return Boolean(
+    offer
+    && RELIC_DEFS.get(offer)
+    && !relicList(state).includes(offer)
+    && relicPoolList(state).includes(offer),
+  );
 }
 
 /**

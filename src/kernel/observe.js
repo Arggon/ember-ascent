@@ -295,12 +295,18 @@ const pileNames = (pile) => (pile.length === 0 ? '-' : pile.map((c) => defOrNull
 const pileCardNames = (pile) => (pile ?? []).map((c) => defOrNull(c)?.name ?? cardIdOf(c));
 
 function rewardBody(state) {
-  // S7: the BOSS reward — the warden's three relic offers replace the cards (StS
+  // S7: the BOSS reward — the warden's relic offers replace the cards (StS
   // parity), so the header and the lines name relics. Tolerant like the card rows
   // (defOrNull's policy): an id the relic table no longer knows renders as its raw id
   // with no text, and offers no r-id will ever enumerate (the R6 mirror).
   const offers = Array.isArray(state.reward.relicOffers) ? state.reward.relicOffers : [];
-  const lines = [offers.length > 0 ? 'REWARD — claim the warden\u2019s relic' : 'REWARD — pick one'];
+  // S10: an EMPTY boss offer is a real state now — the profile has not unlocked the
+  // rare tier yet — and "pick one" over nothing would be a lie. The header says what
+  // is true: the warden has nothing to give this climb.
+  const boss = Boolean(state.reward.boss);
+  const lines = [offers.length > 0
+    ? 'REWARD — claim the warden\u2019s relic'
+    : boss ? 'REWARD — the warden offers nothing' : 'REWARD — pick one'];
   offers.forEach((id, i) => {
     const def = relicDef(id);
     lines.push(` r${i + 1} ${def ? def.name : id}${def ? `  ${def.summary}` : ''}`);
@@ -1210,6 +1216,12 @@ export function snapshot(state) {
     // "legacy state, pool unknown" apart from "legitimately empty pool" and degrade to
     // the full lookup table instead of lying about an empty pool.
     draftPool: Array.isArray(state.draftPool) ? [...state.draftPool] : null,
+    // S10 relic pool: the ids THIS run's drops and offers actually roll from — the
+    // same bare-id convention as draftPool above (the describe rows live behind the
+    // relicDef export). null (not []) marks a state that predates the field or was
+    // begun without profile info: such a run draws from the FULL table, and a surface
+    // must show the full table rather than lie about an empty pool.
+    relicPool: Array.isArray(state.relicPool) ? [...state.relicPool] : null,
     enemies: snapshotEnemies(state),
     // S5 potion belt: every phase (run state), with the combat-only q/d ids resolved
     // here so a renderer greys nothing it would have to guess at.

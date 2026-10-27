@@ -37,12 +37,15 @@
 // creates the first controller for the URL's seed/hero/biome, registers the keyboard
 // listener, exposes `window.__dlb` for a curious viewer, and paints the first screen.
 
-import { createController } from '../surface/gui/controller.js';
-import { ctl, seedFromUrl, setCtl, setSnap, snap } from './runtime.js';
+import { ctl, snap } from './runtime.js';
 import { biomeChoice, heroChoice, act, newGame } from './actions.js';
 import { cancelTargeting, clickCard, pendingSlot, pickTarget } from './targeting.js';
 import { deckOpen, toggleDeck, codexOpen, toggleCodex, beltOpenSlot, toggleBelt, helpOpen, toggleHelp, HELP_SEEN_KEY } from './hud.js';
+// Imported for its LOAD-BEARING side effect, not its export: render.js registers itself
+// as the paint sink (setRepaint) at load, and the boot's newGame() below repaints
+// through that hook. A tree-shake or a "cleanup" of this line blanks the first screen.
 import { render } from './render.js';
+void render;
 
 /* ------------------------------------------------------------- keyboard bonus */
 
@@ -138,8 +141,10 @@ document.addEventListener('keydown', (ev) => {
 /** Expose the controller for a curious viewer (read-only use). Not required by the game. */
 window.__dlb = { controller: () => ctl, snapshot: () => snap };
 
-// The first run of the page: same construction newGame() uses, minus the profile
-// narrowing (the very first run of a fresh browser has an empty history anyway).
-setCtl(createController({ run: { seed: seedFromUrl(), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } }));
-setSnap(ctl.snapshot());
-render();
+// The first run of the page IS newGame() — the exact construction, not a copy of it.
+// The old inline build "minus the profile narrowing" was an honesty hole the S2 codex
+// ruled out and S10's relic gate made visible: a REVISIT of a veteran browser booted a
+// full-table run behind a narrowed profile — the page showed (and dropped, and offered)
+// relics the run could not actually get. newGame() reads the same ledger the HUD does,
+// so the first paint is already the run this player's profile earned.
+newGame();

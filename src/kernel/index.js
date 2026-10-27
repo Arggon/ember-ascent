@@ -11,7 +11,7 @@
 import { freezeDeep, hash as hashState, canonical } from './state.js';
 import { loadContent, defaultContent, draftPoolFrom } from './content.js';
 // Imported as a VALUE as well as re-exported below: `contentForProfile` calls it.
-import { poolSelection } from './unlocks.js';
+import { poolSelection, relicPoolFor } from './unlocks.js';
 import { generateMap, ROWS, ACT_COUNT } from './rules/map.js';
 import { buildEncounterTable, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { DEFAULT_RELIC } from './rules/relics.js';
@@ -102,7 +102,17 @@ export {
   poolPlan,
   poolSelection,
   fullyUnlockedProfile,
+  // S10 relic meta-unlocks: the documented milestone table, the pool it derives, and
+  // the pure before/after verdict the run-summary narration reads. The PROFILE reaches
+  // the rules only as these pools (DR-4, relic-shaped) — nothing below newRun ever
+  // sees a win count.
+  RELIC_UNLOCK_TABLE,
+  relicPoolFor,
+  evaluateRelicUnlocks,
 } from './unlocks.js';
+// S10: the relic describe/count helpers a surface may need for the narration — through
+// the ONE entry point (R1), never rules/relics.js directly.
+export { relicDef, RELIC_TOTAL } from './rules/relics.js';
 
 /**
  * Shipped content narrowed to one profile's card pool (DR-4, DR-5).
@@ -136,7 +146,11 @@ export function contentForProfile(profile = null) {
 
 /**
  * Start a run.
- * @param {{seed?: number, character?: string, difficulty?: number, content?: any}} [opts]
+ * @param {{seed?: number, character?: string, difficulty?: number, content?: any,
+ *          wins?: number, relicPool?: string[]}} [opts]
+ *        `wins` — the profile's lifetime win count; the run's relic pool is derived
+ *        from it (S10). `relicPool` — an explicit pool, the log-replay form; it wins
+ *        over `wins`. Neither: no pool field, the full relic table (harness/legacy).
  * @returns {any} frozen state
  */
 export function newRun(opts = {}) {
@@ -159,6 +173,32 @@ export function newRun(opts = {}) {
   }
   if (!Number.isInteger(difficulty) || difficulty < 0) {
     throw Object.assign(new Error(`difficulty must be a non-negative integer, got ${opts.difficulty}`), { code: 3 });
+  }
+  // S10 relic pool, form 1 — the PROFILE form: a lifetime WIN count the entry itself
+  // turns into the run's relic pool through unlocks.js (RELIC_UNLOCK_TABLE). Optional:
+  // absent means "no profile was declared", and the run gets NO relicPool field — it
+  // draws from the full table at every drop read (rules/relics.js), which is also what
+  // a pre-S10 save reads. That keeps every profile-less harness path — the golden
+  // generator, the sim, the policy suite — byte-identical to before this slice, while
+  // the surfaces (which always have a ledger) opt in by passing the count.
+  let wins = null;
+  if (opts.wins !== undefined) {
+    if (!Number.isInteger(opts.wins) || opts.wins < 0) {
+      throw Object.assign(new Error(`wins must be a non-negative integer, got ${opts.wins}`), { code: 3 });
+    }
+    wins = opts.wins;
+  }
+  // Form 2 — the EXACT form: a verbatim pool, the log-replay door. The replay must
+  // reproduce the original state byte-for-byte, and the pool it carried is the state's
+  // own fact (the win count that produced it is not recoverable from the pool), so the
+  // header carries the pool and replay hands it back un-derived. Shape-checked only:
+  // an array of strings, no more — unknown ids are tolerated everywhere downstream.
+  let relicPool = null;
+  if (opts.relicPool !== undefined) {
+    if (!Array.isArray(opts.relicPool) || opts.relicPool.some((id) => typeof id !== 'string')) {
+      throw Object.assign(new Error('relicPool must be an array of relic-id strings'), { code: 3 });
+    }
+    relicPool = opts.relicPool;
   }
 
   // Map generation consumes the first draws of the stream, then the deck is built.
@@ -253,6 +293,20 @@ export function newRun(opts = {}) {
   // on fresh states — a deliberate format change, exactly like S3's gold — so every S7
   // hash differs from S6's, and the goldens are regenerated against the new format.
   state.relics = [character.startingRelic ?? DEFAULT_RELIC];
+  // S10 RELIC POOL: present exactly when a profile was declared — `wins` derives the
+  // pool through the unlock table (the run's own starter always leads, then unlock
+  // order), an explicit `relicPool` is taken verbatim (the replay form wins, being the
+  // exact fact). Like draftPool, the pool is RUN STATE and hash input: two runs built
+  // for different profiles are different runs. Absent (no profile declared, or a
+  // pre-S10 save) reads as the full table at every drop read — rules/relics.js
+  // documents the one-rule fallback. Zero draws either way: the pool is derived, never
+  // rolled, so the RNG stream — and therefore every hash-relevant draw — is untouched
+  // by the derivation itself.
+  if (relicPool !== null) {
+    state.relicPool = [...relicPool];
+  } else if (wins !== null) {
+    state.relicPool = relicPoolFor({ wins }, state.relics[0]);
+  }
   // B1 Kindling (opt-in). Only an opted-in run gains the extra fields and draws, so the
   // default state — and every existing golden hash — is byte-identical to before.
   if (opts.kindling === true) {

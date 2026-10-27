@@ -19,6 +19,11 @@ export function rewardView() {
   wrap.append(sceneIllus('reward'));
   // S7: the boss reward carries the relic offers INSTEAD of the cards, so the head names
   // the different choice. Everything below reads the kernel's own snapshot rows.
+  // S10: `isBoss` reads the kernel's own flag, not the offer count — a warden whose
+  // vault is empty (the profile has not unlocked the rare tier yet) is STILL the
+  // warden's reward, and rendering it as an empty card reward would promise a pick
+  // that does not exist. The empty case gets its own honest branch below.
+  const isBoss = Boolean(snap.reward.boss);
   const boss = (snap.reward.relicOffers ?? []).length > 0;
   // S3: the head carries both facts the victory just produced — the choice offered and the
   // gold paid. The +N is the kernel's own `snap.reward.goldGained` (set in the same breath
@@ -26,7 +31,7 @@ export function rewardView() {
   // re-derived here. null goldGained (a legacy save's reward predates the field) hides the
   // chip instead of printing "+0" for a grant the engine never computed.
   const head = el('div', { cls: 'reward-head' + (arriving.reward ? ' reveal' : '') });
-  head.append(el('span', { text: boss ? 'Victory — claim the warden\u2019s relic' : 'Victory — choose a card' }));
+  head.append(el('span', { text: boss ? 'Victory — claim the warden\u2019s relic' : isBoss ? 'Victory — the warden offers nothing' : 'Victory — choose a card' }));
   if (snap.reward.goldGained != null) {
     head.append(el('span', { cls: 'reward-gold', attrs: { title: `Spoils of the fight — purse: ${snap.reward.purse} gold` } },
       glyphBox('coin', 'coin-glyph'),
@@ -45,7 +50,30 @@ export function rewardView() {
   }
   wrap.append(head);
 
-  if (boss) {
+  if (isBoss) {
+    // S10: the warden's vault is empty — no rare relic is unlocked for this profile yet.
+    // The count is TRUE (the unlock table decides when it fills) and the screen says so
+    // plainly instead of padding the offer or pretending this is a card reward. The one
+    // way out is the walk-away the kernel itself offers (it climbs on — the relic vault
+    // is the meta's reason to come back and win again).
+    if (!boss) {
+      wrap.append(el('div', { cls: 'boon-list' + (arriving.reward ? ' reveal' : '') },
+        el('p', { cls: 'boon-name', text: 'The warden\u2019s vault holds nothing for you yet.' }),
+        keywordText(el('p', { cls: 'boon-text' }), 'Rare relics enter the vault as your lifetime climbs win.'),
+      ));
+      const controls = el('div', { cls: 'controls' });
+      if (snap.reward.canSkip) {
+        controls.append(el('button', {
+          cls: 'btn secondary',
+          text: 'Walk away',
+          attrs: { type: 'button', title: 'Leave the vault — the climb goes on' },
+          on: { click: () => act(snap.reward.skipId) },
+        }));
+      }
+      controls.append(el('span', { cls: 'hint', text: 'Win climbs to fill the warden\u2019s vault' }));
+      wrap.append(controls);
+      return page('reward', 'III — The Warden\u2019s Relic', 'star', 'panel', [wrap]);
+    }
     // The warden's offers, one boon-style button each (the kindling boon list is the
     // precedent: name, then the kernel's own sentence). Every button's id is the
     // snapshot's `actionId` — null exactly when the kernel offers no pick (a torn id or
@@ -73,7 +101,10 @@ export function rewardView() {
       controls.append(el('button', {
         cls: 'btn secondary',
         text: 'Walk away',
-        attrs: { type: 'button', title: 'Leave the relic — the run still ends in victory' },
+        // True in every shape the run can be in: a one-act (legacy) run ends here, a
+        // two-act climb goes on. Saying which would be a rule the kernel owns — the
+        // button only refuses the relic.
+        attrs: { type: 'button', title: 'Leave the relic where it lies' },
         on: { click: () => act(snap.reward.skipId) },
       }));
     }

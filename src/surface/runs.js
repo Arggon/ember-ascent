@@ -157,13 +157,15 @@ export function appendRuns(runsFile, records, opts = {}) {
  * counters — never pool contents, never stats. `poolPlan` turns those counters into a
  * pool, and `poolSelection` turns that plan into card ids. That single direction is what
  * makes "an unlock adds an option, never power" (AC-9.3) structural rather than a promise.
+ * S10: the lifetime WIN count rides along — the RELIC milestones' counter (the cards'
+ * score counter is unchanged), read by `relicPoolFor` the same way.
  * @param {any} agg a lifetime aggregate from loadAgg()
  */
 export function profileFor(agg) {
   const a = agg ?? emptyAgg();
   const badges = {};
   for (const [id, count] of Object.entries(a.badges ?? {})) badges[id] = Number(count) > 0;
-  return { scoreTotal: a.score?.total ?? 0, runs: a.runs ?? 0, badges };
+  return { scoreTotal: a.score?.total ?? 0, runs: a.runs ?? 0, wins: a.wins ?? 0, badges };
 }
 
 /**

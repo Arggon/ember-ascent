@@ -103,6 +103,85 @@ function countersOf(profile) {
   };
 }
 
+/* ------------------------------------------------------------------ S10: relics ---
+ *
+ * CARDS unlock by lifetime SCORE (the draft pool narrows); RELICS unlock by lifetime
+ * WINS — the design ruling for this table: a win is the thing the feedback names
+ * ("relics reset after winning"), it is rarer and more legible than score, and the
+ * relic pool must feel EARNED rather than accumulated. The direction is the same one
+ * the card pool has had since DR-4: the profile decides which relic IDS EXIST for this
+ * run's drops and offers, and no rule ever reads the profile — the pool travels into
+ * the run as a state field (`state.relicPool`), exactly like `state.draftPool`.
+ *
+ * THE TABLE (S10): one row per win milestone; `at` is a lifetime-win threshold and
+ * `ids` the relics that BECOME AVAILABLE there, tier-ordered — the five commons (both
+ * starters among them, so every hero's starter is present from the first run) are the
+ * act-1 basics, the uncommons follow, and the RARE TIER IS LAST: the warden's offers
+ * are the meta's prize. Anchors: a 5-win player sees 8 relics, a 15-win player sees
+ * all 13. A new relic row added to rules/relics.js WITHOUT a row here is a build
+ * failure (tests/kernel/relic-unlocks.test.js pins the coverage).
+ *
+ * HONESTY (the S2 codex lesson, relic-shaped): the pool is derivable from the profile
+ * alone — no draw is consumed, nothing is rolled — so what a run can be offered is a
+ * fact about (seed, profile), and every surface that shows the pool shows exactly what
+ * the drops can produce. A fresh profile's warden offers FEWER THAN THREE (zero until
+ * the 7-win mark); that count is true, and the reward surface says so rather than
+ * padding the offer.
+ */
+export const RELIC_UNLOCK_TABLE = Object.freeze([
+  Object.freeze({
+    at: 0,
+    ids: Object.freeze(['burning_blood', 'cyan_lantern', 'forge_iron', 'whetted_edge', 'hearth_ash']),
+  }),
+  Object.freeze({ at: 1, ids: Object.freeze(['ember_heart']) }),
+  Object.freeze({ at: 3, ids: Object.freeze(['gold_vein', 'flask_grip']) }),
+  Object.freeze({ at: 7, ids: Object.freeze(['deep_well', 'ash_crown']) }),
+  Object.freeze({ at: 10, ids: Object.freeze(['slag_crown', 'cinder_ward']) }),
+  Object.freeze({ at: 15, ids: Object.freeze(['ash_ledger']) }),
+]);
+
+/**
+ * The relic pool for a lifetime win count: the ids THIS profile's runs can be offered,
+ * in unlock order (the table's row order — the pool's ORDER is part of the state
+ * format, like every table-ordered list here). `starterId` is always in, first — the
+ * one hard guarantee the table itself cannot make for a future hero whose starter is
+ * not in the 0-win row. Pure; consumes no draws; deterministic from its arguments.
+ * @param {{wins?: number}} [profile] the profile's win counter (the only field read)
+ * @param {string} [starterId] the run's own starting relic, always kept in the pool
+ * @returns {string[]}
+ */
+export function relicPoolFor(profile = null, starterId = null) {
+  // Clamped at zero: a negative win count is a meaningless counter, and a caller that
+  // hands one over gets the fresh pool rather than a pool below fresh. (newRun refuses
+  // the value outright at its door; this clamp only guards direct callers.)
+  const wins = Math.max(0, Number(profile?.wins ?? 0) || 0);
+  const out = [];
+  const push = (id) => {
+    if (typeof id === 'string' && id !== '' && !out.includes(id)) out.push(id);
+  };
+  push(starterId);
+  for (const row of RELIC_UNLOCK_TABLE) {
+    if (wins < row.at) break; // rows are ascending; the first unmet threshold ends the walk
+    for (const id of row.ids) push(id);
+  }
+  return out;
+}
+
+/**
+ * What crossing from `winsBefore` to `winsAfter` lifetime wins OPENED. Pure; runs once
+ * per finished run, beside evaluateUnlocks. `newly` is the pool difference in unlock
+ * order (a single win can cross several milestones at once — the union, not one row).
+ * @param {number} winsBefore lifetime wins before the run
+ * @param {number} winsAfter lifetime wins after the run
+ * @returns {{newly: string[], before: string[], after: string[]}}
+ */
+export function evaluateRelicUnlocks(winsBefore, winsAfter) {
+  const before = relicPoolFor({ wins: winsBefore });
+  const after = relicPoolFor({ wins: winsAfter });
+  const had = new Set(before);
+  return { newly: after.filter((id) => !had.has(id)), before, after };
+}
+
 /** True when a catalog entry's `at` threshold is met by these counters. Pure. */
 function meets(entry, counters) {
   const at = entry.at ?? {};
@@ -121,11 +200,11 @@ export function unlocksFor(profile) {
 /**
  * The all-unlocks-open profile (DR-5). Used by `--pool full` and by the AC-9.3 tests.
  *
- * DERIVED FROM THE CATALOG, not hand-written: a new unlock entry raises these counters
- * automatically, so "full" can never quietly stop meaning full as the catalog grows.
- * Every badge in BADGE_CATALOG is marked earned, because a badge-gated entry reads
- * `counters.badges[id] === true`.
- * @returns {{scoreTotal: number, runs: number, badges: Record<string, boolean>}}
+ * DERIVED FROM THE CATALOGS, not hand-written: a new unlock entry — card or relic —
+ * raises these counters automatically, so "full" can never quietly stop meaning full as
+ * either catalog grows. Every badge in BADGE_CATALOG is marked earned, because a
+ * badge-gated entry reads `counters.badges[id] === true`.
+ * @returns {{scoreTotal: number, runs: number, wins: number, badges: Record<string, boolean>}}
  */
 export function fullyUnlockedProfile() {
   let scoreTotal = 0;
@@ -135,9 +214,13 @@ export function fullyUnlockedProfile() {
     if (typeof at.score === 'number') scoreTotal = Math.max(scoreTotal, at.score);
     if (typeof at.runs === 'number') runs = Math.max(runs, at.runs);
   }
+  // S10: the relic milestones ride the same derived profile — the highest win
+  // threshold the RELIC_UNLOCK_TABLE asks for opens every relic at once.
+  let wins = 0;
+  for (const row of RELIC_UNLOCK_TABLE) wins = Math.max(wins, row.at);
   const badges = {};
   for (const badge of BADGE_CATALOG) badges[badge.id] = true;
-  return { scoreTotal, runs, badges };
+  return { scoreTotal, runs, wins, badges };
 }
 
 /**

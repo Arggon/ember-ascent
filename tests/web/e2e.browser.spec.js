@@ -29,7 +29,9 @@
 //  11. the S7 relics: one HUD readout chip (count + the held names in its tooltip); an
 //      elite victory always drops a relic (the spoils chip, the chip counting to 2); the
 //      boss offers three relic buttons instead of cards, taking one ends the run in
-//      victory, and the run summary names the relic count
+//      victory, and the run summary names the relic count. S10: the walk boots with a
+//      doctored VETERAN ledger (the documented dlb.runs.v1 agg schema, 10 lifetime wins)
+//      so the warden's vault holds rares — the FRESH-profile walk below owns the gate.
 //
 // RUN. `npm run test:browser`. Deliberately NOT matched by the default `npm test`
 // glob (`tests/**/*.test.js`): this file is `.spec.js` so the default suite stays
@@ -339,13 +341,13 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
   const page = await freshPage(t);
   await bootToMap(page);
 
-  // The save/load lever (see header): one Slag Surge into the deck, so the sheet can be
-  // pinned against an owned copy. The ironclad starters are not pool cards, so this is
-  // the ONLY owned copy the codex can chip. The lever's own second half (per the roadmap
-  // recipe) is a real action: a bare ctl.load() swaps the session but does not repaint —
-  // `act()` does — so the test travels to the first fight (the deck's CONTENTS are
-  // untouched by travel) and reads the codex from the refreshed paint, in combat, the
-  // same place the S1 deck test reads its sheet.
+  // The save/load lever (see header): one Slag Surge (cardId ironwave) into the deck, so
+  // the sheet can be pinned against an owned copy. The ironclad starters are not pool
+  // cards, so this is the ONLY owned copy the codex can chip. The lever's own second half
+  // (per the roadmap recipe) is a real action: a bare ctl.load() swaps the session but
+  // does not repaint — `act()` does — so the test travels to the first fight (the deck's
+  // CONTENTS are untouched by travel) and reads the codex from the refreshed paint, in
+  // combat, the same place the S1 deck test reads its sheet.
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
@@ -355,27 +357,37 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
   await travelToFight(page);
 
+  // S10 NOTE: this test boots a FRESH ledger, and the boot now builds the run through
+  // the same newGame() a restart uses — so the sheet is the run's REAL narrowed pool
+  // (the S2 truth fix, finally visible from the first paint too): 18 offerable cards,
+  // the fresh composition the S2 review measured (14 common, 4 uncommon, NO rare —
+  // rule 4 holds rares back as the prize). The old 39-row full-table sheet was a boot
+  // bug's view, not a state any profile-true run could reach.
+  const poolLen = await page.evaluate(() => window.__dlb.controller().snapshot().draftPool.length);
+  assert.equal(poolLen, 18, 'the fresh run offers 18 cards');
   const btn = page.locator('#hud button[aria-label^="Card codex:"]');
   assert.equal(await btn.count(), 1, 'the HUD Cards control must be present (exactly one)');
-  assert.equal(await btn.getAttribute('aria-label'), 'Card codex: 39 cards', 'the control must announce the pool size');
+  assert.equal(await btn.getAttribute('aria-label'), 'Card codex: 18 cards', 'the control must announce the pool size');
   await openCodex(page);
 
   const sheet = page.locator('.modal.codex-modal');
-  assert.equal(await sheet.getAttribute('aria-label'), 'Card codex: 39 cards', 'the sheet must be a labelled dialog');
-  assert.equal(await sheet.locator('h2').textContent(), 'Cards (39)', 'the sheet title carries the pool size');
+  assert.equal(await sheet.getAttribute('aria-label'), 'Card codex: 18 cards', 'the sheet must be a labelled dialog');
+  assert.equal(await sheet.locator('h2').textContent(), 'Cards (18)', 'the sheet title carries the pool size');
   const heads = await sheet.locator('.codex-group-head').allTextContents();
-  assert.deepEqual(heads, ['Common (16)', 'Uncommon (18)', 'Rare (5)'], 'the three rarity groups with their counts');
-  assert.equal(await sheet.locator('.codex-row').count(), 39, 'every pool card is one row');
+  assert.deepEqual(heads, ['Common (14)', 'Uncommon (4)'], 'the fresh groups with their counts — and no rare group, honestly absent');
+  assert.equal(await sheet.locator('.codex-row').count(), 18, 'every pool card is one row');
 
-  // Spot-check one known row: Maul, cost 3, its describe-layer sentence verbatim.
-  const maul = sheet.locator('.codex-row', { hasText: 'Maul' });
-  assert.equal(await maul.count(), 1, 'Maul renders exactly one row');
-  assert.equal(await maul.locator('.codex-name').textContent(), 'Maul');
-  assert.equal(await maul.locator('.codex-cost').textContent(), '3');
-  assert.equal(await maul.locator('.codex-desc').textContent(), 'Deal 32 damage to the enemy.');
-
-  // The injected Slag Surge wears the brass chip; nothing else in this deck is a pool card.
+  // Spot-check one known row: Slag Surge (cardId ironwave), cost 1, its describe-layer
+  // sentence verbatim — and the full-table card Maul stays ABSENT from a fresh sheet
+  // (the codex shows what the run can be offered, never the whole shipped table).
   const surge = sheet.locator('.codex-row', { hasText: 'Slag Surge' });
+  assert.equal(await surge.count(), 1, 'Slag Surge renders exactly one row');
+  assert.equal(await surge.locator('.codex-name').textContent(), 'Slag Surge');
+  assert.equal(await surge.locator('.codex-cost').textContent(), '1');
+  assert.equal(await surge.locator('.codex-desc').textContent(), 'Gain 5 Block. Deal 5 damage to the enemy.');
+  assert.equal(await sheet.locator('.codex-row', { hasText: 'Maul' }).count(), 0, 'a locked card is not on the sheet');
+
+  // The injected copy wears the brass chip; nothing else in this deck is a pool card.
   assert.equal(await surge.locator('.codex-indeck').textContent(), 'in deck ×1');
   assert.equal(await sheet.locator('.codex-indeck').count(), 1, 'exactly one owned copy to chip');
 
@@ -1079,13 +1091,17 @@ test('shop: the vendor sells a card, removes one, and closes for good', { timeou
   assert.equal(await page.locator('button[data-action="x"]').count(), 0, 'one removal per visit');
   assert.match(await page.locator('.shop-controls').textContent(), /removal service is spent/);
 
-  // The afford-filter: a shelf is inert exactly when its price exceeds the purse, and
-  // after 75 + a purchase something on the shelves must be out of reach.
+  // The afford-filter: an UNSOLD shelf is inert exactly when its price exceeds the
+  // purse, and after 75 + a purchase something on the shelves must be out of reach.
+  // (The SOLD shelf is inert by definition — it has no buy action left — so the purse
+  // equality is only about shelves still standing; the fresh-pool price roll exposed
+  // that the old loop quietly demanded it of the sold shelf too.)
   const affordability = await page.evaluate(() => {
     const s = window.__dlb.snapshot();
-    return { purse: s.shop.purse, offers: s.shop.offers.map((o) => ({ price: o.price, affordable: o.affordable })) };
+    return { purse: s.shop.purse, offers: s.shop.offers.map((o) => ({ price: o.price, sold: o.sold, affordable: o.affordable })) };
   });
   for (const o of affordability.offers) {
+    if (o.sold) { assert.equal(o.affordable, false, 'a sold shelf is inert, whatever the purse'); continue; }
     assert.equal(o.affordable, o.price <= affordability.purse, `a ${o.price}-gold shelf vs purse ${affordability.purse}`);
   }
   assert.ok(affordability.offers.some((o) => !o.affordable), 'after paying, some shelf is inert');
@@ -1503,6 +1519,23 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+  // S10 VETERAN LEDGER (the documented dlb.runs.v1 agg schema — the S2 QA's doctored
+  // aggregate): 10 lifetime wins put four rares in the pool, so this walk still sees a
+  // real three-offer warden. The score total keeps the CARD pool wide too — this test
+  // claims the relic screen, not the card gate. The FRESH gate is the next test's walk.
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('dlb.runs.v1', JSON.stringify({
+        v: 1,
+        records: [],
+        agg: {
+          runs: 10, wins: 10, losses: 0, unfinished: 0, floors: {},
+          score: { count: 10, total: 900, max: 200 },
+          badges: { first_win: 10, boss_down: 10 },
+        },
+      }));
+    } catch {}
+  });
   await page.goto(`${base}/src/web/index.html?seed=7`);
   await page.waitForLoadState('domcontentloaded');
 
@@ -1638,4 +1671,125 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
   const endStats = await page.locator('.end-stats').textContent();
   assert.match(endStats, /Act 2 · floor/, `the summary names the act: ${endStats}`);
   assert.match(endStats, new RegExp(`· ${held.length} relics$`), `the summary counts the relics: ${endStats}`);
+});
+
+// ---------------------------------------------------------------------------
+// 11b. the S10 fresh gate: an EMPTY ledger (a brand-new browser profile) boots a run
+//      whose relic pool is the five commons. Lever-free claims from that fact: the
+//      pool the snapshot publishes, an elite drop that is ALWAYS a common, an act-1
+//      warden whose vault is EMPTY (the honest zero, never padded, never a fake card
+//      reward), and — the whole point of the slice — the run summary narrating what
+//      the win just opened for the NEXT run (Ember Heart, 6 of 13). The deck/HP lever
+//      below only makes the walk fast; it never touches relics or the pool.
+// ---------------------------------------------------------------------------
+test('a fresh profile: the vault starts empty and the first win unlocks Ember Heart', { timeout: 300000 }, async (t) => {
+  if (!chromium) return t.skip('playwright/chromium unavailable');
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: 'reduce', // paint instantly: the walk's assertions are structural
+  });
+  t.after(() => { void browser.close(); });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+  await page.goto(`${base}/src/web/index.html?seed=7`);
+  await page.waitForLoadState('domcontentloaded');
+  await page.locator('button.boon').first().click();
+  await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
+
+  // The run's pool, straight from the kernel's own snapshot: the five commons, no rares.
+  const FRESH_NAMES = ['Kindled Heart', 'Cyan Lantern', 'Forge Iron', 'Whetted Edge', 'Hearth Ash'];
+  const bootPool = await page.evaluate(() => window.__dlb.snapshot().relicPool);
+  assert.deepEqual(bootPool, ['burning_blood', 'cyan_lantern', 'forge_iron', 'whetted_edge', 'hearth_ash'],
+    `a fresh ledger boots the five-common pool: ${JSON.stringify(bootPool)}`);
+
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    for (let i = 0; i < 12; i += 1) save.state.deck.push({ uid: `e2e-fresh-${i}`, cardId: 'bludgeon' });
+    save.state.player.maxHp = 999;
+    save.state.player.hp = 999;
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+
+  let eliteDrops = [];
+  let emptyVaults = 0;
+  for (let guard = 0; guard < 600; guard += 1) {
+    const phase = await page.evaluate(() => window.__dlb.snapshot().phase);
+    if (phase === 'ended') break;
+    if (phase === 'map') {
+      const elite = page.locator('button[aria-label="Travel to Elite"]').first();
+      const boss = page.locator('button.node.available.t-boss').first();
+      if ((await boss.count()) > 0) await boss.click();
+      else if ((await elite.count()) > 0) await elite.click();
+      else await page.locator('button[aria-label^="Travel to"]').last().click();
+      await sleep(500);
+    } else if (phase === 'combat') {
+      const card = page.locator('button[data-slot][aria-disabled="false"]').first();
+      if ((await card.count()) > 0) {
+        await card.click();
+        const tgt = page.locator('.enemy.targeting').first();
+        if ((await tgt.count()) > 0) await tgt.click();
+        await sleep(700);
+      } else {
+        await endTurn(page);
+        await sleep(1300);
+      }
+    } else if (phase === 'reward') {
+      const spoils = page.locator('.reward-relic');
+      if ((await spoils.count()) > 0) eliteDrops.push((await spoils.first().textContent()).trim());
+      // The warden's EMPTY vault (fresh profile): the reward head says so, no offer
+      // button exists, and the walk-away climbs on. Poll past the kill-hold paint beat.
+      const bossTruth = await page.evaluate(() => Boolean(window.__dlb.controller().snapshot().reward?.boss));
+      for (let w = 0; bossTruth && w < 10; w += 1) await sleep(300);
+      const truthNow = await page.evaluate(() => { const s = window.__dlb.controller().snapshot(); return { phase: s.phase, boss: !!s.reward?.boss }; });
+      if (truthNow.phase === 'reward' && truthNow.boss) {
+        const head = await page.locator('.reward-head span').first().textContent();
+        assert.equal(await page.locator('.relic-offer').count(), 0, 'the empty vault renders no offer button');
+        assert.match(head, /the warden offers nothing/, `the honest zero, headlined: ${head}`);
+        emptyVaults += 1;
+        await page.getByRole('button', { name: 'Walk away' }).first().click();
+        await sleep(900);
+        const climbed = await page.evaluate(() => window.__dlb.controller().snapshot());
+        if (climbed.phase === 'map' && climbed.act === 2) {
+          assert.match(await page.locator('.page-num').first().textContent(), /Kiln Deeps/, 'the walk-away climbed into act 2');
+        }
+        continue;
+      }
+      if ((await spoils.count()) > 0) await sleep(300); // let the spoils paint settle before leaving
+      await leaveReward(page);
+    } else if (phase === 'rest') {
+      await page.getByRole('button', { name: 'Move on' }).first().click();
+      await sleep(500);
+    } else if (phase === 'event') {
+      await page.locator('.event-choices .boon:not([disabled])').first().click();
+      await page.waitForSelector('.event-result, button[data-action="v0"]', { timeout: 5000 });
+      const cont = page.locator('button[data-action="v0"]').first();
+      if (await cont.count()) { await cont.click(); await sleep(500); }
+    } else {
+      await sleep(400);
+    }
+  }
+  await sleep(1000);
+  assert.equal(errors.length, 0, `no page errors during the walk: ${errors.join(' | ')}`);
+  assert.ok(eliteDrops.length >= 1, `an elite dropped under the gate: ${JSON.stringify(eliteDrops)}`);
+  assert.ok(eliteDrops.every((n) => FRESH_NAMES.includes(n)), `every gated drop is a row-0 common: ${JSON.stringify(eliteDrops)}`);
+  assert.equal(emptyVaults, 2, 'both wardens of the two-act climb opened an empty vault');
+
+  // The run ends in VICTORY at the act-2 warden's skip — and the win is the unlock.
+  assert.equal(await page.evaluate(() => window.__dlb.snapshot().ended.outcome), 'win', 'the act-2 skip ends the run in victory');
+  // The run's pool never grew mid-run (unlocks happen BETWEEN runs); the narration
+  // already counts the NEXT run's pool — the contrast is the slice's whole story.
+  const endedPool = await page.evaluate(() => window.__dlb.snapshot().relicPool);
+  assert.deepEqual(endedPool, bootPool, 'the ended run still holds the pool it booted with');
+  const narrated = await page.locator('.unlock-line').allTextContents();
+  assert.ok(narrated.some((s) => s.includes('Your climbs unlocked: Ember Heart.')), `the win narrates the unlock: ${JSON.stringify(narrated)}`);
+  const pools = await page.locator('.unlock-pool').allTextContents();
+  assert.ok(pools.some((s) => s.includes('Relics in play: 6 of 13.')), `the pool count is honest: ${JSON.stringify(pools)}`);
+  // And the ledger itself grew by exactly the one win (the unlock's source of truth).
+  const ledger = await page.evaluate(() => JSON.parse(localStorage.getItem('dlb.runs.v1') ?? 'null'));
+  assert.equal(ledger?.agg?.wins, 1, `the doctored-by-nothing ledger holds one win: ${JSON.stringify(ledger?.agg)}`);
 });

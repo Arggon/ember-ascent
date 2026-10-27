@@ -219,6 +219,12 @@ export function logHeader(session) {
     ...(session.state.tempers ? { tempers: true } : {}),
     ...(session.state.quests ? { quests: true } : {}),
     ...(session.state.biome ? { biome: session.state.biome } : {}),
+    // Additive (S10): the run's relic pool, verbatim, when the run declared one. The
+    // pool is a state field (hash input), so replay cannot reconstruct a pool-gated
+    // run without it — and the win count that produced it is NOT recoverable from the
+    // pool it made, so the exact form is what the log records. A pre-S10 log (no
+    // field) is unchanged, and replays against the full table exactly as it always did.
+    ...(Array.isArray(session.state.relicPool) ? { relicPool: session.state.relicPool } : {}),
   };
 }
 
@@ -241,6 +247,9 @@ export function replay(header, entries) {
     tempers: header.tempers === true,
     quests: header.quests === true,
     ...(header.biome ? { biome: header.biome } : {}),
+    // S10: the pool-gated replay (the header's verbatim relicPool; absent on a pre-S10
+    // log, which rebuilds against the full table as before).
+    ...(Array.isArray(header.relicPool) ? { relicPool: header.relicPool } : {}),
   });
   const steps = [];
   for (const [i, entry] of entries.entries()) {
