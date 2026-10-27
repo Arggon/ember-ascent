@@ -56,7 +56,7 @@ Process rules (standing):
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | pending (feeds the unlock meta) |
 | S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | pending — direct answer to "relics reset after winning" |
-| S9 | Content II: enemies + Act 2 | new encounters + second biome/map skeleton | map/act presentation | **in progress** — REPRIORITIZED per user feedback: relics (and gold/deck) only make sense if the climb is long enough to build around |
+| S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | committed 641731a — QA orchestrator-run, review next |
 
 ## Verification recipes (subagents: use these verbatim)
 
@@ -238,3 +238,20 @@ Process rules (standing):
   and (b) META-PROGRESSION: the existing profile unlock system (which already narrows the
   card pool by lifetime play) extends to relics (new S10) so winning runs permanently
   grows what future runs can hold. Dispatching S9 now.
+- 2026-10-25 — S9 (Act 2) development was taken over INLINE after four provider
+  congestion kills: the dev's kernel unit landed on disk mid-flight (acts field,
+  beginNextAct, act-2 biome/placement/gold) and the orchestrator completed it —
+  stale pins recomputed (4 driver GOLDENs + tempers, all deterministic double-run),
+  golden regen (26 ended, longest 155 steps: runs cross both acts), web chapter
+  marker + act-aware end summary (runAct via bracket access — the module-graph
+  scanner flags bare `act` tokens), AND A REAL FIND: the act-2 warden could offer
+  only TWO relics (3 rares existed, one taken in act 1) — fixed by growing the rare
+  tier to five (Cinder Ward B6/fight-start, Ash Ledger +20 gold/fight; existing
+  hooks, no new mechanics). The relics e2e now walks BOTH acts live: elite drops,
+  act-1 warden 3 offers -> pick -> climb asserts (act 2, chapter, +5 maxHp, full
+  heal, carryover), act-2 elites, act-2 warden 3 offers -> pick -> ended win with
+  the Act 2 summary. Also fixed en route: the S6 e2e's latent dead selector
+  (`[aria-disabled=false]` never matches; `:not([disabled])` is the enabled form).
+  Gates at commit 641731a: 341/340/1 node, gate OK, art OK, 17/17 browser, sim
+  exit 0 (token budgets PASS). Solo review next (subagent if infra recovered,
+  else inline).
