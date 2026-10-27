@@ -426,7 +426,8 @@ export const STEP_HANDLERS = Object.freeze({
   // optional; the victory (or the climb) was not.
   skip: (state) => (state.reward?.boss
     ? skipBossRelic(state)
-    : { state: { ...state, phase: 'map', reward: null }, events: [{ t: 'reward_skipped' }] }),  relic_pick: pickRelic,
+    : { state: { ...state, phase: 'map', reward: null }, events: [{ t: 'reward_skipped' }] }),
+  relic_pick: pickRelic,
   rest_heal: (state) => {
     // S7 Hearth Ash / Ash Crown: the held relics' restHealBonus folds into the ONE rest
     // heal (one `heal` event, source 'rest' — the total is the fact). Zero extra draws.

@@ -372,14 +372,14 @@ export function endTurn(state, cardDefs) {
  *                      ranged.
  *   3. RELIC GOLD      per working relic, acquisition order (Gold Vein). 0 draws.
  *   4. BOSS BRANCH     the warden's relic OFFER replaces the card reward (StS parity:
- *                      no cards on the boss). The offers roll NOW — exactly 3 draws
- *                      while the not-held rare pool holds 3 (the act-2 boss offers 2
- *                      when the act-1 boss relic was TAKEN: the pool filters held relics,
- *                      and pickAt pays only for the picks it makes — the existing
- *                      tolerance, reachable through normal play for the first time).
- *                      The phase opens as `reward`; the run's fate is sealed at the
- *                      pick (`r<n>`) or the skip (`s0`) in rules/steps.js, NOT here.
- *                      Never reaches stages 5-7.
+ *                      no cards on the boss). The offers roll NOW — pickAt pays exactly
+ *                      min(3, pool) draws over the not-held rare pool. Five rares exist
+ *                      (S9 grew the tier), each boss takes at most one, so BOTH bosses
+ *                      of a two-act climb offer a real three (4 remain for act 2 after
+ *                      act 1's pick). Fewer picks only if a torn save already holds
+ *                      rares — never padded, never thrown. The phase opens as `reward`;
+ *                      the run's fate is sealed at the pick (`r<n>`) or the skip (`s0`)
+ *                      in rules/steps.js, NOT here. Never reaches stages 5-7.
  *   4b. ACT TRANSITION (S9, at the pick/skip — rules/steps.js settleBossVictory):
  *                      the LAST act's boss ends the run in victory; an earlier act's
  *                      boss CLIMBS ON through beginNextAct — act +1, +5 max HP, a full
@@ -521,7 +521,7 @@ export function resolveVictory(state, cardDefs) {
   // 7. Roll the reward offer: REWARD_CHOICES distinct cards, one more on an elite — and
   //    one more again on an ACT-2 elite (S9's escalation; a legacy save reads as act 1).
   const elites = nodeType === 'elite' ? 1 : 0;
-  const deepElites = state.act >= 2 && nodeType === 'elite' ? 1 : 0;
+  const deepElites = (state.act ?? 1) >= 2 && nodeType === 'elite' ? 1 : 0;
   const offer = rollReward(next, REWARD_CHOICES + elites + deepElites);
   next = {
     ...next,
@@ -598,7 +598,11 @@ export function beginNextAct(state) {
   return {
     state: {
       ...state,
-      rngDraws: state.rngDraws + gen.draws + draws,
+      // `draws` is buildEncounterTable's ABSOLUTE final index (it starts from the
+      // startDraw it was handed) — the new counter is that value alone. Re-summing
+      // state.rngDraws here double-counted the whole pre-transition stream (S9 review
+      // P1: 500-in became 1070-out); newRun mirrors this with the same bare value.
+      rngDraws: draws,
       act: nextAct,
       phase: 'map',
       outcome: null,

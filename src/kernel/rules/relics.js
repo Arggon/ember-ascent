@@ -39,9 +39,11 @@
 //     falls to the other tier (still 1 pick draw); only when BOTH pools are empty —
 //     impossible through play, reachable through a torn save — is nothing granted, and the
 //     suppressed roll costs NOTHING (the potions ruling: "impossible" is free).
-//   * BOSS: THREE offers from the not-held RARE pool (pickAt 3 — exactly 3 draws while the
-//     pool holds 3; fewer picks only if a torn save already held rares, never more). The
-//     player picks 1 (action `r<n>`) or skips (`s0`, StS lets you walk away). The roll
+//   * BOSS: THREE offers from the not-held RARE pool (pickAt 3 — min(3, pool) draws;
+//     five rares exist and each boss takes at most one, so both bosses of a two-act
+//     climb offer three; fewer picks only if a torn save already held rares, never
+//     more). The player picks 1 (action `r<n>`) or skips (`s0`, StS lets you walk
+//     away). The roll
 //     happens at VICTORY time, like the card offer it replaces; the pick itself is a
 //     choice, not a roll — zero draws.
 //
@@ -272,10 +274,10 @@ export function rollEliteRelicDrop(state) {
 
 /**
  * The boss's THREE-offer roll: distinct picks from the not-held RARE pool, no dupes.
- * pickAt consumes exactly `min(3, pool.length)` draws; through play the pool always
- * holds 3 (rares never drop on elites, the starter is not rare), so the normal case is
- * exactly 3 draws. A run short of rares (a torn save) is offered what exists — never
- * padded, never thrown.
+ * pickAt consumes exactly `min(3, pool.length)` draws; five rares exist (S9 grew the
+ * tier so act 2's warden offers a real three after act 1's pick), rares never drop on
+ * elites, and the starter is not rare — through play both bosses offer exactly 3. A
+ * run short of rares (a torn save) is offered what exists — never padded, never thrown.
  * @param {any} state the boss-victory state
  * @returns {{offers: string[], draws: number}}
  */

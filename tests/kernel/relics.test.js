@@ -426,7 +426,12 @@ test('the boss pick r<n> settles the victory: a two-act run CLIMBS ON, a legacy 
   assert.equal(take.state.rngDraws > out.state.rngDraws, true, 'the act-2 map rolled at the transition');
   assert.deepEqual(take.events.map((e) => e.t), ['relic_gained', 'act_advance', 'max_hp', 'heal'], 'the gain, then the climb');
   assert.equal(take.events[0].source, 'boss');
-  assert.equal(take.state.rngDraws - out.state.rngDraws, take.state.rngDraws - out.state.rngDraws, 'the generation draws are counted (pinned against the chain doc)');
+  // The transition's exact draw account (the chain doc's three terms), pinned as a
+  // number for THIS state (seed 7, the pre-transition counter the test staged):
+  // 12 act-2 layout draws + the newRun-format spacer (deck.length = 10) + the per-node
+  // encounter rolls. A tautology here would have let the S9 review's P1 double-count
+  // through — the number is the contract.
+  assert.equal(take.state.rngDraws - out.state.rngDraws, 54, 'the transition consumed exactly the documented account');
   // Skip: StS lets you walk away; the climb stands anyway.
   const skip = step(out.state, 's0');
   assert.equal(skip.state.phase, 'map');

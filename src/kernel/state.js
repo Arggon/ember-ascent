@@ -13,6 +13,7 @@
 // tests/kernel/sha256-parity.test.js pins the output byte-for-byte to node:crypto.
 
 import { sha256Hex } from './sha256.js';
+import { ACT_COUNT } from './rules/map.js';
 import { POTION_SLOTS } from './rules/potions.js';
 
 /** Save/log format version. Bumping this makes old saves refuse to load (exit 4). */
@@ -160,6 +161,11 @@ export function validateSave(raw) {
         problems.push('save.state: "acts" must be an integer >= 1');
       } else if (Number.isInteger(act) && act > acts) {
         problems.push(`save.state: "act" ${act} must not exceed "acts" ${acts}`);
+      } else if (acts > ACT_COUNT) {
+        // A climb deeper than the engine has layouts for passes the numeric checks and
+        // then crashes beginNextAct's map generation at the act-2 boss skip (S9 review
+        // P2): refused at load, like every shape the engine can never produce.
+        problems.push(`save.state: "acts" ${acts} exceeds the engine's ${ACT_COUNT}`);
       }
     }
     // S3 gold: OPTIONAL on purpose. A pre-gold save (no `player.gold`) must keep loading

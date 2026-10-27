@@ -1534,12 +1534,12 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
   let bossOffers = 0;
   let climbedPre = null; // the max-HP the hero carried INTO the first boss pick
   let firstPickDone = false;
-  for (let guard = 0; guard < 400; guard += 1) {
+  for (let guard = 0; guard < 600; guard += 1) {
     const phase = await page.evaluate(() => window.__dlb.snapshot().phase);
     if (phase === 'ended') break;
     if (phase === 'map') {
       const elite = page.locator('button[aria-label="Travel to Elite"]').first();
-      const boss = page.locator('button[aria-label="Travel to Slag Warden"]').first();
+      const boss = page.locator('button[aria-label*="Warden"]').first();
       if ((await boss.count()) > 0) await boss.click();
       else if ((await elite.count()) > 0) await elite.click();
       else await page.locator('button[aria-label^="Travel to"]').last().click();
