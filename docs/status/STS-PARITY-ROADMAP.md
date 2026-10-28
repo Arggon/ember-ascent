@@ -54,7 +54,7 @@ Process rules (standing):
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | closed — c83a2d0, QA 11/11, review APPROVE |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | closed — 69b05eb + fixes d7441b6, QA 11/11, review APPROVE |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
-| S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | committed 0168d28 — QA orchestrator-run 10/10, review next |
+| S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | closed — 0168d28, QA 10/10, review APPROVE (5 P3s → backlog) |
 | S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | closed — 2ef8ce5, QA 10/10, review APPROVE (5 P3s → backlog) |
 | S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | closed — 641731a + d08da32 + c4a0ace, re-review APPROVE |
 
@@ -311,3 +311,14 @@ Process rules (standing):
   heal +6/zero, exhaust routing, Forge Rhythm's actual "Discard 1 at random" text
   correcting the brief's mis-read, DEX/PWR scaling, shop bands, mid-ladder codex 45).
   Committed 0168d28; solo review next.
+- 2026-10-25 — S8 review VERDICT: APPROVE (retain's blast radius contained — energy still
+  charged per play, startCombat empties before beginTurn, tempered copies keep the
+  marker by construction; heal's honest-zero pinned; multi-hit per-enemy for ALL cards
+  verified in the verb loop; ladder set-equality proven — no card unreachable at any
+  rung; pins carry real reasons). Five P3s → BACKLOG: a HAND_LIMIT-overflow unit test
+  with retained cards; a cross-reference sentence for the heal-event shape divergence
+  (the card verb emits honest zeros, every other site suppresses); the unlock
+  narration's fresh-pool count inherits the §11.2 defect framing; the greedy policy's
+  0/20 on the wider pool → the future policy slice; commit-message nit (24/32/48/68
+  are pool sizes, the score thresholds 25/60/120 are unchanged). S8 CLOSED — THE
+  ROADMAP IS COMPLETE: all ten slices + POLISH through the full SDLC.
