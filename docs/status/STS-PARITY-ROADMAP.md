@@ -322,3 +322,18 @@ Process rules (standing):
   0/20 on the wider pool → the future policy slice; commit-message nit (24/32/48/68
   are pool sizes, the score thresholds 25/60/120 are unchanged). S8 CLOSED — THE
   ROADMAP IS COMPLETE: all ten slices + POLISH through the full SDLC.
+- 2026-10-25 — UX-1 review VERDICT: APPROVE. Verified: the legacy stream identity is
+  PROVABLE (the loop's first pickAt call is textually identical and breaks before the
+  later tiers whenever rares cover 3 — pinned over 80 seeds); the headroom pairs are
+  arithmetically net-zero at every tier; the exhausted-case reachability is a theorem
+  (act-1 offers >= 1 for every fresh profile). Its P2 catches MY second assertion-
+  vs-evidence miss: the "360x780@130 artifact" dismissal was wrong — a real diff-caused
+  1.3px card-name clip (the tall-portrait block's 10px side padding overriding the
+  <=380 tier's engineered 6px). Also: the laptop End-Turn budget MOVED 14px (clears by
+  87 — the "byte-identical" claim was false), and the tooltip claim was half-true
+  (aria-label yes, no title). ALL fold into UX-2 with the pacing work.
+- 2026-10-25 — UX-2 (pacing + UX-1 review fixes) dispatched. Brief from the measured
+  audit: per-enemy enemy-turn sequencing (burst diffs carry per-enemy indices;
+  enemy-strike hook exists), attacker-named damage floats, slam anticipation beats —
+  surface-side only, kernel untouched; plus the <=380 side-padding restore + row
+  re-measure, the doubly-torn vault fallback line, and the End-Turn budget record.
