@@ -487,7 +487,7 @@ const RARITY_GROUP_KEYS = new Set(RARITY_GROUPS.map((g) => g.key));
 /**
  * The codex rows the CURRENT run can actually be offered: the lookup table filtered to
  * `snap.draftPool` — the exact id set `rules/act.js rollReward` picks this run's rewards
- * from, which every snapshot publishes. Recomputed per read (a Set over at most 39 cached
+ * from, which every snapshot publishes. Recomputed per read (a Set over at most 65 cached
  * rows — no describe work), so a new run's narrowing is live from its first paint. A
  * snapshot that predates the field (null: a state loaded from a legacy save) falls back
  * to the whole table — the best a surface can do when the kernel could not say — while an
@@ -559,7 +559,7 @@ export function codexPanel() {
 /**
  * One codex row: cost, type word, face name, rarity tag, the card's own describe-layer
  * sentence, and — only when the deck holds at least one copy — the brass "in deck ×N"
- * chip. Zero copies render no chip: absence is the fact, and 39 zero chips would bury it.
+ * chip. Zero copies render no chip: absence is the fact, and 65 zero chips would bury it.
  */
 function codexRow(c, inDeck) {
   const row = el('div', { cls: 'codex-row', attrs: { 'data-rarity': c.rarity } });

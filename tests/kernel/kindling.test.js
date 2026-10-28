@@ -113,4 +113,4 @@ test('log header carries the flag and replay matches hash-for-hash (golden)', ()
   assert.equal(runHash(session), GOLDEN);
 });
 
-const GOLDEN = 'sha256:992101ab52815d039929ea9aa668283d802e283e6c065ef6a7714c37bde025cb';
+const GOLDEN = 'sha256:9c296d1cbfaaa5f0b19bc47a1706aebf97f5b6b4ada206202cf69d15e49c47d9';

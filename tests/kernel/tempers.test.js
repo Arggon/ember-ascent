@@ -31,10 +31,11 @@ test('default run has no tempers and an unchanged hash', () => {
 });
 
 test('a tempers rest offers t1..t3 beside heal and leave, and tempering is permanent', () => {
-  // S5 moved the drop rolls and S6 moved the map again, so the driver's first rest now
-  // sits on seed 1 (see the golden test below). The claim is unchanged.
-  const s = toFirstRest(1);
-  assert.ok(s, 'seed 1 reaches a rest site');
+  // S5 moved the drop rolls, S6 moved the map, and S8's card-pool growth shifted the
+  // reward streams once more — the driver's first rest now sits on seed 9 (seed 1's
+  // greedy walk no longer reaches one inside 300 steps). Same driver, same claim.
+  const s = toFirstRest(9);
+  assert.ok(s, 'seed 9 reaches a rest site');
   assert.deepEqual(legal(s).map((a) => a.id), ['c', 'e1', 't1', 't2', 't3']);
   const offer = legal(s).find((a) => a.id === 't1').offer;
   const after = submit(s, 't1').session;
@@ -72,10 +73,10 @@ test('a Red-hot Hammerfall deals 9 and costs 2 HP in a real fight', () => {
 
 test('log header carries the flag and replay matches the golden hash', () => {
   // S5 note: the victory drop roll consumes a draw after every won fight, and S6 moved
-  // the map again — the seeded streams shifted and earlier seeds' drivers no longer
-  // reach a rest site inside 300 steps; seed 1 does. Same driver, same claim.
-  let s = toFirstRest(1);
-  assert.ok(s, 'seed 1 reaches a rest site');
+  // the map again, and S8's pool growth shifted the streams once more — earlier seeds'
+  // drivers no longer reach a rest site inside 300 steps; seed 9 does. Same driver, same claim.
+  let s = toFirstRest(9);
+  assert.ok(s, 'seed 9 reaches a rest site');
   s = submit(s, 't3').session;
   const parsed = parseLog(renderLog(s));
   assert.equal(parsed.header.tempers, true);
@@ -83,7 +84,7 @@ test('log header carries the flag and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:7da694fb6b3a0f9f1799eda72398933719215fefd684b53e04ca5d2547e001cb';
+const GOLDEN = 'sha256:6cb87b1b1d701d02f89a8281cff621198ad402840661ba832de7ebf8ba87e211';
 
 // ---------------------------------------------------------------------------
 // Visible tempers: every rendering of a tempered card shows what it really plays.

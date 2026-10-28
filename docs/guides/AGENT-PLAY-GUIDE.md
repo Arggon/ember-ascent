@@ -1,7 +1,7 @@
 # Agent Play Guide — `dlb`
 
 **What this is:** how an AI agent (or a human, or a script) plays the deckbuilder from a terminal, at the lowest practical token cost.
-**Status:** vertical slice complete — 44 cards, one act, one boss, two characters (the Ashwright and the Bellows Keeper; the CLI's internal ids remain `ironclad` and `bellows`). **Mechanically verified; the human fun gate is still open.**
+**Status:** vertical slice complete — 70 cards (S8 content scale), two acts, two wardens, two characters (the Ashwright and the Bellows Keeper; the CLI's internal ids remain `ironclad` and `bellows`). **Mechanically verified; the human fun gate is still open.**
 **Every command and output below was run and captured, not described.**
 
 ---

@@ -40,6 +40,8 @@ const generators = [
   { verb: 'energy', name: 'energy', def: { id: 'g', effects: [{ verb: 'energy', amount: 2 }] } },
   { verb: 'discard', name: 'discard', def: { id: 'g', effects: [{ verb: 'discard', amount: 1 }] } },
   { verb: 'exhaust', name: 'exhaust', def: { id: 'g', effects: [{ verb: 'exhaust' }] } },
+  { verb: 'heal', name: 'heal', def: { id: 'g', effects: [{ verb: 'heal', amount: 6 }] } },
+  { verb: 'retain', name: 'retain', def: { id: 'g', effects: [{ verb: 'retain' }] } },
   ...Object.keys(CUSTOM_SUMMARY).map((handler) => ({
     verb: 'custom',
     name: `custom/${handler}`,

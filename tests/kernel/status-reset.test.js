@@ -17,8 +17,19 @@ import assert from 'node:assert/strict';
 import { loadKernel, loadDescribe } from '../helpers/harness.mjs';
 
 const K = await loadKernel();
-const { newRun, actions, step, snapshot } = K;
+const { newRun, actions, step, snapshot, relicDef } = K;
 await loadDescribe();
+
+/**
+ * The Strength the run's own RELICS grant at combat start (S7 hooks, applied after the
+ * opening draw in acquisition order — rules/act.js startCombat). This is BY DESIGN, not
+ * carry-over: the invariant under test is "nothing survived the LAST fight", so the
+ * relic contribution is the expected opening value, not a violation.
+ */
+function relicOpeningStrength(state) {
+  return (Array.isArray(state.relics) ? state.relics : [])
+    .reduce((n, id) => n + (relicDef(id)?.combatStartStrength ?? 0), 0);
+}
 
 /** Walk a run, recording the player's Strength at the start of every combat. */
 function strengthByCombat(seed) {
@@ -34,6 +45,7 @@ function strengthByCombat(seed) {
         out.push({
           floor: snap.floor,
           strength: snap.player.statuses.find((s) => s.key === 'strength')?.stacks ?? 0,
+          relicStrength: relicOpeningStrength(state),
         });
       }
     }
@@ -46,14 +58,17 @@ function strengthByCombat(seed) {
 }
 
 test('a fight BEGINS with no carry-over Strength, however the last fight ended', () => {
-  // Every combat must start clean. Any non-zero opening Strength is the accumulation bug.
+  // Every combat must start clean: the opening Strength is EXACTLY what the held relics
+  // grant (0 when none does — S8 note: the new pool's reward streams finally put
+  // Whetted Edge in a walk's hands on seed 5, which is why the expected value is the
+  // relic sum and not a bare 0). Anything above it is the accumulation bug.
   for (const seed of [1, 2, 3, 5, 8, 13, 21, 34]) {
     const combats = strengthByCombat(seed);
     for (const c of combats) {
       assert.equal(
         c.strength,
-        0,
-        `seed ${seed}: combat at floor ${c.floor} began with Strength ${c.strength} (must be 0)`,
+        c.relicStrength,
+        `seed ${seed}: combat at floor ${c.floor} began with Strength ${c.strength} (relics grant ${c.relicStrength})`,
       );
     }
   }

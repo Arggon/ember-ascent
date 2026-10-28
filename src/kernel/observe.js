@@ -77,6 +77,8 @@ const SUMMARY_OF_VERB = {
   status: (e) => `${STATUS_ABBREV[e.status] ?? e.status.toUpperCase()}+${e.amount}`,
   discard: (e) => `d${e.amount}`,
   exhaust: () => 'EXH',
+  heal: (e) => `H${e.amount}`,
+  retain: () => 'RTN',
   custom: (e) => CUSTOM_SUMMARY[e.handler] ?? '?',
 };
 

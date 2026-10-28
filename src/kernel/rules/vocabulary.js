@@ -238,6 +238,35 @@ export const VOCABULARY = {
     };
   },
 
+  /**
+   * heal — restore `amount` HP to the player, capped at maxHp. Like loseHp this ignores
+   * Block and other statuses entirely; unlike loseHp it has no floor game — the event
+   * carries the HP ACTUALLY restored, so an overheal reads as a smaller number and no
+   * consumer can mistake the printed value for the delta.
+   *
+   * DRAW ACCOUNTING: zero draws — the amount is fixed, no roll decides it.
+   */
+  heal(state, _ctx, params) {
+    const amount = Math.max(0, Math.min(params.amount, state.player.maxHp - state.player.hp));
+    if (amount === 0) return { state, events: [{ t: 'heal', who: 'player', amount: 0 }] };
+    return {
+      state: { ...state, player: { ...state.player, hp: state.player.hp + amount } },
+      events: [{ t: 'heal', who: 'player', amount }],
+    };
+  },
+
+  /**
+   * retain — a MARKER verb: it does nothing at play time and is instead consumed by the
+   * end-of-turn discard phase (rules/act.js endTurn), which keeps a hand card whose
+   * definition carries this verb in the hand instead of discarding it. The card keeps
+   * its decorated instance (cost included) and stays retained turn after turn — the
+   * check reads the definition, not a one-shot flag. Zero draws at play AND at the
+   * discard phase: nothing rolls, the card simply does not move.
+   */
+  retain(state, _ctx, _params) {
+    return { state, events: [] };
+  },
+
   /** custom — dispatch to a registered rules/effects/<id>.js handler. */
   custom(state, ctx, params) {
     const fn = CUSTOM.get(params.handler);

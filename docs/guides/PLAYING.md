@@ -23,6 +23,15 @@ Add `?seed=42` to the URL for a reproducible run: `http://localhost:5173/src/web
 > **Addendum 2026-10-24 (reconciled after the module refactor):** the shipped build now has
 > **44 card definitions** — 21 attack / 17 skill / 6 power — counted by parsing
 > `src/kernel/content/cards.json`. The "42" above was true of the 2026-10-16 build.
+>
+> **Addendum 2026-10-27 (S8 content scale):** the pool grew to **70 card definitions** —
+> 35 attack / 27 skill / 8 power — still counted by parsing `src/kernel/content/cards.json`.
+> New cards bring the classic verbs the vocabulary was missing: **multi-hit** attacks
+> (`A3x3` — one card, several hits), **Retain** (the card stays in your hand when your
+> turn ends — held until you play or discard it) and **Heal** (restore HP, capped at your
+> maximum). The unlock ladder widened to match: a fresh profile drafts 20 cards, and the
+> top unlock (score 120) opens every card the forge holds. The "44" above was true of the
+> 2026-10-24 build.
 
 ---
 
@@ -84,6 +93,8 @@ Cards you **cannot afford** are visually disabled — if it won't play, you don'
 ### How the game works
 
 You have **3 energy per turn**, and cards cost 1–2, so you'll typically play 2–3 cards. **Block disappears at the start of your turn** — it only reduces damage *this* turn, so block based on the enemy's shown intent. Your deck cycles: when the draw pile empties, the discard pile is shuffled back in.
+
+**Retain.** A card marked *Retain* stays in your hand when your turn ends instead of being discarded — it keeps staying, turn after turn, until you play or discard it. The next turn's draw stacks on top of what you hold.
 
 **The Kindling.** In the browser, every run opens at the forge: it offers three boons and you must take one. Each has an upside *and* a price (for example *Bellows Breath*: +1 Energy every turn, −12 max HP). Choose for your plan, not for the bigger number.
 

@@ -2,14 +2,15 @@
 // truth is snapshot.draftPool — the ids its rewards actually roll from. The surface's
 // "in deck" chip sums the kernel's own deck rows.
 //
-// Pins: the table IS draftPoolFrom(shipped content) (39 ids, starters excluded, 16/18/5
-// by rarity); every row carries the definition's own name/cost/type/rarity and a
-// non-empty description that is the describe layer's sentence verbatim; rows sort
-// deterministically (rarity tier → cost → face name → card id); snapshot() publishes the
-// RUN'S draftPool (narrowed profiles make it shorter than the table; a state that
-// predates the field publishes null), and every run id is covered by a table row so the
-// per-run filter can only ever shrink it; the in-deck tally sums the kernel's aggregated
-// deck rows per cardId, so a tempered copy counts toward its cardId total.
+// Pins: the table IS draftPoolFrom(shipped content) (65 ids, starters excluded, 22/30/13
+// by rarity after S8 grew the table 44 → 70); every row carries the definition's own
+// name/cost/type/rarity and a non-empty description that is the describe layer's sentence
+// verbatim; rows sort deterministically (rarity tier → cost → face name → card id);
+// snapshot() publishes the RUN'S draftPool (narrowed profiles make it shorter than the
+// table; a state that predates the field publishes null), and every run id is covered by
+// a table row so the per-run filter can only ever shrink it; the in-deck tally sums the
+// kernel's aggregated deck rows per cardId, so a tempered copy counts toward its cardId
+// total.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { content, loadDescribe, loadKernel } from '../helpers/harness.mjs';
@@ -25,7 +26,7 @@ test('cardPool is exactly the draft pool: draftPoolFrom ids, starters excluded',
   // Built independently from the shipped content, so the codex cannot drift from what
   // the reward deck can offer.
   const expected = C.cardList.filter((c) => c.rarity !== 'starter').map((c) => c.id).sort();
-  assert.equal(pool.length, 39);
+  assert.equal(pool.length, 65);
   // Same id SET (the pool's own order is rarity tier → cost → name → id, pinned below).
   assert.deepEqual(pool.map((r) => r.cardId).sort(), expected);
   // The starters are no one's reward: none of them may appear in the sheet.
@@ -33,10 +34,10 @@ test('cardPool is exactly the draft pool: draftPoolFrom ids, starters excluded',
   for (const row of pool) assert.ok(!starters.has(row.cardId), `${row.cardId} is a starter`);
 });
 
-test('the pool splits 16 common / 18 uncommon / 5 rare', () => {
+test('the pool splits 22 common / 30 uncommon / 13 rare (S8: 44 → 70 cards)', () => {
   const counts = { common: 0, uncommon: 0, rare: 0 };
   for (const row of cardPool()) counts[row.rarity] += 1;
-  assert.deepEqual(counts, { common: 16, uncommon: 18, rare: 5 });
+  assert.deepEqual(counts, { common: 22, uncommon: 30, rare: 13 });
 });
 
 test('every row carries the definition\'s own facts and a non-empty description', () => {
@@ -78,7 +79,7 @@ test('snapshot publishes the RUN\'S draftPool — the full table only for an unn
   // The default content: the run's pool IS the whole shipped draft pool.
   const full = snapshot(newRun({ seed: 7 }));
   assert.deepEqual(full.draftPool, C.cardList.filter((c) => c.rarity !== 'starter').map((c) => c.id).sort());
-  assert.equal(full.draftPool.length, 39);
+  assert.equal(full.draftPool.length, 65);
   // A state that predates the field (validateSave never required draftPool) publishes
   // null — "pool unknown", NOT an empty pool — so a surface can fall back to the table
   // instead of lying about an empty codex.
@@ -95,7 +96,13 @@ test('a narrowed run publishes its own pool, and the lookup table covers every i
     const expected = narrowed.cardList.filter((c) => c.rarity !== 'starter').map((c) => c.id).sort();
     const ids = snapshot(state).draftPool;
     assert.deepEqual(ids, expected, `${profile === null ? 'fresh' : 'fully unlocked'} profile: snapshot.draftPool must be the run content's own pool`);
-    assert.ok(ids.length < 39, `${profile === null ? 'fresh' : 'fully unlocked'} profile is genuinely narrowed (${ids.length} of 39)`);
+    if (profile === null) {
+      assert.ok(ids.length < 65, `the fresh profile is genuinely narrowed (${ids.length} of 65)`);
+    } else {
+      // S8: the top unlock tier is sized to hold EVERY card (AC-9.4 — the whole pool is
+      // reachable), so the fully-unlocked run's pool legitimately EQUALS the table.
+      assert.equal(ids.length, 65, 'the fully-unlocked pool covers the whole table');
+    }
     // The web's filter: cached cardPool() rows kept when their cardId is in the run's
     // set. It can only shrink the table if — and only if — every run id HAS a row.
     const tableIds = new Set(cardPool().map((r) => r.cardId));

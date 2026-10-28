@@ -11,6 +11,7 @@
 // Every function here is pure: no clock, no `Math.random`, no I/O (the architecture
 // gate fails this file if that stops being true).
 import { helpTopics, glossary } from './describe.js';
+import { SHIPPED_CONTENT } from './content.js';
 import { VERBS } from './rules/vocabulary.js';
 
 /** The only keys a grant may declare. Anything else is a stat, and stat grants are banned. */
@@ -20,8 +21,13 @@ export const GRANT_KEYS = Object.freeze(['grantCard', 'grantOption', 'grantMode'
 export const FRESH_SIZE = 24;
 /** Ratio of the pool by card type, applied to any size: 12:9:3 out of 24 = 0.5 / 0.375 / 0.125. */
 export const TYPE_RATIO = Object.freeze({ attack: 0.5, skill: 0.375, power: 0.125 });
-/** The shipped total (1 act, frozen content). Derived at call time, never used as a literal rule. */
-export const SHIPPED_CARDS = 44;
+/**
+ * The shipped total. DERIVED from the bundle rather than written as a literal, so content
+ * growth (S8: 44 → 70) cannot leave this constant — and the tests that pin it — lying.
+ * (The old comment said "never used as a literal rule" while being a literal; this import
+ * makes that true in fact.)
+ */
+export const SHIPPED_CARDS = SHIPPED_CONTENT.cards.length;
 
 /** Rarity order, cheapest first. A fill may only relax *down* this list. */
 const RARITY_RANK = Object.freeze({ starter: 0, common: 1, uncommon: 2, rare: 3 });
@@ -33,34 +39,37 @@ const RARITY_RANK = Object.freeze({ starter: 0, common: 1, uncommon: 2, rare: 3 
  * or a named badge) — never a game stat. `grant.grantCard` only ever widens the draft
  * POOL; it cannot raise HP, energy, hand size or any damage number (AC-9.3).
  *
- * Sizes are monotone (24 → 30 → 36 → 39) so an unlock is a strict superset of what came
+ * Sizes are monotone (24 → 32 → 48 → 68) so an unlock is a strict superset of what came
  * before: nothing a player already had is ever taken away, and the rare tier is the last
- * and most visible prize (§11.2 rule 4).
+ * and most visible prize (§11.2 rule 4). The S8 content growth retuned the top three
+ * sizes: with 70 shipped cards, the fully-open tier is 68 — every non-starter card the
+ * shared pool can hold (the two hero-bound starters ride along per hero) — so AC-9.4
+ * ("the whole pool is reachable") stays a property and not a wish.
  */
 export const UNLOCK_CATALOG = Object.freeze([
   Object.freeze({
     id: 'wider_pool_1',
     at: Object.freeze({ score: 25 }),
-    grant: Object.freeze({ grantCard: Object.freeze({ size: 30, allowUncommon: true, allowRare: false }) }),
+    grant: Object.freeze({ grantCard: Object.freeze({ size: 32, allowUncommon: true, allowRare: false }) }),
     name: 'More cards can appear in your rewards',
     condition: 'Score 25 or more across your runs',
-    narration: 'Seven more of the 42 cards are now in play (24 → 30), uncommon cards among them.',
+    narration: 'Eight more of the 70 cards are now in play (24 → 32), uncommon cards among them.',
   }),
   Object.freeze({
     id: 'wider_pool_2',
     at: Object.freeze({ score: 60 }),
-    grant: Object.freeze({ grantCard: Object.freeze({ size: 36, allowUncommon: true, allowRare: false }) }),
+    grant: Object.freeze({ grantCard: Object.freeze({ size: 48, allowUncommon: true, allowRare: false }) }),
     name: 'A wider reward pool still',
     condition: 'Score 60 or more across your runs',
-    narration: 'Six more cards are now in play (30 → 36).',
+    narration: 'Sixteen more cards are now in play (32 → 48).',
   }),
   Object.freeze({
     id: 'rare_tier',
     at: Object.freeze({ score: 120 }),
-    grant: Object.freeze({ grantCard: Object.freeze({ size: 39, allowUncommon: true, allowRare: true }) }),
+    grant: Object.freeze({ grantCard: Object.freeze({ size: 68, allowUncommon: true, allowRare: true }) }),
     name: 'Rare cards can appear in your rewards',
     condition: 'Score 120 or more across your runs',
-    narration: 'Three more cards are now in play (36 → 39). The rare tier is open.',
+    narration: 'Twenty more cards are now in play (48 → 68). The rare tier is open — every card the forge holds is yours to draft.',
   }),
   Object.freeze({
     id: 'play_this_seed',

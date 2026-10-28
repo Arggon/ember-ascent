@@ -359,23 +359,23 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
 
   // S10 NOTE: this test boots a FRESH ledger, and the boot now builds the run through
   // the same newGame() a restart uses — so the sheet is the run's REAL narrowed pool
-  // (the S2 truth fix, finally visible from the first paint too): 18 offerable cards,
-  // the fresh composition the S2 review measured (14 common, 4 uncommon, NO rare —
-  // rule 4 holds rares back as the prize). The old 39-row full-table sheet was a boot
-  // bug's view, not a state any profile-true run could reach.
+  // (the S2 truth fix, finally visible from the first paint too). S8 grew the shipped
+  // table 44 → 70, and the fresh composition moved with it: 20 offerable cards
+  // (16 common, 4 uncommon, NO rare — rule 4 holds rares back as the prize; the four
+  // uncommons ride the one-card-per-verb and named-in-help rules, not the fill).
   const poolLen = await page.evaluate(() => window.__dlb.controller().snapshot().draftPool.length);
-  assert.equal(poolLen, 18, 'the fresh run offers 18 cards');
+  assert.equal(poolLen, 20, 'the fresh run offers 20 cards');
   const btn = page.locator('#hud button[aria-label^="Card codex:"]');
   assert.equal(await btn.count(), 1, 'the HUD Cards control must be present (exactly one)');
-  assert.equal(await btn.getAttribute('aria-label'), 'Card codex: 18 cards', 'the control must announce the pool size');
+  assert.equal(await btn.getAttribute('aria-label'), 'Card codex: 20 cards', 'the control must announce the pool size');
   await openCodex(page);
 
   const sheet = page.locator('.modal.codex-modal');
-  assert.equal(await sheet.getAttribute('aria-label'), 'Card codex: 18 cards', 'the sheet must be a labelled dialog');
-  assert.equal(await sheet.locator('h2').textContent(), 'Cards (18)', 'the sheet title carries the pool size');
+  assert.equal(await sheet.getAttribute('aria-label'), 'Card codex: 20 cards', 'the sheet must be a labelled dialog');
+  assert.equal(await sheet.locator('h2').textContent(), 'Cards (20)', 'the sheet title carries the pool size');
   const heads = await sheet.locator('.codex-group-head').allTextContents();
-  assert.deepEqual(heads, ['Common (14)', 'Uncommon (4)'], 'the fresh groups with their counts — and no rare group, honestly absent');
-  assert.equal(await sheet.locator('.codex-row').count(), 18, 'every pool card is one row');
+  assert.deepEqual(heads, ['Common (16)', 'Uncommon (4)'], 'the fresh groups with their counts — and no rare group, honestly absent');
+  assert.equal(await sheet.locator('.codex-row').count(), 20, 'every pool card is one row');
 
   // Spot-check one known row: Slag Surge (cardId ironwave), cost 1, its describe-layer
   // sentence verbatim — and the full-table card Maul stays ABSENT from a fresh sheet

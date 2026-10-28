@@ -34,6 +34,20 @@ export const ACT_HP_BONUS = 5;
 /** Strip a runtime hand card back to its compact deck-instance form. */
 const toInstance = (c) => ({ uid: c.uid, cardId: c.cardId, perPlay: c.perPlay ?? 0 });
 
+/**
+ * S8: whether a hand card is RETAINED across the end-of-turn discard phase — true when
+ * its definition carries the `retain` marker verb (rules/vocabulary.js). The check reads
+ * the DEFINITION, so a card stays retained every turn it sits in hand, and a tempered
+ * copy keeps the marker (temperEffects only appends or rescales — it never drops a verb).
+ * @param {Map<string, any>} cardDefs
+ * @param {{cardId: string}} card
+ * @returns {boolean}
+ */
+function retainsCard(cardDefs, card) {
+  const def = cardDefs?.get(card.cardId);
+  return Array.isArray(def?.effects) && def.effects.some((e) => e.verb === 'retain');
+}
+
 /** Card definitions, injected once by the kernel entry so rules never import content. */
 
 /** @param {Map<string, any>} defs */
@@ -160,6 +174,14 @@ export function intentDamage(enemy) {
 /**
  * Begin a player turn: refill energy, draw a hand, pick enemy intents.
  * Intents are chosen at the START of the turn so the observation can show them.
+ *
+ * S8 RETAIN: the hand is NOT reset here — cards the discard phase kept (definitions
+ * carrying the `retain` verb) are still in it, and the draw stacks the new hand size on
+ * top. startCombat empties the hand itself before calling this, so the opening turn is
+ * unchanged; from endTurn the only hand contents are retained cards. The draw obeys the
+ * ONE hand-cap rule (rules/draw.js): a card drawn onto a full hand routes to the
+ * discard, so 10 retained cards simply overflow the turn draw.
+ *
  * @param {any} state
  * @param {Map<string, any>} cardDefs
  * @returns {{state: any, events: any[]}}
@@ -173,7 +195,7 @@ export function beginTurn(state, cardDefs) {
   const handSize = HAND_SIZE + (state.combat.turn === 0 ? firstTurnDrawOf(state) : 0);
   let next = {
     ...state,
-    combat: { ...state.combat, turn: state.combat.turn + 1, hand: [] },
+    combat: { ...state.combat, turn: state.combat.turn + 1, hand: state.combat.hand },
     player: { ...state.player, block: 0, energy: state.energyPerTurn ?? BASE_ENERGY },
   };
 
@@ -310,8 +332,17 @@ export function endTurn(state, cardDefs) {
   const events = [];
   let next = state;
 
-  const discarded = next.combat.hand.map(toInstance);
-  next = { ...next, combat: { ...next.combat, discard: [...next.combat.discard, ...discarded], hand: [] } };
+  // S8 RETAIN: the discard phase partitions the hand — definitions carrying the
+  // `retain` marker verb stay in the hand (their decorated instances untouched, cost
+  // included), everything else is discarded exactly as before. The retained copies are
+  // NOT re-instantiated: the hand cards already carry cost/perPlay, so keeping them
+  // as-is is the no-op it should be. Zero draws either way: nothing rolls, the cards
+  // just do not move; the next turn's draw stacks on top (beginTurn) with the ordinary
+  // HAND_LIMIT overflow routing the excess to the discard.
+  const retained = next.combat.hand.filter((c) => retainsCard(cardDefs, c));
+  const discarded = next.combat.hand.filter((c) => !retainsCard(cardDefs, c)).map(toInstance);
+  next = { ...next, combat: { ...next.combat, hand: retained, discard: [...next.combat.discard, ...discarded] } };
+  if (retained.length > 0) events.push({ t: 'retain', uids: retained.map((c) => c.uid) });
   if (discarded.length > 0) events.push({ t: 'discard_hand', uids: discarded.map((c) => c.uid) });
 
   const hooks = fireHook(next, 'end_of_turn', { cardDefs });

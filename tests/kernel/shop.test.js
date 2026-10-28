@@ -104,7 +104,7 @@ test('inventory: deterministic, pool-bounded, duplicate-free, exactly 2 draws pe
   assert.ok(a.shop.offers.length > 0 && a.shop.offers.length <= SHOP_OFFERS);
 
   // Entry drew exactly 2 draws per offer (one pick + one price); a full inventory
-  // from the ~39-card default pool is exactly 10.
+  // from the ~65-card default pool is exactly 10.
   const pre = { ...newRun({ seed: 11 }), floor: 4, mapNodeId: 'r4n0' };
   assert.equal(a.rngDraws - pre.rngDraws, 2 * a.shop.offers.length, `entry consumed exactly ${2 * a.shop.offers.length} draws`);
 

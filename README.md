@@ -2,7 +2,8 @@
 
 Agent-playable roguelike deckbuilder — browser demo, zero runtime dependencies.
 
-- 1 act, 42 cards, 6 enemies, 1 boss (the Slag Warden). The hero is the Ashwright.
+- 2 acts (Foundry → Kiln Deeps), 70 cards, 6 enemies + 2 wardens. Heroes: the Ashwright
+  and the Bellows Keeper. Retain, multi-hit and heal joined the card vocabulary (S8).
 - Deterministic: run = pure function of seed (`?seed=7`)
 - A mid-act shop spends the gold the fights pay: five seeded card offers, priced by
   rarity, and one card-removal service per visit

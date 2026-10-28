@@ -252,6 +252,12 @@ export function describeEffect(effect, def = {}) {
       return `Discard ${plural(amount, 'card', 'cards')} at random.`;
     case 'exhaust':
       return 'Exhaust this card for the rest of the fight.';
+    case 'heal':
+      // The engine caps the restore at maxHp (rules/vocabulary.js), so "up to" is the
+      // honest wording — a full-HP play restores nothing.
+      return `Restore up to ${amount} HP.`;
+    case 'retain':
+      return 'Retain this card — it stays in your hand when your turn ends.';
     case 'custom':
       return CUSTOM_SENTENCE[effect.handler] ?? `Special effect (${effect.handler}).`;
     default:
@@ -434,6 +440,7 @@ const SHORTHAND_ENTRIES = [
   glossRow('VULN+n', 'apply n Vulnerable', 'A plus on a status means APPLY that many stacks to the target — the number does not grow. "VULN+2" = apply 2 Vulnerable, so the target takes 50% more damage while it lasts.', 'B'),
   glossRow('WK+n', 'apply n Weak', 'A plus on a status means APPLY that many stacks to the target. "WK+2" = apply 2 Weak, so the target attacks for 25% less.', 'B'),
   glossRow('METAL+n', 'gain n Metallicize', 'A plus on a power means GAIN that many stacks. "METAL+3" = gain 3 Metallicize, gaining 3 Block at the end of each turn.', 'B'),
+  glossRow('DEX+n', 'gain n Dexterity', 'A plus on a power means GAIN that many stacks. "DEX+1" = gain 1 Dexterity, so the Block you gain from cards is 1 higher.', 'B'),
   glossRow('PWRx', 'double your Strength', 'An "x" after a power means MULTIPLY the stacks you already have. "PWRx2" doubles your Strength; it does nothing if you have none.', 'C'),
   glossRow('BLKx', 'double your Block', 'An "x" after Block means MULTIPLY the Block you currently have. "BLKx2" doubles it; it does nothing if you have none.', 'C'),
 ];
@@ -480,6 +487,8 @@ export function glossary() {
     glossRow('E', 'Energy', 'Gain that much Energy immediately. Energy pays for cards; you get 3 each turn.'),
     glossRow('d', 'Discard', 'Discard that many cards from your hand (lower case d, to keep it apart from Draw).'),
     glossRow('EXH', 'Exhaust', 'The card leaves the fight for good — it does not come back in a reshuffle.'),
+    glossRow('H', 'Heal', 'Restore that much HP, never past your maximum. A card played at full HP restores nothing.'),
+    glossRow('RTN', 'Retain', 'The card stays in your hand when your turn ends, instead of being discarded. It keeps staying until you play or discard it.'),
     glossRow('+', 'grows', 'A plus after an ATTACK or BLOCK value means the number grows: each time you play the card, or each turn while a power lasts.'),
     // Status and power names: the B group.
     glossRow('HP', 'Your HP', 'Lose that much HP. This is a COST you pay, not healing: it ignores Block and never drops you below 1 HP.', 'B'),

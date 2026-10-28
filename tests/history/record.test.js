@@ -384,11 +384,13 @@ test('§11.2: the fresh pool is a documented slice of the shipped cards', () => 
 test('§11.2 [TODO — real defect]: poolSelection must actually return FRESH_SIZE cards', { todo: true }, () => {
   // DEFECT: FRESH_SIZE is 24 and the header calls it "the frozen fresh-profile
   // composition (§11.2): 24 of the shipped cards, A/S/P 12/9/3", but poolSelection()
-  // yields 21 (A/S/P 12/8/1). poolPlan() asks typeTargets() for 12/9/3 = 24, then the
-  // fill loop hands only 21 back because the per-type queues run out: only 1 power card
-  // is selected where 3 were requested, and nothing refills the 2 lost slots from the
-  // attack/skill queues that still have candidates. A player who unlocks nothing is
-  // promised 24 cards and shipped 21.
+  // yields less because the per-type fill queues run out: only the COMMON tier is
+  // eligible for a fresh profile, and there are not enough common powers to reach the
+  // power target. (Measured at S8, 70 shipped cards: 23 = A/S/P 12/9/2, with the power
+  // queue two short of its 3 — one common power exists, and uncommons stay locked.)
+  // Nothing refills the lost slots from the other queues.
+  // S8 did NOT fix this — out of slice — but the wider pool changed the measured shape,
+  // so the old numbers in this comment were refreshed rather than left lying.
   const sel = poolSelection(FULL, null);
   assert.equal(sel.size, FRESH_SIZE, `the fresh pool must be FRESH_SIZE (24), got ${sel.size}`);
   assert.deepEqual(sel.composition, { attack: 12, skill: 9, power: 3 }, `the documented 12/9/3 split, got ${JSON.stringify(sel.composition)}`);
