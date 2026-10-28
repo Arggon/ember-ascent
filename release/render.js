@@ -42,12 +42,14 @@ import { signatureFor } from './hero-moves.js';
 import { backdropMarkup } from './stage-art.js';
 import { dyingRow } from './floats.js';
 import { endTargeting, pendingCard, pendingSlot } from './targeting.js';
-import { renderHud, helpPanel, helpOpen, HELP_SEEN_KEY } from './hud.js';
+import { renderHud, helpPanel, helpOpen, HELP_SEEN_KEY, deckPanel, deckOpen, codexPanel, codexOpen, beltOpenSlot, beltPanel, setBeltOpenSlot } from './hud.js';
 import { heroFigure, combatView } from './combat-view.js';
 import { mapView } from './map-view.js';
 import { rewardView } from './reward-view.js';
 import { kindlingView } from './kindling-view.js';
 import { restView } from './rest-view.js';
+import { shopView } from './shop-view.js';
+import { eventView } from './event-view.js';
 import { endView } from './end-view.js';
 import { sceneBeat } from './fx.js';
 import { page } from './page-frame.js';
@@ -222,6 +224,8 @@ export function render() {
     case 'combat': stageEl.append(combatView()); break;
     case 'reward': stageEl.append(rewardView()); break;
     case 'rest': stageEl.append(restView()); break;
+    case 'shop': stageEl.append(shopView()); break;
+    case 'event': stageEl.append(eventView()); break;
     case 'kindling': stageEl.append(kindlingView()); break;
     case 'ended': stageEl.append(endView()); break;
     default: stageEl.append(el('p', { text: `phase ${snap.phase}` }));
@@ -241,6 +245,24 @@ export function render() {
   // step is no longer about anything real, so it ends silently rather than aiming at a
   // stale slot.
   if (helpOpen || !seen) stageEl.append(helpPanel());
+  // The S1 master-deck viewer, when the player opened it from the HUD. It paints AFTER the
+  // phase view like the help sheet, and its `.modal-back` covers the stage, so the run
+  // underneath stays untouched (and unclickable) while it is open.
+  if (deckOpen) stageEl.append(deckPanel());
+  // The S2 card codex, when the player opened it from the HUD. Same placement contract as
+  // the deck sheet: it paints after the phase view and its backdrop covers the stage, so
+  // the run underneath stays untouched (and unclickable) while it is open.
+  if (codexOpen) stageEl.append(codexPanel());
+  // The S5 quaff/discard popover, when the player clicked a filled belt chip in combat.
+  // Same one-modal-system placement as the sheets above: the backdrop covers the stage,
+  // so the choice is the only thing clickable while it is open. A slot whose row the
+  // snapshot no longer carries (a repaint raced a quaff/discard) is STALE: the flag is
+  // dropped HERE, in the paint sink where the one-paint flags are consumed, instead of
+  // from inside beltPanel mid-render (S5 review P3) — the next repaint is what clears it.
+  if (beltOpenSlot !== null) {
+    if ((snap.belt ?? []).some((r) => r.slot === beltOpenSlot)) stageEl.append(beltPanel());
+    else setBeltOpenSlot(null);
+  }
   // The arriving VICTORY or DEFEAT panel takes the caret, so a keyboard player lands on
   // Restart instead of at the top of the document. Best effort, and never a rule.
   if (endFocusPending) {

@@ -11,18 +11,17 @@
 import { freezeDeep, hash as hashState, canonical } from './state.js';
 import { loadContent, defaultContent, draftPoolFrom } from './content.js';
 // Imported as a VALUE as well as re-exported below: `contentForProfile` calls it.
-import { poolSelection } from './unlocks.js';
-import { generateMap, ROWS } from './rules/map.js';
+import { poolSelection, relicPoolFor } from './unlocks.js';
+import { generateMap, ROWS, ACT_COUNT } from './rules/map.js';
 import { buildEncounterTable, BIOMES, DEFAULT_BIOME } from './rules/encounters.js';
 import { DEFAULT_RELIC } from './rules/relics.js';
-import { actions as legalActions } from './actions.js';
-import { _setCardDefs, BASE_ENERGY, HAND_SIZE, REST_HEAL, REWARD_CHOICES } from './rules/act.js';
+import { actions as legalActions } from './actions.js';import { _setCardDefs, BASE_ENERGY, HAND_SIZE, REST_HEAL, REWARD_CHOICES } from './rules/act.js';
 import { offerBoons } from './rules/kindling.js';
 import { rollQuests, advanceQuests } from './rules/quests.js';
 // One row per action kind: what step() dispatches to (the mechanics live in rules).
 import { STEP_HANDLERS } from './rules/steps.js';
 import './rules/effects/index.js'; // registers the exotic handlers exactly once
-import { observe as observeState, observeActions, snapshot as snapshotState } from './observe.js';
+import { observe as observeState, observeActions, snapshot as snapshotState, cardPool } from './observe.js';
 import {
   describeCard as describeCardDef,
   describeEffect,
@@ -45,6 +44,10 @@ export { hashState as hash, canonical };
 // B5: the one biome table, for surfaces (GUI picker, Act I card, CLI).
 export { BIOMES, DEFAULT_BIOME };
 export { observeState as observe, observeActions, snapshotState as snapshot };
+// S2 card codex: the draft pool, enriched through the describe layer. Exported as a
+// FUNCTION, not a snapshot field, on purpose — the pool is content-derived and
+// phase-independent, so no action repaint should carry 39 descriptions it did not ask for.
+export { cardPool };
 // The plain-English layer (R4's second rendering). Exported so every surface reaches it
 // through the ONE public entry point; a surface may not import kernel internals (R1).
 export {
@@ -99,7 +102,17 @@ export {
   poolPlan,
   poolSelection,
   fullyUnlockedProfile,
+  // S10 relic meta-unlocks: the documented milestone table, the pool it derives, and
+  // the pure before/after verdict the run-summary narration reads. The PROFILE reaches
+  // the rules only as these pools (DR-4, relic-shaped) — nothing below newRun ever
+  // sees a win count.
+  RELIC_UNLOCK_TABLE,
+  relicPoolFor,
+  evaluateRelicUnlocks,
 } from './unlocks.js';
+// S10: the relic describe/count helpers a surface may need for the narration — through
+// the ONE entry point (R1), never rules/relics.js directly.
+export { relicDef, RELIC_TOTAL } from './rules/relics.js';
 
 /**
  * Shipped content narrowed to one profile's card pool (DR-4, DR-5).
@@ -133,7 +146,11 @@ export function contentForProfile(profile = null) {
 
 /**
  * Start a run.
- * @param {{seed?: number, character?: string, difficulty?: number, content?: any}} [opts]
+ * @param {{seed?: number, character?: string, difficulty?: number, content?: any,
+ *          wins?: number, relicPool?: string[]}} [opts]
+ *        `wins` — the profile's lifetime win count; the run's relic pool is derived
+ *        from it (S10). `relicPool` — an explicit pool, the log-replay form; it wins
+ *        over `wins`. Neither: no pool field, the full relic table (harness/legacy).
  * @returns {any} frozen state
  */
 export function newRun(opts = {}) {
@@ -157,9 +174,37 @@ export function newRun(opts = {}) {
   if (!Number.isInteger(difficulty) || difficulty < 0) {
     throw Object.assign(new Error(`difficulty must be a non-negative integer, got ${opts.difficulty}`), { code: 3 });
   }
+  // S10 relic pool, form 1 — the PROFILE form: a lifetime WIN count the entry itself
+  // turns into the run's relic pool through unlocks.js (RELIC_UNLOCK_TABLE). Optional:
+  // absent means "no profile was declared", and the run gets NO relicPool field — it
+  // draws from the full table at every drop read (rules/relics.js), which is also what
+  // a pre-S10 save reads. That keeps every profile-less harness path — the golden
+  // generator, the sim, the policy suite — byte-identical to before this slice, while
+  // the surfaces (which always have a ledger) opt in by passing the count.
+  let wins = null;
+  if (opts.wins !== undefined) {
+    if (!Number.isInteger(opts.wins) || opts.wins < 0) {
+      throw Object.assign(new Error(`wins must be a non-negative integer, got ${opts.wins}`), { code: 3 });
+    }
+    wins = opts.wins;
+  }
+  // Form 2 — the EXACT form: a verbatim pool, the log-replay door. The replay must
+  // reproduce the original state byte-for-byte, and the pool it carried is the state's
+  // own fact (the win count that produced it is not recoverable from the pool), so the
+  // header carries the pool and replay hands it back un-derived. Shape-checked only:
+  // an array of strings, no more — unknown ids are tolerated everywhere downstream.
+  let relicPool = null;
+  if (opts.relicPool !== undefined) {
+    if (!Array.isArray(opts.relicPool) || opts.relicPool.some((id) => typeof id !== 'string')) {
+      throw Object.assign(new Error('relicPool must be an array of relic-id strings'), { code: 3 });
+    }
+    relicPool = opts.relicPool;
+  }
 
   // Map generation consumes the first draws of the stream, then the deck is built.
   // Order matters and is part of the format: do not reorder these two blocks.
+  // (S9: only ACT 1's map is generated here. Act 2's map rolls later, at the act
+  // transition, from the live counter — rules/act.js beginNextAct documents the draws.)
   const mapGen = generateMap(seed, 0);
   const deck = character.startingDeck.map((cardId, i) => ({ uid: `c${i}`, cardId }));
   // Deck order is fixed by the character definition, so only its LENGTH advances the
@@ -173,9 +218,13 @@ export function newRun(opts = {}) {
     difficulty,
     stepIndex: 0,
     rngDraws: draws,
-    // Single act in the slice (requirements §7.1), but the field is real from day one:
-    // validateSave() checks it, and R10's per-act metrics anchor on it.
+    // S9: the run climbs TWO acts. `act` is where the run is standing; `acts` is the
+    // declared length of the climb — the field the boss pick reads to decide between
+    // the act transition (rules/act.js beginNextAct) and the ended win. A legacy save
+    // predates `acts` and reads as a one-act run at every `?? 1`, so its act-1 boss
+    // still ends it in victory (validateSave keeps the field optional).
     act: 1,
+    acts: ACT_COUNT,
     phase: 'map',
     outcome: null,
     floor: -1,
@@ -191,6 +240,13 @@ export function newRun(opts = {}) {
       block: 0,
       energy: 0,
       statuses: {},
+      // S3 gold economy: the run's purse, part of run state and therefore of the hash.
+      // Starts at 99 — Slay the Spire's own opening purse — and only ever grows here:
+      // every combat victory pays by node tier (rules/map.js NODE_TYPES gold ranges, via
+      // rules/act.js resolveVictory). Inert until the shop slice gives it a spender.
+      // Legacy saves from before this field default to 0 at every read (`?? 0`), so no
+      // format bump; validateSave keeps it optional.
+      gold: 99,
     },
     combat: {
       active: false,
@@ -204,13 +260,53 @@ export function newRun(opts = {}) {
       exhaust: [],
     },
     reward: null,
+    // S4 shop: null everywhere except inside the shop phase, where it carries the
+    // inventory, the removal-service state and the removal flag (rules/shop.js).
+    // Leaving nulls it again; the offers themselves roll at ENTRY time (the travel
+    // step), so nothing is pre-rolled for a shop the run never visits. Legacy saves
+    // predate the field entirely — validateSave keeps it optional and every read is
+    // null-tolerant.
+    shop: null,
+    // S5 potions: the belt, empty at run start (StS parity). It fills only from
+    // seeded victory drops (rules/potions.js rollPotionDrop, called by the victory
+    // path in rules/act.js) and empties only by quaffing or discarding — both
+    // combat-only steps. Legacy saves predate the field: validateSave keeps it
+    // optional and every read is `?? []`-tolerant (absent = empty belt).
+    potions: [],
+    // S6 events: null everywhere except inside the event phase, where it carries the
+    // drawn story id, the modal temper state and the resolved beat's lines
+    // (rules/events.js). The WHICH-event draw happens at ENTRY time (the travel
+    // step), so nothing is pre-rolled for an event the run never visits. Legacy
+    // saves predate the field — validateSave keeps it optional and every read is
+    // null-tolerant (an unknown story id degrades to a continue-only phase).
+    event: null,
   };
 
   // B5 alternate biome: recorded only when not the default, so foundry hashes are unchanged.
   if (biome !== DEFAULT_BIOME) state.biome = biome;
-  // B4 second hero: a character whose relic is not the Kindled Heart records it, so the
-  // default (Ashwright) state keeps no new field and every existing hash is unchanged.
-  if (character.startingRelic && character.startingRelic !== DEFAULT_RELIC) state.relic = character.startingRelic;
+  // S7 RELICS: every run carries its held relics as an ARRAY in acquisition order —
+  // relics[0] is the character's starting relic (the kindling Iron Skin boon's "{relic}").
+  // The B4-era singular `state.relic` field is GONE from fresh states: every read goes
+  // through rules/relics.js relicList(), which tolerates a legacy save by falling back
+  // to `[state.relic ?? DEFAULT_RELIC]`. A relic gained later (the elite drop, the boss
+  // pick) appends; the order is part of the format. The field is unconditionally present
+  // on fresh states — a deliberate format change, exactly like S3's gold — so every S7
+  // hash differs from S6's, and the goldens are regenerated against the new format.
+  state.relics = [character.startingRelic ?? DEFAULT_RELIC];
+  // S10 RELIC POOL: present exactly when a profile was declared — `wins` derives the
+  // pool through the unlock table (the run's own starter always leads, then unlock
+  // order), an explicit `relicPool` is taken verbatim (the replay form wins, being the
+  // exact fact). Like draftPool, the pool is RUN STATE and hash input: two runs built
+  // for different profiles are different runs. Absent (no profile declared, or a
+  // pre-S10 save) reads as the full table at every drop read — rules/relics.js
+  // documents the one-rule fallback. Zero draws either way: the pool is derived, never
+  // rolled, so the RNG stream — and therefore every hash-relevant draw — is untouched
+  // by the derivation itself.
+  if (relicPool !== null) {
+    state.relicPool = [...relicPool];
+  } else if (wins !== null) {
+    state.relicPool = relicPoolFor({ wins }, state.relics[0]);
+  }
   // B1 Kindling (opt-in). Only an opted-in run gains the extra fields and draws, so the
   // default state — and every existing golden hash — is byte-identical to before.
   if (opts.kindling === true) {

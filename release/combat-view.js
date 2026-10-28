@@ -446,7 +446,10 @@ export function cardTile(card, opts = {}) {
       'data-slot': card.slot,
       ...(opts.actionId ? { 'data-action': opts.actionId } : {}),
       'aria-disabled': String(disabled),
-      'aria-label': `${card.name}. Costs ${card.cost} Energy. ${desc}${disabled ? ' Not playable: not enough Energy.' : ''}${awaiting}`,
+      // The inert reason belongs to the CARD'S CONTEXT: a hand tile lacks Energy, a
+      // shop shelf (S4) lacks gold. `disabledNote` lets a caller state the real reason
+      // instead of the Energy default.
+      'aria-label': `${card.name}. Costs ${card.cost} Energy. ${desc}${disabled ? ` ${card.disabledNote ?? 'Not playable: not enough Energy.'}` : ''}${awaiting}`,
       ...(isPending ? { 'aria-pressed': 'true' } : {}),
     },
     on: disabled && !opts.onClick ? {} : { click: onClick },
@@ -499,7 +502,7 @@ export function cardTile(card, opts = {}) {
   if (card.showSummary !== false) {
     const foot = el('span', { cls: 'cfoot' });
     foot.append(el('span', { cls: 'csum', text: card.summary, attrs: { title: 'Compact form used by the agent-facing command line' } }));
-    if (disabled) foot.append(el('span', { cls: 'cwhy', text: 'needs more Energy' }));
+    if (disabled) foot.append(el('span', { cls: 'cwhy', text: card.disabledWhy ?? 'needs more Energy' }));
     if (stamp) foot.append(stamp);
     tile.append(foot);
   } else if (stamp) {

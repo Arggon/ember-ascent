@@ -16,6 +16,27 @@ import { drawIntoHand } from './draw.js';
 /** Debuff/buff counters the engine understands. */
 export const STATUSES = ['strength', 'vulnerable', 'weak', 'dexterity', 'metallicize'];
 
+/**
+ * The ONE classification of that table (S5 review P3, single-sourced in the POLISH
+ * round): which counters are BUFFS the player wants to keep and which are DEBUFFS a
+ * Purge Flask clears. Every STATUSES member must appear here — a new status ('frail',
+ * say) is a broken row in this table until it is classified, which is what keeps it
+ * from silently surviving the purge. rules/potions.js derives POTION_DEBUFFS from the
+ * debuff half instead of carrying its own copy of the list.
+ */
+export const STATUS_KINDS = Object.freeze({
+  strength: 'buff',
+  dexterity: 'buff',
+  metallicize: 'buff',
+  vulnerable: 'debuff',
+  weak: 'debuff',
+});
+
+/** The debuff half of the table, in STATUSES order. Derived, never maintained twice. */
+export const DEBUFFS = Object.freeze(
+  STATUSES.filter((s) => STATUS_KINDS[s] === 'debuff'),
+);
+
 /** Persistent powers, each with finite stacks, fired from hooks in rules/powers.js. */
 export const POWERS = ['combust', 'dark_embrace', 'feel_no_pain', 'rupture'];
 
@@ -215,6 +236,35 @@ export const VOCABULARY = {
       state: { ...state, combat: { ...state.combat, exhaust: [...state.combat.exhaust, { uid, cardId: ctx.card.cardId }] } },
       events: [{ t: 'exhaust', uid, cardId: ctx.card.cardId }],
     };
+  },
+
+  /**
+   * heal — restore `amount` HP to the player, capped at maxHp. Like loseHp this ignores
+   * Block and other statuses entirely; unlike loseHp it has no floor game — the event
+   * carries the HP ACTUALLY restored, so an overheal reads as a smaller number and no
+   * consumer can mistake the printed value for the delta.
+   *
+   * DRAW ACCOUNTING: zero draws — the amount is fixed, no roll decides it.
+   */
+  heal(state, _ctx, params) {
+    const amount = Math.max(0, Math.min(params.amount, state.player.maxHp - state.player.hp));
+    if (amount === 0) return { state, events: [{ t: 'heal', who: 'player', amount: 0 }] };
+    return {
+      state: { ...state, player: { ...state.player, hp: state.player.hp + amount } },
+      events: [{ t: 'heal', who: 'player', amount }],
+    };
+  },
+
+  /**
+   * retain — a MARKER verb: it does nothing at play time and is instead consumed by the
+   * end-of-turn discard phase (rules/act.js endTurn), which keeps a hand card whose
+   * definition carries this verb in the hand instead of discarding it. The card keeps
+   * its decorated instance (cost included) and stays retained turn after turn — the
+   * check reads the definition, not a one-shot flag. Zero draws at play AND at the
+   * discard phase: nothing rolls, the card simply does not move.
+   */
+  retain(state, _ctx, _params) {
+    return { state, events: [] };
   },
 
   /** custom — dispatch to a registered rules/effects/<id>.js handler. */

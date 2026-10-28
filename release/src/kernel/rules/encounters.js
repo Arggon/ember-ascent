@@ -162,6 +162,22 @@ export const ENCOUNTERS = {
   mines_strong_2: { id: 'mines_strong_2', name: 'Two Crawlers', tier: 2, enemies: ['slag_crawler', 'slag_crawler'] },
   mines_elite_1: { id: 'mines_elite_1', name: 'Ash Matriarch', tier: 3, elite: true, enemies: ['ash_wraith_elite'] },
   mines_boss_1: { id: 'mines_boss_1', name: 'Cinder Foreman', tier: 4, boss: true, enemies: ['cinder_foreman'] },
+
+  // ---- S9 The Kiln Deeps (act 2). No new enemies: every row re-mixes the EXISTING
+  // roster into bigger, harder pools — the act-1 opener (Jaw Worm) returns as a BASELINE
+  // fight, singles become pairs and trios, and the elite fights are PAIRS (an act-1
+  // elite plus a tag-along). The boss is the Cinder Foreman — the mines boss elevated
+  // to the second act's summit. Spawn HP rolls exactly as everywhere else; the
+  // difficulty comes from the mixes and their bigger total HP pools.
+  kiln_weak_1: { id: 'kiln_weak_1', name: 'Cinder Maw', stateName: 'Jaw Worm', tier: 1, enemies: ['jaw_worm'] },
+  kiln_weak_2: { id: 'kiln_weak_2', name: 'Slag Crawler', tier: 1, enemies: ['slag_crawler'] },
+  kiln_weak_3: { id: 'kiln_weak_3', name: 'Ooze and Mite', stateName: 'Slime + Louse', tier: 1, enemies: ['acid_slime', 'red_louse'] },
+  kiln_strong_1: { id: 'kiln_strong_1', name: 'Maw and Ooze', stateName: 'Jaw Worm + Slime', tier: 2, enemies: ['jaw_worm', 'acid_slime'] },
+  kiln_strong_2: { id: 'kiln_strong_2', name: 'Cantor and Crawler', stateName: 'Cultist + Crawler', tier: 2, enemies: ['cultist', 'slag_crawler'] },
+  kiln_strong_3: { id: 'kiln_strong_3', name: 'The Wraith Pack', stateName: 'Two Wraiths + Slime', tier: 2, enemies: ['ash_wraith', 'ash_wraith', 'acid_slime'] },
+  kiln_elite_1: { id: 'kiln_elite_1', name: 'Brute and Mite', stateName: 'Gremlin Nob + Louse', tier: 3, elite: true, enemies: ['gremlin_nob', 'red_louse'] },
+  kiln_elite_2: { id: 'kiln_elite_2', name: 'Matriarch and Wraith', stateName: 'Ash Matriarch + Wraith', tier: 3, elite: true, enemies: ['ash_wraith_elite', 'ash_wraith'] },
+  kiln_boss_1: { id: 'kiln_boss_1', name: 'Cinder Foreman', stateName: 'Cinder Foreman', tier: 4, boss: true, enemies: ['cinder_foreman'] },
 };
 
 /**
@@ -182,10 +198,49 @@ export const BIOMES = Object.freeze({
     backdrop: 'tunnel',
     byType: { combat_weak: ['mines_weak_1', 'mines_weak_2', 'mines_weak_3'], combat_strong: ['mines_strong_1', 'mines_strong_2'], elite: ['mines_elite_1'], boss: ['mines_boss_1'] },
   },
+  // S9: act 2's own biome — the deep shafts below both act-1 paths. It is NOT an act-1
+  // choice (rules/act.js beginNextAct walks every two-act run into it after the act-1
+  // boss) and it is harder than both act-1 tables: every pool re-mixes the existing
+  // roster into bigger groups with bigger total HP. It reuses the tunnel backdrop.
+  kiln: {
+    name: 'The Kiln Deeps',
+    backdrop: 'tunnel',
+    byType: { combat_weak: ['kiln_weak_1', 'kiln_weak_2', 'kiln_weak_3'], combat_strong: ['kiln_strong_1', 'kiln_strong_2', 'kiln_strong_3'], elite: ['kiln_elite_1', 'kiln_elite_2'], boss: ['kiln_boss_1'] },
+  },
 });
 
 /** The biome a run without `biome` plays (its state carries no `biome` field). */
 export const DEFAULT_BIOME = 'foundry';
+
+/** S9: the biome every act >= 2 walks into. State carries the ACT-1 biome (`state.biome`,
+ *  unchanged from B5 — the log header and the record still mean "where the run STARTED"),
+ *  so the CURRENT act's biome is derived here: the ONE place that maps acts to biomes.
+ *  A legacy save (no `act` field) reads as act 1. */
+export const ACT2_BIOME = 'kiln';
+
+/**
+ * The biome the run is standing in RIGHT NOW (S9): the act-2 biome from act 2 on,
+ * the run's own biome before that. Surfaces read this (through the snapshot's
+ * `biome`/`biomeName`), never the raw state field — the state field stays the
+ * starting biome so replay/log headers keep their meaning.
+ * @param {any} state
+ * @returns {string} a BIOMES key
+ */
+export function currentBiome(state) {
+  if ((state?.act ?? 1) >= 2) return ACT2_BIOME;
+  return state?.biome ?? DEFAULT_BIOME;
+}
+
+/**
+ * The act-1 START paths (S9): every biome EXCEPT the act-2 one. The kindling screen's
+ * Path picker renders THIS list — the Deeps are where the climb goes, not where it
+ * begins — and the choice lives here, kernel-side, so no surface curates its own list
+ * (the B5 ruling). The CLI keeps accepting any BIOMES key; this is the picker's list.
+ * @returns {string[]}
+ */
+export function startBiomeIds() {
+  return Object.keys(BIOMES).filter((id) => id !== ACT2_BIOME);
+}
 
 /**
  * Choose the next intent for one enemy. Deterministic, and avoids repeating the

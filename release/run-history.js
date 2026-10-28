@@ -20,6 +20,8 @@
 // (`newGame` resets the run outcome through `resetRunOutcome()`), so they need no setters.
 
 import {
+  RELIC_TOTAL,
+  RELIC_UNLOCK_TABLE,
   RETAIN,
   SHIPPED_CARDS,
   UNLOCK_CATALOG,
@@ -28,9 +30,12 @@ import {
   buildRunRecord,
   contentForProfile,
   emptyAgg,
+  evaluateRelicUnlocks,
   evaluateUnlocks,
   fullyUnlockedProfile,
   pruneRuns,
+  relicDef,
+  relicPoolFor,
   scoreRun,
 } from './src/kernel/index.js';
 
@@ -97,11 +102,12 @@ export let savedOk = true;
 /** Set when retention has dropped a record at some point in this session. */
 let evictedThisSession = false;
 
-/** The kernel's counters, read as an unlock profile. Mirrors surface/runs.js `profileFor`. */
+/** The kernel's counters, read as an unlock profile. Mirrors surface/runs.js `profileFor`.
+ *  S10: the lifetime WIN count rides along — the relic milestones' counter. */
 export function profileOf(agg) {
   const badges = {};
   for (const [id, n] of Object.entries(agg?.badges ?? {})) badges[id] = Number(n) > 0;
-  return { scoreTotal: agg?.score?.total ?? 0, runs: agg?.runs ?? 0, badges };
+  return { scoreTotal: agg?.score?.total ?? 0, runs: agg?.runs ?? 0, wins: agg?.wins ?? 0, badges };
 }
 /** The profile the NEXT run is built for: the player's own lifetime counters. */
 export function currentProfile() {
@@ -209,6 +215,16 @@ export function unlockThresholdLine(entry, info) {
   return `Condition met: ${entry?.condition ?? 'a threshold'}.`;
 }
 
+/** The relic milestone an unlock was met by, as a sentence — the AC-9.2 rule in its
+ *  S10 register: the WINS mark crossed, never just "unlocked!". */
+export function relicThresholdLine(ids, winsAfter) {
+  const rows = (RELIC_UNLOCK_TABLE ?? []).filter((row) => row.ids.some((id) => ids.includes(id)));
+  const marks = rows.map((row) => `${row.at} ${row.at === 1 ? 'win' : 'wins'}`);
+  return marks.length > 0
+    ? `${winsAfter} lifetime ${winsAfter === 1 ? 'win' : 'wins'} crossed the ${marks.join(' and ')} mark${marks.length === 1 ? '' : 's'}.`
+    : `${winsAfter} lifetime ${winsAfter === 1 ? 'win' : 'wins'} on the ledger.`;
+}
+
 /** The post-run narration block: threshold crossed, option opened, pool size, limitation. */
 export function unlockBlock(info) {
   const block = el('div', { cls: 'unlock-block' });
@@ -220,9 +236,24 @@ export function unlockBlock(info) {
     // stronger" — an unlock adds an OPTION, and the framing may not imply the game eased.
     block.append(el('p', { cls: 'unlock-line', text: unlocked.narration }));
   }
+  // S10 RELICS: the same narration, relic-shaped. A win that crossed a milestone names
+  // what future climbs can now be offered (the run's own rewards are unchanged — an
+  // unlock adds an option for the NEXT run, never power in this one), states the WINS
+  // mark crossed, and counts the pool honestly. Unknown ids (a stale build) name
+  // themselves — the raw-id degrade, never a blank.
+  const relics = info.relics ?? null;
+  if (relics && relics.newly.length > 0) {
+    const names = relics.newly.map((id) => relicDef(id)?.name ?? id);
+    block.append(el('p', { cls: 'unlock-head', text: 'UNLOCKED — relics for the climbs ahead' }));
+    block.append(el('p', { cls: 'unlock-line', text: `Your climbs unlocked: ${names.join(', ')}.` }));
+    block.append(el('p', { cls: 'unlock-that', text: relicThresholdLine(relics.newly, relics.winsAfter) }));
+  }
   const inPlay = info.cardsAfter;
   if (typeof inPlay === 'number') {
     block.append(el('p', { cls: 'unlock-pool', text: `Cards in play: ${inPlay} of ${SHIPPED_CARDS}.` }));
+  }
+  if (relics && typeof relics.countAfter === 'number') {
+    block.append(el('p', { cls: 'unlock-pool', text: `Relics in play: ${relics.countAfter} of ${RELIC_TOTAL}.` }));
   }
   // The limitation, stated plainly ONCE, in the kernel's frozen-content terms: the pool is
   // re-ordered and gated, it is never enlarged.
@@ -256,6 +287,14 @@ export function recordRun() {
   const newly = (verdict.newly ?? []).filter((u) => !unlocksState.narrated.includes(u.id));
 
   history.agg = aggregate(record, history.agg);
+  const after = profileOf(history.agg);
+  // S10 RELICS: the same order the card verdict keeps — the BEFORE profile is read
+  // before the fold, the AFTER after it, so the win this very run earned counts. A
+  // loss crosses no milestone (evaluateRelicUnlocks's before/after agree) and the
+  // block stays out of the screen entirely.
+  const relicVerdict = evaluateRelicUnlocks(before.wins ?? 0, after.wins ?? 0);
+  const relicNewly = relicVerdict.newly;
+
   const next = [...history.records, record];
   const pruned = pruneRuns(next, { keep: RETAIN });
   if (pruned.dropped.length > 0) evictedThisSession = true;
@@ -272,13 +311,22 @@ export function recordRun() {
   if (!storePut(UNLOCKS_KEY, { v: 1, narrated: unlocksState.narrated, byRecord })) savedOk = false;
 
   lastRecord = record;
-  lastUnlock = newly.length > 0
+  lastUnlock = newly.length > 0 || relicNewly.length > 0
     ? {
       newly,
       scoreTotalAfter: history.agg.score?.total ?? 0,
       runCountAfter: history.agg.runs ?? 0,
       cardsBefore: cardsInPlay(before),
-      cardsAfter: cardsInPlay(profileOf(history.agg)),
+      cardsAfter: cardsInPlay(after),
+      // S10: the relic story beside the card story — what the win opened, the WINS
+      // mark it crossed, and the pool the NEXT run's drops will draw from. The
+      // narration fires on the SAME hook (lastUnlock) so the end screen shows both
+      // stories in one block, in one place, or neither.
+      relics: {
+        newly: relicNewly,
+        winsAfter: after.wins ?? 0,
+        countAfter: relicPoolFor(after).length,
+      },
     }
     : null;
   cardsInPlayCache = { key: '', n: null };

@@ -805,6 +805,472 @@ export const cardsBundle = {
         }
       ],
       "flavor": "What you cut comes back as heat in the chest."
+    },
+    {
+      "id": "cinder_flick",
+      "name": "Cinder Flick",
+      "cost": 1,
+      "type": "attack",
+      "rarity": "common",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 3,
+          "hits": 3
+        }
+      ],
+      "flavor": "Three sparks before the iron knows it has been hit."
+    },
+    {
+      "id": "heavy_swing",
+      "name": "Heavy Swing",
+      "cost": 2,
+      "type": "attack",
+      "rarity": "common",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 14
+        }
+      ],
+      "flavor": "Both hands. All shoulder. No apology."
+    },
+    {
+      "id": "kindled_blade",
+      "name": "Kindled Blade",
+      "cost": 1,
+      "type": "attack",
+      "rarity": "common",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 7
+        },
+        {
+          "verb": "retain"
+        }
+      ],
+      "flavor": "It never quite leaves your grip."
+    },
+    {
+      "id": "slag_shrapnel",
+      "name": "Slag Shrapnel",
+      "cost": 1,
+      "type": "attack",
+      "rarity": "common",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 2,
+          "hits": 4
+        }
+      ],
+      "flavor": "The wheel throws sparks; you throw worse."
+    },
+    {
+      "id": "scrap_shield",
+      "name": "Scrap Shield",
+      "cost": 0,
+      "type": "skill",
+      "rarity": "common",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "block",
+          "amount": 4
+        },
+        {
+          "verb": "exhaust"
+        }
+      ],
+      "flavor": "Off-cuts hold a blow. Once."
+    },
+    {
+      "id": "bellows_work",
+      "name": "Bellows Work",
+      "cost": 1,
+      "type": "power",
+      "rarity": "common",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "status",
+          "status": "dexterity",
+          "amount": 1,
+          "to": "self"
+        }
+      ],
+      "flavor": "A steady draw makes steady hands."
+    },
+    {
+      "id": "forge_stance",
+      "name": "Forge Stance",
+      "cost": 1,
+      "type": "skill",
+      "rarity": "uncommon",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "status",
+          "status": "dexterity",
+          "amount": 2,
+          "to": "self"
+        }
+      ],
+      "flavor": "Feet like anvils. Hands like water."
+    },
+    {
+      "id": "ember_ward",
+      "name": "Ember Ward",
+      "cost": 2,
+      "type": "skill",
+      "rarity": "uncommon",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "block",
+          "amount": 14
+        },
+        {
+          "verb": "retain"
+        }
+      ],
+      "flavor": "Hold the glow. It holds you."
+    },
+    {
+      "id": "tallow_rub",
+      "name": "Tallow Rub",
+      "cost": 1,
+      "type": "skill",
+      "rarity": "uncommon",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "heal",
+          "amount": 6
+        },
+        {
+          "verb": "exhaust"
+        }
+      ],
+      "flavor": "Old smoke, new skin."
+    },
+    {
+      "id": "forge_rhythm",
+      "name": "Forge Rhythm",
+      "cost": 1,
+      "type": "skill",
+      "rarity": "uncommon",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "draw",
+          "amount": 2
+        },
+        {
+          "verb": "discard",
+          "amount": 1
+        }
+      ],
+      "flavor": "Strike, turn, strike — the beat does the work."
+    },
+    {
+      "id": "slag_wall",
+      "name": "Slag Wall",
+      "cost": 2,
+      "type": "skill",
+      "rarity": "uncommon",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "block",
+          "amount": 16
+        }
+      ],
+      "flavor": "Pour it cool and stand behind it."
+    },
+    {
+      "id": "cinder_storm",
+      "name": "Cinder Storm",
+      "cost": 2,
+      "type": "attack",
+      "rarity": "uncommon",
+      "target": "all",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 3,
+          "hits": 4,
+          "target": "all_enemies"
+        }
+      ],
+      "flavor": "The draft turns and everyone is downwind."
+    },
+    {
+      "id": "anvil_rain",
+      "name": "Anvil Rain",
+      "cost": 2,
+      "type": "attack",
+      "rarity": "uncommon",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 6,
+          "hits": 3
+        }
+      ],
+      "flavor": "What goes up quenched comes down angry."
+    },
+    {
+      "id": "pressure_spike",
+      "name": "Pressure Spike",
+      "cost": 1,
+      "type": "attack",
+      "rarity": "uncommon",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 9
+        },
+        {
+          "verb": "energy",
+          "amount": 1
+        }
+      ],
+      "flavor": "Vent the chamber through the target."
+    },
+    {
+      "id": "weight_of_iron",
+      "name": "Weight of Iron",
+      "cost": 2,
+      "type": "attack",
+      "rarity": "uncommon",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 12
+        },
+        {
+          "verb": "status",
+          "status": "weak",
+          "amount": 2,
+          "to": "enemy"
+        }
+      ],
+      "flavor": "Heavy things argue best."
+    },
+    {
+      "id": "tempered_strike",
+      "name": "Tempered Strike",
+      "cost": 1,
+      "type": "attack",
+      "rarity": "uncommon",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 6
+        },
+        {
+          "verb": "block",
+          "amount": 6
+        }
+      ],
+      "flavor": "Quenched at the edge, hard at the face."
+    },
+    {
+      "id": "seam_finder",
+      "name": "Seam Finder",
+      "cost": 1,
+      "type": "attack",
+      "rarity": "uncommon",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 4,
+          "hits": 3
+        },
+        {
+          "verb": "status",
+          "status": "vulnerable",
+          "amount": 1,
+          "to": "enemy"
+        }
+      ],
+      "flavor": "Every casting has one. Find it."
+    },
+    {
+      "id": "furnace_heart",
+      "name": "Furnace Heart",
+      "cost": 2,
+      "type": "power",
+      "rarity": "uncommon",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "status",
+          "status": "strength",
+          "amount": 3,
+          "to": "self"
+        }
+      ],
+      "flavor": "It does not beat. It roars."
+    },
+    {
+      "id": "kiln_wrath",
+      "name": "Kiln Wrath",
+      "cost": 3,
+      "type": "attack",
+      "rarity": "rare",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 12,
+          "hits": 3
+        }
+      ],
+      "flavor": "The whole kiln, delivered at once."
+    },
+    {
+      "id": "great_pyre",
+      "name": "Great Pyre",
+      "cost": 2,
+      "type": "attack",
+      "rarity": "rare",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 18
+        },
+        {
+          "verb": "exhaust"
+        }
+      ],
+      "flavor": "Build it tall. Walk away."
+    },
+    {
+      "id": "ember_tide",
+      "name": "Ember Tide",
+      "cost": 2,
+      "type": "attack",
+      "rarity": "rare",
+      "target": "all",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 5,
+          "hits": 4,
+          "target": "all_enemies"
+        }
+      ],
+      "flavor": "Open every grate at once."
+    },
+    {
+      "id": "pyre_feast",
+      "name": "Pyre Feast",
+      "cost": 2,
+      "type": "attack",
+      "rarity": "rare",
+      "target": "all",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 8,
+          "target": "all_enemies"
+        },
+        {
+          "verb": "heal",
+          "amount": 5
+        }
+      ],
+      "flavor": "The fire eats. You eat first."
+    },
+    {
+      "id": "blaze_bellows",
+      "name": "Blaze Bellows",
+      "cost": 1,
+      "type": "skill",
+      "rarity": "rare",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "energy",
+          "amount": 2
+        },
+        {
+          "verb": "exhaust"
+        }
+      ],
+      "flavor": "One great heave and the room is white."
+    },
+    {
+      "id": "rekindle",
+      "name": "Rekindle",
+      "cost": 2,
+      "type": "skill",
+      "rarity": "rare",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "heal",
+          "amount": 10
+        },
+        {
+          "verb": "draw",
+          "amount": 2
+        },
+        {
+          "verb": "exhaust"
+        }
+      ],
+      "flavor": "Bank the coals. Breathe. Begin again."
+    },
+    {
+      "id": "hearth_stand",
+      "name": "Hearth Stand",
+      "cost": 3,
+      "type": "skill",
+      "rarity": "rare",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "block",
+          "amount": 20
+        },
+        {
+          "verb": "retain"
+        }
+      ],
+      "flavor": "The last stand is taken at the hearth."
+    },
+    {
+      "id": "forge_flood",
+      "name": "Forge Flood",
+      "cost": 2,
+      "type": "skill",
+      "rarity": "rare",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "draw",
+          "amount": 3
+        },
+        {
+          "verb": "energy",
+          "amount": 1
+        }
+      ],
+      "flavor": "Open the sluice. Let the work pour."
     }
   ],
   "statuses": {

@@ -329,8 +329,11 @@ export const sumEnemyHp = (s) => s.enemies.reduce((n, e) => n + e.hp, 0);
 export function newGame(seed = null, opts = {}) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
   // narrowing happens in the kernel: `contentForProfile` decides which cards EXIST, and no
-  // rule ever reads the profile. `?pool=full` bypasses the narrowing for a tester.
-  setCtl(createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(currentProfile()), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } }));
+  // rule ever reads the profile. S10: the profile's lifetime WINS ride along — the relic
+  // pool is derived kernel-side from them (RELIC_UNLOCK_TABLE), the same one-way trip the
+  // card pool takes. `?pool=full` bypasses both narrowings for a tester.
+  const profile = currentProfile();
+  setCtl(createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(profile), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true, wins: profile.wins } }));
   setSnap(ctl.snapshot());
   // The event stream is per-RUN, so it dies with the run. It is the only source of the kill
   // / elite / boss counts the score needs, which is why it is accumulated rather than

@@ -60,7 +60,20 @@ const MARKS = {
   't-quench': { box: '0 0 20 20', body: '<path class="m" d="M10 2.5 C13 6.5 14.6 9 14.6 11.4 C14.6 14 12.6 15.8 10 15.8 C7.4 15.8 5.4 14 5.4 11.4 C5.4 9 7 6.5 10 2.5 Z"/><path class="m" d="M2.5 18 C5 16.6 7.5 19.4 10 18 C12.5 16.6 15 19.4 17.5 18"/>' },
   't-redhot': { box: '0 0 20 20', body: '<path class="m" d="M10 18 C5 15 6.6 10.6 8.8 7.4 C9.6 10 12.4 9.8 11.8 6 C15.4 9.4 15.8 15 10 18 Z"/><path class="mf" d="M10 15.6 C8.4 14.4 8.8 12.6 9.8 11.4 C10.4 12.6 11.8 12.8 11.6 11.6 C12.6 13 12.2 14.8 10 15.6 Z"/>' },
   't-balance': { box: '0 0 20 20', body: '<path class="m" d="M10 3 V17 M6 17 H14 M3.5 6 H16.5"/><path class="m" d="M3.5 6 L1.8 11 H5.2 Z"/><path class="m" d="M16.5 6 L14.8 11 H18.2 Z"/>' },
+  // --- gold (S3): a struck coin, same woodcut stroke family as the marks above ---
+  coin: { box: '0 0 20 20', body: '<circle class="m" cx="10" cy="10" r="6.6"/><path class="m" d="M10 6.7 V13.3"/>' },
   broken: { box: '0 0 26 26', body: '<path class="m" d="M12 3 L15 11"/><path class="m" d="M14 15 L8 23"/><path class="m" d="M18 5 L21 12"/>' },
+  // --- potions (S5): a stoppered flask and a drop, same woodcut stroke family. The belt
+  //     reuses existing marks where the shape reads (flame for the draught, the ward for
+  //     stone skin, the blade for the whetstone, the star for energy); an EMPTY slot and
+  //     an unknown potion id both fall back through the flask / rune respectively. ---
+  flask: { box: '0 0 20 20', body: '<path class="m" d="M8 2.5 H12 M9 2.5 V7 L5.5 14.5 C4.8 16.4 6 18 8 18 H12 C14 18 15.2 16.4 14.5 14.5 L11 7 V2.5"/><path class="m" d="M7 12.5 H13"/>' },
+  droplet: { box: '0 0 20 20', body: '<path class="m" d="M10 2.5 C13.2 7 15.5 10.4 15.5 13 A5.5 5.5 0 0 1 4.5 13 C4.5 10.4 6.8 7 10 2.5 Z"/><path class="m" d="M7.4 13 A2.6 2.6 0 0 0 10 15.6"/>' },
+  // --- relics (S7): a kindled heart, same woodcut stroke family. The HUD's relic chip
+  //     wears it; every relic uses the one mark (a relic's identity is its NAME, which
+  //     always rides beside the mark) — an unknown relic id falls back through the rune
+  //     inside glyphBox, never an empty box. ---
+  relic: { box: '0 0 20 20', body: '<path class="m" d="M10 16.5 C4.2 12.4 2.8 8.4 5.4 6 C7.4 4.2 9.4 5.1 10 6.8 C10.6 5.1 12.6 4.2 14.6 6 C17.2 8.4 15.8 12.4 10 16.5 Z"/><path class="m" d="M10 8.2 V12.4 M8 10.2 H12"/>' },
 
   // --- enemy illustrations (art-direction rev): forged-iron woodcut. Three layers per
   //     creature: `.b` body (near-black iron), `.r` rim light (currentColor = the creature's
@@ -103,20 +116,35 @@ export function glyphBox(name, cls) {
 /** Temper id -> its stamp. */
 export const TEMPER_GLYPH = { quenched: 't-quench', redhot: 't-redhot', balanced: 't-balance' };
 
+/** Potion id -> its belt mark (S5). Presentation only: the belt chip's glyph is chosen
+ *  here from the snapshot's own `potionId`; an unknown id falls back to the generic
+ *  flask in the belt's own code and the rune inside glyphBox, never an empty box. */
+export const POTION_GLYPH = {
+  ember_draught: 'flame',
+  stone_skin: 'ward',
+  ash_salts: 'droplet',
+  bellows_fuel: 'star',
+  whetstone: 'blade',
+  purge_flask: 'flask',
+};
+
 export const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', status: 'hourglass', curse: 'skull' };
 
 /** Intent kind -> its mark. */
 export const INTENT_GLYPH = { attack: 'strike', block: 'shieldWide', buff: 'chevUp', debuff: 'chevDown' };
 
-/** Node type (after stripping the `combat_` prefix) -> its silhouette. */
-export const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', rest: 'flame', boss: 'horns' };
+/** Node type (after stripping the `combat_` prefix) -> its silhouette. The shop (S4)
+ *  wears the coin — it is the one node that never fights and only trades. The event
+ *  (S6) wears the rune — the wayside story nobody can name from the road. */
+export const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', rest: 'flame', boss: 'horns', shop: 'coin', event: 'rune' };
 
 /** Node type -> the words a player reads on the map. Presentation only: the kernel's
  *  own label ("fight", "fight+") still drives the title and the travel banner. The second
- *  line states only what the kernel's NODE_TYPES.reward says (card or heal). */
+ *  line states only what the kernel's NODE_TYPES.reward says (card, heal or shop). */
 export const NODE_WORDS = {
   weak: ['Skirmish', 'card reward'], strong: ['Hard fight', 'card reward'], elite: ['Elite', 'card reward'],
-  rest: ['Campfire', 'heal'], boss: ['Slag Warden', 'final fight'],
+  rest: ['Campfire', 'heal'], boss: ['Slag Warden', 'final fight'], shop: ['Shop', 'buy · remove'],
+  event: ['Wayside', 'a choice'],
 };
 
 /**

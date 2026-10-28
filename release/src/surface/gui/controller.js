@@ -144,8 +144,12 @@ export function createController(opts = {}) {
       session = res.session;
       return { ok: true, problems: [] };
     },
-
-    // Aliases so a renderer author can call either spelling.
-    submit: (id) => submit(session, id),
+    // No `submit` alias. An earlier draft kept one — `submit: (id) => submit(session, id)`
+    // — which called the real session submit but never reassigned the closed-over
+    // session, so every call was a success-looking no-op that dropped the run forward.
+    // The one dispatch path is `dispatch` above; the POLISH review (S6 round) ruled the
+    // alias deleted rather than fixed, because no surface consumed it and a second
+    // dispatch spelling is a second way to drift from the CLI. dual-surface.test.js
+    // pins the absence.
   };
 }

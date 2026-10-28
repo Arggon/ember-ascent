@@ -16,6 +16,10 @@ import { page } from './page-frame.js';
 export function endView() {
   const e = snap.ended;
   const won = e.outcome === 'win';
+  // S9: which act the run ended in. Bracket access on purpose — the module-graph
+  // scanner reads any bare `act` token as the actions.js dispatcher this module does
+  // not import; a property read cannot be a ReferenceError.
+  const runAct = e['act'] ?? 1;
   const wrap = el('div');
   wrap.append(el('p', { cls: 'section-title', text: 'Run Over' }));
   wrap.append(el('div', { cls: `demon${won ? '' : ' lose'}` }, glyphBox(won ? 'crown' : 'broken', 'demon-glyph')));
@@ -23,14 +27,21 @@ export function endView() {
   // a number is not an achievement, and a run's meaning is not its arithmetic.
   wrap.append(el('div', { cls: `big-title ${won ? 'win' : 'loss'}`, text: won ? 'VICTORY' : 'DEFEAT' }));
   wrap.append(el('hr', { cls: 'end-rule' }));
-  wrap.append(el('p', { cls: 'end-stats', text: `Reached floor ${e.floor} · ${e.steps} steps · seed ${snap.seed}` }));
+  // S3: the purse the run finished with — the kernel snapshot's own `player.gold`, the same
+  // value the HUD carried from boot to here (grant details live in the record's events).
+  // S7: beside it, the relic count the run carried to its end (`snap.ended.relics`, the
+  // kernel's own number — the same one the CLI dump's summary line shows; an ended record
+  // that predates the field falls back to the snapshot's live relic rows).
+  const purse = snap.player.gold ?? 0;
+  const relicCount = e.relics ?? (snap.relics ?? []).length;
+  wrap.append(el('p', { cls: 'end-stats', text: `${runAct >= 2 ? 'Act ' + runAct + ' · floor ' + e.floor : 'Reached floor ' + e.floor} · ${e.steps} steps · seed ${snap.seed} · ${purse} gold · ${relicCount} relic${relicCount === 1 ? '' : 's'}` }));
 
   const math = lastRecord ? ledgerMath(lastRecord) : null;
   if (math) {
     wrap.append(ledgerBlock(math));
     if (math.earned) {
       wrap.append(el('p', { cls: 'def', text: won
-        ? 'You cleared Act 1 and the Slag Warden fell.'
+        ? (runAct >= 2 ? 'The Kiln Deeps are quiet. The climb is complete.' : 'You cleared Act 1 and the Slag Warden fell.')
         : 'The Ashwright falls. Try a different route or a better card pick.' }));
     } else {
       // AC-7.4 (ANTI-HOLLOW). No elite, no boss, no victory: the total does NOT get display
@@ -44,7 +55,7 @@ export function endView() {
     // that was reloaded onto a finished run). The screen shows what it has and NO ledger:
     // an itemised block would have to invent every line.
     wrap.append(el('p', { cls: 'def', text: won
-      ? 'You cleared Act 1 and the Slag Warden fell.'
+      ? (runAct >= 2 ? 'The Kiln Deeps are quiet. The climb is complete.' : 'You cleared Act 1 and the Slag Warden fell.')
       : 'The Ashwright falls. Try a different route or a better card pick.' }));
   }
 

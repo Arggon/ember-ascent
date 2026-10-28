@@ -12,11 +12,15 @@
 // through the seed stream with every draw counted into rngDraws.
 import { parsePlayId } from '../actions.js';
 import { VOCABULARY } from './vocabulary.js';
-import { startCombat, endTurn, resolveVictory, REST_HEAL } from './act.js';
+import { startCombat, endTurn, resolveVictory, REST_HEAL, beginNextAct } from './act.js';
 import { fireHook } from './powers.js';
 import { applyBoon } from './kindling.js';
 import { offerTempers, temperEffects, temperHpCost } from './tempers.js';
 import { findNode } from './map.js';
+import { rollShopInventory, REMOVAL_PRICE } from './shop.js';
+import { rollEventAt, resolveChoice, resolveTemper, continueEvent } from './events.js';
+import { potionDef, quaffEffects } from './potions.js';
+import { activeRelicDefs, restHealBonusOf, bossOfferOpen, gainRelic } from './relics.js';
 import { shuffleAt, pickAt } from '../rng.js';
 
 /** Play one card from hand and settle the combat if it ended. */
@@ -145,6 +149,43 @@ function travel(state, action, content) {
     }
     return { state: { ...at, phase: 'rest' }, events: [{ t: 'rest_ready', node: node.id }] };
   }
+  // S4: the shop's wares roll HERE, at entry, from the live counter (rules/shop.js for
+  // the full draw accounting — a full inventory is exactly 10 draws). Entry happens
+  // through this one step and re-entry is impossible, so the counter the rolls read is
+  // reproducible from the action log forever; nothing is pre-rolled at map generation,
+  // so a run that never visits pays nothing from the stream.
+  if (node.type === 'shop') {
+    const inv = rollShopInventory(at, content.cards);
+    return {
+      state: {
+        ...at,
+        phase: 'shop',
+        rngDraws: at.rngDraws + inv.draws,
+        shop: {
+          offers: inv.offers,
+          removal: { price: REMOVAL_PRICE, sold: false, done: false },
+          removing: false,
+        },
+      },
+      events: [{ t: 'shop_open', node: node.id }],
+    };
+  }
+  // S6: the event's STORY rolls HERE, at entry, from the live counter — exactly ONE
+  // draw (which event the wayside holds; rules/events.js for the full accounting).
+  // The same convention as the shop's inventory: entry happens through this one step,
+  // re-entry is impossible, and a run that never visits pays nothing from the stream.
+  if (node.type === 'event') {
+    const roll = rollEventAt(at);
+    return {
+      state: {
+        ...at,
+        phase: 'event',
+        rngDraws: at.rngDraws + roll.draws,
+        event: { id: roll.id, nodeId: node.id, resolved: null, tempering: false, offers: null },
+      },
+      events: [{ t: 'event_open', node: node.id, event: roll.id }],
+    };
+  }
   throw new Error(`unhandled node type "${node.type}"`);
 }
 
@@ -160,6 +201,212 @@ function pickReward(state, action) {
   };
 }
 
+/* ---------------------------------------------------------------- S7: relic picks --
+ * The boss's relic OFFER resolves here. The id was matched against the legal list by
+ * step() before this runs, so the offer exists, the table knows it, and it is not
+ * already held (actions.js mirrors gainRelic's own guards — the S4.1 ruling). The
+ * handler still degrades to a no-op on a stale match rather than throwing.
+ *
+ * DRAW ACCOUNTING (rules/relics.js header): a pick is a CHOICE, not a roll — zero draws
+ * for the pick itself; the ACT TRANSITION it may trigger consumes its own documented
+ * draws (rules/act.js beginNextAct). gainRelic is the ONE acquisition path, so Ember
+ * Heart's max-HP passive applies here exactly as it does on the elite drop. Taking
+ * (or skipping) is what settles the run: the boss victory opened this reward phase
+ * instead of `ended`, and this handler closes it — one step later than pre-S7. */
+
+/**
+ * S9: what a settled boss pick/skip MEANS. A run with acts left climbs on (beginNextAct:
+ * act flip, +5 max HP, full heal, a fresh map); the LAST act's boss — or a LEGACY save,
+ * which has no `acts` field and reads as a one-act run at the `?? 1` — ends the run in
+ * victory, exactly as every boss did before S9. The old `run_end` event fires HERE, on
+ * the final act only.
+ * @param {any} state the post-acquisition state (reward still open)
+ * @param {any[]} events the pick/skip's own events, in order
+ * @returns {{state: any, events: any[]}}
+ */
+function settleBossVictory(state, events) {
+  if ((state.acts ?? 1) > (state.act ?? 1)) {
+    const next = beginNextAct(state);
+    return { state: next.state, events: [...events, ...next.events] };
+  }
+  return {
+    state: { ...state, phase: 'ended', outcome: 'win', reward: null },
+    events: [...events, { t: 'run_end', outcome: 'win' }],
+  };
+}
+
+/** Take one relic offer: acquire it, then settle the run (climb on, or end in victory). */
+function pickRelic(state, match) {
+  const offer = (Array.isArray(state.reward?.relicOffers) ? state.reward.relicOffers : [])[match.index];
+  if (!bossOfferOpen(offer, state)) return { state, events: [] };
+  const got = gainRelic(state, offer, 'boss');
+  return settleBossVictory(got.state, got.events);
+}
+
+/** Leave a relic offer without taking it (the boss's `s0`): the run settles anyway. */
+function skipBossRelic(state) {
+  return settleBossVictory(state, [{ t: 'relic_skipped' }]);
+}
+
+/* --------------------------------------------------------------- S4: the shop --
+ * Four handlers, one per shop action kind. The id was matched against the legal list
+ * by step() before any of these run, so affordability and mode are already guaranteed:
+ * an unaffordable offer never produced an id, and a `shop_remove_pick` only exists in
+ * the paid removal step. Each handler still degrades to a no-op on a stale match
+ * rather than throwing — the same defensive shape playCard keeps. */
+
+/** Buy one shelf offer: deduct the price, add the card instance, mark the slot sold. */
+function buyOffer(state, match) {
+  const offer = state.shop?.offers?.[match.index];
+  if (!offer || offer.sold) return { state, events: [] };
+  const uid = `c${state.deck.length}_${state.stepIndex}`;
+  return {
+    state: {
+      ...state,
+      // `?? 0` — validateSave keeps player.gold optional, so a pre-gold save standing in
+      // a shop (S4.1 review P2) deducts from an empty purse: `undefined - 0` was NaN,
+      // which made canonical() — and therefore hash() and every save — throw.
+      player: { ...state.player, gold: (state.player.gold ?? 0) - offer.price },
+      deck: [...state.deck, { uid, cardId: offer.cardId }],
+      shop: { ...state.shop, offers: state.shop.offers.map((o, i) => (i === match.index ? { ...o, sold: true } : o)) },
+    },
+    events: [
+      { t: 'gold_spent', amount: offer.price, what: 'card', cardId: offer.cardId },
+      { t: 'card_bought', cardId: offer.cardId, uid, price: offer.price },
+    ],
+  };
+}
+
+/** Buy the removal service: deduct the flat price and open the removal step. */
+function buyRemoval(state) {
+  const rem = state.shop?.removal;
+  if (!rem || rem.sold || rem.done) return { state, events: [] };
+  return {
+    state: {
+      ...state,
+      // Same purse floor as buyOffer above (S4.1 review P2): the field is optional on
+      // every save validateSave accepts, so the deduction must not read it bare.
+      player: { ...state.player, gold: (state.player.gold ?? 0) - rem.price },
+      shop: { ...state.shop, removal: { ...rem, sold: true }, removing: true },
+    },
+    events: [
+      { t: 'gold_spent', amount: rem.price, what: 'removal' },
+      { t: 'removal_paid', price: rem.price },
+    ],
+  };
+}
+
+/** The removal step's pick: exactly one deck INSTANCE (uid-precise) leaves the deck. */
+function pickRemoval(state, match) {
+  const inst = state.deck?.[match.index];
+  // Hard invariant: a deck of exactly one card cannot shrink further. Unreachable
+  // through legal ids (the service is not sold at deck length 1), guarded here because
+  // the handler is the one place the deck actually shrinks.
+  if (!inst || state.deck.length <= 1) return { state, events: [] };
+  return {
+    state: {
+      ...state,
+      deck: state.deck.filter((_, i) => i !== match.index),
+      shop: { ...state.shop, removing: false, removal: { ...state.shop.removal, done: true } },
+    },
+    events: [{ t: 'card_removed', uid: inst.uid, cardId: inst.cardId }],
+  };
+}
+
+/** Leave the shop — final: the phase closes, the room is consumed with the node. */
+function leaveShop(state) {
+  return { state: { ...state, phase: 'map', shop: null }, events: [{ t: 'shop_left' }] };
+}
+
+/* ------------------------------------------------------------ S6: the event wayside --
+ * Three registry rows; the mechanics live in rules/events.js (the same shape the shop
+ * keeps: handlers here stay thin, the domain module owns the numbers). The id was
+ * matched against the legal list by step() before any of these run, so a chosen choice
+ * was offered, its guards held, and a temper pick only exists inside the open modal.
+ * Each handler still degrades to a no-op on a stale match rather than throwing.
+ *
+ * DRAW ACCOUNTING (rules/events.js header): the choice resolution draws happen inside
+ * resolveChoice/openTemper, which advance the counter themselves; the continue and the
+ * modal's pick are choices, not rolls — zero draws. */
+
+/* ------------------------------------------------------------- S5: the potion belt --
+ * Two handlers, one per belt action kind. The id was matched against the legal list by
+ * step() before either runs, so the slot index is in range, the phase is `combat`
+ * (actions() offers belt ids nowhere else) and — for a quaff — the potion id is one
+ * the table still knows (an unknown belt id is offered a discard, never a quaff, the
+ * same enumeration-mirrors-guard ruling as the S4.1 torn shop). Each handler still
+ * degrades to a no-op on a stale match rather than throwing — the same defensive
+ * shape every handler here keeps.
+ *
+ * DRAW ACCOUNTING (rules/potions.js header): NEITHER action consumes a draw. A quaff's
+ * numbers are all fixed; a discard changes nothing but the belt. */
+
+/** Quaff belt slot `match.index` (0-based): the potion leaves the belt and resolves. */
+function quaffPotion(state, match) {
+  const belt = Array.isArray(state.potions) ? state.potions : [];
+  const idx = match.index;
+  const potionId = belt[idx];
+  // No slot, or a slot whose id the table no longer knows: nothing to resolve. A
+  // stale id can only reach here through a torn save — its quaff was never offered.
+  if (potionId === undefined || !potionDef(potionId)) return { state, events: [] };
+  const def = potionDef(potionId);
+
+  // Resolve the aim exactly like playCard: the LIVING enemies in state order. The
+  // aimed form (q<n>_<k>) carries `targetEnemyIndex` = the 0-based LIVING position the
+  // enumeration used — the same field a play action carries. `q<n>` unaimed is null
+  // and falls to the first living enemy; a dead/out-of-range value (impossible through
+  // legal ids — the enumeration only offers living ks) falls the same way.
+  const liveIdx = state.combat.enemies.map((e, i) => (!e.dead ? i : -1)).filter((i) => i !== -1);
+  const aimed = match.targetEnemyIndex !== null && liveIdx[match.targetEnemyIndex] !== undefined
+    ? match.targetEnemyIndex
+    : liveIdx[0] ?? 0;
+
+  // The slot is consumed BEFORE the effect resolves: a potion cannot quaff itself
+  // twice, and the belt the victory path (a killing Ember Draught) reads afterwards
+  // is the post-quaff belt.
+  const spent = {
+    ...state,
+    potions: belt.filter((_, i) => i !== idx),
+  };
+  const out = quaffEffects(spent, potionId, aimed);
+  let next = out.state;
+  const events = [{ t: 'potion_quaffed', slot: idx + 1, potion: potionId, name: def.name }, ...out.events];
+
+  // S7 Flask Grip: every held relic's quaffBlock lands AFTER the potion resolves, one
+  // `block` event per relic (acquisition order — the same per-relic convention the
+  // combat-start hooks keep). Zero draws: the hook is a fixed number, like every relic.
+  for (const { id, def: relic } of activeRelicDefs(next)) {
+    const block = relic.quaffBlock ?? 0;
+    if (block > 0) {
+      next = { ...next, player: { ...next.player, block: next.player.block + block } };
+      events.push({ t: 'block', who: 'player', amount: block, source: id });
+    }
+  }
+
+  // The same settle-as-playCard tail: an Ember Draught that kills the last enemy must
+  // resolve victory through the ONE implementation, combat_won included (DR-6), or
+  // the fight would hang on an all-dead field with only `e1` left to press.
+  if (next.combat.active && next.combat.enemies.every((e) => e.dead)) {
+    const won = resolveVictory(next, null);
+    return { state: won.state, events: [...events, { t: 'combat_won' }, ...won.events] };
+  }
+  return { state: next, events };
+}
+
+/** Discard belt slot `match.index` (0-based): the slot frees, nothing else moves. */
+function discardPotion(state, match) {
+  const belt = Array.isArray(state.potions) ? state.potions : [];
+  const idx = match.index;
+  if (belt[idx] === undefined) return { state, events: [] };
+  const potionId = belt[idx];
+  return {
+    state: { ...state, potions: belt.filter((_, i) => i !== idx) },
+    // Known potion or stale id alike: the dump names what left, by id — the describe
+    // layer's job to render, and a stale id renders as itself (never a throw).
+    events: [{ t: 'potion_discarded', slot: idx + 1, potion: potionId }],
+  };
+}
+
 /**
  * The registry: action kind -> runner. `step` looks the matched action's kind up here;
  * a kind with no row is the internal-error path (code 1), never a silent no-op.
@@ -170,12 +417,24 @@ export const STEP_HANDLERS = Object.freeze({
   end_turn: (state, _match, content) => endTurn(state, content.cards),
   travel,
   pick: pickReward,
-  skip: (state) => ({ state: { ...state, phase: 'map', reward: null }, events: [{ t: 'reward_skipped' }] }),
+  // S7: `s0` means two skips, split by the reward's own shape — the OLD skip (cards on
+  // the table) walks back to the map; the BOSS skip (relic offers, cards omitted) walks
+  // away from the warden's relic and settles the run: climb on to the next act (S9) or
+  // end in victory (the last act — and every legacy save). One state never offers both
+  // (the `e1` id-letter precedent): a boss reward has no cards, a card reward has no
+  // relic offers. Skipping the boss relic is legal (StS parity) — the relic was
+  // optional; the victory (or the climb) was not.
+  skip: (state) => (state.reward?.boss
+    ? skipBossRelic(state)
+    : { state: { ...state, phase: 'map', reward: null }, events: [{ t: 'reward_skipped' }] }),
+  relic_pick: pickRelic,
   rest_heal: (state) => {
-    const healed = Math.min(REST_HEAL, state.player.maxHp - state.player.hp);
+    // S7 Hearth Ash / Ash Crown: the held relics' restHealBonus folds into the ONE rest
+    // heal (one `heal` event, source 'rest' — the total is the fact). Zero extra draws.
+    const heal = Math.min(REST_HEAL + restHealBonusOf(state), state.player.maxHp - state.player.hp);
     return {
-      state: { ...state, player: { ...state.player, hp: state.player.hp + healed }, phase: 'map', ...(state.tempers ? { temperOffers: null } : {}) },
-      events: [{ t: 'heal', who: 'player', amount: healed, source: 'rest' }],
+      state: { ...state, player: { ...state.player, hp: state.player.hp + heal }, phase: 'map', ...(state.tempers ? { temperOffers: null } : {}) },
+      events: [{ t: 'heal', who: 'player', amount: heal, source: 'rest' }],
     };
   },
   temper: (state, match) => {
@@ -187,4 +446,13 @@ export const STEP_HANDLERS = Object.freeze({
   },
   boon: (state, match) => applyBoon(state, match.boon),
   rest_leave: (state) => ({ state: { ...state, phase: 'map', ...(state.tempers ? { temperOffers: null } : {}) }, events: [{ t: 'rest_left' }] }),
+  shop_buy: buyOffer,
+  shop_removal: buyRemoval,
+  shop_remove_pick: pickRemoval,
+  shop_leave: leaveShop,
+  event_choice: (state, match, content) => resolveChoice(state, match, content.cards),
+  event_temper: (state, match) => resolveTemper(state, match),
+  event_continue: continueEvent,
+  quaff: quaffPotion,
+  discard_potion: discardPotion,
 });

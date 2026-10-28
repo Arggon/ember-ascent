@@ -51,7 +51,10 @@ export function mapView(travel = null) {
   wrap.append(map);
   requestAnimationFrame(() => drawRoutes(map));
   wrap.append(el('p', { cls: 'hint', text: 'Click a glowing node to travel. Fight something weak, risk an elite, or rest.' }));
-  return page('map', 'I — The Path', 'route', 'panel', [wrap]);
+  // S9: the climb is two acts — the map's chapter names the one you are walking.
+  const actNo = snap.act ?? 1;
+  const chapter = actNo >= 2 ? 'II — The Kiln Deeps' : 'I — The Path';
+  return page('map', chapter, 'route', 'panel', [wrap]);
 }
 
 /** B3 Ember quests: one compact chip per quest, progress as text and as a bar. */
@@ -155,10 +158,16 @@ function toggleMapPin(id) {
 
 function mapNode(n) {
   const short = n.type.replace('combat_', '');
+  // S9: the boss word names ITS warden — act 2's Kiln Deeps boss is the Cinder
+  // Foreman, not the Slag Warden, and the shared words table is act-blind. Computed
+  // BEFORE the node so the aria-label and the visible word cannot disagree.
+  const words = short === 'boss' && (snap.act ?? 1) >= 2
+    ? ['Cinder Foreman', 'final fight']
+    : (NODE_WORDS[short] || [n.label, '']);
   const cls = `node t-${short}` + (n.available ? ' available' : '') + (n.current ? ' current' : '');
   const node = el(n.available ? 'button' : 'span', {
     cls,
-    attrs: n.available ? { type: 'button', title: `Travel to ${n.label}`, 'aria-label': `Travel to ${(NODE_WORDS[short] || [n.label])[0]}` } : {},
+    attrs: n.available ? { type: 'button', title: `Travel to ${n.label}`, 'aria-label': `Travel to ${words[0]}` } : {},
     on: {
       ...(n.available && n.actionId ? { click: () => act(n.actionId) } : {}),
       // Right-click (long-press on touch) drops or lifts a planning pin. Browser-only state.
@@ -172,7 +181,6 @@ function mapNode(n) {
     node.classList.add('pinned');
     node.append(el('span', { cls: 'node-pin', attrs: { 'aria-label': 'pinned' } }));
   }
-  const words = NODE_WORDS[short] || [n.label, ''];
   node.append(el('span', { cls: 'ntype', text: words[0] }));
   if (words[1]) node.append(el('span', { cls: 'nsub', text: words[1] }));
   return node;

@@ -37,17 +37,64 @@
 // creates the first controller for the URL's seed/hero/biome, registers the keyboard
 // listener, exposes `window.__dlb` for a curious viewer, and paints the first screen.
 
-import { createController } from './src/surface/gui/controller.js';
-import { ctl, seedFromUrl, setCtl, setSnap, snap } from './runtime.js';
+import { ctl, snap } from './runtime.js';
 import { biomeChoice, heroChoice, act, newGame } from './actions.js';
 import { cancelTargeting, clickCard, pendingSlot, pickTarget } from './targeting.js';
+import { deckOpen, toggleDeck, codexOpen, toggleCodex, beltOpenSlot, toggleBelt, helpOpen, toggleHelp, HELP_SEEN_KEY } from './hud.js';
+// Imported for its LOAD-BEARING side effect, not its export: render.js registers itself
+// as the paint sink (setRepaint) at load, and the boot's newGame() below repaints
+// through that hook. A tree-shake or a "cleanup" of this line blanks the first screen.
 import { render } from './render.js';
+void render;
 
 /* ------------------------------------------------------------- keyboard bonus */
 
 document.addEventListener('keydown', (ev) => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const k = ev.key;
+
+  // --- a sheet owns the keyboard while it is open -------------------------------------------
+  // ONE contract for all three sheets: while a sheet is open every key is swallowed
+  // except that sheet's own toggle (d for deck, k for codex) and Escape — so no OTHER
+  // sheet, no card, no turn and no run can be driven from behind an overlay. The
+  // open-sheet guards stand BEFORE the open-toggle lines below: a toggle line that ran
+  // first would leak its key into a sheet that is already open (d used to stack the
+  // deck sheet on top of the codex). (Each panel is a dialog, so its Close button and
+  // backdrop are the mouse paths out.)
+  // The Help sheet is the strictest case (POLISH round, the E8b class one layer down):
+  // it has no toggle key of its own, so Escape is its ONLY key — d/k would stack sheets
+  // on it and `n` used to discard a run behind it (the footer's own New Run button is
+  // the deliberate way out). The guard covers the sheet however it came up: toggled
+  // open, OR the first-run paint that shows it while the seen-flag is unset. It stands
+  // FIRST: if Help is somehow open over another sheet, the topmost sheet is the one the
+  // keyboard talks to.
+  const helpSeen = (() => { try { return localStorage.getItem(HELP_SEEN_KEY) === '1'; } catch { return true; } })();
+  if (helpOpen || !helpSeen) {
+    if (k === 'Escape' || k === 'Esc') {
+      ev.preventDefault();
+      if (!helpSeen) { try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch { /* best effort */ } }
+      toggleHelp(false);
+    }
+    return;
+  }
+  if (deckOpen) {
+    if (k === 'Escape' || k === 'Esc' || k === 'd' || k === 'D') { ev.preventDefault(); toggleDeck(false); }
+    return;
+  }
+  if (codexOpen) {
+    if (k === 'Escape' || k === 'Esc' || k === 'k' || k === 'K') { ev.preventDefault(); toggleCodex(false); }
+    return;
+  }
+  // The S5 quaff/discard popover owns the keyboard while it is open, the same contract:
+  // Escape closes (keeping the potion), everything else is swallowed so no card, no turn
+  // and no run can be driven from behind the overlay (the E8b class). The popover's own
+  // buttons stay natively keyboard-operable (Tab + Enter) without this handler.
+  if (beltOpenSlot !== null) {
+    if (k === 'Escape' || k === 'Esc') { ev.preventDefault(); toggleBelt(null); }
+    return;
+  }
+  if (k === 'd' || k === 'D') { ev.preventDefault(); toggleDeck(true); return; }
+  if (k === 'k' || k === 'K') { ev.preventDefault(); toggleCodex(true); return; }
 
   // --- targeting owns the keyboard while it is active -----------------------------
   if (pendingSlot !== null && snap.phase === 'combat') {
@@ -94,8 +141,10 @@ document.addEventListener('keydown', (ev) => {
 /** Expose the controller for a curious viewer (read-only use). Not required by the game. */
 window.__dlb = { controller: () => ctl, snapshot: () => snap };
 
-// The first run of the page: same construction newGame() uses, minus the profile
-// narrowing (the very first run of a fresh browser has an empty history anyway).
-setCtl(createController({ run: { seed: seedFromUrl(), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true } }));
-setSnap(ctl.snapshot());
-render();
+// The first run of the page IS newGame() — the exact construction, not a copy of it.
+// The old inline build "minus the profile narrowing" was an honesty hole the S2 codex
+// ruled out and S10's relic gate made visible: a REVISIT of a veteran browser booted a
+// full-table run behind a narrowed profile — the page showed (and dropped, and offered)
+// relics the run could not actually get. newGame() reads the same ledger the HUD does,
+// so the first paint is already the run this player's profile earned.
+newGame();

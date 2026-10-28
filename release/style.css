@@ -196,6 +196,9 @@ html, body {
 .stat.block { color: var(--block); border-color: rgba(95, 168, 220, 0.34);
   background: none
 }
+/* S3 gold: the purse chip shares the one warm accent with Energy — a coin IS gold — but
+   keeps the standard stat well so the two chips read as different rows, not one repeated. */
+.stat.gold { color: var(--gold); border-color: rgba(245, 197, 66, 0.34); }
 .stat.dim { color: var(--faint); font-weight: 500; border-color: transparent; background: none; padding-left: 0;
   display: none
 }
@@ -886,11 +889,14 @@ html, body {
 .node.t-elite .ntype-mark { color: var(--power); }
 .node.t-rest .ntype-mark { color: #8fc9a8; }
 .node.t-boss .ntype-mark { color: var(--hp); }
+.node.t-shop .ntype-mark { color: var(--gold); }
 .node.t-boss { border-color: #5a2630; color: #d9a0a0; }
 .node.t-boss.available { border-color: var(--hp); color: var(--ink); box-shadow: 0 0 0 3px rgba(226, 80, 76, 0.2), var(--shadow); }
 .node.t-elite { border-color: #40305a; color: #c0a4dd; }
 .node.t-elite.available { border-color: var(--power); color: var(--ink); box-shadow: 0 0 0 3px rgba(185, 143, 224, 0.2), var(--shadow); }
 .node.t-rest { border-color: #2c4a3a; color: #9fc7b0; }
+.node.t-shop { border-color: #4a3d1e; color: #d9c07a; }
+.node.t-shop.available { border-color: var(--gold); color: var(--ink); box-shadow: 0 0 0 3px rgba(245, 197, 66, 0.2), var(--shadow); }
 
 /* ---------- Reward / rest / end screens ---------- */
 
@@ -930,6 +936,15 @@ html, body {
 
 /* Reward and rest are beats, not forms: a banner line and room to breathe. */
 .reward-head { font-size: var(--fs-5); font-weight: 800; color: var(--gold); margin: 0 0 var(--sp-2); }
+/* S3: the spoils chip sits inside the head, quieter than the headline it answers to —
+   the struck-coin mark plus "+N gold", one kernel value each. */
+.reward-gold { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  margin-left: var(--sp-3); padding: 3px 11px; font-size: var(--fs-3); font-weight: 700;
+  color: var(--gold); border: 1px solid rgba(245, 197, 66, 0.34); border-radius: 999px;
+  background: var(--stat-well); font-variant-numeric: tabular-nums; }
+.reward-gold .coin-glyph { display: inline-flex; width: 14px; height: 14px; }
+.reward-gold .coin-glyph svg { display: block; width: 100%; height: 100%; }
+.reward-gold .coin-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
 .rest-head { font-size: var(--fs-5); font-weight: 800; color: #9fc7b0; margin: 0 0 var(--sp-2); }
 .rest-note { color: var(--dim); font-size: var(--fs-3); margin: 0 0 var(--sp-3); }
 
@@ -997,6 +1012,133 @@ html, body {
 .demon .demon-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .demon .demon-glyph .mf { fill: currentColor; stroke: none; }
 .demon.lose { color: var(--loss); }
+
+/* ---------- Shop (S4): the vendor's shelves, priced in gold ---------- */
+/* Same engraved page as reward/rest; the hue is the coin's gold, dimmed — a room that
+   takes rather than gives. */
+
+.page-shop { --panel-hue: #b9963f; }
+
+.shop-head { display: flex; align-items: baseline; justify-content: center; gap: var(--sp-3); flex-wrap: wrap; }
+.shop-title { margin: var(--sp-2) 0; }
+/* The purse chip: the same struck coin as the reward spoils, sized up — here it is the
+   room's subject, not a footnote. One kernel value; the HUD shows the same number. */
+.shop-purse { display: inline-flex; align-items: center; gap: 7px; padding: 4px 14px;
+  font-size: var(--fs-4); font-weight: 800; color: var(--gold);
+  border: 1px solid rgba(245, 197, 66, 0.34); border-radius: 999px;
+  background: var(--stat-well); font-variant-numeric: tabular-nums; }
+.shop-purse .coin-glyph { display: inline-flex; width: 17px; height: 17px; }
+.shop-purse .coin-glyph svg { display: block; width: 100%; height: 100%; }
+.shop-purse .coin-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.shop-note { color: var(--dim); font-size: var(--fs-3); margin: 0 auto var(--sp-3); max-width: 560px; line-height: 1.5; }
+
+/* The shelf row: the reward row's layout with the vendor's frame. Tiles that cannot be
+   bought are the hand's inert tiles (same .disabled / aria-disabled language). */
+.shop-grid {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: stretch;
+  padding: 12px 10px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(245, 197, 66, 0.07) 0%, rgba(0, 0, 0, 0) 40%);
+  border: 1px solid rgba(245, 197, 66, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+.shop-grid .card { width: 172px; min-height: 236px; position: relative; }
+
+/* The price badge rides on every tile, top-right opposite the Energy gem. */
+.shop-price {
+  position: absolute; top: 6px; right: 6px;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: var(--fs-2); font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--gold); border: 1px solid rgba(245, 197, 66, 0.4);
+  background: linear-gradient(180deg, rgba(20, 16, 6, 0.92), rgba(12, 10, 4, 0.92));
+}
+.shop-price .coin-glyph { display: inline-flex; width: 11px; height: 11px; }
+.shop-price .coin-glyph svg { display: block; width: 100%; height: 100%; }
+.shop-price .coin-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.shop-price.cannot { color: var(--faint); border-color: var(--edge); text-decoration: line-through; }
+.shop-price.sold { color: var(--faint); border-color: var(--edge); font-style: italic; }
+
+.shop-controls { margin-top: var(--sp-3); display: flex; gap: var(--sp-3); justify-content: center; flex-wrap: wrap; align-items: center; }
+.shop-controls .btn { min-width: 200px; }
+
+/* The removal step's instance list: the temper list's shape, one button per deck card.
+   Copy labels ("copy 2/5") are the uid-precise distinction the kernel's x<n> ids address. */
+.remove-list { margin-top: var(--sp-2); }
+.remove-offer { min-width: 210px; text-align: left; }
+.remove-offer .boon-name { font-size: var(--fs-3); }
+.shop .shop-purse,
+.shop .remove-list { animation: fade-up var(--dur-slow) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
+
+/* ---------- Event (S6): the wayside story, its choices, the resolved beat ---------- */
+/* Same engraved page as shop/rest; the hue is the rune's violet — a story at the side
+   of the road, neither fight nor vendor. */
+
+.page-event { --panel-hue: #9d86c9; }
+
+.event-head { margin: var(--sp-2) 0; text-align: center; }
+
+/* The map node: the rune mark, cool against the fight nodes' warm silhouettes. */
+.node.t-event .ntype-mark { color: #9d86c9; }
+.node.t-event { border-color: #3c3352; color: #b3a3d9; }
+.node.t-event.available { border-color: #b3a3d9; color: var(--ink); box-shadow: 0 0 0 3px rgba(157, 134, 201, 0.2), var(--shadow); }
+
+.event-story {
+  color: var(--ink); font-size: var(--fs-4); line-height: 1.65; font-style: italic;
+  margin: var(--sp-2) auto var(--sp-3); max-width: 620px; text-align: center;
+}
+.event-note { color: var(--dim); font-size: var(--fs-3); margin: 0 auto var(--sp-3); max-width: 560px; line-height: 1.5; text-align: center; }
+
+/* The choice list: the boon list's shape (the temper offers' family), stacked wide so
+   each choice carries its effect sentence and its cost chips without squeezing. */
+.event-choices { display: flex; flex-direction: column; gap: 10px; align-items: center; width: 100%; }
+.event-choice {
+  width: min(560px, 100%); min-height: 64px; text-align: left;
+  display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
+  position: relative;
+}
+.event-choice.dim, .event-choice[disabled] { opacity: 0.55; cursor: not-allowed; transform: none; }
+.event-choice.dim:hover, .event-choice[disabled]:hover { border-color: var(--edge); box-shadow: none; transform: none; }
+/* The reason a dimmed choice is dim: a fact, not a mystery (the shop's inert-shelf contract). */
+.event-reason { font-size: 0.78rem; color: #c96a5a; font-style: italic; }
+.event-reason:empty { display: none; }
+
+/* Cost chips ride the choice's right edge: a struck coin for gold, a droplet for HP —
+   the belt chip's glyph family, so the same resource wears the same mark everywhere. */
+.event-chips { position: absolute; top: 8px; right: 10px; display: inline-flex; gap: 6px; }
+.event-cost {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: var(--fs-2); font-weight: 800; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--edge); background: var(--stat-well);
+}
+.event-cost.gold { color: var(--gold); }
+.event-cost.hp { color: #e0836f; }
+.event-cost-glyph { display: inline-flex; width: 11px; height: 11px; }
+.event-cost-glyph svg { display: block; width: 100%; height: 100%; }
+.event-cost-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The resolved beat: the kernel's own result sentences, listed plainly, then Continue. */
+.event-result { list-style: none; margin: var(--sp-2) auto; padding: 10px 16px; max-width: 560px;
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid rgba(157, 134, 201, 0.3); border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(157, 134, 201, 0.08) 0%, rgba(0, 0, 0, 0) 45%); }
+.event-result li { color: var(--ink); font-size: var(--fs-3); line-height: 1.5; }
+
+.event .event-story,
+.event .event-choices { animation: fade-up var(--dur-slow) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .event .event-story, .event .event-choices { animation: none; }
+}
+
+/* Phones: the cost chips come down into the flow, the story keeps its width. */
+@media (max-width: 640px) {
+  .event-choice { padding-right: 8px; }
+  .event-chips { position: static; margin-top: 2px; }
+  .event-story { font-size: var(--fs-3); }
+}
+
+
 
 /* ---------- Toast ---------- */
 
@@ -6486,17 +6628,30 @@ html, body {
   font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: #f8eee5; text-shadow: 0 1px 0 #000;
 }
-.card .ctemper .t-mark { display: inline-flex; width: 12px; height: 12px; color: var(--tc); }
-.card .ctemper .t-mark svg { width: 100%; height: 100%; }
-.card .ctemper .t-mark .m { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.card .ctemper .t-mark .mf { fill: currentColor; }
-.card .ctemper .t-name { line-height: 1.2; }
+/* The stamp's inner mark + name: ONE rule pair per element for every surface that wears
+   the stamp (hand tiles .card, deck rows), as a shared selector list — so the two can
+   never drift. The outer geometry rules above/below stay per-surface on purpose: a tile
+   stamp is positioned over the plate art, a row stamp is a flex child. */
+.card .ctemper .t-mark, .deck-row .ctemper .t-mark { display: inline-flex; width: 12px; height: 12px; color: var(--tc); }
+.card .ctemper .t-mark svg, .deck-row .ctemper .t-mark svg { width: 100%; height: 100%; }
+.card .ctemper .t-mark .m, .deck-row .ctemper .t-mark .m { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.card .ctemper .t-mark .mf, .deck-row .ctemper .t-mark .mf { fill: currentColor; }
+.card .ctemper .t-name, .deck-row .ctemper .t-name { line-height: 1.2; }
 .card.temper-quenched { box-shadow: 0 0 0 2px #6fb6e4, 0 0 14px rgba(111, 182, 228, 0.45); }
-.card.temper-quenched .ctemper { --tc: #8fd0f2; }
 .card.temper-redhot { box-shadow: 0 0 0 2px #ff6a2a, 0 0 16px rgba(255, 90, 30, 0.55); }
-.card.temper-redhot .ctemper { --tc: #ff8a4a; box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 0 8px rgba(255, 106, 42, 0.55); }
 .card.temper-balanced { box-shadow: 0 0 0 2px #e8c45a, 0 0 14px rgba(232, 196, 90, 0.45); }
-.card.temper-balanced .ctemper { --tc: #f5c542; }
+/* The per-temper stamp hue (--tc): ONE declaration per hue for every surface that wears
+   the stamp, as a shared selector list exactly like the .t-mark rules above, so the tile
+   and the deck row can never drift. Red-hot's extra glow is the tile's alone and stays
+   card-only, one rule down. */
+.card.temper-quenched .ctemper, .deck-row.temper-quenched .ctemper { --tc: #8fd0f2; }
+.card.temper-redhot .ctemper, .deck-row.temper-redhot .ctemper { --tc: #ff8a4a; }
+.card.temper-balanced .ctemper, .deck-row.temper-balanced .ctemper { --tc: #f5c542; }
+/* Red-hot's extra glow is the tile's alone (the shared hue rule above carries the deck
+   row too, so the glow cannot ride on it). The tile always carries BOTH classes — the
+   views add `tempered` and `temper-X` together, and a stamp exists only inside that
+   branch — so this longer form matches exactly the same elements. */
+.card.tempered.temper-redhot .ctemper { box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 0 8px rgba(255, 106, 42, 0.55); }
 .temper-head { margin: 6px 0 0; color: #cbb59e; font-size: 0.85rem; }
 .temper-list .boon { min-height: 64px; }
 .temper-offer.temper-quenched { border-color: #4f7f99; }
@@ -6876,3 +7031,324 @@ html, body {
 .unlock-line { margin: 0; color: var(--dim); font-family: var(--rules); font-size: var(--fs-3); line-height: 1.45; }
 .unlock-pool { margin: var(--sp-1) 0 0; color: var(--dim); font-family: var(--num); font-size: var(--fs-2); }
 .unlock-limit { margin: var(--sp-1) 0 0; color: var(--faint); font-size: var(--fs-2); font-style: italic; }
+
+/* ==========================================================================================
+   MASTER-DECK VIEWER (S1) — the read-only "Deck (N)" sheet, reachable from the HUD in every
+   in-run phase. It reuses the help sheet's shell (.modal-back > .modal > .modal-scroll +
+   .modal-foot), so only the ROWS are styled here: cost, type word, face name, the temper
+   stamp (the hand tiles' own .ctemper, re-scoped for rows) and the ×N duplicate chip.
+   Presentation only: every fact in a row arrived via the kernel's snapshot.deckCards.
+   ========================================================================================== */
+.deck-modal { max-width: 620px; }
+.deck-rows { display: flex; flex-direction: column; }
+.deck-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 7px 10px 6px;
+  border-bottom: 1px solid rgba(42, 51, 72, 0.55);
+}
+.deck-row:last-child { border-bottom: 0; }
+/* The cost reads as a small forged plate, echoing the hand tiles' cost gem. */
+.deck-cost {
+  flex: 0 0 auto;
+  min-width: 22px;
+  padding: 1px 0;
+  text-align: center;
+  font-family: var(--num);
+  font-size: var(--fs-3);
+  font-weight: 700;
+  color: var(--ink);
+  background: linear-gradient(180deg, #232c40, #161c2a);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.deck-type {
+  flex: 0 0 auto;
+  width: 4.9em;
+  color: var(--faint);
+  font-family: var(--display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.deck-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: var(--fs-3);
+  letter-spacing: 0.02em;
+}
+/* A tempered copy keeps its left-edge hue, the way a hand tile keeps its rim. */
+.deck-row.tempered { border-left: 3px solid var(--tc, #ff9d3a); padding-left: 7px; }
+.deck-row.temper-quenched { --tc: #6fb6e4; }
+.deck-row.temper-redhot { --tc: #ff6a2a; }
+.deck-row.temper-balanced { --tc: #e8c45a; }
+/* The stamp: the hand tiles' .ctemper look, re-scoped to rows (the .card rules cannot
+   apply here — there is no .card ancestor — so the stamp carries its own geometry; its
+   inner mark + name and the per-temper hues come from the shared .card/.deck-row rules
+   in the Tempers block, so those cannot drift). */
+.deck-row .ctemper {
+  --tc: #ff9d3a;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px 1px 4px;
+  background: linear-gradient(180deg, #3b261a, #1a120d 70%);
+  border: 1px solid var(--tc);
+  box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 2px 4px rgba(0, 0, 0, 0.7);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 4px 100%, 0 50%);
+  font-family: var(--display, Cinzel, serif);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f8eee5;
+  text-shadow: 0 1px 0 #000;
+}
+/* The per-temper STAMP hues are not repeated here: they are declared once, on the shared
+   .card/.deck-row selector lists in the Tempers block (beside the tile's own stamp
+   rules), so the two surfaces cannot drift. Only the row-level border hue above — which
+   has no card-side counterpart — is row-local. */
+/* Duplicates: a brass chip pinned to the row's right edge, so ×5 reads before the eye
+   reaches the next name. */
+.deck-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-width: 34px;
+  text-align: right;
+  font-family: var(--num);
+  font-size: var(--fs-3);
+  font-weight: 700;
+  color: var(--brass);
+}
+/* Phones: the type word yields first; name, stamp and count keep their facts. */
+@media (max-width: 620px) {
+  .deck-modal { max-width: none; }
+  .deck-row { gap: var(--sp-1); padding: 6px 6px 5px; }
+  .deck-row.tempered { padding-left: 4px; }
+  .deck-type { display: none; }
+}
+
+/* ==========================================================================================
+   CARD CODEX (S2) — the read-only "Cards" sheet beside Deck/Help: every card the draft pool
+   can add to the deck, grouped Common → Uncommon → Rare with group counts. Each row is a
+   kernel `cardPool()` fact (describe-layer sentences verbatim) plus, when the deck holds
+   copies, a brass "in deck ×N" chip summed from snapshot.deckCards. Same modal shell as the
+   deck sheet — only the rarity headers and the two-line rows are styled here.
+   ========================================================================================== */
+.codex-modal { max-width: 660px; }
+.codex-group-head {
+  margin: var(--sp-4) 0 var(--sp-1);
+  font-size: var(--fs-4);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.codex-rows { display: flex; flex-direction: column; }
+/* A row is two lines: the card's identity line, then its description at full width. */
+.codex-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 7px;
+  border-bottom: 1px solid rgba(42, 51, 72, 0.55);
+}
+.codex-row:last-child { border-bottom: 0; }
+.codex-line { display: flex; align-items: baseline; gap: var(--sp-2); }
+/* The cost reads as the deck rows' forged plate — the same number the hand tiles charge. */
+.codex-cost {
+  flex: 0 0 auto;
+  min-width: 22px;
+  padding: 1px 0;
+  text-align: center;
+  font-family: var(--num);
+  font-size: var(--fs-3);
+  font-weight: 700;
+  color: var(--ink);
+  background: linear-gradient(180deg, #232c40, #161c2a);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.codex-type {
+  flex: 0 0 auto;
+  width: 4.9em;
+  color: var(--faint);
+  font-family: var(--display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.codex-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: var(--fs-3);
+  letter-spacing: 0.02em;
+}
+/* The rarity tag repeats the group it sits in (the group header is the primary cue; the
+   tag survives scrolling deep into a long group). Hue deepens with the tier. */
+.codex-rarity {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  font-family: var(--display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+}
+.codex-row[data-rarity='common'] .codex-rarity { color: var(--faint); }
+.codex-row[data-rarity='uncommon'] .codex-rarity { color: var(--brass); border-color: rgba(185, 138, 82, 0.55); }
+.codex-row[data-rarity='rare'] .codex-rarity { color: var(--gold); border-color: rgba(245, 197, 66, 0.6); }
+/* Owned copies: the deck sheet's brass, so "you have this" reads the same in both sheets. */
+.codex-indeck {
+  flex: 0 0 auto;
+  padding: 0 7px;
+  font-family: var(--num);
+  font-size: var(--fs-2);
+  font-weight: 700;
+  color: var(--brass);
+  border: 1px solid rgba(185, 138, 82, 0.5);
+  border-radius: 999px;
+}
+.codex-desc {
+  /* Aligned under the name, past the cost plate, so the text column is one straight edge. */
+  padding-left: calc(22px + var(--sp-2));
+  color: var(--dim);
+  font-family: var(--rules);
+  font-size: var(--fs-2);
+  line-height: 1.45;
+}
+/* Phones: the type word yields first (as on the deck rows); cost, name and chip keep their
+   facts, and the description takes the full width. */
+@media (max-width: 620px) {
+  .codex-modal { max-width: none; }
+  .codex-row { padding: 6px 6px 5px; }
+  .codex-type { display: none; }
+  .codex-desc { padding-left: 0; }
+}
+
+/* ==========================================================================================
+   RELICS (S7) — the HUD's one readout chip beside the belt, the elite spoils chip on the
+   reward head, and the warden's offer buttons. A relic acts through HOOKS, never through a
+   click, so the chip is a readout (title/aria carry the list); the offers are the kindling
+   boon buttons' own `.boon` shell with a relic tint, and an offer the kernel refuses is
+   `.inert` (visible, unclickable, honest).
+   ========================================================================================== */
+.relics {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  font-weight: 800;
+  font-size: var(--fs-3);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 130, 40, 0.4);
+  background: var(--stat-well);
+  color: #ff9d3a;
+  white-space: nowrap;
+  cursor: help;
+}
+.relics.none { color: var(--faint); border-color: var(--edge); opacity: 0.75; }
+.relics .relic-glyph { display: inline-flex; width: 14px; height: 14px; }
+.relics .relic-glyph svg { display: block; width: 100%; height: 100%; }
+.relics .relic-glyph .m { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.relic-count { font-variant-numeric: tabular-nums; }
+
+/* The elite's gained relic on the reward head: the spoils chip's own shape, tinted to the
+   relic accent instead of the coin's gold. */
+.reward-relic { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  margin-left: var(--sp-3); padding: 3px 11px; font-size: var(--fs-3); font-weight: 700;
+  color: #ff9d3a; border: 1px solid rgba(255, 130, 40, 0.34); border-radius: 999px;
+  background: var(--stat-well); }
+.reward-relic .coin-glyph { display: inline-flex; width: 14px; height: 14px; }
+.reward-relic .coin-glyph svg { display: block; width: 100%; height: 100%; }
+.reward-relic .coin-glyph .m { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The warden's offers reuse the boon shell; the relic tint and the inert row are the only
+   additions. An inert offer stays VISIBLE (the raw name reads) but promises no click. */
+.relic-offer { border-color: rgba(255, 130, 40, 0.4); }
+.relic-offer.inert { opacity: 0.55; cursor: not-allowed; border-style: dashed; }
+.relic-offer.inert:hover, .relic-offer.inert:focus-visible { border-color: rgba(255, 130, 40, 0.4); transform: none; box-shadow: none; }
+
+/* ==========================================================================================
+   POTION BELT (S5) — the three belt slots beside the gold readout, and the quaff/discard
+   popover. A filled slot is a named glyph chip (mark + name; tooltip = the kernel's own
+   effect sentence); an empty slot is a dim flask. In combat a filled chip is a BUTTON that
+   opens the popover (the shop removal modal's two-choice pattern, scaled to one potion,
+   reusing the shared modal shell); anywhere else the chips are a readout (`.inert`).
+   ========================================================================================== */
+.belt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.belt-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-weight: 800;
+  font-size: var(--fs-3);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--stat-well);
+  white-space: nowrap;
+}
+.belt-slot .belt-glyph { display: inline-flex; width: 14px; height: 14px; }
+.belt-slot .belt-glyph svg { display: block; width: 100%; height: 100%; }
+.belt-slot .belt-glyph .m { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.belt-slot .belt-glyph .mf { fill: currentColor; stroke: none; }
+/* Filled: the potion's own hue family is the warm ember accent — the belt is a spendable,
+   like the purse it sits beside. The chip reads as a chip, not a button, until hover. */
+.belt-slot.filled { color: var(--brass); border-color: rgba(185, 138, 82, 0.45); }
+button.belt-slot.filled { cursor: pointer; font: inherit; font-weight: 800; font-size: var(--fs-3); }
+button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
+  color: var(--gold);
+  border-color: rgba(245, 197, 66, 0.6);
+  outline: none;
+}
+.belt-slot.filled:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+/* Outside combat the chips are a readout: the same look, minus the affordance. */
+.belt-slot.filled.inert { cursor: help; }
+/* Empty: the dim flask, present but unlit — the slot is the promise, not the potion. */
+.belt-slot.empty { color: var(--faint); border-color: var(--edge); opacity: 0.75; }
+.belt-name {
+  overflow: hidden;
+  max-width: 9.5em;
+  text-overflow: ellipsis;
+}
+
+/* The quaff/discard popover: the shared modal shell, one potion wide. */
+.belt-modal { max-width: 480px; }
+.belt-desc {
+  color: var(--dim);
+  font-family: var(--rules);
+  font-size: var(--fs-3);
+  line-height: 1.5;
+}
+.belt-choices { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+.belt-act { justify-content: flex-start; text-align: left; }
+.belt-act.quaff { color: var(--gold); }
+/* The discard reads as the renunciation it is: same shape, cold ink. */
+.belt-act.discard { color: var(--dim); }
+.belt-act.discard:hover, .belt-act.discard:focus-visible { color: var(--ink); }
+/* Phones: the belt yields its names first (the glyphs and tooltips keep the facts), and
+   the popover goes full-width like every other sheet. */
+@media (max-width: 720px) {
+  .belt-name { display: none; }
+  .belt-modal { max-width: none; }
+}
