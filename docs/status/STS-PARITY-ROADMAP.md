@@ -373,4 +373,15 @@ Process rules (standing):
   browser (+2: the sequence-order test and the torn-vault walk), sim 20 runs exit 0
   (token budgets PASS), golden REBUILT AND BYTE-IDENTICAL (sha256 27b5f677…, cmp
   clean — the kernel did not move), frozen viewport rows 915x412 + 1280x800 ALL PASS.
-
+- 2026-10-25 — UX-2 dev done (10 files; sequenced named enemy turn over the kernel's own
+  enemy_attack events; 500ms beat / 640ms slam / impact 46%; intent badge lights on the
+  seq clock and moves down the line; vignette at last impact; aggregate float silent,
+  toast keeps the net; speed dock divides; reduced motion arms nothing; the <=380 clip
+  fixed with measured flush-wrap + fan-flatten extras; sealed-vault fallback line; title
+  tooltips). One real bug caught in the new mechanism itself (a leaked plan re-slams
+  forever — identity-checked retirement). Gates: 377/376/1 node, gate OK, art OK, 20/20
+  browser (+2 sequence tests), sim exit 0, golden byte-identical (kernel untouched —
+  proven). QA PASS 10/10 (order +361/+856ms, highlight windows 519ms apart, 2x halving,
+  reduced-motion zero, absorbed-vs-net honesty, the 360x780@130 row = baseline minus
+  the clip, sealed vault verbatim, tooltips byte-identical). Committed c8ee3f7; solo
+  review next.
