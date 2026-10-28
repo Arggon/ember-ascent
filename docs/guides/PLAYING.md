@@ -84,7 +84,7 @@ Cards you **cannot afford** are visually disabled — if it won't play, you don'
 - **Energy orb** — the energy you have left this turn, large, beside the hand
 - **Draw and discard** — piles in the corners. Click one to read the cards in it
 - **Hand** — your cards fanned along the bottom, each with its cost and a plain-English description
-- **End Turn** — the enemies then act
+- **End Turn** — the enemies then act. Each enemy attacks **one at a time**: it winds up, dashes in, and a floating line over your hero names the attacker and its damage ("Kiln Mite −6") as it lands — block eating the whole attack says "absorbed". The attacker's intent badge lights up while it strikes. A fully-blocked attack still shows the swing; a hard turn takes about a second and a half, and `2×` halves every beat.
 - **Map** — the path through the act, with clickable nodes
 - **Rewards** — pick one of three cards after each fight
 - **`Help` button** — how to play plus the full keyword glossary

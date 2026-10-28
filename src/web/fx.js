@@ -23,6 +23,7 @@ import {
   signatureFor,
 } from './hero-moves.js';
 import {
+  STRIKE_SEQ,
   HERO_POSE_MS,
   animMs,
   animSpeed,
@@ -41,11 +42,13 @@ import {
   setQuietIntro,
   snap,
   stageEl,
+  strikeSeq,
   bumpAnimGen,
 } from './runtime.js';
 import { el, placeAt } from './dom.js';
 import { fxAdd } from './fx-add.js';
 import { SIG_FX } from './fx-signatures.js';
+import { strikeFloatNode } from './floats.js';
 
 /**
  * One line of words on the screen layer at the moment of arrival: the boss walks in, the
@@ -126,6 +129,27 @@ export function throwLane(b) {
 }
 
 /**
+ * Where the HERO stands, in fx-layer coordinates (the layer is `position: fixed; inset: 0`,
+ * so viewport rects map 1:1), measured at the moment an effect needs it. The sequenced
+ * enemy turn's named damage floats land here — over the hero's chest, where the old
+ * aggregate floater used to rise from the hero's own effect box.
+ * @returns {{x: number, y: number, w: number, h: number} | null}
+ */
+function heroLane() {
+  if (!stageEl || !stageEl.querySelector) return null;
+  const hero = stageEl.querySelector('.fight .hero');
+  if (!hero) return null;
+  const r = hero.getBoundingClientRect();
+  if (r.width === 0 && r.height === 0) return null;
+  return {
+    x: Math.round(r.left + r.width / 2),
+    y: Math.round(r.top + r.height * 0.24),
+    w: r.width,
+    h: r.height,
+  };
+}
+
+/**
  * Play the bursts collected for the action just taken. Called AFTER `render()`, so any
  * node an effect wants to attach to already exists in its final tree.
  */
@@ -156,6 +180,37 @@ export function dispatchFx() {
       case 'vignette':
         fxAdd(el('div', { cls: 'fx-vignette' }), 620);
         break;
+      case 'enemy-turn': {
+        // UX-2: the enemy turn as a SEQUENCE of named attacks. The plan (armed in act()
+        // before the paint) carries the divided clock; every beat below is scheduled on
+        // THIS action generation, so a newer action (or ») retires the rest of the turn.
+        // Speed 0 skips the choreography entirely — the » fast form paints the named
+        // floats statically in the hero's own effect box (floats.js heroEfx).
+        if (animSpeed === 0) break;
+        const plan = strikeSeq;
+        if (!plan) break;
+        plan.attacks.forEach((a, i) => {
+          // Each attacker's named float lands where its dash arrives (the slam's impact
+          // keyframe), measured over the hero at fire time — a repaint between beats
+          // moves the hero, so the lane is re-read when the beat fires, not captured once.
+          // The fx-layer class rides the hold param (className assembly, the same shape
+          // the tier ladder uses), so no classList surgery is needed on the node.
+          fire(() => {
+            const node = strikeFloatNode(a, ' fx-strike-float');
+            const l = heroLane();
+            if (l) placeAt(node, l, 0, 0);
+            fxAdd(node, animMs(STRIKE_SEQ.floatMs) || STRIKE_SEQ.floatMs);
+          }, plan.beatMs * i + plan.impactMs);
+        });
+        // The screen pulse, re-timed to the sequence: ONE pulse when the last attack
+        // lands, so the turn's cumulative weight reads without strobing the screen per
+        // hit. (The aggregate "You take N" toast keeps the net fact for everyone else.)
+        if (b.playerLost > 0) {
+          const last = plan.attacks.length - 1;
+          fire(() => fxAdd(el('div', { cls: 'fx-vignette' }), 620), plan.beatMs * last + plan.impactMs);
+        }
+        break;
+      }
       case 'wipe':
         fxAdd(el('div', { cls: 'fx-turn-wipe' }), 460);
         break;

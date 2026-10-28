@@ -452,6 +452,92 @@ test('end turn: the turn advances and the enemy does what its intent announced',
   }
 });
 
+// ---------------------------------------------------------------------------
+// UX-2: the enemy turn is a SEQUENCE of named attacks, not one simultaneous slam.
+// Seed 22's opening fight is two Kiln Mites whose turn-1 intents are both "Will
+// attack for 6" — the smallest shape that can prove ordering. The claims:
+//   * the kernel truth is unchanged (turn advances, the announced total lands);
+//   * each attacker's OWN named float ("Kiln Mite −6") lands over the hero, in
+//     attack order, one beat apart — and no aggregate "−12" float paints;
+//   * the current attacker's intent badge carries the striking highlight, and the
+//     highlight MOVES: attacker 1's window starts a beat before attacker 2's.
+// The floats and the highlight are transient (~1s), so an in-page 40ms collector
+// samples them, exactly like the kill beat's collector.
+// ---------------------------------------------------------------------------
+test('the enemy turn plays as ordered, named attacks (UX-2 sequence)', { timeout: 60000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 22);
+  await bootToMap(page);
+  await travelToFight(page);
+
+  const intents = await readIntents(page);
+  const attackers = intents.filter((i) => i.kind === 'attack');
+  assert.ok(attackers.length >= 2, `the seeded fight needs two attackers: ${JSON.stringify(intents)}`);
+  const announced = attackers.reduce((n, i) => n + i.damage, 0);
+
+  await page.evaluate(() => {
+    window.__seq = { floats: [], badgeRuns: [] };
+    const seen = new WeakSet();
+    window.__seqTimer = setInterval(() => {
+      for (const n of document.querySelectorAll('#fx-layer .fx-strike-float')) {
+        if (seen.has(n)) continue;
+        seen.add(n);
+        window.__seq.floats.push({ text: (n.textContent || '').trim(), t: Math.round(performance.now()) });
+      }
+      const running = [];
+      for (const card of document.querySelectorAll('.enemy.is-striking')) {
+        const badge = card.querySelector('.intent-badge');
+        // ACTIVELY lit, not merely scheduled: a delayed CSS animation reports playState
+        // 'running' and progress 0 through its delay phase too (the badge is held unlit
+        // there), so the lit window is computed from the animation's own clock: from
+        // its delay to delay+duration is exactly while that attacker's slam plays.
+        const live = badge && badge.getAnimations
+          ? badge.getAnimations().some((a) => {
+            if (a.animationName !== 'intent-strike' || a.playState !== 'running' || !a.effect) return false;
+            const t = a.effect.getComputedTiming();
+            const at = (a.currentTime ?? 0) - (t.delay ?? 0);
+            return at >= 0 && at < (t.duration ?? 0);
+          })
+          : false;
+        if (live) running.push(card.getAttribute('data-target-index'));
+      }
+      window.__seq.badgeRuns.push({ t: Math.round(performance.now()), ks: running });
+    }, 40);
+  });
+
+  const before = await readState(page);
+  await endTurn(page);
+  // The sequence at 1x: floats land ~0.3s and ~0.8s in, the turn settles by ~1.7s.
+  await sleep(2400);
+  const seq = await page.evaluate(() => { clearInterval(window.__seqTimer); return window.__seq; });
+  const after = await readState(page);
+
+  assert.equal(after.turn, before.turn + 1, 'the turn still advances');
+  assert.equal(before.player.hp - after.player.hp, announced,
+    'the kernel total still equals what the intents announced');
+
+  // One NAMED float per attacker, each carrying its own damage; no aggregate number.
+  assert.equal(seq.floats.length, attackers.length,
+    `one named float per attacker: ${JSON.stringify(seq.floats)}`);
+  for (let i = 0; i < seq.floats.length; i += 1) {
+    assert.match(seq.floats[i].text, new RegExp(`−${attackers[i].damage}`),
+      `float ${i} carries its own attacker's damage: ${seq.floats[i].text}`);
+    assert.match(seq.floats[i].text, /Kiln Mite/, `the float NAMES the attacker: ${seq.floats[i].text}`);
+  }
+  assert.ok(seq.floats[1].t - seq.floats[0].t >= 200,
+    `the strikes land in ORDER, a beat apart: ${seq.floats.map((f) => `${f.text}@${f.t - seq.floats[0].t}ms`).join(', ')}`);
+
+  // The striking badge highlight moves with the sequence: attacker 1's window opens
+  // first, attacker 2's a beat later.
+  const firstOf = (k) => seq.badgeRuns.find((r) => r.ks.includes(k)) ?? null;
+  const one = firstOf('1');
+  const two = firstOf('2');
+  assert.ok(one, 'attacker 1 badge carried the intent-strike highlight');
+  assert.ok(two, 'attacker 2 badge carried the intent-strike highlight');
+  assert.ok(two.t - one.t >= 200,
+    `the highlight moved attacker 1 -> attacker 2, a beat apart: ${two.t - one.t}ms`);
+});
+
 test('kill: the stroke plays against the hold stage, then the reward arrives', { timeout: 240000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   // Seed 1 deals the exact shape this claim needs (the S4 map draw shift moved seed 7's
@@ -1833,4 +1919,91 @@ test('a fresh profile: the vault offers down-tier commons and the first win unlo
   // And the ledger itself grew by exactly the one win (the unlock's source of truth).
   const ledger = await page.evaluate(() => JSON.parse(localStorage.getItem('dlb.runs.v1') ?? 'null'));
   assert.equal(ledger?.agg?.wins, 1, `the doctored-by-nothing ledger holds one win: ${JSON.stringify(ledger?.agg)}`);
+});
+
+// ---------------------------------------------------------------------------
+// UX-2: the DOUBLY-TORN vault — a save whose relicPool is a VALID array of ids the
+// relic table does not know. The kernel rolls such a pool honestly to zero offers, but
+// the run does NOT hold a complete collection, so the exhausted-vault wording ("You
+// hold everything the warden's vault can give") would be false there; the reward
+// screen says the neutral line instead. The pool is doctored through the documented
+// save lever BEFORE any travel (validateSave takes any array of unique strings — the
+// torn-save tolerance is the point), so the warden's own roll proves the shape.
+// ---------------------------------------------------------------------------
+test('a torn relic pool seals the warden\u2019s vault honestly (UX-2 fallback)', { timeout: 300000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 7);
+  await bootToMap(page);
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.relicPool = ['ghost_one', 'ghost_two'];
+    for (let i = 0; i < 12; i += 1) save.state.deck.push({ uid: `e2e-torn-${i}`, cardId: 'bludgeon' });
+    save.state.player.maxHp = 999;
+    save.state.player.hp = 999;
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+  // Engine truth, not the painted surface: a bare load leaves window.__dlb.snapshot()
+  // (the renderer's last paint) stale until the next act(), so the pool is read off the
+  // controller's own snapshot — the same read the relics walk uses mid-climb.
+  const pool = await page.evaluate(() => window.__dlb.controller().snapshot().relicPool);
+  assert.deepEqual(pool, ['ghost_one', 'ghost_two'], 'the torn pool is the run\u2019s own pool');
+
+  // Boss-ward walk: boss when reachable, else the last travel (the 11b pattern).
+  let sealed = null;
+  for (let guard = 0; guard < 400 && !sealed; guard += 1) {
+    const phase = await page.evaluate(() => window.__dlb.snapshot().phase);
+    if (phase === 'ended') break;
+    if (phase === 'map') {
+      const boss = page.locator('button.node.available.t-boss').first();
+      if ((await boss.count()) > 0) await boss.click();
+      else await page.locator('button[aria-label^="Travel to"]').last().click();
+      await sleep(500);
+    } else if (phase === 'combat') {
+      const card = page.locator('button[data-slot][aria-disabled="false"]').first();
+      if ((await card.count()) > 0) {
+        await card.click();
+        const tgt = page.locator('.enemy.targeting').first();
+        if ((await tgt.count()) > 0) await tgt.click();
+        await sleep(700);
+      } else {
+        await endTurn(page);
+        await sleep(1600);
+      }
+    } else if (phase === 'rest') {
+      await page.getByRole('button', { name: /^Rest \(/ }).first().click();
+      await sleep(600);
+    } else if (phase === 'event') {
+      // A choice button if the wayside still asks, else the resolved beat's Continue.
+      const choice = page.locator('button.event-choice[aria-disabled="false"], button.event-choice:not([disabled])').first();
+      if ((await choice.count()) > 0) await choice.click();
+      else await page.getByRole('button', { name: 'Continue' }).first().click();
+      await sleep(600);
+    } else if (phase === 'shop') {
+      await page.locator('button', { hasText: /leave/i }).first().click();
+      await sleep(600);
+    } else if (phase === 'reward') {
+      const truth = await page.evaluate(() => {
+        const s = window.__dlb.controller().snapshot();
+        return { boss: Boolean(s.reward?.boss), offers: (s.reward?.relicOffers ?? []).length };
+      });
+      if (truth.boss) {
+        sealed = truth;
+        assert.equal(truth.offers, 0, `a torn pool offers nothing: ${JSON.stringify(truth)}`);
+        const body = await page.locator('.boon-name').first().textContent();
+        assert.match(body, /sealed to you this climb/, `the torn vault says so honestly: ${body}`);
+        assert.doesNotMatch(body, /hold everything/, 'the false exhausted claim is gone');
+        assert.equal(await page.locator('.relic-offer').count(), 0, 'a sealed vault renders no offer button');
+        await page.getByRole('button', { name: 'Walk away' }).first().click();
+        await sleep(900);
+      } else {
+        await page.getByRole('button', { name: /^Skip/ }).click();
+        await sleep(600);
+      }
+    } else {
+      await sleep(300);
+    }
+  }
+  assert.ok(sealed, 'the walk reached the warden and read the sealed vault');
 });

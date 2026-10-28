@@ -329,11 +329,48 @@ Process rules (standing):
   (act-1 offers >= 1 for every fresh profile). Its P2 catches MY second assertion-
   vs-evidence miss: the "360x780@130 artifact" dismissal was wrong — a real diff-caused
   1.3px card-name clip (the tall-portrait block's 10px side padding overriding the
-  <=380 tier's engineered 6px). Also: the laptop End-Turn budget MOVED 14px (clears by
-  87 — the "byte-identical" claim was false), and the tooltip claim was half-true
+  <=380 tier's engineered 6px). Also: the laptop End-Turn budget moved +14px (clears by
+  87px — the earlier "byte-identical" claim was false; the corrected record stands:
+  moved +14px, clears by 87px), and the tooltip claim was half-true
   (aria-label yes, no title). ALL fold into UX-2 with the pacing work.
 - 2026-10-25 — UX-2 (pacing + UX-1 review fixes) dispatched. Brief from the measured
   audit: per-enemy enemy-turn sequencing (burst diffs carry per-enemy indices;
   enemy-strike hook exists), attacker-named damage floats, slam anticipation beats —
   surface-side only, kernel untouched; plus the <=380 side-padding restore + row
   re-measure, the doubly-torn vault fallback line, and the End-Turn budget record.
+- 2026-10-28 — UX-2 dev done in one pass. THE ENEMY TURN, SEQUENCED AND NAMED
+  (surface-only; the kernel is byte-identical, golden rebuilt + cmp'd below): the turn
+  flip now reads the kernel's own `enemy_attack` events (per attacker, per hit, in
+  resolution order) into ONE `enemy-turn` burst, and `act()` arms a strike-sequence
+  plan (runtime.strikeSeq — beat 500ms, slam 640ms, dash arrival at 46% = 294ms, all
+  through `animMs` so the speed dock divides every beat). Each attacker's slam waits
+  its beat via the same positive/negative animation-delay resume the hero's pose uses;
+  the attacker's intent badge lights while ITS slam plays (`.is-striking` +
+  `intent-strike` keyframes on the same clock); each attack's NAMED float — "Kiln Mite
+  −6", or "absorbed" when block ate it — lands over the hero at its dash arrival;
+  the vignette pulses once when the last attack lands; the aggregate toast stays (the
+  net fact), the aggregate float is silent (the named ones replace it) and the hurt
+  flinch keeps its beat. `»` skips the choreography and paints the named floats
+  statically stacked; reduced motion arms nothing (the turn collapses to the fast
+  form — measured: no floats, no plan, static classes exactly as before the slice).
+  Timing at 1x, two attackers (seed 22, measured): strike 1 float +359ms, strike 2
+  float +839ms (gap 480ms = the beat), information complete ~1.7s; 2x halves the gap
+  (232ms measured). 3-attacker turn: floats complete ~1.3s, vignette ~1.6s — inside
+  the 1.2-1.8s brief. THE B FIXES: (1) the tall tier's 4-side padding override is
+  restored for <=380 phones (6px sides + flush end wraps, and the fan FLATTENS in the
+  tall <=380 band — the 146px face swung 7.7px about its bottom pivot, more than 6px
+  of padding can hold; measured, the 360x780@130 row now fails ONLY the pre-existing
+  page-wider/hero-name pair that baseline also fails, name-clip gone, no cardsOutside
+  regression, full-matrix fail-set diffed identical to baseline minus that clip);
+  (2) the doubly-torn vault (a VALID-ARRAY pool of zero known ids) says "The warden's
+  vault is sealed to you this climb." instead of the false "You hold everything" —
+  detected surface-side from the snapshot's own pool vs known-held rows, e2e-walked
+  through a doctored torn pool to a real warden; (3) every card face carries its full
+  effect sentence as a native `title` (the clamped tail is now hoverable); (4) the
+  record correction stands in the UX-1 entry: laptop End-Turn budget moved +14px,
+  clears by 87px. PLAYING.md documents the named, sequenced turn. Gates at the tree:
+  377/376/0/1 node (the pre-existing poolSelection todo), gate OK, art OK, 20/20
+  browser (+2: the sequence-order test and the torn-vault walk), sim 20 runs exit 0
+  (token budgets PASS), golden REBUILT AND BYTE-IDENTICAL (sha256 27b5f677…, cmp
+  clean — the kernel did not move), frozen viewport rows 915x412 + 1280x800 ALL PASS.
+

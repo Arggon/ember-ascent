@@ -1634,6 +1634,24 @@ html, body {
    contradict a bar that did not move. */
 .efloat-absorbed { font-size: var(--fs-2); letter-spacing: 0.06em; text-transform: uppercase; color: var(--block); }
 
+/* ---------- UX-2: the sequenced enemy turn's NAMED floats ----------
+   One float per attacker, over the hero, in attack order: WHO hit, and for what. The
+   node reuses the .efloat visual language (same glyph ladder, same rise) but sits on the
+   persistent fx layer above the hero, so it survives the paint that ends the enemy turn
+   and lands exactly when its attacker's dash arrives. */
+.fx-strike-float { position: absolute; z-index: 30; pointer-events: none; }
+.efloat-named { gap: 7px; }
+.efloat-named .efloat-who {
+  font-family: var(--text, var(--mono));
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #ffcf9e;
+  padding-right: 2px;
+}
+.efloat-named .efloat-hits { font-size: 0.72em; opacity: 0.85; }
+
 /* ---------- Block absorbing: the shield flares and is visibly consumed ---------- */
 
 .hpbar.block.block-eat > i { animation: juice-block-eat 0.5s ease-out both; }
@@ -3312,6 +3330,23 @@ html, body {
   line-height: 1;
   color: #ffe6c8;
   text-shadow: 0 1px 0 #000, 0 0 6px rgba(255, 120, 40, 0.6);
+}
+/* UX-2: the CURRENT attacker's intent badge lights while its own slam plays. The class
+   is painted on every attacker of the playing sequence; the CSS variable pair written by
+   enemyCard (--seq-delay / --seq-dur, from the same clock as the slam delays) spaces the
+   highlights one attacker apart, so "who is striking" reads without measuring anything.
+   `both` holds the unlit 0% frame while an attacker waits for its beat and returns to it
+   after, so the badge is lit exactly for its own attack. */
+@keyframes intent-strike {
+  0%, 100% { border-color: #5a3420; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7)); }
+  30%, 70% {
+    border-color: #ffb45e;
+    filter: drop-shadow(0 0 10px rgba(255, 150, 50, 0.95)) brightness(1.45);
+  }
+}
+.stage-combat .enemy.is-striking .intent-badge {
+  animation: intent-strike var(--seq-dur, 640ms) ease-in-out both;
+  animation-delay: var(--seq-delay, 0ms);
 }
 
 .stage-combat .fig { position: relative; width: min(150px, 100%); height: min(200px, 34vh); color: #f0d2b4; filter: none; }
@@ -7002,6 +7037,28 @@ html, body {
 @media (max-width: 620px) and (min-height: 761px) {
   .stage-combat .card { height: min(146px, 30vh); }
   .stage-combat .hand { padding: 26px 10px 8px; margin-top: -10px; }
+}
+/* - UX-2: the tall tier's `padding: 26px 10px 8px` (all four sides, later in source order)
+     overrode the <=380 tier's engineered 6px side padding on tall-narrow phones (360x780 and
+     friends at 130% text), and a name lost the 4px of text width it needed — a 1.3px clip
+     measured by the viewport harness ("clipped" fail-kind). Restore the two sides only; the
+     tall tier keeps its 26px/8px top-bottom and its 10px sides for every >=381px phone. The
+     end wraps go flush again too: the <=380 `margin: 0 -1.5px` above comes later in source
+     order than the <=620 first/last zeroing, and with only 6px of hand padding the swung
+     end corners need that 1.5px back or the harness re-fails "cards outside the hand box".
+   - And the fan itself flattens in the TALL <=380 band: the tier's 146px face swung about
+     its bottom pivot (transform-origin: 50% 100%, 3deg a step) carries an end card
+     7.7px sideways out of its wrap — measured — and 6px of padding cannot absorb it (the
+     <=380 tier was engineered against the 100px face of the short tier, which swings only
+     5.1px). The 6+ hands already flatten for the same clip-arithmetic reason; a 5-card
+     hand on a tall narrow phone joins them and keeps the lift. */
+@media (max-width: 380px) {
+  .stage-combat .hand { padding-left: 6px; padding-right: 6px; }
+  .stage-combat .card-wrap:first-child { margin-left: 0; }
+  .stage-combat .card-wrap:last-child { margin-right: 0; }
+}
+@media (max-width: 380px) and (min-height: 761px) {
+  .stage-combat .card { transform: translateY(-12px); }
 }
 /* - Tall-narrow phones at large text (#28: 360x780 with 130% text). Between 700 and 780px
      tall the fight is capped at 348px and the figures are 36-42vh (210-260px), so the hero

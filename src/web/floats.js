@@ -43,6 +43,32 @@ export function floatNode(b) {
 }
 
 /**
+ * UX-2: the NAMED damage float for one attacker of the sequenced enemy turn — who hit
+ * the hero, and for what. The name is the kernel's own enemy name (carried on the burst
+ * from the before-snapshot); the number is what that attacker's hits dealt THROUGH block
+ * according to the kernel's own `enemy_attack` events, or the honest "absorbed" when
+ * block ate the whole attack (a 0 would contradict an unchanged HP bar). Two containers
+ * share the node: the animated form sits on the fx layer above the hero (fx.js places
+ * it at the impact beat), the »-speed form sits in the hero's own effect box (heroEfx).
+ * @param {{name: string, dealt: number, blocked: number, hits: number}} a one attacker
+ * @param {string} [hold] extra class for the queued/static mechanism (`floatHold()`)
+ */
+export function strikeFloatNode(a, hold = '') {
+  const absorbedByBlock = a.dealt <= 0;
+  const tier = absorbedByBlock ? 1 : a.dealt >= 16 ? 3 : a.dealt >= 8 ? 2 : 1;
+  const glyph = absorbedByBlock ? '⛨' : tier >= 3 ? '✸' : tier >= 2 ? '◆' : '·';
+  // className, not a cls: template — the same shape floatNode uses, so the tier ladder
+  // stays an assembled string (the surface-art checker resolves cls: templates only).
+  const span = el('span', { cls: 'efloat' });
+  span.className = `efloat efloat-g${tier} efloat-named${hold}`;
+  span.append(el('b', { cls: 'efloat-who', text: a.name }));
+  span.append(el('b', { text: glyph }));
+  span.append(el('b', { text: absorbedByBlock ? 'absorbed' : `−${a.dealt}` }));
+  if (a.hits > 1 && !absorbedByBlock) span.append(el('b', { cls: 'efloat-hits', text: `${a.hits}×` }));
+  return span;
+}
+
+/**
  * The enemy's hit reaction, as a class on its own card. `flash.n` is part of the class
  * name so that a repaint for an unrelated reason reproduces the identical string — a new
  * class string only ever appears when a hit genuinely happened. Colour is not the carrier:
@@ -72,7 +98,23 @@ export function heroEfx() {
   if (reducedMotion) return box;
   for (const b of bursts) {
     if (b.kind !== 'hero-float') continue;
+    // UX-2: on a sequenced enemy turn the aggregate damage float is silent — the
+    // per-attacker NAMED floats carry the numbers instead (see strikeFloatNode).
+    if (b.silent) continue;
     box.append(floatNode(b));
+  }
+  // UX-2, the » fast form: with the choreography skipped the per-attacker facts still
+  // land — each attacker's named float, stacked, in the order the attacks resolved.
+  // (The box is a 0-height absolute strip, so the stack is spaced by an inline top.)
+  if (animSpeed === 0) {
+    const turn = bursts.find((b) => b.kind === 'enemy-turn');
+    if (turn) {
+      turn.attacks.forEach((a, i) => {
+        const node = strikeFloatNode(a, ' is-static');
+        if (node.style) node.style.top = `${i * 44}px`;
+        box.append(node);
+      });
+    }
   }
   // A GUARD that actually gained block raises the glowing armor dome: the barrier is
   // the card's promise made visible, and it flashes at the same beat the number rises.
