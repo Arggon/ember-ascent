@@ -111,7 +111,6 @@ export function strikeSlot(index) {
     i,
     delay: Math.round(strikeSeq.beatMs * i - elapsed),
     dur: strikeSeq.slamMs,
-    attacking: elapsed >= strikeSeq.beatMs * i && elapsed < strikeSeq.beatMs * i + strikeSeq.slamMs,
   };
 }
 export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800, uppercut: 700, hammerfall: 560, quench: 620, bellowspush: 640, snapcast: 480, fanflames: 700, arccut: 620, collarline: 680, headbutt: 600, surge: 760, haftjab: 520, forgeclap: 780, wildflail: 740, bellowsflex: 560, dropkick: 820, bloodhammer: 900, castaside: 640, truetemper: 700, fitplate: 660, kilncry: 620, vent: 600, heattrance: 760, hailblows: 880, climbcut: 720, veintap: 560, reapsweep: 1000, heatwash: 900, bracelock: 800, flameward: 760, cindershroud: 720, stoke: 640, scaleup: 700, bankcoal: 680, ashembrace: 720, cinderskin: 660, lockdown: 900, overtemper: 820, tithe: 780, splitseam: 700 };

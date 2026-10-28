@@ -324,8 +324,10 @@ export function act(actionId, targetK = null) {
   // painted with their per-attacker delays from the first frame. The plan carries the
   // ALREADY-DIVIDED durations (animMs applies the speed dock once, here), so 2× halves
   // every beat and reduced motion / » never arm one at all — those shapes collapse to the
-  // simultaneous fast form the turn had before this slice.
-  const seqBurst = fx.find((b) => b.kind === 'enemy-turn');
+  // simultaneous fast form the turn had before this slice. A flip that ENDS the run (the
+  // hero died on the enemy turn) arms nothing: the defeat panel is the moment, and
+  // unplaced floats would land unpositioned over it (UX-2 review P3).
+  const seqBurst = after.phase === 'ended' ? null : fx.find((b) => b.kind === 'enemy-turn');
   if (seqBurst && !reducedMotion && animSpeed !== 0) {
     const beatMs = animMs(STRIKE_SEQ.beat);
     const slamMs = animMs(STRIKE_SEQ.slam);
@@ -344,6 +346,12 @@ export function act(actionId, targetK = null) {
     // its attackers on every hover repaint forever. The identity check keeps a stale
     // cleanup from clearing a NEWER sequence armed by an action in between.
     later(() => { if (strikeSeq === plan) setStrikeSeq(null); }, plan.totalMs + 400);
+  } else if (!seqBurst) {
+    // UX-2 review P2: the turn-flip that is NOT an enemy attack (the player's own
+    // actions, the reward/rest flips) must retire any plan still armed — the
+    // End-Turn timer above only covers the sequence's own lifetime, and an unguarded
+    // plan re-slams stale attackers over the player's next action for ~1.5s.
+    setStrikeSeq(null);
   }
   repaint();
   dispatchFx();
