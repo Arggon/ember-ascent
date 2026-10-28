@@ -54,7 +54,7 @@ Process rules (standing):
 | S5 | Potions | 3 slots, post-combat drop table (seeded), quaff/discard action ids | potion belt in HUD with tooltips, quaff/discard controls | closed — c83a2d0, QA 11/11, review APPROVE |
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | closed — 69b05eb + fixes d7441b6, QA 11/11, review APPROVE |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
-| S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | **in progress** (dev dispatched) |
+| S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | committed 0168d28 — QA orchestrator-run 10/10, review next |
 | S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | closed — 2ef8ce5, QA 10/10, review APPROVE (5 P3s → backlog) |
 | S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | closed — 641731a + d08da32 + c4a0ace, re-review APPROVE |
 
@@ -301,3 +301,13 @@ Process rules (standing):
   symmetry); the history screen's persistent unlock line never learned relics. S10
   CLOSED — ALL TEN SYSTEM/CONTENT SLICES S1-S7+S9+S10 + POLISH through the full SDLC.
   Remaining roadmap: S8 (content scale), the release/ rebuild, the backlog.
+- 2026-10-25 — S8 (card content scale) dev done in one clean pass: 70 cards (22C/30U/13R
+  + 5 starters), multi-hit via the damage verb's dormant hits param (pinned per-hit:
+  block soaks hit by hit, totals identical either way), TWO new verbs (retain —
+  endTurn/beginTurn hand preservation; heal — honest zero at full HP), the unlock
+  ladder retuned 24/32/48/68, all pins updated with reasons, one golden flip
+  (greedy seed 1 loss->win, the wider draft). Gates: 375/374/1 node, gate OK, art OK,
+  18/18 browser, sim exit 0. QA PASS 10/10 (multi-hit math 9/18/36, retain by UID,
+  heal +6/zero, exhaust routing, Forge Rhythm's actual "Discard 1 at random" text
+  correcting the brief's mis-read, DEX/PWR scaling, shop bands, mid-ladder codex 45).
+  Committed 0168d28; solo review next.
