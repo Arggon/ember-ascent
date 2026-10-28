@@ -55,6 +55,8 @@ Process rules (standing):
 | S6 | Events | `event` node type + phase; 4 seeded events with 2–3 choices each | event view (story text, choice buttons, outcomes) | closed — 69b05eb + fixes d7441b6, QA 11/11, review APPROVE |
 | S7 | Relics | grow relic table with real effect hooks; elite drops relic; boss offers 3 | relic display + picks in reward flow | closed — 190a3e8, QA 11/11, review APPROVE (inline) |
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | closed — 0168d28, QA 10/10, review APPROVE (5 P3s → backlog) |
+| UX-1 | Boss-offer down-tier + uniform card faces + gem readability | offer pool fills rare→uncommon→common; fixed faces per viewport tier | honest exhausted copy | closed — 90a840e, QA 8/8, review APPROVE (P2 → UX-2) |
+| UX-2 | The sequenced, named enemy turn + UX-1 review fixes | kernel untouched (goldens byte-identical) | per-attacker floats, intent highlight, ≤380 restore, sealed vault, tooltips | closed — c8ee3f7 + 7906900, QA 10/10, review APPROVE (P2 fixed in 7906900) |
 | S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | closed — 2ef8ce5, QA 10/10, review APPROVE (5 P3s → backlog) |
 | S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | closed — 641731a + d08da32 + c4a0ace, re-review APPROVE |
 
@@ -385,3 +387,14 @@ Process rules (standing):
   reduced-motion zero, absorbed-vs-net honesty, the 360x780@130 row = baseline minus
   the clip, sealed vault verbatim, tooltips byte-identical). Committed c8ee3f7; solo
   review next.
+- 2026-10-25 — UX-2 review VERDICT: APPROVE. Verified: goldens byte-identical (kernel
+  untouched); the plan lifecycle traced across every interleaving (2x mid-sequence,
+  >> mid-sequence, newGame, resize, the two-plans identity check) with ONE P2 — the
+  End-Turn timer only covered the sequence's own lifetime, so a player action inside
+  the ~1.5s window re-slamed stale attackers (contradicting the arm block's own
+  comment) — fixed in 7906900: every non-enemy-turn action retires the plan outright,
+  and the run-ending flip arms nothing (unplaced floats were landing over the defeat
+  panel). P3s fixed: the dead `attacking` plan field dropped; the ">>" static-form
+  claims corrected in floats.js + the roadmap (it exists only when ">>" armed before
+  the turn). Gates at 7906900: 377/376/1 node, gate OK, art OK, 20/20 browser, sim
+  exit 0, golden byte-identical. UX ROUNDS CLOSED.
