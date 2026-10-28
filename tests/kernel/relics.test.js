@@ -14,7 +14,9 @@
 //     Iron Skin's relicOff switches off relics[0] ONLY.
 //   - The drops: an elite is a GUARANTEED 70/30 common/uncommon roll (1 band draw + 1
 //     pick draw, exactly 2; 0 only when both pools are empty — impossible through play);
-//     the boss offers THREE distinct not-held rares (3 draws), pick r<n> or skip s0, and
+//     the boss offers THREE distinct offers, highest tier first (UX-1 down-tier: the
+//     full table covers them from rares — 3 draws; a short pool fills from uncommons,
+//     then commons), pick r<n> or skip s0, and
 //     the run ends at that step, not at the victory. Acquisition always goes through
 //     gainRelic — Ember Heart's max-HP passive fires on the elite drop exactly as on the
 //     boss pick.
@@ -380,7 +382,7 @@ test('the held relic never drops again: the pool filters, and empty pools are fr
   assert.equal(rollEliteRelicDrop(dry).draws, 0);
 });
 
-test('the boss offer: three DISTINCT not-held rares, exactly 3 draws, never a common', () => {
+test('the boss offer: three DISTINCT not-held rares, exactly 3 draws, never a common (the full table)', () => {
   for (let seed = 0; seed < 80; seed += 1) {
     const s = wonState({ seed, nodeType: 'boss', player: { gold: 0 } });
     const out = resolveVictory(s, null);
@@ -395,14 +397,19 @@ test('the boss offer: three DISTINCT not-held rares, exactly 3 draws, never a co
       assert.ok(!s.relics.includes(id), 'never an already-held relic');
     }
     assert.equal(out.state.rngDraws, s.rngDraws + 3, 'gold 0 (flat) + exactly 3 offer draws');
-    // The roll is reproducible: pickAt over the not-held rare pool at the post-gold counter.
+    // The roll is reproducible: pickAt over the not-held rare pool at the post-gold
+    // counter. The FULL table covers the offer from rares alone, so the down-tier fill
+    // (UX-1) never reaches the uncommon/common tiers and the stream is unchanged.
     assert.deepEqual(offers, pickAt(s.seed, s.rngDraws, dropPool(s, 'rare'), 3).picked);
   }
-  // A torn save that already holds rares is offered what exists — never padded, never thrown.
+  // A torn save that already holds rares is offered what exists, DOWN-TIER (UX-1):
+  // the 2 not-held rares, then the ONE uncommon fill — 3 real offers, never padded
+  // beyond the pool, never an empty vault while anything is available.
   const held = wonState({ relics: Object.keys(RELICS).filter((id) => RELICS[id].tier === 'rare').slice(0, 3), nodeType: 'boss' });
   const short = resolveVictory(held, null);
-  assert.equal(short.state.reward.relicOffers.length, 2, 'held rares are filtered out of the offer (3 of 5 held, 2 offered)');
-  assert.equal(short.state.rngDraws, held.rngDraws + 2, 'pickAt pays only for the picks it makes');
+  assert.deepEqual(short.state.reward.relicOffers.map((id) => RELICS[id].tier), ['rare', 'rare', 'uncommon'],
+    'the not-held rares first, then the uncommon fill');
+  assert.equal(short.state.rngDraws, held.rngDraws + 3, 'pickAt pays only for the picks it makes');
 });
 
 test('the boss pick r<n> settles the victory: a two-act run CLIMBS ON, a legacy one-act run ends', () => {

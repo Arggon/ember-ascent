@@ -51,15 +51,17 @@ export function rewardView() {
   wrap.append(head);
 
   if (isBoss) {
-    // S10: the warden's vault is empty — no rare relic is unlocked for this profile yet.
-    // The count is TRUE (the unlock table decides when it fills) and the screen says so
-    // plainly instead of padding the offer or pretending this is a card reward. The one
-    // way out is the walk-away the kernel itself offers (it climbs on — the relic vault
-    // is the meta's reason to come back and win again).
+    // S10/UX-1: the warden's vault is EXHAUSTED — the run holds every relic its pool
+    // can give (through play this is reachable on a fresh profile: the elite-heavy
+    // climb can hold all five commons by the act-2 warden; a gated pool otherwise
+    // offers down-tier commons first). The count is TRUE and the screen says so
+    // plainly instead of padding the offer or pretending this is a card reward. The
+    // one way out is the walk-away the kernel itself offers (it climbs on — winning
+    // is what widens the vault for the NEXT run).
     if (!boss) {
       wrap.append(el('div', { cls: 'boon-list' + (arriving.reward ? ' reveal' : '') },
-        el('p', { cls: 'boon-name', text: 'The warden\u2019s vault holds nothing for you yet.' }),
-        keywordText(el('p', { cls: 'boon-text' }), 'Rare relics enter the vault as your lifetime climbs win.'),
+        el('p', { cls: 'boon-name', text: 'You hold everything the warden\u2019s vault can give.' }),
+        keywordText(el('p', { cls: 'boon-text' }), 'New relics enter the vault as your lifetime climbs win.'),
       ));
       const controls = el('div', { cls: 'controls' });
       if (snap.reward.canSkip) {

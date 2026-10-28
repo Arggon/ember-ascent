@@ -9,9 +9,13 @@
 //     byte-identical states for the harness paths (the golden generator's proof is that
 //     tests/golden/logs.jsonl regenerates byte-for-byte).
 //   - Drops and offers respect the pool: a fresh profile's elite can NEVER roll an
-//     unlocked-later relic (200 seeds), its warden offers NOTHING at zero draws, a
-//     7-win pool offers two, a 10-win pool three. The pick guards the pool too (the
-//     resolver refuses a known, not-held id the pool excludes — torn saves only).
+//     unlocked-later relic (200 seeds), and its warden offers what the pool HAS,
+//     down-tier (UX-1): a fresh pool offers three COMMONS, a 7-win pool two rares and
+//     one uncommon, a 10-win pool three rares. A fully exhausted vault (every pool
+//     relic held — reachable through play on a fresh elite-heavy climb) offers nothing.
+//     The pick guards the pool
+//     too (the resolver refuses a known, not-held id the pool excludes — torn saves
+//     only).
 //   - LEGACY: an absent/torn relicPool reads as the FULL table at every drop read —
 //     one rule covering the pre-S10 save and the profile-less run alike.
 //   - A pool-gated run replays hash-for-hash: the log header carries the pool verbatim
@@ -174,34 +178,99 @@ test('a fresh profile\u2019s elite CANNOT drop an unlocked-later relic — 200 s
   assert.ok(controlUncommons.length > 20, `the full-table control still drops uncommons (${controlUncommons.length}/200) — the gate, not the roll, changed`);
 });
 
-test('the gated boss offer: fresh = NONE at zero draws; 7 wins = two; 10 wins = three', () => {
-  // Fresh pool: the warden's vault is empty. The branch still opens the reward phase;
-  // the skip is the way out; the roll cost nothing.
+test('the gated boss offer is DOWN-TIER (UX-1): fresh = 3 commons; 7 wins = 2 rares + 1 uncommon; 10 wins = 3 rares', () => {
+  // FRESH pool (five commons): the vault offers a REAL three-common choice — the S10
+  // empty vault became a normal offer the moment the pool had anything to give. Three
+  // draws, one pick id per offer, the skip beside them, and the pick climbs on.
   for (let seed = 0; seed < 20; seed += 1) {
     const s = wonState({ seed, nodeType: 'boss', relicPool: relicPoolFor({ wins: 0 }) });
     const out = resolveVictory(s, null);
     assert.equal(out.state.phase, 'reward');
-    assert.deepEqual(out.state.reward.relicOffers, [], `seed ${seed}: the honest zero`);
-    assert.equal(out.state.reward.boss, true);
-    assert.equal(out.state.rngDraws, s.rngDraws, `seed ${seed}: an empty vault costs no draw`);
-    assert.deepEqual(actions(out.state).map((a) => a.id), ['s0'], 'the skip is offered — never a softlock');
-    assert.match(observe(out.state), /REWARD — the warden offers nothing/, 'the dump says what is true');
-    const climb = step(out.state, 's0');
-    assert.equal(climb.state.phase, 'map', 'walking away climbs on (the vault is the reason to come back)');
+    assert.equal(out.state.reward.relicOffers.length, 3, `seed ${seed}: a real offer, never an empty vault`);
+    assert.ok(out.state.reward.relicOffers.every((id) => RELICS[id].tier === 'common'),
+      `seed ${seed}: every offer is a common — the pool has nothing higher`);
+    assert.equal(out.state.rngDraws, s.rngDraws + 3, `seed ${seed}: exactly the picks it made`);
+    assert.deepEqual(actions(out.state).map((a) => a.id), ['r1', 'r2', 'r3', 's0'],
+      'a pick per offer, plus the skip — never a softlock');
+    assert.doesNotMatch(observe(out.state), /the warden offers nothing/,
+      'the dump never calls a stocked vault empty');
+    const pick = step(out.state, 'r1');
+    assert.equal(pick.state.phase, 'map', 'the pick climbs on (the act transition)');
   }
-  // 7 wins: two rares in the pool — the offer is min(3, pool) = two, two draws.
+  // 7 wins: two rares left in the pool — the offer is those two, then ONE uncommon
+  // fill (the fill order rare → uncommon → common, rules/relics.js). Still 3 draws.
   const seven = wonState({ nodeType: 'boss', relicPool: relicPoolFor({ wins: 7 }) });
   const sevenOut = resolveVictory(seven, null);
-  assert.equal(sevenOut.state.reward.relicOffers.length, 2);
-  assert.ok(sevenOut.state.reward.relicOffers.every((id) => RELICS[id].tier === 'rare'));
-  assert.equal(sevenOut.state.rngDraws, seven.rngDraws + 2, 'exactly the picks it made');
-  // 10 wins: four rares — a real three, and every offer is INSIDE the pool.
+  assert.deepEqual(sevenOut.state.reward.relicOffers.map((id) => RELICS[id].tier), ['rare', 'rare', 'uncommon'],
+    'the not-held rares first, then the uncommon fill');
+  assert.equal(sevenOut.state.rngDraws, seven.rngDraws + 3, 'exactly the picks it made');
+  // 10 wins: four rares — a real three, all rare, and every offer is INSIDE the pool.
   const ten = wonState({ nodeType: 'boss', relicPool: relicPoolFor({ wins: 10 }) });
   const tenOut = resolveVictory(ten, null);
   assert.equal(tenOut.state.reward.relicOffers.length, 3);
+  assert.ok(tenOut.state.reward.relicOffers.every((id) => RELICS[id].tier === 'rare'));
   const tenPool = new Set(ten.relicPool);
   assert.ok(tenOut.state.reward.relicOffers.every((id) => tenPool.has(id)), 'offers come from the run\u2019s own pool, never the full table');
   assert.equal(new Set(tenOut.state.reward.relicOffers).size, 3, 'no dupes');
+});
+
+test('the down-tier fill order is tier-first, uniform within a tier, and never padded', () => {
+  // One rare + two uncommons available (legacy full-table read, most of the table held):
+  // the rare leads, the uncommons fill, three offers, three draws.
+  const oneRare = wonState({
+    nodeType: 'boss',
+    relics: ['burning_blood', 'ash_crown', 'slag_crown', 'cinder_ward', 'ash_ledger', 'gold_vein'],
+  });
+  const out = rollBossRelicOffers(oneRare);
+  assert.deepEqual(out.offers.map((id) => RELICS[id].tier), ['rare', 'uncommon', 'uncommon']);
+  assert.equal(out.draws, 3);
+  // Zero rares available (all five held), two of three uncommons held, four commons:
+  // the last uncommon + 2 common fills — the order crosses into the common tier.
+  const noRares = wonState({
+    nodeType: 'boss',
+    relics: ['burning_blood', 'deep_well', 'ash_crown', 'slag_crown', 'cinder_ward', 'ash_ledger', 'gold_vein', 'ember_heart'],
+  });
+  const out2 = rollBossRelicOffers(noRares);
+  assert.deepEqual(out2.offers.map((id) => RELICS[id].tier), ['uncommon', 'common', 'common']);
+  assert.equal(out2.draws, 3);
+  // A pool short as a WHOLE (one relic left in it): one offer, one draw — the count is
+  // min(3, pool), never padded.
+  const short = wonState({ nodeType: 'boss', relicPool: ['ember_heart'] });
+  const out3 = rollBossRelicOffers(short);
+  assert.deepEqual(out3.offers, ['ember_heart']);
+  assert.equal(out3.draws, 1);
+  // The picks are uniform WITHIN their tier, not the table's head: one rare held back
+  // with THREE uncommons available, so the two uncommon fills vary across seeds.
+  const seen = new Set();
+  for (let seed = 0; seed < 60; seed += 1) {
+    const r = rollBossRelicOffers(wonState({ seed, nodeType: 'boss',
+      relics: ['ash_crown', 'slag_crown', 'cinder_ward', 'ash_ledger'] }));
+    assert.equal(r.offers.length, 3);
+    for (const id of r.offers.filter((x) => RELICS[x].tier === 'uncommon')) seen.add(id);
+  }
+  assert.ok(seen.size >= 2, `the uncommon fill varies across seeds (saw ${JSON.stringify([...seen])})`);
+});
+
+test('a fully exhausted vault is still the honest zero (reachable on a fresh elite-heavy climb)', () => {
+  // Every relic the pool carries is already held: no tier has anything to give. Through
+  // play this is REACHABLE on a fresh profile — the two-act maps can roll an elite on
+  // three (act 1) and four (act 2) rows, and starter + four elite drops is every common
+  // the fresh pool carries — so the honest zero is a real screen, not just a torn-save
+  // shape. The fixture builds the same state directly (small pool, both ids held).
+  const s = wonState({
+    nodeType: 'boss',
+    relicPool: ['burning_blood', 'cyan_lantern'],
+    relics: ['burning_blood', 'cyan_lantern'],
+  });
+  const out = resolveVictory(s, null);
+  assert.equal(out.state.phase, 'reward');
+  assert.deepEqual(out.state.reward.relicOffers, [], 'the honest zero');
+  assert.equal(out.state.reward.boss, true);
+  assert.equal(out.state.rngDraws, s.rngDraws, 'an exhausted vault costs no draw');
+  assert.deepEqual(actions(out.state).map((a) => a.id), ['s0'], 'the skip is offered — never a softlock');
+  assert.match(observe(out.state), /REWARD — the warden offers nothing/, 'the dump says what is true');
+  const climb = step(out.state, 's0');
+  assert.equal(climb.state.phase, 'map', 'walking away climbs on (the vault is the reason to come back)');
 });
 
 test('the pick guard enforces the pool at the resolver: an out-of-pool offer takes no id', () => {

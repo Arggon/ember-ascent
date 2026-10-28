@@ -497,10 +497,12 @@ export function resolveVictory(state, cardDefs) {
   // 4. BOSS BRANCH (S7) — the offer, rolled at victory time exactly like the card offer
   //    it replaces; the run's fate (act transition 4b, or the ended win) moves to the
   //    pick/skip step (rules/steps.js settleBossVictory). The reward carries `boss: true`
-  //    and the flat tier's gold; cards are omitted. S9: the offers roll from the
-  //    not-held rare pool — five rares exist, so BOTH bosses of a two-act climb offer
-  //    a real three (act 2 holds four after act 1's pick); pickAt pays min(3, pool),
-  //    the documented tolerance, fewer only for a torn save.
+  //    and the flat tier's gold; cards are omitted. S7 rolled the not-held RARE pool;
+  //    UX-1 makes the vault DOWN-TIER (rules/relics.js owns the fill order): rares fill
+  //    first, then uncommons, then commons — a gated pool offers what exists (a fresh
+  //    profile's warden offers three COMMONS) and only a fully exhausted vault offers
+  //    nothing. pickAt pays exactly the picks made: 3 draws when 3 relics are available
+  //    at any tier, fewer only when the whole pool is short.
   if (nodeType === 'boss') {
     const offer = rollBossRelicOffers(next);
     next = {

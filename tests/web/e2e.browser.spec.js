@@ -1674,15 +1674,22 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
 });
 
 // ---------------------------------------------------------------------------
-// 11b. the S10 fresh gate: an EMPTY ledger (a brand-new browser profile) boots a run
-//      whose relic pool is the five commons. Lever-free claims from that fact: the
-//      pool the snapshot publishes, an elite drop that is ALWAYS a common, an act-1
-//      warden whose vault is EMPTY (the honest zero, never padded, never a fake card
-//      reward), and — the whole point of the slice — the run summary narrating what
-//      the win just opened for the NEXT run (Ember Heart, 6 of 13). The deck/HP lever
-//      below only makes the walk fast; it never touches relics or the pool.
+// 11b. the S10 fresh gate (UX-1 down-tier): an EMPTY ledger (a brand-new browser
+//      profile) boots a run whose relic pool is the five commons. Lever-free claims
+//      from that fact: the pool the snapshot publishes, an elite drop that is ALWAYS a
+//      common, and a warden whose vault is a REAL down-tier offer (S10's empty vault
+//      became a normal choice the moment the pool had anything to give): each warden
+//      offers min(3, pool minus held), every offer not-held, in-pool, and a common.
+//      The act-1 offer is PICKED (the pick climbs into act 2 — the act-1 vault is
+//      never exhausted through play: at most four of the five commons are holdable by
+//      then); the act-2 offer is WALKED AWAY from (the skip ends the run in victory)
+//      — the act-2 vault may be legitimately EXHAUSTED (the elite-heavy walk can hold
+//      all five commons by then: starter + four elite drops), and the walk asserts the
+//      honest zero in that shape too. The run summary narrates what the win just
+//      opened for the NEXT run (Ember Heart, 6 of 13). The deck/HP lever below only
+//      makes the walk fast; it never touches relics or the pool.
 // ---------------------------------------------------------------------------
-test('a fresh profile: the vault starts empty and the first win unlocks Ember Heart', { timeout: 300000 }, async (t) => {
+test('a fresh profile: the vault offers down-tier commons and the first win unlocks Ember Heart', { timeout: 300000 }, async (t) => {
   if (!chromium) return t.skip('playwright/chromium unavailable');
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
@@ -1716,7 +1723,7 @@ test('a fresh profile: the vault starts empty and the first win unlocks Ember He
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
 
   let eliteDrops = [];
-  let emptyVaults = 0;
+  let wardens = 0;
   for (let guard = 0; guard < 600; guard += 1) {
     const phase = await page.evaluate(() => window.__dlb.snapshot().phase);
     if (phase === 'ended') break;
@@ -1741,22 +1748,56 @@ test('a fresh profile: the vault starts empty and the first win unlocks Ember He
     } else if (phase === 'reward') {
       const spoils = page.locator('.reward-relic');
       if ((await spoils.count()) > 0) eliteDrops.push((await spoils.first().textContent()).trim());
-      // The warden's EMPTY vault (fresh profile): the reward head says so, no offer
-      // button exists, and the walk-away climbs on. Poll past the kill-hold paint beat.
+      // The warden's DOWN-TIER offer (UX-1): a real choice drawn from the run's own
+      // pool minus what it holds. Poll past the kill-hold paint beat, then assert the
+      // offer against the kernel's own arithmetic.
       const bossTruth = await page.evaluate(() => Boolean(window.__dlb.controller().snapshot().reward?.boss));
       for (let w = 0; bossTruth && w < 10; w += 1) await sleep(300);
       const truthNow = await page.evaluate(() => { const s = window.__dlb.controller().snapshot(); return { phase: s.phase, boss: !!s.reward?.boss }; });
       if (truthNow.phase === 'reward' && truthNow.boss) {
-        const head = await page.locator('.reward-head span').first().textContent();
-        assert.equal(await page.locator('.relic-offer').count(), 0, 'the empty vault renders no offer button');
-        assert.match(head, /the warden offers nothing/, `the honest zero, headlined: ${head}`);
-        emptyVaults += 1;
+        const k = await page.evaluate(() => {
+          const s = window.__dlb.controller().snapshot();
+          return { pool: s.relicPool, held: s.relics.map((r) => r.relicId), offers: s.reward.relicOffers };
+        });
+        const expected = Math.min(3, k.pool.length - k.held.length);
+        assert.equal(k.offers.length, expected,
+          `the warden offers min(3, pool minus held) = ${expected}: ${JSON.stringify(k)}`);
+        for (const o of k.offers) {
+          assert.ok(k.pool.includes(o.relicId), `the offer ${o.relicId} is inside the run's pool`);
+          assert.ok(!k.held.includes(o.relicId), `the offer ${o.relicId} is not already held`);
+          assert.equal(o.tier, 'common', `a fresh pool has only commons to give (${o.relicId})`);
+        }
+        wardens += 1;
+        if (expected === 0) {
+          // The vault can be genuinely EXHAUSTED through play on a fresh profile: the
+          // elite-heavy walk may hold every common the pool carries by the act-2 warden
+          // (starter + four elite drops). The honest zero is the S10 truth, still
+          // headlined, still offering the walk-away.
+          const head = await page.locator('.reward-head span').first().textContent();
+          assert.match(head, /the warden offers nothing/, `an exhausted vault says so: ${head}`);
+          assert.equal(await page.locator('.relic-offer').count(), 0, 'an exhausted vault renders no offer button');
+        } else {
+          const head = await page.locator('.reward-head span').first().textContent();
+          assert.match(head, /claim the warden\u2019s relic/, `a stocked vault headlines the offer: ${head}`);
+        }
+        if (wardens === 1) {
+          // The ACT-1 vault is never exhausted through play (at most four of the five
+          // commons can be held by then — starter + three elites): take the first
+          // offer — it climbs into act 2, the relic crossing with the hero.
+          assert.ok(expected >= 1, 'the act-1 vault always has something to give');
+          const heldBefore = k.held.length;
+          await page.locator('.relic-offer').first().click();
+          await sleep(900);
+          const climbed = await page.evaluate(() => window.__dlb.controller().snapshot());
+          assert.equal(climbed.phase, 'map', 'the pick climbs into act 2');
+          assert.equal(climbed.act, 2, 'the act advanced');
+          assert.match(await page.locator('.page-num').first().textContent(), /Kiln Deeps/, 'the climb opens act 2');
+          assert.equal(climbed.relics.length, heldBefore + 1, 'the picked relic crossed the climb');
+          continue;
+        }
+        // The ACT-2 WALK AWAY: stocked or exhausted, the skip ends the run in victory.
         await page.getByRole('button', { name: 'Walk away' }).first().click();
         await sleep(900);
-        const climbed = await page.evaluate(() => window.__dlb.controller().snapshot());
-        if (climbed.phase === 'map' && climbed.act === 2) {
-          assert.match(await page.locator('.page-num').first().textContent(), /Kiln Deeps/, 'the walk-away climbed into act 2');
-        }
         continue;
       }
       if ((await spoils.count()) > 0) await sleep(300); // let the spoils paint settle before leaving
@@ -1777,7 +1818,7 @@ test('a fresh profile: the vault starts empty and the first win unlocks Ember He
   assert.equal(errors.length, 0, `no page errors during the walk: ${errors.join(' | ')}`);
   assert.ok(eliteDrops.length >= 1, `an elite dropped under the gate: ${JSON.stringify(eliteDrops)}`);
   assert.ok(eliteDrops.every((n) => FRESH_NAMES.includes(n)), `every gated drop is a row-0 common: ${JSON.stringify(eliteDrops)}`);
-  assert.equal(emptyVaults, 2, 'both wardens of the two-act climb opened an empty vault');
+  assert.equal(wardens, 2, 'both wardens of the two-act climb opened a vault priced at min(3, pool minus held)');
 
   // The run ends in VICTORY at the act-2 warden's skip — and the win is the unlock.
   assert.equal(await page.evaluate(() => window.__dlb.snapshot().ended.outcome), 'win', 'the act-2 skip ends the run in victory');
