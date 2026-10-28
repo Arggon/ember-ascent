@@ -39,12 +39,17 @@
 //     falls to the other tier (still 1 pick draw); only when BOTH pools are empty —
 //     impossible through play, reachable through a torn save — is nothing granted, and the
 //     suppressed roll costs NOTHING (the potions ruling: "impossible" is free).
-//   * BOSS: min(3, pool) offers from the not-held RARE pool (pickAt — exactly that many
-//     draws; the full table holds five rares and each boss takes at most one, so a
-//     FULL-POOL two-act climb offers three at both wardens). The player picks 1 (action
-//     `r<n>`) or skips (`s0`, StS lets you walk away). The roll happens at VICTORY time,
-//     like the card offer it replaces; the pick itself is a choice, not a roll — zero
-//     draws.
+//   * BOSS (UX-1 down-tier): min(3, pool) offers from the not-held pool, HIGHEST TIER
+//     FIRST — the not-held RARES fill the offer, then UNCOMMONS, then COMMONS (the fill
+//     order rare → uncommon → common, table order within a tier, is part of the
+//     format). Each tier is ONE pickAt over its own not-held pool and pays exactly the
+//     picks it made, so the total is 3 whenever 3 relics are available at any tier and
+//     fewer only when the whole pool is short; an exhausted tier is skipped at ZERO
+//     draws (the potions ruling). The full table (five rares) draws exactly as before —
+//     the rare tier alone covers the offer, so no later tier is touched and the stream
+//     is byte-identical. The player picks 1 (action `r<n>`) or skips (`s0`, StS lets
+//     you walk away). The roll happens at VICTORY time, like the card offer it
+//     replaces; the pick itself is a choice, not a roll — zero draws.
 //
 // THE POOL (S10). `state.relicPool` is the ids THIS run's drops and offers draw from —
 // the relic analogue of `state.draftPool`, derived by the kernel entry (index.js
@@ -148,7 +153,8 @@ export const RELICS = Object.freeze({
     summary: `B${FLASK_GRIP_BLOCK}/quaff`, text: `Whenever you quaff a potion, gain ${FLASK_GRIP_BLOCK} Block.`,
     quaffBlock: FLASK_GRIP_BLOCK,
   },
-  // --- rare drops (the boss offers three of these) -----------------------------------
+  // --- rare drops (the boss offers these FIRST; UX-1's down-tier fills a short offer
+  // --- from uncommons, then commons) --------------------------------------------------
   deep_well: {
     tier: 'rare', name: 'Deep Well',
     summary: `D+${DEEP_WELL_DRAW} turn 1`, text: `Draw ${DEEP_WELL_DRAW} additional card on the first turn of each combat.`,
@@ -300,19 +306,35 @@ export function rollEliteRelicDrop(state) {
 }
 
 /**
- * The boss's offer roll: distinct picks from the not-held RARE pool, no dupes —
- * min(3, pool) offers, exactly that many draws. THE HONESTY RULE (S10): the count is
- * never padded. A FULL pool (five rares, each boss takes at most one) offers a real
- * three at both wardens of a two-act climb; a gated pool offers what the profile has
- * unlocked — a fresh profile's warden offers NOTHING, and that zero is true (the
- * unlock table, not the roll, decides when the vault fills). A run short of rares
- * through a torn save is offered what exists — never padded, never thrown.
+ * The boss's offer roll (UX-1 down-tier): min(3, pool) offers from the not-held pool,
+ * HIGHEST TIER FIRST — the not-held RARES fill the offer, then UNCOMMONS, then COMMONS
+ * (table order within a tier; the fill order rare → uncommon → common is part of the
+ * format). Each tier is one pickAt over its own not-held pool and pays exactly the
+ * picks it made: 3 offers cost exactly 3 draws whenever 3 relics are available at any
+ * tier, fewer only when the whole pool is short, and an exhausted tier is skipped at
+ * ZERO draws (the potions ruling). THE HONESTY RULE (S10) survives unchanged — the
+ * count is never padded — but a gated pool no longer means an EMPTY vault: a fresh
+ * profile (five commons) gets a real three-common choice, and a 7-win pool (two rares
+ * left) offers two rares and one uncommon. A pool that exhausts EVERY tier (every pool
+ * relic already held — reachable through play on a fresh elite-heavy climb) offers
+ * nothing, and that zero is
+ * still true. The full table (five rares) draws exactly as before: the rare tier alone
+ * covers the offer, so no later tier is touched and the stream is byte-identical.
  * @param {any} state the boss-victory state
  * @returns {{offers: string[], draws: number}}
  */
 export function rollBossRelicOffers(state) {
-  const picked = pickAt(state.seed, state.rngDraws, dropPool(state, 'rare'), 3);
-  return { offers: picked.picked, draws: picked.draws };
+  const offers = [];
+  let draws = 0;
+  for (const tier of [...RELIC_TIERS].reverse()) {
+    if (offers.length >= 3) break;
+    const pool = dropPool(state, tier);
+    if (pool.length === 0) continue; // an exhausted tier costs nothing (the potions ruling)
+    const picked = pickAt(state.seed, state.rngDraws + draws, pool, 3 - offers.length);
+    offers.push(...picked.picked);
+    draws += picked.draws;
+  }
+  return { offers, draws };
 }
 
 /**

@@ -68,6 +68,51 @@ export function bumpAnimGen() { animGen += 1; return animGen; }
  */
 export let heroMoveHold = null; // { pose, start, dur } — the pose to keep painting, and its window
 export function setHeroMoveHold(hold) { heroMoveHold = hold; }
+
+/* ------------------------------------------------------- UX-2: the strike sequence ---
+ * The enemy turn, SEQUENCED: one attacker at a time, each with its own windup-to-slam
+ * beat, its own named damage float on the hero, and its own intent-badge highlight.
+ * The plan is armed by `act()` (BEFORE the paint, so the poses it schedules are painted
+ * with their delays from the first frame) from the kernel's own per-attacker events, and
+ * it is pure presentation: it decides when a pose plays, never what a rule does. Like
+ * `heroMoveHold` it is read per paint and survives incidental repaints (a hover recomputes
+ * the same clock), and it is cleared when the sequence ends (act() schedules the
+ * retirement timer beside the arming), when the player hits » (`skipAnim`), or when the
+ * run restarts (`newGame`).
+ *
+ * `beatMs` is the gap between two attackers' slams, `slamMs` the CSS slam length, and
+ * `impactMs` the moment inside a slam where the dash ARRIVES (the keyframe's impact beat)
+ * — that is when the attacker's named float lands and the vignette pulse reads. All three
+ * arrive already divided by the speed dock (`animMs`), so 2× halves every beat and » never
+ * arms a plan at all. Reduced motion arms nothing: the turn collapses to the fast form.
+ */
+export let strikeSeq = null; // { attacks, beatMs, slamMs, impactMs, start, totalMs }
+export function setStrikeSeq(seq) { strikeSeq = seq; }
+/**
+ * The sequence's base timing, at 1x, in milliseconds — the numbers the audit targets:
+ * a beat (windup-to-slam gap between two attackers) of 500ms and a slam of 640ms whose
+ * dash arrives at 46% of its run, so a 3-attacker turn's INFORMATION (every named float
+ * and the closing vignette) completes in about 1.6s. `animMs` divides all of it: 2×
+ * halves every beat, » never arms a plan at all.
+ */
+export const STRIKE_SEQ = { beat: 500, slam: 640, impactAt: 0.46, floatMs: 950 };
+/**
+ * Where THIS enemy sits in the playing sequence, or null. `delay` is what its .fig's
+ * animation-delay should be RIGHT NOW: positive (waiting for its turn — `fill: both`
+ * holds the 0% frame) or negative (resuming mid-flight after an incidental repaint),
+ * exactly the resume mechanism the hero's pose uses.
+ */
+export function strikeSlot(index) {
+  if (!strikeSeq) return null;
+  const i = strikeSeq.attacks.findIndex((a) => a.enemy === index);
+  if (i === -1) return null;
+  const elapsed = Date.now() - strikeSeq.start;
+  return {
+    i,
+    delay: Math.round(strikeSeq.beatMs * i - elapsed),
+    dur: strikeSeq.slamMs,
+  };
+}
 export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800, uppercut: 700, hammerfall: 560, quench: 620, bellowspush: 640, snapcast: 480, fanflames: 700, arccut: 620, collarline: 680, headbutt: 600, surge: 760, haftjab: 520, forgeclap: 780, wildflail: 740, bellowsflex: 560, dropkick: 820, bloodhammer: 900, castaside: 640, truetemper: 700, fitplate: 660, kilncry: 620, vent: 600, heattrance: 760, hailblows: 880, climbcut: 720, veintap: 560, reapsweep: 1000, heatwash: 900, bracelock: 800, flameward: 760, cindershroud: 720, stoke: 640, scaleup: 700, bankcoal: 680, ashembrace: 720, cinderskin: 660, lockdown: 900, overtemper: 820, tithe: 780, splitseam: 700 };
 export let pileOpen = null;
 export function setPileOpen(v) { pileOpen = v; }
@@ -88,6 +133,9 @@ export function revealFloats() {
 export function skipAnim() {
   animGen += 1;
   clearHitstop();
+  // » also retires a playing strike sequence: the remaining beats never fire, and the
+  // next paint drops the slam poses (the past floats stay until their own removal timers).
+  setStrikeSeq(null);
   revealFloats();
 }
 

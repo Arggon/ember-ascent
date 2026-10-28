@@ -51,15 +51,32 @@ export function rewardView() {
   wrap.append(head);
 
   if (isBoss) {
-    // S10: the warden's vault is empty — no rare relic is unlocked for this profile yet.
-    // The count is TRUE (the unlock table decides when it fills) and the screen says so
-    // plainly instead of padding the offer or pretending this is a card reward. The one
-    // way out is the walk-away the kernel itself offers (it climbs on — the relic vault
-    // is the meta's reason to come back and win again).
+    // S10/UX-1: the warden's vault is EXHAUSTED — the run holds every relic its pool
+    // can give (through play this is reachable on a fresh profile: the elite-heavy
+    // climb can hold all five commons by the act-2 warden; a gated pool otherwise
+    // offers down-tier commons first). The count is TRUE and the screen says so
+    // plainly instead of padding the offer or pretending this is a card reward. The
+    // one way out is the walk-away the kernel itself offers (it climbs on — winning
+    // is what widens the vault for the NEXT run).
+    //
+    // UX-2: one shape where "you hold everything" would LIE — a torn save whose
+    // relicPool is a valid array of ids the table does not know (or is empty). The
+    // kernel rolls such a pool honestly to zero offers, but the run does NOT hold a
+    // complete collection, so the head line gets a neutral fallback there. The read
+    // is surface-side and total: the pool ids this run can ever be offered that the
+    // snapshot itself certifies known are exactly the pool ids matching a known held
+    // row (an empty offer row with a known, unheld pool id is impossible — the roll
+    // would have offered it), so zero such matches means the vault is sealed, not
+    // collected. A pool the snapshot does not publish (null: a legacy run over the
+    // full table) keeps the exhausted wording — that shape is the genuine exhaustion.
+    const knownHeld = new Set((snap.relics ?? []).filter((r) => r.known).map((r) => r.relicId));
+    const vaultSealed = Array.isArray(snap.relicPool) && !snap.relicPool.some((id) => knownHeld.has(id));
     if (!boss) {
       wrap.append(el('div', { cls: 'boon-list' + (arriving.reward ? ' reveal' : '') },
-        el('p', { cls: 'boon-name', text: 'The warden\u2019s vault holds nothing for you yet.' }),
-        keywordText(el('p', { cls: 'boon-text' }), 'Rare relics enter the vault as your lifetime climbs win.'),
+        el('p', { cls: 'boon-name', text: vaultSealed
+          ? 'The warden\u2019s vault is sealed to you this climb.'
+          : 'You hold everything the warden\u2019s vault can give.' }),
+        keywordText(el('p', { cls: 'boon-text' }), 'New relics enter the vault as your lifetime climbs win.'),
       ));
       const controls = el('div', { cls: 'controls' });
       if (snap.reward.canSkip) {

@@ -26,6 +26,7 @@ import {
   setHeroMoveHold,
   skipAnim,
   snap,
+  strikeSlot,
 } from './runtime.js';
 import { el, keywordText } from './dom.js';
 import { TEMPER_GLYPH, TYPE_GLYPH, enemyLook, glyphBox } from './glyphs.js';
@@ -133,10 +134,15 @@ export function heroFigure() {
 }
 
 function enemyPose(e) {
-  // The attack RUN: an enemy whose turn it was just acted — dash across and slam. The
-  // burst fires exactly once (when the turn flipped), like the old strike, but the pose
+  // UX-2, the SEQUENCED attack run: while a strike sequence is playing, its attackers
+  // slam one at a time — the plan (runtime.strikeSeq) carries each attacker's beat, and
+  // enemyCard applies the per-attacker animation delay from the same clock. The pose
   // reads as travel: anticipation, long dash, impact beat, return.
-  if (bursts.some((b) => b.kind === 'enemy-strike' && b.enemy === e.index)) return 'slam';
+  if (strikeSlot(e.index)) return 'slam';
+  // The simultaneous form (kept for »/reduced motion, where no plan is armed): the
+  // action's own burst names this turn's attackers and they strike together, as before.
+  const turn = bursts.find((b) => b.kind === 'enemy-turn');
+  if (turn && turn.attacks.some((a) => a.enemy === e.index)) return 'slam';
   if (flash.hits.includes(e.index)) return 'hurt';
   if (e.hp / Math.max(1, e.maxHp) <= 0.35) return 'low';
   if (e.intent && e.intent.kind === 'attack') return 'windup';
@@ -373,8 +379,33 @@ function enemyCard(e, position) {
   });
 
   const pose = enemyPose(e);
+  // UX-2: the sequenced attacker. The plan clock gives this enemy its own beat: the
+  // intent badge lights up exactly while ITS slam plays (a CSS animation whose delay is
+  // the same clock, so a repaint re-derives it without restarting the timeline), and the
+  // .fig's slam waits for (or resumes at) its slot. Reduced motion and » never arm a
+  // plan, so both fall through to the static forms.
+  const seq = strikeSlot(e.index);
+  if (seq) {
+    // The badge highlight rides a CSS variable pair so the stylesheet owns the look and
+    // the plan only owns the clock. setProperty is guarded: the fake-DOM test hosts carry
+    // a plain style object, and only a real CSSOM can hold custom properties anyway.
+    if (card.style && card.style.setProperty) {
+      card.style.setProperty('--seq-delay', `${seq.delay}ms`);
+      card.style.setProperty('--seq-dur', `${seq.dur}ms`);
+    }
+    card.classList.add('is-striking');
+  }
   card.append(intentBadge(e));
   const fig = el('div', { cls: `fig pose-${pose}${enemyVariant(e.id)}`, attrs: { 'aria-hidden': 'true' } });
+  if (seq && pose === 'slam') {
+    // Same resume mechanism as the hero's pose: a positive delay waits for the
+    // attacker's turn (`fill: both` holds the 0% frame), a negative one resumes
+    // mid-flight after an incidental repaint instead of restarting it.
+    if (fig.style && fig.style.setProperty) {
+      fig.style.animationDuration = `${seq.dur}ms`;
+      fig.style.animationDelay = `${seq.delay}ms`;
+    }
+  }
   fig.innerHTML = enemyMarkup(e.id);
   card.append(fig);
   // The target mark is a SHAPE, not a colour: a slot number, plus a crosshair on the
@@ -450,6 +481,11 @@ export function cardTile(card, opts = {}) {
       // shop shelf (S4) lacks gold. `disabledNote` lets a caller state the real reason
       // instead of the Energy default.
       'aria-label': `${card.name}. Costs ${card.cost} Energy. ${desc}${disabled ? ` ${card.disabledNote ?? 'Not playable: not enough Energy.'}` : ''}${awaiting}`,
+      // UX-2 (review P3): the rules row is line-clamped at several tiers, and the
+      // clamped tail was reachable only through the aria-label — invisible to a
+      // sighted hover. The native title carries the FULL sentence, which makes the
+      // "full sentence stays in the card's aria-label/tooltip" claims literal.
+      title: desc,
       ...(isPending ? { 'aria-pressed': 'true' } : {}),
     },
     on: disabled && !opts.onClick ? {} : { click: onClick },

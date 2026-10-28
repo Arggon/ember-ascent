@@ -17,10 +17,12 @@ import {
 } from './src/kernel/index.js';
 import { createController } from './src/surface/gui/controller.js';
 import {
+  STRIKE_SEQ,
   clearFxTimers,
   clearHitstop,
   flash,
   fxEl,
+  later,
   noArrival,
   notifyEndTargeting,
   repaint,
@@ -45,7 +47,12 @@ import {
   setQuietIntro,
   setRunEvents,
   setSnap,
+  setStrikeSeq,
   snap,
+  animSpeed,
+  animMs,
+  reducedMotion,
+  strikeSeq,
   bumpAnimGen,
   ctl,
   setCtl,
@@ -110,20 +117,43 @@ export function act(actionId, targetK = null) {
      * No extra rules: a floater exists exactly where damage was dealt.
      */
 
-    // Player hurt -> a screen pulse. It lives in the layer `render()` cannot clear, so
-    // it does not depend on the enemy's HTML surviving the repaint.
-    if (playerLost > 0) fx.push({ kind: 'vignette' });
-    // The number is the HP delta between the two kernel snapshots, so it is the damage
-    // that actually landed. Block gained is the same kind of delta.
+    // UX-2: the enemy turn, SEQUENCED AND NAMED. The turn flip is the one moment the
+    // kernel resolves several attacks in one step, so the snapshot diff can only say
+    // "the hero lost N in total" — the per-attacker facts live in the kernel's OWN
+    // event stream for this step (`enemy_attack` carries the attacker's index, what it
+    // dealt and what the hero's block ate, per hit, in resolution order). They are read
+    // here the same way the run record reads them: kernel words about what happened,
+    // regrouped for presentation, never re-derived. The result is ONE burst the
+    // dispatcher plays as a sequence — enemy 1 winds up and strikes (its named float
+    // lands on the hero), THEN enemy 2 — instead of every foe slamming at once.
+    let turnStrikes = null;
+    if (before.phase === 'combat' && after.turn !== before.turn) {
+      const attacks = [];
+      for (const ev of (Array.isArray(res.events) ? res.events : [])) {
+        if (!ev || ev.t !== 'enemy_attack') continue;
+        let a = attacks.find((x) => x.enemy === ev.enemy);
+        if (!a) {
+          const foe = before.enemies.find((e) => e.index === ev.enemy);
+          a = { enemy: ev.enemy, name: foe ? foe.name : 'The enemy', dealt: 0, blocked: 0, hits: 0 };
+          attacks.push(a);
+        }
+        a.dealt += ev.dealt ?? 0;
+        a.blocked += ev.blocked ?? 0;
+        a.hits += 1;
+      }
+      if (attacks.length > 0) turnStrikes = attacks;
+    }
+    if (turnStrikes) fx.push({ kind: 'enemy-turn', attacks: turnStrikes, playerLost });
+    // The player hurt flinch: the HP delta drives the pose (and the HP-bar flash). The
+    // NUMBER is carried per attacker by the sequenced floats instead — on a sequenced
+    // turn the aggregate floater is marked silent so the hero flinches once without
+    // printing a second, unnamed total over the named ones. A non-sequenced loss (an
+    // HP-cost card) keeps its own float, as before.
     if (playerLost > 0) {
-      fx.push({ kind: 'hero-float', amount: playerLost, tone: 'dmg', tier: playerLost >= 16 ? 3 : playerLost >= 8 ? 2 : 1 });
+      fx.push({ kind: 'hero-float', amount: playerLost, tone: 'dmg', tier: playerLost >= 16 ? 3 : playerLost >= 8 ? 2 : 1, silent: turnStrikes !== null });
+      if (!turnStrikes) fx.push({ kind: 'vignette' });
     }
     if (gainedBlock > 0) fx.push({ kind: 'hero-float', amount: gainedBlock, tone: 'block', tier: 1 });
-    if (playerLost > 0 && after.turn !== before.turn) {
-      for (const e of before.enemies) {
-        if (e.intent && e.intent.kind === 'attack') fx.push({ kind: 'enemy-strike', enemy: e.index });
-      }
-    }
 
     // Per-enemy: the damage that landed (HP delta), the glyph tier for that amount, and
     // whether block ate all of it. The bar still shows the remaining total.
@@ -290,6 +320,39 @@ export function act(actionId, targetK = null) {
       setPhaseArriving('rest');
     }
   }
+  // UX-2: arm the strike sequence BEFORE the paint, so the slam poses it schedules are
+  // painted with their per-attacker delays from the first frame. The plan carries the
+  // ALREADY-DIVIDED durations (animMs applies the speed dock once, here), so 2× halves
+  // every beat and reduced motion / » never arm one at all — those shapes collapse to the
+  // simultaneous fast form the turn had before this slice. A flip that ENDS the run (the
+  // hero died on the enemy turn) arms nothing: the defeat panel is the moment, and
+  // unplaced floats would land unpositioned over it (UX-2 review P3).
+  const seqBurst = after.phase === 'ended' ? null : fx.find((b) => b.kind === 'enemy-turn');
+  if (seqBurst && !reducedMotion && animSpeed !== 0) {
+    const beatMs = animMs(STRIKE_SEQ.beat);
+    const slamMs = animMs(STRIKE_SEQ.slam);
+    const plan = {
+      attacks: seqBurst.attacks,
+      beatMs,
+      slamMs,
+      impactMs: Math.round(slamMs * STRIKE_SEQ.impactAt),
+      start: Date.now(),
+      totalMs: beatMs * (seqBurst.attacks.length - 1) + slamMs,
+    };
+    setStrikeSeq(plan);
+    // The plan's retirement is deliberately NOT generation-guarded: a newer action
+    // retires the pending float/vignette timers (its own dispatchFx bumps the
+    // generation), but it must not leave the plan armed — a leaked plan would re-slam
+    // its attackers on every hover repaint forever. The identity check keeps a stale
+    // cleanup from clearing a NEWER sequence armed by an action in between.
+    later(() => { if (strikeSeq === plan) setStrikeSeq(null); }, plan.totalMs + 400);
+  } else if (!seqBurst) {
+    // UX-2 review P2: the turn-flip that is NOT an enemy attack (the player's own
+    // actions, the reward/rest flips) must retire any plan still armed — the
+    // End-Turn timer above only covers the sequence's own lifetime, and an unguarded
+    // plan re-slams stale attackers over the player's next action for ~1.5s.
+    setStrikeSeq(null);
+  }
   repaint();
   dispatchFx();
 }
@@ -357,6 +420,7 @@ export function newGame(seed = null, opts = {}) {
   setPrevEnemies([]);
   setEnteredIds(new Set());
   setHeroMoveHold(null);
+  setStrikeSeq(null);
   setPhaseArriving(null);
   setArriving(noArrival());
   setEndFocusPending(false);

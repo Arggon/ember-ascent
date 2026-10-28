@@ -302,9 +302,10 @@ function rewardBody(state) {
   // (defOrNull's policy): an id the relic table no longer knows renders as its raw id
   // with no text, and offers no r-id will ever enumerate (the R6 mirror).
   const offers = Array.isArray(state.reward.relicOffers) ? state.reward.relicOffers : [];
-  // S10: an EMPTY boss offer is a real state now — the profile has not unlocked the
-  // rare tier yet — and "pick one" over nothing would be a lie. The header says what
-  // is true: the warden has nothing to give this climb.
+  // S10: an EMPTY boss offer is a real state — UX-1 down-tiered the vault (rules/
+  // relics.js), so empty no longer means "the rare tier is locked" (a gated pool now
+  // offers down-tier commons); it means EVERY pool relic is held — the exhausted
+  // vault. "Pick one" over nothing would be a lie, so the header says what is true.
   const boss = Boolean(state.reward.boss);
   const lines = [offers.length > 0
     ? 'REWARD — claim the warden\u2019s relic'

@@ -464,8 +464,11 @@ html, body {
 .card-wrap:focus-within:not(.is-disabled) { z-index: 3; }
 .hand-index {
   position: absolute;
-  top: -9px;
-  right: -9px;
+  /* UX-1: -9px put the digit's far edge 9px past the card, 1px past the hand row's 8px
+     side padding — the last card's badge shaved by the row's own clip. -6px keeps the
+     badge fully inside the padding at every hand size. */
+  top: -6px;
+  right: -6px;
   width: 21px;
   height: 21px;
   border-radius: 50%;
@@ -1400,7 +1403,10 @@ html, body {
   .card::after { display: none; }
   .card .c-art { display: none; }
   .card .c-type-mark { width: 12px; height: 12px; opacity: 0.8; }
-  .cost-gem { top: -5px; left: 0; width: 21px; height: 21px; }
+  /* UX-1: left 6px, not 0 — the combat fan's 1.5deg swing carried even this fully
+     inset gem ~5px past the hand row's clip box on the end cards (measured at 390x844
+     and 360x640); 6px of inset keeps it inside through the swing. */
+  .cost-gem { top: -5px; left: 6px; width: 21px; height: 21px; }
 
   .card { width: 100%; max-width: 280px; }
   .hand { gap: var(--sp-2); }
@@ -1627,6 +1633,24 @@ html, body {
 /* A hit fully absorbed by block says so in words. It never prints a 0, which would
    contradict a bar that did not move. */
 .efloat-absorbed { font-size: var(--fs-2); letter-spacing: 0.06em; text-transform: uppercase; color: var(--block); }
+
+/* ---------- UX-2: the sequenced enemy turn's NAMED floats ----------
+   One float per attacker, over the hero, in attack order: WHO hit, and for what. The
+   node reuses the .efloat visual language (same glyph ladder, same rise) but sits on the
+   persistent fx layer above the hero, so it survives the paint that ends the enemy turn
+   and lands exactly when its attacker's dash arrives. */
+.fx-strike-float { position: absolute; z-index: 30; pointer-events: none; }
+.efloat-named { gap: 7px; }
+.efloat-named .efloat-who {
+  font-family: var(--text, var(--mono));
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #ffcf9e;
+  padding-right: 2px;
+}
+.efloat-named .efloat-hits { font-size: 0.72em; opacity: 0.85; }
 
 /* ---------- Block absorbing: the shield flares and is visibly consumed ---------- */
 
@@ -2262,7 +2286,11 @@ html, body {
   /* The plain-English effect text is the whole reason a new player can play: it stays.
      At 0.66rem it is under a comfortable phone size, so it is set at the next step up. */
   .card .cdesc { font-size: var(--fs-2); line-height: 1.2; }
-  .cost-gem { width: 21px; height: 21px; top: -8px; left: -5px; border-width: 1px; }
+  /* UX-1: left 6px, not -5px — the later-of-us combat fan swing (1.5deg a step) carried
+     even a fully inset gem ~5px past the hand row's clip box on the end cards (measured
+     at 390x844); 6px of inset keeps it inside through the swing. (The <=620 rule near
+     the top of the file carries the same inset for the same reason.) */
+  .cost-gem { width: 21px; height: 21px; top: -8px; left: 6px; border-width: 1px; }
   .cost-gem .gem-core { font-size: var(--fs-2); }
   /* The compact CLI code and the "needs more Energy" caption are the only card chrome with
      no gameplay value on screen — the disabled CARD already shows it is disabled, and the
@@ -3303,6 +3331,23 @@ html, body {
   color: #ffe6c8;
   text-shadow: 0 1px 0 #000, 0 0 6px rgba(255, 120, 40, 0.6);
 }
+/* UX-2: the CURRENT attacker's intent badge lights while its own slam plays. The class
+   is painted on every attacker of the playing sequence; the CSS variable pair written by
+   enemyCard (--seq-delay / --seq-dur, from the same clock as the slam delays) spaces the
+   highlights one attacker apart, so "who is striking" reads without measuring anything.
+   `both` holds the unlit 0% frame while an attacker waits for its beat and returns to it
+   after, so the badge is lit exactly for its own attack. */
+@keyframes intent-strike {
+  0%, 100% { border-color: #5a3420; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7)); }
+  30%, 70% {
+    border-color: #ffb45e;
+    filter: drop-shadow(0 0 10px rgba(255, 150, 50, 0.95)) brightness(1.45);
+  }
+}
+.stage-combat .enemy.is-striking .intent-badge {
+  animation: intent-strike var(--seq-dur, 640ms) ease-in-out both;
+  animation-delay: var(--seq-delay, 0ms);
+}
 
 .stage-combat .fig { position: relative; width: min(150px, 100%); height: min(200px, 34vh); color: #f0d2b4; filter: none; }
 .stage-combat .hero .fig { width: min(180px, 100%); height: min(250px, 42vh); }
@@ -3364,7 +3409,15 @@ html, body {
   align-items: flex-start;
   justify-content: center;
   gap: 0;
-  padding: 16px 8px 12px;
+  /* UX-1 gem headroom: the row's overflow:hidden is the fan's clip box, and the cards'
+     swung top corners (5deg fan, translateY lift) plus the cost gem's -6px overhang
+     poked past the old 16px top padding — 3 of 5 gems measurably shaved at 1280x800,
+     5 of 5 at 915x412 and 390x844. The padding gives the swing room; the matching
+     NEGATIVE margin keeps the dock's height budget identical (align-items:end rows
+     size by margin boxes), so End Turn's clearance cannot move. Tier blocks below
+     repeat the pair at their own scale. */
+  padding: 30px 8px 12px;
+  margin-top: -14px;
   min-width: 0;
   overflow: hidden;
 }
@@ -3376,13 +3429,29 @@ html, body {
   transform: none;
   z-index: calc(var(--i) + 1);
 }
+/* UX-1: the END wraps keep no negative margin — the last card's keyboard-digit badge
+   (-6px overhang) rode that -6px margin 4px past the hand's clip box (measured at a
+   7-card desktop hand), and the first card's gem did the same on the phone scrollers.
+   The <=1000px tier already zeroed these; this promotes it to every width. */
+.stage-combat .card-wrap:first-child { margin-left: 0; }
+.stage-combat .card-wrap:last-child { margin-right: 0; }
 .stage-combat .card-wrap:hover:not(.is-disabled),
 .stage-combat .card-wrap:focus-within:not(.is-disabled),
 .stage-combat .card-wrap.is-pending { transform: none; z-index: 8; }
 .stage-combat .card {
   width: 100%;
+  /* UX-1 UNIFORM FACES: one height per tier for every card in the hand — the tallest
+     card's content (measured: 186px of needed height at the 168px desktop card width,
+     4-line effect row at the old type) is the target, so short cards grow instead of
+     shrinking the row's rhythm. The old `min-height: 0 + max-height` pair made height
+     CONTENT-DRIVEN (a 1-line Quench sat visibly shorter than a wordy Forgeclap — the
+     owner's screenshots); `overflow: hidden` stays as the mechanical guard for a text
+     overrun, and the effect row is sized so the longest shipped text fits without it
+     at the desktop tiers (see the cdesc note below). */
+  height: min(228px, 34vh);
+  /* The phone tiers' REWARD min-heights (120/140px at <=620px) must not leak into the
+     combat face: the combat height is owned by the tiers below, nowhere else. */
   min-height: 0;
-  max-height: min(228px, 34vh);
   overflow: hidden;
   transform: translateY(-8px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 3deg));
   transform-origin: 50% 100%;
@@ -3394,6 +3463,10 @@ html, body {
 .stage-combat .card-wrap.is-pending .card {
   transform: translateY(-18px) rotate(0deg);
 }
+/* Flavor is reward-screen chrome: the combat hand is a fixed-height uniform face now
+   (UX-1), and a flavor line would either grow it or clip mid-sentence. (Was only hidden
+   on the <=480px tier; tall desktops showed it and re-introduced uneven faces.) */
+.stage-combat .card .cflavor { display: none; }
 
 .page-combat .pile-back {
   position: fixed;
@@ -3574,8 +3647,11 @@ html, body {
   .page-combat .orb-num { font-size: 1.2rem; }
   .page-combat .pile { width: 46px; min-height: 48px; box-shadow: 3px 3px 0 #0c0806; }
   .stage-combat .card {
-    min-height: 0 !important;
-    max-height: 104px;
+    /* UX-1 uniform face. 76px = the tallest card this tier REALIZED before (70-75px of
+       content-driven height at the 122px card width, measured) plus headroom — the old
+       104px max-height was a ceiling no card reached, and fixing the face AT it grew the
+       dock 27px and scrolled the page (the frozen 915x412 row caught it). */
+    height: 76px !important;
     padding: 6px 4px 3px;
     gap: 1px;
   }
@@ -3583,9 +3659,28 @@ html, body {
   .stage-combat .cflavor { display: none; }
   .stage-combat .card .cname { font-size: 0.72rem; }
   .stage-combat .card .cdesc { font-size: 0.66rem; line-height: 1.1; }
-  .stage-combat .hand { padding: 10px 4px 8px; }
+  /* Gem headroom pair (see .stage-combat .hand): net top padding unchanged (10px). */
+  .stage-combat .hand { padding: 24px 4px 8px; margin-top: -14px; }
   .page-combat .dock { margin-bottom: 4px; }
   .page-combat .speed-btn { min-height: 22px; padding: 0 6px; }
+}
+@media (min-height: 700px) and (min-width: 621px) {
+  .stage-combat .card {
+    /* UX-1 uniform faces: 196px is the TALLEST needed content (186px of a 4-line card
+       at the 168px desktop card width, measured across all 65 pool cards) plus headroom
+       for the 5-line effect row the smaller cdesc now buys — and it is the same number
+       the 768px laptop tier was already pinned to, so the End Turn budget does not
+       move. (The portrait blocks BELOW override it at <=700px widths — a 196px card
+       would push End Turn off a phone.) */
+    height: min(196px, 36vh);
+    transform: translateY(-12px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 5deg));
+  }
+  /* Gem headroom pair (see .stage-combat .hand): the 5deg fan's swung top corner plus
+     the riding gem reach ~32px above the content top (measured), so 36px of clip
+     headroom; the negative margin keeps this tier's net top padding at 16px. */
+  .stage-combat .hand { padding: 36px 8px 8px; margin-top: -20px; }
+  .stage-combat .hero .fig { height: min(260px, 42vh); }
+  .stage-combat .fig { height: min(210px, 36vh); }
 }
 /* Portrait phones (360x640): the stacked dock plus a full figure must still clear End Turn. */
 @media (max-width: 700px) and (max-height: 760px) {
@@ -3594,26 +3689,18 @@ html, body {
   .stage-combat .intent-badge { width: 26px; height: 28px; }
   .stage-combat .enemy .ename,
   .stage-combat .enemy .ehp { font-size: 0.68rem; line-height: 1.05; }
-  .stage-combat .card { max-height: 100px; }
-  .stage-combat .hand { padding: 8px 2px 4px; }
+  .stage-combat .card { height: 100px; }
+  .stage-combat .hand { padding: 24px 2px 4px; margin-top: -16px; }
   .page-combat .energy-orb { width: 44px; height: 44px; }
   .page-combat .pile { width: 44px; min-height: 44px; }
   .page-combat .orb-num { font-size: 1.15rem; }
 }
-@media (min-height: 700px) {
-  .stage-combat .card {
-    max-height: min(250px, 36vh);
-    transform: translateY(-12px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 5deg));
-  }
-  .stage-combat .hero .fig { height: min(260px, 42vh); }
-  .stage-combat .fig { height: min(210px, 36vh); }
-}
 /* A tall foundry plus a wordy hand is what scrolls a 768px laptop. The fight keeps
-   the backdrop, and it stops above the hand so End Turn and the hint stay inside. */
+   the backdrop, and it stops above the hand so End Turn and the hint stay inside.
+   (The card height and the hand's gem headroom are fixed at the min-height:700 rule
+   above — 196px there too — so this block only caps the fight.) */
 @media (min-height: 700px) and (max-height: 780px) {
   .page-combat .fight { max-height: 348px; }
-  .stage-combat .card { max-height: 196px; }
-  .stage-combat .hand { padding: 12px 8px 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .stage-combat .fig,
@@ -6799,7 +6886,10 @@ html, body {
 
 /* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
    than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at
-   768x1024. Cap combat-hand rules at 4 lines; the full sentence stays in the card's
+   768x1024. UX-1: the hand card is a FIXED-height uniform face now, so the row cannot
+   grow to fit — the effect type drops a step (0.9rem/1.4 -> 0.84rem/1.3) and the clamp
+   rides the fixed height instead of a line count: five lines fit the 196px desktop card
+   (measured), four the 100-120px phone ones. The full sentence stays in the card's
    aria-label/tooltip and the keyword glossary. */
 .stage-combat .card .cdesc {
   display: -webkit-box;
@@ -6807,6 +6897,14 @@ html, body {
   -webkit-line-clamp: 4;
   overflow: hidden;
   min-width: 0;
+}
+/* The desktop/tablet fixed face (196px) provably holds FIVE lines of the smaller type
+   (5 x 12.6px x 1.3 = 82px inside the ~86px effect row), so the clamp rides up with it.
+   Measured: the longest shipped effect (Rising Blow) wraps to 6 lines at the 168px card
+   width even at 0.84rem — its sixth line still clamps, sentence intact in the
+   aria-label/tooltip and the glossary. Phones keep their own type and clamp depths. */
+@media (min-height: 700px) and (min-width: 621px) {
+  .stage-combat .card .cdesc { font-size: 0.84rem; line-height: 1.3; -webkit-line-clamp: 5; }
 }
 @media (max-height: 480px) {
   .stage-combat .card .cdesc { -webkit-line-clamp: 3; line-height: 1; }
@@ -6869,6 +6967,11 @@ html, body {
 @media (max-width: 620px) {
   .stage-combat .hand { padding-left: 10px; padding-right: 10px; }
   .stage-combat .card-wrap { margin: 0 -2px; }
+  /* UX-1: the END wraps stay flush (the base first/last-child zeroing above is
+     overridden by this later -2px rule otherwise) — the first card's cost gem rode
+     the -2px margin ~3px past the row's clip box. */
+  .stage-combat .card-wrap:first-child { margin-left: 0; }
+  .stage-combat .card-wrap:last-child { margin-right: 0; }
   .stage-combat .card .cname { font-size: max(9px, min(0.82rem, 14cqi)); }
 }
 /* - 360px phones: 5 cards leave ~60px of text width, under the 62px a ten-letter name needs
@@ -6887,6 +6990,16 @@ html, body {
      first card, the next card peeks in at the right edge as the cue to swipe, and the fan
      flattens because rotated tiles in a scroller would clip at its edges. Tap targets and
      keyboard digits are unchanged. */
+/* - UX-1: a 6+ hand flattens the fan at EVERY width (was <=620px only). At 3deg a step a
+     7-card desktop fan swings its end cards +-9deg, which carries the end cards' cost
+     gems ~49px sideways out of the row's clip box — measured, gems cut in half. The
+     <=620 scroller below already flattened for exactly this reason ("rotated tiles in a
+     scroller would clip at its edges"); the same arithmetic holds on desktop. Five-card
+     hands keep the full fan. This must stay AFTER the <=1000px fan rules above (source
+     order is what retires them for 6+). */
+.stage-combat .hand:has(> .card-wrap:nth-child(6)) .card {
+  transform: translateY(-12px);
+}
 @media (max-width: 620px) {
   .stage-combat .hand:has(> .card-wrap:nth-child(6)) {
     justify-content: flex-start;
@@ -6912,6 +7025,40 @@ html, body {
      card's aria-label/tooltip and the glossary, as with the 4-line cap. */
 @media (max-width: 700px) and (max-height: 760px) {
   .stage-combat .card .cdesc { -webkit-line-clamp: 3; }
+}
+/* - UX-1: TALL portrait phones (390x844 and friends) get the fixed face too. Their cards
+     used to be content-driven up to the min(250px,36vh) ceiling while measuring ~70-118px
+     of real content — visibly uneven. 146px holds the 4-line rules row at BOTH text
+     scales the release bar tests (100% and the 130% large-font rows: 4 x 18.25px of
+     effect line + 35px type head + 13px name + paddings, measured) — 120px cut the
+     fourth line in half at 130%. 30vh degrades gracefully on the shortest tall phones.
+     This must stay BELOW the min-height:700 desktop rule in source order or the phone
+     would inherit the 196px face. */
+@media (max-width: 620px) and (min-height: 761px) {
+  .stage-combat .card { height: min(146px, 30vh); }
+  .stage-combat .hand { padding: 26px 10px 8px; margin-top: -10px; }
+}
+/* - UX-2: the tall tier's `padding: 26px 10px 8px` (all four sides, later in source order)
+     overrode the <=380 tier's engineered 6px side padding on tall-narrow phones (360x780 and
+     friends at 130% text), and a name lost the 4px of text width it needed — a 1.3px clip
+     measured by the viewport harness ("clipped" fail-kind). Restore the two sides only; the
+     tall tier keeps its 26px/8px top-bottom and its 10px sides for every >=381px phone. The
+     end wraps go flush again too: the <=380 `margin: 0 -1.5px` above comes later in source
+     order than the <=620 first/last zeroing, and with only 6px of hand padding the swung
+     end corners need that 1.5px back or the harness re-fails "cards outside the hand box".
+   - And the fan itself flattens in the TALL <=380 band: the tier's 146px face swung about
+     its bottom pivot (transform-origin: 50% 100%, 3deg a step) carries an end card
+     7.7px sideways out of its wrap — measured — and 6px of padding cannot absorb it (the
+     <=380 tier was engineered against the 100px face of the short tier, which swings only
+     5.1px). The 6+ hands already flatten for the same clip-arithmetic reason; a 5-card
+     hand on a tall narrow phone joins them and keeps the lift. */
+@media (max-width: 380px) {
+  .stage-combat .hand { padding-left: 6px; padding-right: 6px; }
+  .stage-combat .card-wrap:first-child { margin-left: 0; }
+  .stage-combat .card-wrap:last-child { margin-right: 0; }
+}
+@media (max-width: 380px) and (min-height: 761px) {
+  .stage-combat .card { transform: translateY(-12px); }
 }
 /* - Tall-narrow phones at large text (#28: 360x780 with 130% text). Between 700 and 780px
      tall the fight is capped at 348px and the figures are 36-42vh (210-260px), so the hero
