@@ -3752,22 +3752,30 @@ html, body {
 @media (min-height: 700px) and (max-height: 780px) {
   .page-combat .fight { max-height: 348px; }
 }
-/* - UX-3.1: the landscape-short desktop band (481-699px tall, >= 621px wide — the 800x600
-     class, the user's "side cards cropped at some resolutions"). Measured at 800x600 with
-     a 5-card hand, the page was 827px tall in a 600px window and End Turn's bottom sat at
-     760px = 168px below the fold: no height compression applied here at all (the <=480px
-     tier ends at 480, the min-height:700 desktop tier begins at 700), so the base 42vh
-     250px hero figure, 34vh 200px enemy figure and 34vh 204px card face spent the whole
-     window. The compression, measured at 800x600: hero figure 250 -> 140, enemy 200 ->
-     140, the intent line clamped to one row, card face 204 -> 148 with the footer chip
-     hidden and the rules row at 3 lines (the <=480px tier's exact moves), the hand's gem
-     headroom pair shrunk to this band's 1.5deg swing (the gem is socketed INSIDE the card
-     since UX-3; the pair keeps the net-top budget form: 30-14 -> 18-8), the instructional
-     hint (restates Help verbatim) and the chapter page-num dropped, and the app/stage
-     frames tightened. The 44px touch floor is untouched. No frozen row is in this band
-     (915x412 / 844x390 / 1200x450 are <= 480 tall; 768x1024 / 1280x800 / 1366x768 are
-     >= 700) and no phone row matches (min-width 621). */
-@media (min-width: 621px) and (min-height: 481px) and (max-height: 699px) {
+/* - UX-3.1: the landscape-short desktop band (481-699px tall). TWO width arms, because the
+     band's vertical budget differs sharply across the width axis (the UX-3 review P1):
+     the dock stacks below 761px ("draw orb discard / hand / end", ~+80px vertical over the
+     side-by-side dock) and the portrait tier (<=700px wide, <=760px tall) already compresses
+     deeper there (card face 100px, figures 100px) — an unscoped band sat LATER in source,
+     un-did those values at 621-700 and made 640x600 strictly worse than its parent (End
+     Turn -4 -> +38 below the fold; measured). So:
+       * >= 761px: the side-by-side dock the original numbers were calibrated on; the page
+         had NO height compression here at all (measured 800x600: docH 827, End Turn bottom
+         760 = 168px below the fold; the base 42vh/250px hero figure, 34vh/200px enemy
+         figure and 34vh/204px card face spent the window). Compression measured at
+         800x600: hero figure 250 -> 140, enemy 200 -> 140, the intent line clamped to one
+         row, the enemy row's 6%-of-width floor pad (48px at 800) to 2%, card face 204 ->
+         clamp(124px, 25vh, 148px) with the footer chip hidden, the hand's gem-headroom
+         pair shrunk to this band's 1.5deg swing (the gem is socketed INSIDE the card since
+         UX-3; the pair keeps the net-top budget form: 30-14 -> 18-8), the instructional
+         hint (restates Help verbatim) and the chapter page-num dropped, app/stage frames
+         tightened. The 44px touch floor is untouched.
+       * 621-760px: a separate block BELOW the portrait tier (source order is what keeps
+         the portrait tier's deeper card/figure values standing at 621-700) keeps those
+         values and adds the same hint/page-num/frame/intent moves; see that block.
+     No frozen row is in either arm (915x412 / 844x390 / 1200x450 are <= 480 tall;
+     768x1024 / 1280x800 / 1366x768 are >= 700) and no phone row matches (min-width 621). */
+@media (min-width: 761px) and (min-height: 481px) and (max-height: 699px) {
   #app { padding: 6px 8px 8px; gap: 8px; }
   #stage { padding: 8px 10px 6px; }
   .page .page-num { display: none; }
@@ -3789,11 +3797,82 @@ html, body {
   }
   .stage-combat .card .cfoot,
   .stage-combat .cflavor { display: none; }
-  .stage-combat .card .cdesc { font-size: 0.72rem; line-height: 1.15; -webkit-line-clamp: 3; }
   /* Gem headroom pair (see .stage-combat .hand): net top space 10px (was 16). The gem
      rides INSIDE the card (UX-3); the 1.5deg fan swings a ~148px card's corner ~4px and
      the -8px lift sits inside the 18px pad. */
   .stage-combat .hand { padding: 18px 8px 8px; margin-top: -8px; }
+}
+/* - UX-3.1 narrow arm: 621-760px wide (stacked dock) x 481-699px tall. MUST sit after the
+     portrait tier's block above: at 621-700 both match, and the portrait tier's deeper
+     face (card 100px, figures 100px, orb/pile 44px) is what fits the stacked dock — this
+     block keeps those values exactly (measured: the unscoped band raised the card to 148px
+     here and pushed End Turn further below the fold than the parent) and adds the
+     band-wide moves. At 701-760 the portrait tier does not match, so its values are
+     restated here. The rules row and the type head shrink to what a 100px face holds:
+     the hidden has-illus mark keeps a 38px HEIGHT at width 0 (the head plate measured
+     57px tall everywhere), which alone overflows a 100px card — the mark drops out
+     entirely here (hue + word carry type; the <=620 tier hides it too), and the rules
+     row runs the <=480px tier's 3-line step. */
+@media (min-width: 621px) and (max-width: 760px) and (min-height: 481px) and (max-height: 699px) {
+  #app { padding: 6px 8px 4px; gap: 6px; }
+  #stage { padding: 8px 10px 4px; }
+  .stage-combat { gap: 4px; }
+  /* The dock stays STACKED here (the <=760px grid): its full-width hand keeps 5-card names
+     whole at ~117px a card, where the side-by-side dock measured 55px cards and clipped
+     "Hammerfall" at the 9px floor (640x600, measured). The vertical budget comes from the
+     deep sub-arm below at 481-601px instead. */
+  .page .page-num { display: none; }
+  .hint { display: none; }
+  .stage-combat .hero .fig,
+  .stage-combat .fig { height: 100px; }
+  .stage-combat .enemies { padding-bottom: 2%; }
+  .stage-combat .e-intent { margin-top: 2px; padding: 3px 7px; }
+  .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; }
+  .stage-combat .card { height: 100px; padding: 6px 6px 4px; gap: 1px; }
+  .stage-combat .card .cfoot,
+  .stage-combat .cflavor { display: none; }
+  /* The rules echo (c-art echo) is an absolute box tuned for tall faces (top 84 / bottom
+     44): in a 100px face it inverts and spills 3px past #stage (760x600, measured). The
+     <=620 tier hides it too; the head drawing stays. */
+  .stage-combat .card .c-art { display: none; }
+  .card .c-type-mark { width: 0; height: 0; margin-right: -6px; visibility: hidden; }
+  /* Gem headroom pair: 14px top / -8px margin (net 6px) — the 1.5deg fan swings a 100px
+     card's corner ~2.6px and the -8px lift sits inside the 14px (AABB top +3px). */
+  .stage-combat .hand { padding: 14px 8px 8px; margin-top: -8px; }
+  .page-combat .energy-orb { width: 44px; height: 44px; }
+  .page-combat .pile { width: 44px; min-height: 44px; }
+  .page-combat .orb-num { font-size: 1.15rem; }
+}
+/* - UX-3.1 deep sub-arm: 621-760px wide at 481-601px tall. The stacked dock's two extra
+     rows (~91px) plus the two-row HUD (~48px over one row) exceed the band's short end:
+     760x481 measured 114px below the fold with the face at 100px and the HUD unwrapped.
+     The face and figures scale with the viewport (the <=480px tier's own pattern), the
+     stage hero column drops (the HUD carries HP/energy/block verbatim), the enemy card's
+     padding goes (its intent stays), and the HUD runs the <=480px recipe WITHOUT hiding
+     anything — the hero name stays shown per the >=381px contract, chips and buttons just
+     tighten (the 44px touch floor is min-height/padding-independent). */
+@media (min-width: 621px) and (max-width: 760px) and (min-height: 481px) and (max-height: 601px) {
+  .stage-combat .card { height: min(100px, 17vh); }
+  .stage-combat .hero .fig,
+  .stage-combat .fig { height: min(100px, 15vh); }
+  .page-combat .hero-name,
+  .page-combat .hero .ehp,
+  .page-combat .hero .hpbar,
+  .page-combat .hero .eblock { display: none; }
+  .stage-combat .enemy { padding: 0; }
+  .stage-combat .e-intent { margin-top: 0; }
+  /* The HUD must unwrap to ONE row here (at 481px the two-row HUD alone was ~50px over
+     the fold; measured 102px at 640x481): chips to the padding floor, the four ghost
+     buttons to the small step, and the elastic spacer out (it is 24px of nothing). The
+     44px button floor is min-height and unaffected; NOTHING is hidden — the hero name
+     stays shown per the >=381px rule (its font steps down, whole word intact). */
+  #hud { padding: 4px 8px; gap: 2px; }
+  .stat { padding: 0 2px; font-size: var(--fs-1); }
+  .hud-step { padding: 2px 4px; }
+  .pill { padding: 0 3px; font-size: var(--fs-1); }
+  #hud .btn { font-size: var(--fs-1); padding: 4px 6px; }
+  .hud-char { font-size: var(--fs-2); }
+  .spacer { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .stage-combat .fig,
@@ -7116,17 +7195,18 @@ html, body {
   }
   .stage-combat .hand:has(> .card-wrap:nth-child(6)) .card { transform: translateY(-8px); }
 }
-/* - UX-3: the same deliberate scroller one band up (761-1000px wide). Below 760px the dock
-     stacks and the hand gets the full row (6 cards compress to ~100px, everything holds);
-     at 761-1000px the 5-column dock leaves ~380-660px, so a 7-card hand compressed to
-     56-86px a card and the fixed face broke down: the 5-line rules clamp outgrew its box
-     and the -3px neighbour overlap covered rules-line ends (both measured,
-     768x1024+hand7); names survived at the 9px floor with ~2px of margin. So 6+ hands
-     here scroll with the <=620 precedent's exact mechanism and cue (next card peeks at
-     the right edge, fan already flattened by the nth-child(6) rule above): cards hold a
-     legible fixed width, the first card is whole at scroll 0, every card is reachable by
-     swipe. 5-card hands keep compress-to-fit (their floor is ~76px — measured clean). */
-@media (min-width: 761px) and (max-width: 1000px) {
+/* - UX-3: the deliberate scroller one band up (621-1000px wide). At <=620 the scroller is
+     76px cards; here it is 104px. Two sub-ranges: 761-1000px, where the 5-column dock
+     leaves ~380-660px and a 7-card hand compressed to 56-86px a card — the fixed face
+     broke down (the 5-line rules clamp outgrew its box and the -3px neighbour overlap
+     covered rules-line ends; both measured, 768x1024+hand7; names survived at the 9px
+     floor with ~2px of margin) — and 621-760px (UX-3.1's stacked-dock arm, where the hand
+     is full-width but a 7-card hand still lands ~84px a card, back under the face's
+     content floor). 6+ hands scroll with the <=620 precedent's exact mechanism and cue
+     (next card peeks at the right edge, fan already flattened by the nth-child(6) rule
+     above): cards hold a legible fixed width, the first card is whole at scroll 0, every
+     card is reachable by swipe. 5-card hands keep compress-to-fit. */
+@media (min-width: 621px) and (max-width: 1000px) {
   .stage-combat .hand:has(> .card-wrap:nth-child(6)) {
     justify-content: flex-start;
     overflow-x: auto;
@@ -7161,6 +7241,11 @@ html, body {
 @media (min-width: 761px) and (max-width: 1000px) and (max-height: 480px) {
   .stage-combat .hand:has(> .card-wrap:nth-child(6)) .card .cdesc { -webkit-line-clamp: 3; }
 }
+/* UX-3.1: the scroller now also covers 621-760px (stacked-dock arm), whose 100px faces
+   hold three rules lines, not four — same restatement, one band over. */
+@media (min-width: 621px) and (max-width: 760px) and (min-height: 481px) and (max-height: 699px) {
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) .card .cdesc { -webkit-line-clamp: 3; }
+}
 /* - UX-3: compressed 6+ hands on the short tiers go flush too. Above 1000px wide there is
      no scroller, and the base -6px wrap margins overlap neighbours by 12px — past the
      short tier's 4px side padding, so a full rules line's end ran under the next card
@@ -7178,6 +7263,15 @@ html, body {
      card's aria-label/tooltip and the glossary, as with the 4-line cap. */
 @media (max-width: 700px) and (max-height: 760px) {
   .stage-combat .card .cdesc { -webkit-line-clamp: 3; }
+}
+/* - UX-3.1: both short-height arms (621-760 stacked dock, 761+ side-by-side; 481-699px
+     tall) run 100-148px faces, which hold three rules lines of the small step and not the
+     base 0.9rem/4-line set (a 4-line row measured ~73-81px against a ~63px box at the
+     148px face). This must sit AFTER the base clamp-4 rule above in source order — the
+     band blocks up top are earlier and would lose it. The full sentence stays in the
+     card's aria-label/tooltip and the glossary, as with every other clamp. */
+@media (min-width: 621px) and (min-height: 481px) and (max-height: 699px) {
+  .stage-combat .card .cdesc { font-size: 0.72rem; line-height: 1.15; -webkit-line-clamp: 3; }
 }
 /* - UX-1: TALL portrait phones (390x844 and friends) get the fixed face too. Their cards
      used to be content-driven up to the min(250px,36vh) ceiling while measuring ~70-118px

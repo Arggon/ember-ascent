@@ -126,6 +126,12 @@ const SIZES = [
   // Before the band existed the combat page measured 827px tall here and End Turn sat
   // 168px below the fold — the user's "side cards cropped at some resolutions".
   [800, 600, 'short-window'],
+  // UX-3.1 review: BOTH ends of the width axis. 640x600 rides the portrait tier's deeper
+  // face inside the stacked dock (the unscoped band un-did it and measured +38 below the
+  // fold vs the parent's -4); 760x600 is the stacked dock's widest cell, ~80px taller than
+  // the side-by-side dock the 800px row was calibrated on.
+  [640, 600, 'short-window-640'],
+  [760, 600, 'short-window-760'],
 ];
 // Max-hand rows: the kernel caps the hand at 10 (src/kernel/rules/act.js and friends:
 // `hand.length < 10`). No seed deals 10 on turn 1, so the harness builds the worst case from

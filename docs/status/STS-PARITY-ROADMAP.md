@@ -57,8 +57,8 @@ Process rules (standing):
 | S8 | Content I: cards | ~70 cards incl. new verbs (multi-hit, exhaust, retain) | codex/deck views already render them | closed — 0168d28, QA 10/10, review APPROVE (5 P3s → backlog) |
 | UX-1 | Boss-offer down-tier + uniform card faces + gem readability | offer pool fills rare→uncommon→common; fixed faces per viewport tier | honest exhausted copy | closed — 90a840e, QA 8/8, review APPROVE (P2 → UX-2) |
 | UX-2 | The sequenced, named enemy turn + UX-1 review fixes | kernel untouched (goldens byte-identical) | per-attacker floats, intent highlight, ≤380 restore, sealed vault, tooltips | closed — c8ee3f7 + 7906900, QA 10/10, review APPROVE (P2 fixed in 7906900) |
-| UX-3 | The socketed cost gem + the hand always fits | kernel untouched (goldens byte-identical) | gem inside the card at every tier (--gem cqi sizing), type word clears the socket, 761-1000px 6+ scroller, short-tier flush 6+ hands, viewport-check gem/hand7 matrix, e2e gem test | dev done — gates green, QA PASS, review pending |
-| UX-3.1 | The landscape-short desktop band (QA follow-up) | kernel untouched (goldens byte-identical) | new 481-699px height tier (figs/intent/enemies-pad/card 148px/hint+page-num), 800x600 + 800x600+hand7 matrix rows | dev done — gates green, QA pending |
+| UX-3 | The socketed cost gem + the hand always fits | kernel untouched (goldens byte-identical) | gem inside the card at every tier (--gem cqi sizing), type word clears the socket, 621-1000px 6+ scroller, short-tier flush 6+ hands, viewport-check gem/hand7 matrix, e2e gem test | committed c23988d — QA PASS, review REQUEST_CHANGES (P1 band scope) -> UX-3.1 fix in the tree |
+| UX-3.1 | The landscape-short desktop band (QA follow-up) | kernel untouched (goldens byte-identical) | 481-699px height tier in two width arms (761+ side-by-side dock; 621-760 stacked with a deep 481-601 sub-arm), matrix rows 800x600/640x600/760x600 + hand7 | review fix in the tree — gates green, re-review pending |
 | S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | closed — 2ef8ce5, QA 10/10, review APPROVE (5 P3s → backlog) |
 | S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | closed — 641731a + d08da32 + c4a0ace, re-review APPROVE |
 
@@ -436,7 +436,7 @@ Process rules (standing):
   same at 1280x800/390x844 with 5- and 7-card hands. GATES AT THE TREE: 377/376/0/1
   node (the pre-existing poolSelection todo), gate OK, art OK, 21/21 browser, sim 20
   runs exit 0 (token budgets PASS), golden REBUILT AND BYTE-IDENTICAL (sha256
-  27b5f677…, cmp clean — the kernel did not move). FULL MATRIX (34 rows, seed 11):
+  27b5f677…, cmp clean — the kernel did not move). FULL MATRIX (35 rows, seed 11):
   every >=621px row passes with 5 AND 7 cards (1280x800, 1366x768, 1200x450, 915x412,
   844x390, 768x1024, plus their hand7 rows); the frozen rows 915x412 + 1280x800 are
   metric-identical to baseline (End Turn 394/412 and 753/800, clearance 18/47, spill
@@ -461,7 +461,7 @@ Process rules (standing):
   MEASURED 800x600 BEFORE -> AFTER: docH 827 -> 600 (scroll 227 -> 0), End Turn bottom
   760 -> 586 (clearance -168 -> +14), hand bottom 760 -> 586. Band short end measured:
   800x481 docH 481 (scroll 0), End Turn 467, +14. NO frozen row or existing matrix row
-  moved (the band matches no frozen size); the release matrix grows to 36 rows —
+  moved (the band matches no frozen size); the release matrix grows to 37 rows —
   800x600 and 800x600+hand7, both ALL PASS with every gem assertion green. GATES AT THE
   TREE: 377/376/0/1 node (the pre-existing poolSelection todo), gate OK, art OK, 21/21
   browser, sim 20 runs exit 0 (token budgets PASS), golden cmp byte-identical (sha256
@@ -474,6 +474,41 @@ Process rules (standing):
   viewport), the hand compresses or deliberately scrolls at every width, AND the
   measured 481-699px-tall band (800x600: the hand rode 160px below the fold — the
   user's "some resolutions") gained its height tier (docH 827->600, End Turn
-  clearance -168->+14, the band holding at 481px). Matrix grew to 36 rows, frozen rows
+  clearance -168->+14, the band holding at 481px). Matrix grew to 37 rows, frozen rows
   metric-identical, goldens byte-identical, 21/21 browser. UX-3.1 verified by the
   orchestrator live at 800x600 and 800x481. Solo review next, then the release rebuild.
+- 2026-10-29 — UX-3 review VERDICT: REQUEST_CHANGES. P1 (measured at real CDP sizes
+  against the parent b86e0d3): the 481-699px band FAILED on part of its width range —
+  the band sat later in source than the portrait tier's deeper compression
+  (@media max-width 700px + max-height 760px: card 100px, figs 100px) and UN-DID it at
+  621-700px wide (640x600: End Turn -4 -> +38 below the fold, strictly worse than the
+  parent), and at <=760px wide the dock STACKS (~+80px vertical over the side-by-side
+  dock the numbers were calibrated on; 760x600 +67 below, 621x550 +53). The dev had
+  measured both ends of the HEIGHT axis and neither end of the WIDTH axis. FIX (per the
+  review): (1) the band's combat compression rescoped to min-width 761px; (2) an
+  explicit 621-760 x 481-699 arm BELOW the portrait tier keeps its deeper values (card
+  100px, figs 100px, orb/pile 44px, hand pair) and adds the band's
+  hint/page-num/frame/intent/enemies moves, with a DEEP sub-arm at 481-601px tall where
+  the stacked dock's two extra rows + the two-row HUD cannot fit: face/figures scale
+  with vh (min(100px,17vh) / min(100px,15vh)), the stage hero column drops (the HUD
+  carries HP/energy/block verbatim), enemy padding 0, and the HUD runs the <=480px
+  recipe WITHOUT hiding anything (hero name shown per the >=381px rule; chips/buttons
+  tighten to the padding floor, the elastic spacer out) — measured: at 481px the HUD
+  was 102px in two rows and the page 114px over; one row is 52px. The 6+ scroller
+  extends to 621-1000px (a 7-card hand at 621-760 still lands ~84px a card), with its
+  3-line clamp restated for the 100px faces; the rules echo (c-art) hides in the 100px
+  faces (it inverted and spilled 3px past #stage). P3(a) fixed here: the slice-log row
+  counts (35 rows after UX-3, 37 after UX-3.1 — the entries said 34/36) and the two
+  slice-table rows. THE MEASURED GRID (widths 621/640/700/760/800 x heights
+  481/550/600/699, seed 11, 5-card hands): End Turn bottom = vh-8 EXACTLY at every
+  621-760 cell (the deep arm's budget is fully spent, clearance +8 = the contract bar)
+  and vh-14 at every 761px+ cell; End Turn topmost, docH <= vh (no scroll), no hand
+  card outside the viewport, every gem circle inside its card — ALL 20 CELLS FIT.
+  Matrix now 41 rows (+640x600, 760x600, 640x600+hand7, 760x600+hand7 — all ALL PASS;
+  18 pass, 23 fail = the pre-existing phone-emulation kinds and the 360x640@130 family,
+  unchanged in kind and row set). GATES AT THE TREE: 377/376/0/1 node (the
+  pre-existing poolSelection todo), gate OK, art OK, 21/21 browser, sim 20 runs exit 0
+  (token budgets PASS), golden cmp byte-identical (sha256 27b5f677…). P3(b) noted:
+  release/style.css staleness is expected — the rebuild lands at round close after
+  re-review. P3(c) the boot-timeout flake assessment accepted (pre-existing, re-run
+  policy).

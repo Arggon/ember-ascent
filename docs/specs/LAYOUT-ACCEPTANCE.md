@@ -306,3 +306,22 @@ Each with the default I would ship without an answer.
   800×600+hand7 (both ALL PASS) — and no existing row's metrics moved (the band matches no
   frozen size: 915×412/844×390/1200×450 are ≤480 tall, 768×1024/1280×800/1366×768 ≥700;
   phones fail min-width 621). Kernel untouched; golden cmp'd byte-identical.
+
+- **2026-10-29 — UX-3.1 review fix (P1: the band failed on part of its width range).** The
+  band sat later in source than the portrait tier's deeper compression (≤700px wide +
+  ≤760px tall: card 100px, figures 100px) and un-did it at 621–700 wide (640×600: End Turn
+  −4 → +38 below the fold, strictly worse than the parent), and at ≤760px the dock stacks
+  (~+80px vertical; 760×600 +67, 621×550 +53 below). Restructured: the side-by-side-dock
+  compression is scoped to `min-width: 761px`; a new 621–760 arm BELOW the portrait tier
+  keeps its deeper values and adds the band's hint/page-num/intent/enemies moves, with a
+  deep sub-arm at 481–601px tall (face/figures scale with vh, the stage hero column drops
+  — the HUD carries HP/energy/block — enemy padding 0, and the HUD runs the ≤480px recipe
+  without hiding anything; the hero name stays shown per the ≥381px rule). The 6+ scroller
+  extends to 621–1000px with its 3-line clamp restated for the 100px faces, and the rules
+  echo hides in those faces (it inverted and spilled 3px past `#stage`). **Release matrix
+  grows by four more rows** — 640×600, 760×600, 640×600+hand7, 760×600+hand7 (41 total;
+  all four ALL PASS). The measured width×height grid (621/640/700/760/800 ×
+  481/550/600/699, seed 11): End Turn bottom = viewport − 8 exactly at every 621–760 cell
+  (the deep arm's budget is fully spent; clearance +8 = the contract bar) and viewport − 14
+  at every 761px+ cell; End Turn topmost, no page scroll, no hand card outside the
+  viewport, every gem circle inside its card — all 20 cells fit.
