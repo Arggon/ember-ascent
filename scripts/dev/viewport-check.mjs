@@ -61,6 +61,17 @@ const CARDS_OUTSIDE_HAND_MAX = 0;   // every hand card inside the hand's visible
 const DESC_OCCLUDED_MAX = 0;        // both ends of every visible rules line must be on its card
 const HERO_NAME_MIN_WIDTH = 381;    // from this width up the HUD shows the full hero name
 const NAME_MIN_PX = 9;              // a hand card name is never set below 9px (QA floor)
+// UX-3 (gem + hand fit): the cost gem is a socketed circle — its full circle (border
+// included) must sit INSIDE its card rectangle (the combat card's overflow:hidden shears
+// anything past the border box — the user's clipped-gem screenshot) and inside the
+// viewport; the type word must never run under the gem (the old "TACK" bug); and every
+// hand card must sit inside the viewport (or the deliberate scroller's window). Measured
+// in the card's LOCAL frame via transform-free clones, so the fan's rotation cannot mask
+// an offset. 0.5px rounding allowance, same as the checks above.
+const GEMS_OUTSIDE_CARD_MAX = 0;
+const GEMS_OUTSIDE_VP_MAX = 0;
+const WORD_UNDER_GEM_MAX = 0;
+const CARDS_OUTSIDE_VP_MAX = 0;
 // -------------------------------------------------------------------------------------------
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -108,6 +119,13 @@ const SIZES = [
   [1280, 800, 'desktop'],
   [1366, 768, 'laptop'],
   [1200, 450, 'short-desktop-window'],
+  // UX-3: the tall Android phone at 100% text joins the release bar (its 130% row was
+  // already here); the gem and hand-fit contract is asserted on both.
+  [360, 780, 'android-tall'],
+  // UX-3.1: the landscape-short desktop band's release row (481-699px tall, >= 621px wide).
+  // Before the band existed the combat page measured 827px tall here and End Turn sat
+  // 168px below the fold — the user's "side cards cropped at some resolutions".
+  [800, 600, 'short-window'],
 ];
 // Max-hand rows: the kernel caps the hand at 10 (src/kernel/rules/act.js and friends:
 // `hand.length < 10`). No seed deals 10 on turn 1, so the harness builds the worst case from
@@ -119,15 +137,24 @@ const HAND_SIZES = [
   [390, 844, 'iphone-14-hand10', MAX_HAND],
   [414, 896, 'phone-large-hand10', MAX_HAND],
 ];
+// UX-3: the SEVEN-card guarantee — at every release-bar size (and every large-font size) a
+// 7-card hand must fit the viewport with every gem whole: 5-card hands compress
+// (flex 1 1 0), 6+ hands take the deliberate scroller below 1000px (<=620 since UX-1,
+// 761-1000 since UX-3), and wide desktops compress. The fixture grows the real hand, so
+// every clone carries the real markup.
+const HAND7 = 7;
 // Rows are [w, h, label, textScale, handN]: every 100% row, then the large-font rows
 // (scripts/dev/text-scale.mjs: Gonzalo's rule, every build at 360-412dp with 130% text), then
-// the 10-card hand at every phone size, at 100% and at 130%. --sizes takes "360x640",
-// "360x640@130", "360x640+hand10" and "360x640@130+hand10".
+// the 10-card hand at every phone size, at 100% and at 130%, then the 7-card hand at every
+// size at 100% and 130%. --sizes takes "360x640", "360x640@130", "360x640+hand10",
+// "360x640@130+hand10" and "360x640+hand7".
 const MATRIX = [
   ...SIZES.map(([w, h, label]) => [w, h, label, 1, 0]),
   ...LARGE_FONT_SIZES.map(([w, h, label, scale]) => [w, h, label, scale, 0]),
   ...HAND_SIZES.map(([w, h, label, n]) => [w, h, label, 1, n]),
   ...LARGE_FONT_SIZES.map(([w, h, label, scale]) => [w, h, label + '-hand10', scale, MAX_HAND]),
+  ...SIZES.map(([w, h, label]) => [w, h, label + '-hand7', 1, HAND7]),
+  ...LARGE_FONT_SIZES.map(([w, h, label, scale]) => [w, h, label + '-hand7', scale, HAND7]),
 ];
 const keyOf = (w, h, scale, hand) => sizeKey(w, h, scale) + (hand ? `+hand${hand}` : '');
 const SIZES_SEL = sizesArg
@@ -398,6 +425,90 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
         if (cutLines.size) descOccluded.push(cardName(c) + ' (' + cutLines.size + ' of its first ' + (clampN === Infinity ? 'all' : clampN) + ' lines cut off by the card/rules box)');
         if (bad) descOccluded.push(cardName(c) + ' (' + bad + ' line end(s) hidden)');
       }
+      // UX-3: the cost gem is a socketed circle. Three checks, one lab:
+      //   1. its full circle (border included) sits inside its card rectangle — measured on a
+      //      transform-free CLONE of each hand card laid out in an off-screen lab that
+      //      reproduces the live hand's width, so the fan's rotation cannot mask an offset
+      //      (the live card's getBoundingClientRect is the rotated AABB). The card's own
+      //      overflow:hidden shears anything past its border box, so a negative slack IS the
+      //      user's clipped-gem bug.
+      //   2. the live gem circle is inside the viewport (the circle's rect is its bounding
+      //      circle at any rotation).
+      //   3. the type word never runs under the gem (the old "TACK" bug) — gem circle span
+      //      vs the word's first glyph box, with the y ranges intersecting.
+      const gemChecks = (() => {
+        const out = { outsideCard: [], outsideVp: [], wordUnder: [] };
+        if (!hand) return out;
+        const lab = document.createElement('div');
+        lab.className = 'stage-combat';
+        lab.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;';
+        const labHand = document.createElement('div');
+        labHand.className = 'hand';
+        labHand.style.width = hand.clientWidth + 'px';
+        lab.append(labHand);
+        document.body.append(lab);
+        const wraps = [...hand.querySelectorAll(':scope > .card-wrap')];
+        // Clone EVERY wrap before measuring any: flex shares the lab row across the whole
+        // hand, so a lone clone grows to its max-width cap instead of the realized width.
+        const clones = wraps.map((w) => {
+          const c = w.cloneNode(true);
+          c.style.setProperty('--i', '0');
+          const cc = c.querySelector('.card');
+          if (cc) cc.style.transform = 'none';
+          labHand.append(c);
+          return c;
+        });
+        wraps.forEach((wrap, i) => {
+          const card = wrap.querySelector('.card');
+          const clone = clones[i].querySelector('.card');
+          if (!card || !clone) return;
+          const name = cardName(card);
+          // A hand that scrolls shows a window on purpose: only the guaranteed-whole first
+          // card's LIVE gem is viewport-checked; the local-frame checks hold for all cards.
+          const liveVisible = !handScrolls || i === 0;
+          if (liveVisible) {
+            const g = card.querySelector('.cost-gem');
+            if (g) {
+              const gr = g.getBoundingClientRect();
+              if (!(gr.left >= -0.5 && gr.top >= -0.5 && gr.right <= vw + 0.5 && gr.bottom <= vh + 0.5)) {
+                out.outsideVp.push(name + '[' + Math.round(gr.left) + ',' + Math.round(gr.top) + ',' + Math.round(gr.right) + ',' + Math.round(gr.bottom) + ']');
+              }
+            }
+          }
+          const cgem = clone.querySelector('.cost-gem');
+          if (cgem) {
+            const box = clone.getBoundingClientRect();
+            const gr = cgem.getBoundingClientRect();
+            const slack = [gr.left - box.left, gr.top - box.top, box.right - gr.right, box.bottom - gr.bottom];
+            if (slack.some((s) => s < -0.5)) {
+              out.outsideCard.push(name + ' slack[l' + slack[0].toFixed(1) + ' t' + slack[1].toFixed(1) + ' r' + slack[2].toFixed(1) + ' b' + slack[3].toFixed(1) + ']');
+            }
+            const ct = clone.querySelector('.ctype');
+            const word = ct ? [...ct.querySelectorAll('span')].find((s) => !/c-type-mark|c-illus/.test(s.className) && s.textContent.trim()) : null;
+            if (word) {
+              const wrd = [...word.getClientRects()].filter((x) => x.width > 0.5);
+              if (wrd.length) {
+                const wl = Math.min(...wrd.map((x) => x.left));
+                const wt = Math.min(...wrd.map((x) => x.top));
+                const wb = Math.max(...wrd.map((x) => x.bottom));
+                if (gr.right > wl + 0.5 && gr.left < wl && gr.bottom > wt && gr.top < wb) {
+                  out.wordUnder.push(name + ' (gem right ' + Math.round(gr.right - box.left) + ' vs word left ' + Math.round(wl - box.left) + ')');
+                }
+              }
+            }
+          }
+        });
+        lab.remove();
+        return out;
+      })();
+      // UX-3: every hand card's bounding box (rotation included) inside the viewport — the
+      // scroller's by-design window uses the same first-card rule as cardsOutside above.
+      const cardsOutsideVp = handCards.map((c) => {
+        const r = c.getBoundingClientRect();
+        return (r.left < -0.5 || r.top < -0.5 || r.right > vw + 0.5 || r.bottom > vh + 0.5)
+          ? cardName(c) + '[' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.right) + ',' + Math.round(r.bottom) + ']'
+          : null;
+      }).filter((s, i) => s && (!handScrolls || i === 0));
       // The HUD hero name: dropped by design only below 381px wide (no room at 360px).
       const heroEl = document.querySelector('.hud-char');
       const heroName = !heroEl ? 'missing'
@@ -424,6 +535,8 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
         descOccluded,
         heroName,
         nameSmall,
+        gemChecks,
+        cardsOutsideVp,
         handCount: handCards.length,
         handScrolls,
         handBox: handBox.map(Math.round),
@@ -576,6 +689,18 @@ function evaluateRow(m) {
   if (m.cardsOutside.length > CARDS_OUTSIDE_HAND_MAX) {
     fails.push(`hand card(s) cut off outside the visible hand box [${m.handBox.join(',')}]: ${m.cardsOutside.join(' ')}`);
   }
+  if (m.cardsOutsideVp.length > CARDS_OUTSIDE_VP_MAX) {
+    fails.push(`hand card(s) outside the viewport: ${m.cardsOutsideVp.join(' ')}`);
+  }
+  if (m.gemChecks.outsideCard.length > GEMS_OUTSIDE_CARD_MAX) {
+    fails.push(`cost gem circle not fully inside its card (the card's overflow clip shears it): ${m.gemChecks.outsideCard.join('; ')}`);
+  }
+  if (m.gemChecks.outsideVp.length > GEMS_OUTSIDE_VP_MAX) {
+    fails.push(`cost gem circle outside the viewport: ${m.gemChecks.outsideVp.join('; ')}`);
+  }
+  if (m.gemChecks.wordUnder.length > WORD_UNDER_GEM_MAX) {
+    fails.push(`type word runs under the cost gem: ${m.gemChecks.wordUnder.join('; ')}`);
+  }
   if (m.descOccluded.length > DESC_OCCLUDED_MAX) {
     fails.push(`rules text hidden (covered or off-screen): ${m.descOccluded.join('; ')}`);
   }
@@ -608,6 +733,9 @@ console.log('thresholds: EndTurn bottom <= innerHeight - ' + END_TURN_CLEARANCE_
   + ' | rules lines hidden <= ' + DESC_OCCLUDED_MAX
   + ' | hero name shown from ' + HERO_NAME_MIN_WIDTH + 'px'
   + ' | card names >= ' + NAME_MIN_PX + 'px'
+  + ' | gem circles inside card + viewport: ' + (GEMS_OUTSIDE_CARD_MAX === 0 && GEMS_OUTSIDE_VP_MAX === 0)
+  + ' | type word under gem <= ' + WORD_UNDER_GEM_MAX
+  + ' | cards outside viewport <= ' + CARDS_OUTSIDE_VP_MAX
   + ' | seed pinned: ' + (SEED_IN_URL ? 'yes' : 'no'));
 console.log('base: ' + BASE_TEMPLATE + '  seeds: ' + SEEDS.join(','));
 console.log('');

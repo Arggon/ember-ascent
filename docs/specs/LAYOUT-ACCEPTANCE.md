@@ -256,3 +256,53 @@ Each with the default I would ship without an answer.
   The screen still fits 1440×900 and 915×412 with no page scroll (scrollHeight = window
   height). In combat the Keeper uses the same hero slot and sizing rules as the Ashwright,
   with a cyan name and glow.
+
+- **2026-10-29 — UX-3 gem socket + hand fit (acceptance instrument extended; the S1–S3
+  numbers above did not move).** The user reported the cost gem's circle clipped at the
+  card corner and side cards cropped at some resolutions. Both verified and fixed on the
+  surface (`src/web/style.css` only; kernel untouched, golden rebuilt byte-identical):
+  - **The gem is socketed INSIDE the card at every tier** (was `top:-6px; left:-2px` at
+    base and negative at three media tiers — the card's own `overflow: hidden` sheared the
+    top arc at EVERY tier; measured slack top −5px, left −1..−3px). Combat sizes the gem
+    per card (`--gem: max(16px, 18cqi)` — combat cards compress continuously, so fixed
+    per-tier sizes cannot clear the type word at the narrow end); fixed contexts (reward,
+    shop) keep 30/21/18px inset gems. The type word starts at gem + 11..15px per tier
+    (measured), which retires the "TACK" word-under-gem bug on phones.
+  - **The hand fits at every width ≥ 621px** (compress-to-fit was already true in combat;
+    now pinned): 5-card hands compress (`flex 1 1 0`); 6-card hands take the deliberate
+    ≤620-style scroller in the 761–1000px band (compression realized 56–86px cards there,
+    where the fixed face broke down: the 5-line rules clamp outgrew its box and the
+    −3px overlap covered rules-line ends; measured, 768×1024+hand7), and go flush on the
+    short tiers where the base −6px
+    overlap ran past the 4px side padding (measured, 1200×450+hand7).
+  - **Harness** (`scripts/dev/viewport-check.mjs`): new thresholds — gem circle inside its
+    card rect (transform-free clone lab, rotation-proof) and inside the viewport, type word
+    never under the gem, every hand card inside the viewport; new matrix rows — 360×780 at
+    100% text (the brief's frozen row; only its 130% row existed) and a 7-card hand at every
+    size at 100% and 130%. Frozen rows 915×412 and 1280×800 are metric-identical after the
+    change (End Turn 394/412 and 753/800, clearance 18/47, spill −6, ALL PASS). The
+    pre-existing phone-row artifact pair ("page wider than the screen" + hero name, mobile
+    emulation zoom on this machine's Chromium) is unchanged in kind and row set.
+  - **e2e** (`tests/web/e2e.browser.spec.js`): +1 test (21 total) pinning gem-in-card,
+    gem-in-viewport, word-clearance and cards-in-viewport at 1280×800 and 390×844 with 5-
+    and 7-card hands.
+
+- **2026-10-29 — UX-3.1 the landscape-short desktop band (QA follow-up to the gem slice).**
+  QA measured the slice's own open issue: at 800×600 the combat page was 827px tall in a
+  600px window (227px scroll) and End Turn's bottom sat at 760px = 168px below the fold —
+  the band 481–699px tall had no height tier at all (the ≤480px tier ends at 480, the
+  ≥700px desktop tier begins at 700), so the base 42vh/250px hero figure, 34vh/200px enemy
+  figure and 34vh/204px card face spent the whole window. New scoped tier
+  `@media (min-width: 621px) and (min-height: 481px) and (max-height: 699px)`
+  (`src/web/style.css`): hero figure → `min(140px, 24vh)`, enemy → `min(140px, 22vh)`, the
+  enemy row's 6%-of-width floor pad → 2% (was ~48px at 800 wide), the intent line clamped
+  to one row, card face → `clamp(124px, 25vh, 148px)` with the footer chip hidden and the
+  rules row at 3 lines (the ≤480px tier's exact moves), the hand's gem-headroom pair
+  shrunk to the band's 1.5deg swing (30−14 → 18−8), the instructional hint (restates Help
+  verbatim) and the chapter page-num dropped, app/stage frames tightened. 44px touch floor
+  untouched. Measured: 800×600 now renders docH 600 (no scroll) with End Turn at 586 and
+  14px clearance (was 827/760/−168); the band's short end (800×481) renders docH 481, End
+  Turn 467, 14px clearance. **Release matrix grows by two rows** — 800×600 and
+  800×600+hand7 (both ALL PASS) — and no existing row's metrics moved (the band matches no
+  frozen size: 915×412/844×390/1200×450 are ≤480 tall, 768×1024/1280×800/1366×768 ≥700;
+  phones fail min-width 621). Kernel untouched; golden cmp'd byte-identical.

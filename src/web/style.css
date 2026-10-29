@@ -548,6 +548,10 @@ html, body {
   gap: 6px;
   margin: -15px -12px 2px;
   padding: 9px 6px 5px;
+  /* UX-3: the word starts right of the socketed cost gem — gem width + 11px, measured to
+     leave a ~4px gap after the head plate's negative left margin at every tier. Tier
+     shorthands below re-declare padding-left against their own gem sizes and margins. */
+  padding-left: calc(var(--gem, 30px) + 11px);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--card-hue) 17%, transparent) 0%,
@@ -629,6 +633,8 @@ html, body {
   font-size: var(--fs-4);
   line-height: 1.18;
   letter-spacing: 0.005em;
+  /* The name row starts BELOW the type band, so the gem (socketed inside the band's left
+     end since UX-3) never crosses it; the inset is retained as breathing room. */
   padding-left: 18px; /* clear of the absolutely-positioned cost gem */
   overflow-wrap: anywhere;
 }
@@ -646,11 +652,16 @@ html, body {
 /* Cost gem: a faceted stone with an inner highlight, not a plain circle. */
 .cost-gem {
   position: absolute;
-  /* Inset into the padding gutter, NOT outside the card edge: at negative offsets the gems
-     of adjacent cards collided in a tight row, and the neighbour's gem cut into this card's
-     corner. The dark ring keeps it readable over the card's own frame. */
-  top: -6px;
-  left: -2px;
+  /* UX-3: the gem is SOCKETED INSIDE the card's top-left corner — its full circle (border
+     included) sits within the card rectangle at every tier. The old top:-6px/left:-2px put
+     the top arc outside the border box, and the combat card's own `overflow: hidden` sheared
+     it flat (the user's "the circle must be visible" screenshot; measured slack top -5px,
+     left -1..-3px at every tier). The combat hand re-sizes the gem per card below
+     (--gem, container-query units) because combat cards compress continuously; this base
+     30px pair serves the fixed-width contexts (reward, shop, closeups). The type word clears
+     the socket via .card.has-illus .ctype padding-left. */
+  top: 4px;
+  left: 4px;
   width: 30px;
   height: 30px;
   display: grid;
@@ -1403,11 +1414,18 @@ html, body {
   .card::after { display: none; }
   .card .c-art { display: none; }
   .card .c-type-mark { width: 12px; height: 12px; opacity: 0.8; }
-  /* UX-1: left 6px, not 0 — the combat fan's 1.5deg swing carried even this fully
-     inset gem ~5px past the hand row's clip box on the end cards (measured at 390x844
-     and 360x640); 6px of inset keeps it inside through the swing. */
-  .cost-gem { top: -5px; left: 6px; width: 21px; height: 21px; }
+  /* UX-3: the gem is socketed INSIDE the card (top 3px, left 3px, 21px) — the old
+     top:-5px hung the top arc past the border box and the card's own overflow:hidden
+     sheared it. 21px fits here because these cards are the fixed-width reward/shop faces
+     (>= 100px); the combat hand overrides with per-card --gem sizing below. */
+  .cost-gem { top: 3px; left: 3px; width: 21px; height: 21px; }
 
+  /* UX-3: no-illus cards (28 of 70 ship without a drawing — the Bellows family and
+     friends) get the same left-aligned head as has-illus cards here: their centered
+     mark+word group overflows the narrow band and ran the word under the socketed gem.
+     The 11px mark goes with the group; hue + word still carry type. */
+  .card:not(.has-illus) .ctype { justify-content: flex-start; }
+  .card:not(.has-illus) .c-type-mark { width: 0; margin-right: -6px; visibility: hidden; }
   .card { width: 100%; max-width: 280px; }
   .hand { gap: var(--sp-2); }
   .enemy { min-width: 0; width: 100%; max-width: 300px; }
@@ -2280,7 +2298,7 @@ html, body {
     gap: 3px;
     border-radius: 9px;
   }
-  .card .ctype { font-size: var(--fs-1); letter-spacing: 0.06em; gap: 3px; min-height: 0; }
+  .card .ctype { font-size: var(--fs-1); letter-spacing: 0.06em; gap: 3px; min-height: 0; padding-left: calc(var(--gem, 21px) + 15px); }
   .c-type-mark { width: 11px; height: 11px; }
   .card .cname { font-size: var(--fs-2); padding-left: 12px; line-height: 1.12; }
   /* The plain-English effect text is the whole reason a new player can play: it stays.
@@ -2289,8 +2307,11 @@ html, body {
   /* UX-1: left 6px, not -5px — the later-of-us combat fan swing (1.5deg a step) carried
      even a fully inset gem ~5px past the hand row's clip box on the end cards (measured
      at 390x844); 6px of inset keeps it inside through the swing. (The <=620 rule near
-     the top of the file carries the same inset for the same reason.) */
-  .cost-gem { width: 21px; height: 21px; top: -8px; left: 6px; border-width: 1px; }
+     the top of the file carries the same inset for the same reason.)
+     UX-3: socketed INSIDE the card (top 3px, left 3px) — top:-8px hung the circle's top
+     arc past the border box where the card's own overflow:hidden sheared it flat (the
+     user's screenshot). The combat hand overrides size + offset per card (--gem below). */
+  .cost-gem { width: 18px; height: 18px; top: 3px; left: 3px; border-width: 1px; }
   .cost-gem .gem-core { font-size: var(--fs-2); }
   /* The compact CLI code and the "needs more Energy" caption are the only card chrome with
      no gameplay value on screen — the disabled CARD already shows it is disabled, and the
@@ -2376,14 +2397,17 @@ html, body {
      rules at their final values; the Readability floor note survives below.) */
   .card-wrap { min-height: 0 !important; max-width: 164px; flex: 1 1 0; }
   .card { min-height: 0 !important; height: auto; padding: 7px 5px 3px; gap: 1px; }
-  .card .ctype { font-size: 0.6rem; letter-spacing: 0.02em; gap: 2px; padding: 6px 5px 4px; margin: -10px -8px 1px; }
+  .card .ctype { font-size: 0.6rem; letter-spacing: 0.02em; gap: 2px; padding: 6px 5px 4px; padding-left: calc(var(--gem, 18px) + 15px); margin: -10px -8px 1px; }
   .card .c-type-mark { width: 22px; height: 22px; }
   /* Readability floor: the effect sentence must stay legible. It was 0.62rem (9.9px), which
      is below a comfortable phone size; the height it costs is taken back from the decorative
      art plate and the paddings below, never from the text a player has to read. */
   .card .cname { font-size: 0.78rem; padding-left: 11px; }
   .card .cdesc { font-size: 0.74rem; line-height: 1.1; }
-  .cost-gem { width: 18px; height: 18px; top: -6px; left: -4px; }
+  /* UX-3: socketed INSIDE the card — top:-6px/left:-4px hung the circle past the border
+     box where the card's own overflow:hidden sheared it (measured slack -5/-3). The
+     combat hand overrides size + offset per card (--gem below). */
+  .cost-gem { width: 18px; height: 18px; top: 3px; left: 3px; }
   .cost-gem .gem-core { font-size: 0.66rem; }
   .hand { align-items: flex-start; padding: 2px 0 0; }
   .enemy { max-width: 300px; padding: 5px 7px 5px; gap: 1px; }
@@ -3020,7 +3044,10 @@ html, body {
    ========================================================================================== */
 @media screen {
   /* --- Card head = illustration window. The drawing sits right, type mark + word left. --- */
-  .card.has-illus .ctype { position: relative; overflow: hidden; justify-content: flex-start; padding-left: 12px; }
+  /* UX-3: flex-start puts the word at the head's left padding, which the base .ctype rule
+     sizes from the cost gem's socket (gem + 11px). Was padding-left: 12px, which let the
+     first glyphs run under the old corner-straddling gem. */
+  .card.has-illus .ctype { position: relative; overflow: hidden; justify-content: flex-start; }
   /* The mark keeps its per-breakpoint HEIGHT (it sets the head plate's height, which the
      layout contract measured) but gives up its width to the drawing. Type stays readable
      by hue, the type word and the head shape. */
@@ -3457,7 +3484,30 @@ html, body {
   transform-origin: 50% 100%;
   /* Query container for the name size (cqi), see "Combat-hand legibility" below. */
   container-type: inline-size;
+  /* UX-3 gem socket: the cost gem and the type word clear each other by a size derived
+     from the card's OWN width, because the compressed hand realizes every width from
+     ~56px (7 cards at 768px) to the 168px cap — fixed per-tier gem sizes cannot fit the
+     word at the narrow end (measured: the 0.19em ATTACK word alone is 59px wide, so any
+     gem past ~17px overflows a 76px card). --gem is consumed by .stage-combat .cost-gem
+     (size) and .stage-combat .card .ctype (word clearance); cqi resolves here, against
+     this container, on both children. Curve: 27px at the 168px cap down to the 16px
+     legibility floor. */
+  --gem: max(16px, 18cqi);
 }
+/* UX-3: the combat gem is socketed INSIDE the card at every hand size — top/left 3px puts
+   the full circle (1px ring included) within the border box at every realized card width,
+   and the card's own overflow:hidden can no longer shear it. Size rides --gem above; the
+   1px ring matches the small-gem phone tiers (the outer ring shadow keeps the dark edge). */
+.stage-combat .cost-gem {
+  top: 3px;
+  left: 3px;
+  width: var(--gem);
+  height: var(--gem);
+  border-width: 1px;
+}
+/* The digit scales with the socket: a fixed fs-4 core (14.4px) overflowed a 16px floor gem
+   at the narrow end of the compressed hand (76px cards, 768x1024). 9px floor. */
+.stage-combat .cost-gem .gem-core { font-size: max(9px, 8.5cqi); }
 .stage-combat .card-wrap:hover:not(.is-disabled) .card,
 .stage-combat .card-wrap:focus-within:not(.is-disabled) .card,
 .stage-combat .card-wrap.is-pending .card {
@@ -3701,6 +3751,49 @@ html, body {
    above — 196px there too — so this block only caps the fight.) */
 @media (min-height: 700px) and (max-height: 780px) {
   .page-combat .fight { max-height: 348px; }
+}
+/* - UX-3.1: the landscape-short desktop band (481-699px tall, >= 621px wide — the 800x600
+     class, the user's "side cards cropped at some resolutions"). Measured at 800x600 with
+     a 5-card hand, the page was 827px tall in a 600px window and End Turn's bottom sat at
+     760px = 168px below the fold: no height compression applied here at all (the <=480px
+     tier ends at 480, the min-height:700 desktop tier begins at 700), so the base 42vh
+     250px hero figure, 34vh 200px enemy figure and 34vh 204px card face spent the whole
+     window. The compression, measured at 800x600: hero figure 250 -> 140, enemy 200 ->
+     140, the intent line clamped to one row, card face 204 -> 148 with the footer chip
+     hidden and the rules row at 3 lines (the <=480px tier's exact moves), the hand's gem
+     headroom pair shrunk to this band's 1.5deg swing (the gem is socketed INSIDE the card
+     since UX-3; the pair keeps the net-top budget form: 30-14 -> 18-8), the instructional
+     hint (restates Help verbatim) and the chapter page-num dropped, and the app/stage
+     frames tightened. The 44px touch floor is untouched. No frozen row is in this band
+     (915x412 / 844x390 / 1200x450 are <= 480 tall; 768x1024 / 1280x800 / 1366x768 are
+     >= 700) and no phone row matches (min-width 621). */
+@media (min-width: 621px) and (min-height: 481px) and (max-height: 699px) {
+  #app { padding: 6px 8px 8px; gap: 8px; }
+  #stage { padding: 8px 10px 6px; }
+  .page .page-num { display: none; }
+  .hint { display: none; }
+  .stage-combat .hero .fig { height: min(140px, 24vh); }
+  .stage-combat .fig { height: min(140px, 22vh); }
+  /* The enemy row's 6%-of-width floor pad is ~48px at 800px wide (measured); 2% keeps the
+     sprites clear of the dock and gives the band's short end (~481px) its last ~20px. */
+  .stage-combat .enemies { padding-bottom: 2%; }
+  .stage-combat .e-intent { margin-top: 2px; padding: 3px 7px; }
+  .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; }
+  .stage-combat .card {
+    /* 148px holds the 3-line rules row with a ~28px margin at every height in the band
+       (the content needs ~120px, measured); the 124px floor keeps the shortest band
+       window (481px) above the content too, where 25vh alone would dip under it. */
+    height: clamp(124px, 25vh, 148px);
+    padding: 6px 6px 4px;
+    gap: 1px;
+  }
+  .stage-combat .card .cfoot,
+  .stage-combat .cflavor { display: none; }
+  .stage-combat .card .cdesc { font-size: 0.72rem; line-height: 1.15; -webkit-line-clamp: 3; }
+  /* Gem headroom pair (see .stage-combat .hand): net top space 10px (was 16). The gem
+     rides INSIDE the card (UX-3); the 1.5deg fan swings a ~148px card's corner ~4px and
+     the -8px lift sits inside the 18px pad. */
+  .stage-combat .hand { padding: 18px 8px 8px; margin-top: -8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .stage-combat .fig,
@@ -6953,7 +7046,14 @@ html, body {
     padding-right: 4px;
     transform: translateY(-8px) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 1.5deg));
   }
-  .stage-combat .card .ctype { margin-left: -4px; margin-right: -4px; padding-left: 18px; padding-right: 4px; gap: 2px; }
+  /* UX-3: the word starts right of the gem socket (--gem + 11px, measured to a ~4px gap
+     after this rule's -4px margin; was 18px, which let "ATTACK" run under the old
+     corner-straddling gem — the "TACK" screenshot). The 0.06em tracking (was the 0.19em
+     base) is what makes gem + word fit a 76px card: the wide tracking word alone measured
+     59px, so any visible gem overflowed the band at the narrow end of the compressed
+     hand. This rule's specificity also lifts the <=480px tier's 0.02em on short rows
+     (915x412 et al) — at 0.6rem that is a ~1px word-width change, measured harmless. */
+  .stage-combat .card .ctype { margin-left: -4px; margin-right: -4px; padding-left: calc(var(--gem, 18px) + 11px); padding-right: 4px; gap: 2px; letter-spacing: 0.06em; }
   .stage-combat .card .cname { text-align: center; letter-spacing: 0; font-size: max(9px, min(0.98rem, 14cqi)); }
 }
 @media (max-width: 1000px) and (min-height: 700px) {
@@ -7015,6 +7115,59 @@ html, body {
     scroll-snap-align: start;
   }
   .stage-combat .hand:has(> .card-wrap:nth-child(6)) .card { transform: translateY(-8px); }
+}
+/* - UX-3: the same deliberate scroller one band up (761-1000px wide). Below 760px the dock
+     stacks and the hand gets the full row (6 cards compress to ~100px, everything holds);
+     at 761-1000px the 5-column dock leaves ~380-660px, so a 7-card hand compressed to
+     56-86px a card and the fixed face broke down: the 5-line rules clamp outgrew its box
+     and the -3px neighbour overlap covered rules-line ends (both measured,
+     768x1024+hand7); names survived at the 9px floor with ~2px of margin. So 6+ hands
+     here scroll with the <=620 precedent's exact mechanism and cue (next card peeks at
+     the right edge, fan already flattened by the nth-child(6) rule above): cards hold a
+     legible fixed width, the first card is whole at scroll 0, every card is reachable by
+     swipe. 5-card hands keep compress-to-fit (their floor is ~76px — measured clean). */
+@media (min-width: 761px) and (max-width: 1000px) {
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 12px;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) > .card-wrap {
+    /* 104px, not the 86px a 6-way split realizes: at 86px the two-word fixture names
+       ("Returning Brand") wrap to two lines and the 5-line rules clamp outgrew its box by
+       3px (measured, 768x1024+hand7). 104px is the width the 5-card short-tier rows already
+       prove end to end (915x412+hand5): names on one line, clamps inside their boxes. */
+    flex: 0 0 104px;
+    /* Flush, not the row's -3px overlap: at a narrow card the overlap reached past the side
+       padding and covered the rules text's line ends (measured, 768x1024+hand7). The <=620
+       scroller keeps its -2px pair because its overlap equals the padding. */
+    margin: 0;
+    scroll-snap-align: start;
+  }
+  /* The name rides the short-tier cap (0.72rem) instead of the 14cqi curve: proportional
+     sizing re-wraps "Returning Brand" at every width (measured); the cap holds one line at
+     the 104px card the same way it does in the proven 5-card short-tier rows. */
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) .card .cname { font-size: max(9px, min(0.72rem, 13.5cqi)); }
+  /* The 5-line clamp needs an ~82px rules box (5 x 16.38) and the realized row varies
+     67-83px with card width (measured) — 4 lines fit every realized box in this band. */
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) .card .cdesc { -webkit-line-clamp: 4; }
+}
+/* The band's clamp-4 rule above outranks the <=480px tier's 3-line clamp (source order and
+   specificity); the 76px short-tier card only holds three. Restated here for those rows. */
+@media (min-width: 761px) and (max-width: 1000px) and (max-height: 480px) {
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) .card .cdesc { -webkit-line-clamp: 3; }
+}
+/* - UX-3: compressed 6+ hands on the short tiers go flush too. Above 1000px wide there is
+     no scroller, and the base -6px wrap margins overlap neighbours by 12px — past the
+     short tier's 4px side padding, so a full rules line's end ran under the next card
+     (measured, 1200x450+hand7: 4 of 7 cards). 5-card rows keep the overlap: their texts
+     never reached the zone and the frozen rows pin them. */
+@media (max-height: 480px) {
+  .stage-combat .hand:has(> .card-wrap:nth-child(6)) > .card-wrap { margin: 0; }
 }
 @media (max-width: 380px) {
   .stage-combat .hand:has(> .card-wrap:nth-child(6)) > .card-wrap { flex-basis: 72px; }

@@ -453,6 +453,143 @@ test('end turn: the turn advances and the enemy does what its intent announced',
 });
 
 // ---------------------------------------------------------------------------
+// UX-3: the cost gem is a SOCKETED CIRCLE. The old top:-6px/left:-2px offsets hung the
+// gem's top arc past the card's border box, where the combat card's own overflow:hidden
+// sheared it flat (the user's screenshot), and at the narrow tiers the type word ran
+// under the gem ("TACK"). The contract, asserted on the real served page at the two
+// representative tiers (the owner-approved desktop and a phone) with the real 5-card
+// hand and a grown 7-card hand (the full matrix lives in scripts/dev/viewport-check.mjs,
+// which builds the same measurement from the frozen sizes):
+//   * every gem's full circle (border included) lies inside its card rectangle — measured
+//     on a transform-free clone of each card laid out in an off-screen lab at the live
+//     hand's width, so the fan's rotation cannot mask an offset;
+//   * every live gem circle and every hand card bounding box sits inside the viewport
+//     (a deliberate scroller's by-design window excepted: its first card is whole);
+//   * the type word never starts under the gem's circle.
+// ---------------------------------------------------------------------------
+test('UX-3: every cost gem is a whole circle inside its card, and the type word clears it', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 7);
+  await bootToMap(page);
+  await travelToFight(page);
+  await sleep(1300); // the deal-in animation settles before any rect is read
+
+  const GEM_PROBE = () => {
+    const out = { gemOutsideCard: [], gemOutsideVp: [], wordUnderGem: [], cardOutsideVp: [], cards: 0 };
+    const vw = innerWidth, vh = innerHeight;
+    const hand = document.querySelector('.hand');
+    if (!hand) return out;
+    const scrolls = /auto|scroll/.test(getComputedStyle(hand).overflowX) && hand.scrollWidth > hand.clientWidth + 1;
+    const lab = document.createElement('div');
+    lab.className = 'stage-combat';
+    lab.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;';
+    const labHand = document.createElement('div');
+    labHand.className = 'hand';
+    labHand.style.width = hand.clientWidth + 'px';
+    lab.append(labHand);
+    document.body.append(lab);
+    const wraps = [...hand.querySelectorAll(':scope > .card-wrap')];
+    // Clone EVERY wrap before measuring any: flex shares the lab row across the whole hand,
+    // so a lone clone grows to its max-width cap instead of the realized width.
+    const clones = wraps.map((w) => {
+      const c = w.cloneNode(true);
+      c.style.setProperty('--i', '0');
+      const cc = c.querySelector('.card');
+      if (cc) cc.style.transform = 'none';
+      labHand.append(c);
+      return c;
+    });
+    wraps.forEach((wrap, i) => {
+      const card = wrap.querySelector('.card');
+      const clone = clones[i].querySelector('.card');
+      if (!card || !clone) return;
+      out.cards += 1;
+      const name = card.querySelector('.cname')?.textContent.trim() ?? '?';
+      const liveVisible = !scrolls || i === 0; // scrolled-out cards are the scroller's design
+      if (liveVisible) {
+        const cr = card.getBoundingClientRect();
+        if (cr.left < -0.5 || cr.top < -0.5 || cr.right > vw + 0.5 || cr.bottom > vh + 0.5) {
+          out.cardOutsideVp.push(`${name}[${[cr.left, cr.top, cr.right, cr.bottom].map(Math.round).join(',')}]`);
+        }
+        const gem = card.querySelector('.cost-gem');
+        if (gem) {
+          const gr = gem.getBoundingClientRect();
+          if (gr.left < -0.5 || gr.top < -0.5 || gr.right > vw + 0.5 || gr.bottom > vh + 0.5) {
+            out.gemOutsideVp.push(`${name}[${[gr.left, gr.top, gr.right, gr.bottom].map(Math.round).join(',')}]`);
+          }
+        }
+      }
+      const cg = clone.querySelector('.cost-gem');
+      if (!cg) { out.gemOutsideCard.push(`${name}: no .cost-gem`); return; }
+      const box = clone.getBoundingClientRect();
+      const gr = cg.getBoundingClientRect();
+      const slack = [gr.left - box.left, gr.top - box.top, box.right - gr.right, box.bottom - gr.bottom];
+      if (slack.some((s) => s < -0.5)) {
+        out.gemOutsideCard.push(`${name} slack[${slack.map((s) => s.toFixed(1)).join(',')}]`);
+      }
+      const ct = clone.querySelector('.ctype');
+      const word = [...ct.querySelectorAll('span')].find((s) => !/c-type-mark|c-illus/.test(s.className) && s.textContent.trim());
+      if (word) {
+        const wrd = [...word.getClientRects()].filter((x) => x.width > 0.5);
+        if (wrd.length) {
+          const wl = Math.min(...wrd.map((x) => x.left));
+          const wt = Math.min(...wrd.map((x) => x.top));
+          const wb = Math.max(...wrd.map((x) => x.bottom));
+          if (gr.right > wl + 0.5 && gr.left < wl && gr.bottom > wt && gr.top < wb) {
+            out.wordUnderGem.push(`${name} (gem right ${Math.round(gr.right - box.left)} vs word left ${Math.round(wl - box.left)})`);
+          }
+        }
+      }
+    });
+    lab.remove();
+    return out;
+  };
+
+  const GROW7 = `(() => {
+    const hand = document.querySelector('.hand');
+    hand.classList.remove('deal-in');
+    const src = [...hand.children];
+    while (hand.children.length < 7) hand.append(src[hand.children.length % src.length].cloneNode(true));
+    const names = ['Hammerfall', 'Untempered', 'Overtemper', 'Returning Brand', 'Forgeclap', 'Climbing Heat', 'Unbroken'];
+    [...hand.children].forEach((w, i) => {
+      w.style.setProperty('--i', String(i));
+      const nm = w.querySelector('.cname');
+      if (nm) nm.textContent = names[i % names.length];
+    });
+    hand.style.setProperty('--n', String(hand.children.length));
+    hand.scrollLeft = 0;
+    return hand.children.length;
+  })()`;
+
+  for (const [w, h] of [[1280, 800], [390, 844]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await sleep(400); // the tier rules re-resolve at the new size
+    const five = await page.evaluate(GEM_PROBE);
+    assert.ok(five.cards === 5, `a 5-card hand is dealt at ${w}x${h} (got ${five.cards})`);
+    assert.deepEqual(five.gemOutsideCard, [], `gems not fully inside their cards at ${w}x${h}`);
+    assert.deepEqual(five.gemOutsideVp, [], `gem circles outside the viewport at ${w}x${h}`);
+    assert.deepEqual(five.wordUnderGem, [], `type words run under the gem at ${w}x${h}`);
+    assert.deepEqual(five.cardOutsideVp, [], `hand cards outside the viewport at ${w}x${h}`);
+  }
+
+  // The 7-card hand (markup-grown with the longest-word names, like the harness fixture):
+  // the desktop row compresses, the phone row takes the deliberate scroller.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  assert.equal(await page.evaluate(GROW7), 7, 'the hand grows to 7 cards');
+  await sleep(400);
+  for (const [w, h] of [[1280, 800], [390, 844]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await sleep(400);
+    const seven = await page.evaluate(GEM_PROBE);
+    assert.ok(seven.cards === 7, `the 7-card hand is still dealt at ${w}x${h} (got ${seven.cards})`);
+    assert.deepEqual(seven.gemOutsideCard, [], `7-card gems not fully inside their cards at ${w}x${h}`);
+    assert.deepEqual(seven.gemOutsideVp, [], `7-card gem circles outside the viewport at ${w}x${h}`);
+    assert.deepEqual(seven.wordUnderGem, [], `7-card type words run under the gem at ${w}x${h}`);
+    assert.deepEqual(seven.cardOutsideVp, [], `7-card hand cards outside the viewport at ${w}x${h}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // UX-2: the enemy turn is a SEQUENCE of named attacks, not one simultaneous slam.
 // Seed 22's opening fight is two Kiln Mites whose turn-1 intents are both "Will
 // attack for 6" — the smallest shape that can prove ordering. The claims:
