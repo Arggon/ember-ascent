@@ -512,3 +512,13 @@ Process rules (standing):
   release/style.css staleness is expected — the rebuild lands at round close after
   re-review. P3(c) the boot-timeout flake assessment accepted (pre-existing, re-run
   policy).
+- 2026-10-25 — UX-3.2 committed e09cc2d: the P1 closed per the reviewer's structure (the
+  band rescoped to min-width 761px; an explicit deeper-cut arm for 621-760 x 481-699
+  incl. a 481-601 deep sub-arm where the stacked dock cannot fit; the 6+ scroller
+  extended to 621-1000px; four new pinned rows 640x600/760x600 +hand7). The measured
+  grid (widths 621/640/700/760/800 x heights 481/550/600/699, natural 5-card hand):
+  ALL 20 CELLS FIT, End Turn clearance +8/+14, no scroll, no card outside the
+  viewport, gems in cards — and the orchestrator verified the reviewer's exact
+  regression cells live (640x600, 760x600, 621x550, 760x481: clearance +8, 0 cards
+  out, gems whole). 41 matrix rows, zero new-kind failures; doc row counts corrected.
+  Gates green; goldens byte-identical. Re-review next, then the release rebuild.
