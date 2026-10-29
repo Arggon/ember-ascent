@@ -466,3 +466,14 @@ Process rules (standing):
   TREE: 377/376/0/1 node (the pre-existing poolSelection todo), gate OK, art OK, 21/21
   browser, sim 20 runs exit 0 (token budgets PASS), golden cmp byte-identical (sha256
   27b5f677…). LAYOUT-ACCEPTANCE revision recorded.
+- 2026-10-25 — UX-3 (+3.1) committed c23988d after QA PASS with measurement: the gem
+  socketed INSIDE the card at every tier (the REAL root cause was the card's own
+  overflow:hidden shearing the gem's arc — UX-1's headroom fixed the row, not the card
+  edge; the QA's stash-check reproduced the user's bug pre-fix at -7px and post-fix
+  measures +4px inside the border box / +3px inside the clip boundary at every
+  viewport), the hand compresses or deliberately scrolls at every width, AND the
+  measured 481-699px-tall band (800x600: the hand rode 160px below the fold — the
+  user's "some resolutions") gained its height tier (docH 827->600, End Turn
+  clearance -168->+14, the band holding at 481px). Matrix grew to 36 rows, frozen rows
+  metric-identical, goldens byte-identical, 21/21 browser. UX-3.1 verified by the
+  orchestrator live at 800x600 and 800x481. Solo review next, then the release rebuild.
