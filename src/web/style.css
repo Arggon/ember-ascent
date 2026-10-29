@@ -3835,7 +3835,9 @@ html, body {
      44): in a 100px face it inverts and spills 3px past #stage (760x600, measured). The
      <=620 tier hides it too; the head drawing stays. */
   .stage-combat .card .c-art { display: none; }
-  .card .c-type-mark { width: 0; height: 0; margin-right: -6px; visibility: hidden; }
+  /* Scoped to combat on purpose: the 38px hidden mark alone overflows the 100px combat
+     face, but reward/shop tiles (236px) have room — their type marks stay visible. */
+  .stage-combat .card .c-type-mark { width: 0; height: 0; margin-right: -6px; visibility: hidden; }
   /* Gem headroom pair: 14px top / -8px margin (net 6px) — the 1.5deg fan swings a 100px
      card's corner ~2.6px and the -8px lift sits inside the 14px (AABB top +3px). */
   .stage-combat .hand { padding: 14px 8px 8px; margin-top: -8px; }

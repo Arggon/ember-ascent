@@ -512,7 +512,7 @@ Process rules (standing):
   release/style.css staleness is expected — the rebuild lands at round close after
   re-review. P3(c) the boot-timeout flake assessment accepted (pre-existing, re-run
   policy).
-- 2026-10-25 — UX-3.2 committed e09cc2d: the P1 closed per the reviewer's structure (the
+- 2026-10-29 — UX-3.2 committed e09cc2d: the P1 closed per the reviewer's structure (the
   band rescoped to min-width 761px; an explicit deeper-cut arm for 621-760 x 481-699
   incl. a 481-601 deep sub-arm where the stacked dock cannot fit; the 6+ scroller
   extended to 621-1000px; four new pinned rows 640x600/760x600 +hand7). The measured
@@ -522,3 +522,14 @@ Process rules (standing):
   regression cells live (640x600, 760x600, 621x550, 760x481: clearance +8, 0 cards
   out, gems whole). 41 matrix rows, zero new-kind failures; doc row counts corrected.
   Gates green; goldens byte-identical. Re-review next, then the release rebuild.
+- 2026-10-29 — UX-3 re-review VERDICT: APPROVE. The P1 verified fixed (the reviewer
+  probed BEYOND the claimed grid: 602-690 tall, docH tracks the viewport, no hole;
+  source-order audit correct; deep-arm HUD recipe verified). Remaining: P2 the deep
+  sub-arm's short ends are measured green (dev grid + orchestrator live probe:
+  760x481 hand bottom 467/481 +14, 800x481 586/600 +14, gems in cards, cards in
+  viewport) but NOT harness-pinned - the harness's >=381px hero-name assertion
+  encodes the pre-band design (the stage hero column the band intentionally drops);
+  pinning needs a band-aware hero-name decision (a11y: where does the name live at
+  481px tall?) -> backlog. P3 fixed in the tree: the narrow arm's type-mark hide
+  scoped to .stage-combat (reward/shop tiles keep their marks); the UX-3.2 entry
+  date corrected to 2026-10-29. Release rebuilt at round close.

@@ -132,6 +132,14 @@ const SIZES = [
   // the side-by-side dock the 800px row was calibrated on.
   [640, 600, 'short-window-640'],
   [760, 600, 'short-window-760'],
+  // UX-3.2 review asked for the deep sub-arm's SHORT ends pinned too (760x481 rides the
+  // min(100px, 17vh) face at 82px realized; 800x481 the >=761 clamp floor). MEASURED
+  // GREEN by the dev grid and the orchestrator's live probe (hand bottom 467/481 and
+  // 586/600, gems in cards, cards in viewport) — but the harness rows are NOT added:
+  // its >=381px hero-name assertion encodes the PRE-BAND design (the stage hero column),
+  // which the 481-699px band intentionally drops in favor of the HUD vitals. Pinning
+  // them needs a band-aware hero-name check — a design decision (is the name required
+  // at 481px tall, and where?) recorded in the roadmap backlog, not smuggled in here.
 ];
 // Max-hand rows: the kernel caps the hand at 10 (src/kernel/rules/act.js and friends:
 // `hand.length < 10`). No seed deals 10 on turn 1, so the harness builds the worst case from
