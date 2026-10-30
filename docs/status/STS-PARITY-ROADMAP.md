@@ -581,3 +581,12 @@ Process rules (standing):
   481px tall?) -> backlog. P3 fixed in the tree: the narrow arm's type-mark hide
   scoped to .stage-combat (reward/shop tiles keep their marks); the UX-3.2 entry
   date corrected to 2026-10-29. Release rebuilt at round close.
+- 2026-10-29 — UX-4 committed b06f841 after QA PASS 9/9 (measured: deal 171-189ms gaps/
+  600ms flights/1318ms span; Hammerfall pose 1120ms at 1x and exactly 560ms at 2x — the
+  classic pace; the enemy turn doubled; the Maul kill hold ~2.9s with the reward
+  arriving; dock cinematic/classic/skip verified; reduced motion fast; zero errors).
+  SLOW_FACTOR=2 expressed in animMs + --pace (373 CSS declarations routed); the opening
+  hand now deals (a real find — it never animated). UX-5 (real path topology + input
+  lock) resumes next on top; note the orchestrator stopped its first dispatch because
+  it had been started against the same uncommitted tree UX-4's QA was testing — the
+  quiescent-tree rule now applies to QA too, not only reviews.
