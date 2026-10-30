@@ -11,9 +11,10 @@ import { BIOMES, DEFAULT_BIOME } from '../kernel/index.js';
 import {
   HERO_POSE_MS,
   SPEED_KEY,
+  animMs,
   animSpeed,
   bursts,
-  dealPending,
+  dealClock,
   dyingThisPaint,
   enteringIds,
   flash,
@@ -50,16 +51,17 @@ export function heroPose() {
   const move = heroMove(bursts.find((b) => b.kind === 'card-fly'));
   if (move) {
     // Reduced motion and speed 0 skip the animation; do not hold a pose that never plays.
-    // The hold length is the CSS animation's own duration (the keyframes do not scale
-    // with the JS speed setting), so the pose is never dropped mid-swing on a repaint.
-    // A per-card SIGNATURE (HERO_SIGNATURES) may override the pose's base duration.
+    // The hold length is the pose's PACED duration — the same `animMs` figure the
+    // stylesheet's `calc(<base>s * var(--pace, 1))` resolves to — so the pose is never
+    // dropped mid-swing on a repaint and the swing plays at the dock's pace. A per-card
+    // SIGNATURE (HERO_SIGNATURES) may override the pose's base duration.
     const sig = move ? signatureFor(bursts.find((b) => b.kind === 'card-fly')) : null;
     const base = (sig && sig.poseMs) || HERO_POSE_MS[move] || 400;
     if (reducedMotion || animSpeed === 0) setHeroMoveHold(null);
     // `melee` arms the approach (`.hero.is-approach`): a stroke that is not a throw or a
     // cast carries the hero into the enemy lane. fx.js measures the real gap right after
     // the paint and writes it back as `approachX` on this same hold.
-    else setHeroMoveHold({ pose: move, start: Date.now(), dur: base, melee: isMeleeMove(move) });
+    else setHeroMoveHold({ pose: move, start: Date.now(), dur: animMs(base), melee: isMeleeMove(move) });
     return move;
   }
   // An incidental repaint (hover, aim) during the hold repaints the SAME pose rather
@@ -314,10 +316,19 @@ export function combatView() {
   const dock = el('div', { cls: 'dock' });
   dock.append(pileButton('draw'));
   dock.append(energyOrb());
+  // UX-4: the deal is a visible EVENT. While the deal clock is armed the hand carries
+  // `deal-in` and the clock's PACED step/duration as CSS variables, plus `--deal-offset`
+  // (the negative elapsed time) so a mid-deal repaint — a hover — RESUMES each card's
+  // flight where it is instead of cutting it (the same resume shape the hero pose uses).
+  // The layout contract is unchanged: the entry animates, the fan it lands in does not.
+  const deal = dealClock;
+  const dealStyle = deal
+    ? `;--deal-step:${deal.stepMs}ms;--deal-dur:${deal.durMs}ms;--deal-offset:${Math.min(0, deal.start - Date.now())}ms`
+    : '';
   // Fan rotation lives on the inner card (`--i`), never on this wrap, so the hand stays one row.
   dock.append(el('div', {
-    cls: 'hand' + (dealPending ? ' deal-in' : ''),
-    attrs: { style: `--n:${snap.hand.length}` },
+    cls: 'hand' + (deal ? ' deal-in' : ''),
+    attrs: { style: `--n:${snap.hand.length}${dealStyle}` },
   }, ...snap.hand.map((c, i) => cardTile(c, { index: i + 1 }))));
   dock.append(pileButton('discard'));
   dock.append(combatControls(targeting));

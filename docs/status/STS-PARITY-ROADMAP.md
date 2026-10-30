@@ -59,6 +59,7 @@ Process rules (standing):
 | UX-2 | The sequenced, named enemy turn + UX-1 review fixes | kernel untouched (goldens byte-identical) | per-attacker floats, intent highlight, ≤380 restore, sealed vault, tooltips | closed — c8ee3f7 + 7906900, QA 10/10, review APPROVE (P2 fixed in 7906900) |
 | UX-3 | The socketed cost gem + the hand always fits | kernel untouched (goldens byte-identical) | gem inside the card at every tier (--gem cqi sizing), type word clears the socket, 621-1000px 6+ scroller, short-tier flush 6+ hands, viewport-check gem/hand7 matrix, e2e gem test | committed c23988d — QA PASS, review REQUEST_CHANGES (P1 band scope) -> UX-3.1 fix in the tree |
 | UX-3.1 | The landscape-short desktop band (QA follow-up) | kernel untouched (goldens byte-identical) | 481-699px height tier in two width arms (761+ side-by-side dock; 621-760 stacked with a deep 481-601 sub-arm), matrix rows 800x600/640x600/760x600 + hand7 | review fix in the tree — gates green, re-review pending |
+| UX-4 | The halved pace + a visible draw and play | kernel untouched (goldens byte-identical) | SLOW_FACTOR=2 in animMs + --pace on every combat one-shot CSS duration/delay; the deal re-timed to a visible stagger (90ms base step / 300ms base flight, resume-across-repaint deal clock); pose holds, card-fly, throws, kill holds, banners all routed; dock: 1× cinematic, 2× classic, » skip | in the tree — gates green, QA/review pending |
 | S10 | Meta: relic unlocks | the profile unlock system grows the RELIC pool across runs (StS: new relics enter the pool as you play) | codex or summary surface for unlocked relics | closed — 2ef8ce5, QA 10/10, review APPROVE (5 P3s → backlog) |
 | S9 | Act 2 (The Kiln Deeps) | two-act generation + transition in the victory chain; harder tables; legacy back-compat | Act II chapter marker, Kiln backdrop, act-aware end summary | closed — 641731a + d08da32 + c4a0ace, re-review APPROVE |
 
@@ -400,6 +401,53 @@ Process rules (standing):
   claims corrected in floats.js + the roadmap (it exists only when ">>" armed before
   the turn). Gates at 7906900: 377/376/1 node, gate OK, art OK, 20/20 browser, sim
   exit 0, golden byte-identical. UX ROUNDS CLOSED.
+- 2026-10-29 — UX-4 dev done (the user's live-play report: "Combat animations and FXs
+  still so fast. reduce it to half. Card draw and card usage animation are not there or
+  they are so fast that don't allow me to see them"). ONE FACTOR, TWO EXPRESSIONS: (1)
+  `SLOW_FACTOR = 2` in runtime's `animMs` — `ms × SLOW_FACTOR ÷ animSpeed` — so every
+  JS-scheduled beat doubles at the new 1× (pose holds now arm `animMs(base)`; the deal
+  clock, card-fly/hammer flights, hit impacts, hit-stop, the UX-2 plan, kill holds and
+  the end-hold stroke estimate `animMs(650)` all route); (2) `--pace` on the document
+  root (`SLOW_FACTOR ÷ animSpeed`, 0 at ») — every ONE-SHOT combat duration AND delay in
+  style.css (373 declarations: all poses + sprite frames, foe slam/strike, juice beats,
+  floats, shatter, shake, banners/ring/bloom/darken, every per-card fx node) is
+  `calc(<base> × var(--pace, 1))`; ambient loops (breathe/wind/embers) and screen
+  arrivals (fade-up, settle, travel-in, act card) stay at base and are flagged as out of
+  combat scope. THE DEAL RE-TIMED: base step 0.03s → 0.09s, base flight 0.3s, flight
+  distance 24px → 64px — at 1× an 8-card deal spans 7×180+600 ≈ 1.86s of cards landing
+  one by one, each card's flight 600ms ≥ 400ms target; a new run-scoped deal clock
+  (runtime `DEAL` + `dealClock`) holds `deal-in` for the whole span and re-derives
+  `--deal-offset` per repaint so a hover RESUMES the deal instead of cutting it; the
+  fan never shifts (juice-deal ends at transform:none, rotation lives on the inner
+  .card — asserted in the new e2e). CARD-PLAY VISIBILITY: measured the fx-card flight at
+  34vh ≈ 272px at 1280x800 — NOT near-zero; the fix is the doubled duration (CSS
+  0.42s → 0.84s at 1×, node lifetime animMs(460) = 920ms), no keyframe change. ROUTING
+  AUDIT FIXED: vignette/wipe/banner/boss-ring/run-bloom/run-darken/act-card/scene
+  fxAdd lifetimes were RAW ms — all routed through animMs; the » gap where CSS
+  animations kept playing at skip speed is closed by --pace = 0. DOCK SEMANTICS: 1× =
+  cinematic (everything doubled), 2× = the classic pace (animMs(base), --pace = 1),
+  » skips; documented in PLAYING.md. Reduced motion arms nothing, unchanged. TESTS
+  MOVED HONESTLY: the pose-hold release probe waits out the paced window (1800ms), the
+  UX-2 sequence bounds double (float/badge gap >= 700ms vs the 1000ms beat), signature/
+  hammer/kill-slot probe sleeps re-measured, and a NEW e2e asserts the deal: every card
+  >= 400ms flight, consecutive lands >= 150ms apart, span >= 1s, entry is a travel, fan
+  layout stable. Kernel untouched: golden rebuild + cmp BYTE-IDENTICAL to 3e0d108
+  (sha256 27b5f677…). LIVE MEASUREMENT at the new 1x (1280x800, seed 7): --pace=2; the
+  opening deal lands 5 cards at 180ms steps with a 600ms flight each (delays
+  0/178/358/538/718 observed, span 1318ms); Hammerfall's pose computes 1.12s (was
+  0.56s); the played-card flight computes 0.84s (was 0.42s). THE 2x DOCK MEASURED:
+  --pace=1, deal flight 300ms, pose 0.56s — the classic pace, as documented. One slice
+  finding fixed en route: the OPENING hand never animated a deal at all (the deal burst
+  was gated on before.phase === 'combat', so the fight's first draw painted fully
+  formed) — entering combat now pushes the same deal burst. Layout matrix: the frozen
+  1280x800 row is METRIC-IDENTICAL to the 3e0d108 baseline A/B (End Turn 753/800,
+  clearance 47, spill -6, pass; 800x600 586/600 +14 pass); the 915x412 seed-7 row fails
+  "rules text hidden: Anvil Blow" on the PRISTINE BASELINE TOO (worktree A/B —
+  pre-existing, seed-dependent hand content, not this slice). The harness's fixed
+  1300ms post-fight settle could now land mid-deal, so it waits the entry out for real
+  (DEAL_SETTLED: no running juice-deal animation). Gates: 377 tests / 376 pass / 0
+  fail / 1 pre-existing poolSelection todo, gate OK, art OK, sim 20 runs exit 0
+  (token budgets PASS), browser 22/22 (21 prior + the new deal-visibility test).
 - 2026-10-29 — USER RE-TEST after UX-1: (1) "the cards energy cost still not fully
   visible, all the circle must be visible" — the gem's circle CLIPPED at the card's
   corner; (2) "some side cards get are visible cropped at some resolutions". UX-3

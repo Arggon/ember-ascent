@@ -29,6 +29,7 @@ import {
   runEvents,
   seedFromUrl,
   setBursts,
+  setDealClock,
   setDealPending,
   setDyingThisPaint,
   setEndFocusPending,
@@ -217,6 +218,12 @@ export function act(actionId, targetK = null) {
       // The hand the player is looking at changed: the replacement cards fan in.
       if (handKey(before.hand) !== handKey(after.hand)) fx.push({ kind: 'deal' });
     }
+    // UX-4: the OPENING hand is a draw too. Entering a fight (map/reward/rest/event ->
+    // combat) lands the first hand fully formed — the deal burst above only fired on
+    // IN-combat hand changes, so the most-seen draw in the game was the one with no
+    // animation at all. The fight's first paint now deals its hand the same way every
+    // later draw plays. Presentation only: a burst the renderer consumes; no rule reads it.
+    if (after.phase === 'combat' && before.phase !== 'combat') fx.push({ kind: 'deal' });
 
     // A TRAVEL along the map. The map is rebuilt on every paint too, so the departing node
     // is gone by the time the new one is drawn. The node the player stood on is therefore
@@ -322,11 +329,12 @@ export function act(actionId, targetK = null) {
   }
   // UX-2: arm the strike sequence BEFORE the paint, so the slam poses it schedules are
   // painted with their per-attacker delays from the first frame. The plan carries the
-  // ALREADY-DIVIDED durations (animMs applies the speed dock once, here), so 2× halves
-  // every beat and reduced motion / » never arm one at all — those shapes collapse to the
-  // simultaneous fast form the turn had before this slice. A flip that ENDS the run (the
-  // hero died on the enemy turn) arms nothing: the defeat panel is the moment, and
-  // unplaced floats would land unpositioned over it (UX-2 review P3).
+  // ALREADY-PACED durations (animMs applies the dock and the UX-4 base factor once,
+  // here), so the dock scales every beat and reduced motion / » never arm one at all —
+  // those shapes collapse to the simultaneous fast form the turn had before this slice.
+  // A flip that ENDS the run (the hero died on the enemy turn) arms nothing: the defeat
+  // panel is the moment, and unplaced floats would land unpositioned over it (UX-2
+  // review P3).
   const seqBurst = after.phase === 'ended' ? null : fx.find((b) => b.kind === 'enemy-turn');
   if (seqBurst && !reducedMotion && animSpeed !== 0) {
     const beatMs = animMs(STRIKE_SEQ.beat);
@@ -411,6 +419,7 @@ export function newGame(seed = null, opts = {}) {
   bumpAnimGen();
   clearHitstop();
   setDealPending(false);
+  setDealClock(null);
   setDyingThisPaint([]);
   setLastPlayerStatuses([]);
   setPaintedPhase(null);

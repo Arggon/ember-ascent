@@ -238,7 +238,12 @@ const ev = async (e) => {
 // Full navigate - dismiss - navigate - travel cycle, per viewport x seed.
 // Each step WAITS for the element it needs before the old settle time: with fixed sleeps alone a
 // loaded machine produced "End Turn NOT FOUND" / "no seed" rows because the page had not
-// rendered yet. The final 1300ms settle stays so the deal-in animation is over.
+// rendered yet. The final settle then waits the deal ENTRY out for real (UX-4: the deal
+// now spans ~1.3s+ at 1x and can grow with the pace), so this harness always measures the
+// SETTLED layout — animations do not move the layout boxes, but they do move the boxes
+// while they run, and a card sampled mid-flight read as "rules text hidden".
+const DEAL_SETTLED = `[...document.querySelectorAll('.hand .card-wrap')]
+  .every((w) => !(w.getAnimations && w.getAnimations().some((a) => a.animationName === 'juice-deal' && a.playState === 'running')))`;
 async function waitFor(expr, timeoutMs = 15000) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
@@ -267,6 +272,8 @@ async function cycle(url) {
   await ev(`(()=>{const n=document.querySelector('.node.available');if(n)n.click();return 1})()`);
   await waitFor(FIGHT_READY);
   await sleep(1300);
+  await waitFor(DEAL_SETTLED, 8000);
+  await sleep(200);
 }
 
 const rows = [];

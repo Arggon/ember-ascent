@@ -45,8 +45,8 @@
 // snapshot act() refreshes, so cards cannot be injected into a live hand. The one
 // writable lever is ctl.load(save): parse ctl.save(), append deck entries, reload
 // — BEFORE travelling. The fight then deals them like real cards. Transient FX are
-// sampled by an in-page 40ms collector: stage-shake lasts 450ms and fx-shockwave
-// 560ms, which round-trip polling from Node can miss.
+// sampled by an in-page 40ms collector: at the UX-4 pace stage-shake lasts 900ms and
+// fx-shockwave 1120ms, which round-trip polling from Node can miss.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -472,7 +472,7 @@ test('UX-3: every cost gem is a whole circle inside its card, and the type word 
   const page = await freshPage(t, 7);
   await bootToMap(page);
   await travelToFight(page);
-  await sleep(1300); // the deal-in animation settles before any rect is read
+  await sleep(2400); // the deal-in settles before any rect is read (UX-4: a 5-card deal spans ~1.32s)
 
   const GEM_PROBE = () => {
     const out = { gemOutsideCard: [], gemOutsideVp: [], wordUnderGem: [], cardOutsideVp: [], cards: 0 };
@@ -644,8 +644,10 @@ test('the enemy turn plays as ordered, named attacks (UX-2 sequence)', { timeout
 
   const before = await readState(page);
   await endTurn(page);
-  // The sequence at 1x: floats land ~0.3s and ~0.8s in, the turn settles by ~1.7s.
-  await sleep(2400);
+  // The sequence at the UX-4 1x (doubled beat: 1000ms gap, 1280ms slam, impact at 589ms):
+  // floats land ~0.6s and ~1.6s in, the turn settles by ~2.3s and the last named float
+  // lives ~1.9s beyond its landing.
+  await sleep(3600);
   const seq = await page.evaluate(() => { clearInterval(window.__seqTimer); return window.__seq; });
   const after = await readState(page);
 
@@ -661,8 +663,8 @@ test('the enemy turn plays as ordered, named attacks (UX-2 sequence)', { timeout
       `float ${i} carries its own attacker's damage: ${seq.floats[i].text}`);
     assert.match(seq.floats[i].text, /Kiln Mite/, `the float NAMES the attacker: ${seq.floats[i].text}`);
   }
-  assert.ok(seq.floats[1].t - seq.floats[0].t >= 200,
-    `the strikes land in ORDER, a beat apart: ${seq.floats.map((f) => `${f.text}@${f.t - seq.floats[0].t}ms`).join(', ')}`);
+  assert.ok(seq.floats[1].t - seq.floats[0].t >= 700,
+    `the strikes land in ORDER, a beat apart (the UX-4 beat is 1000ms): ${seq.floats.map((f) => `${f.text}@${f.t - seq.floats[0].t}ms`).join(', ')}`);
 
   // The striking badge highlight moves with the sequence: attacker 1's window opens
   // first, attacker 2's a beat later.
@@ -671,8 +673,110 @@ test('the enemy turn plays as ordered, named attacks (UX-2 sequence)', { timeout
   const two = firstOf('2');
   assert.ok(one, 'attacker 1 badge carried the intent-strike highlight');
   assert.ok(two, 'attacker 2 badge carried the intent-strike highlight');
-  assert.ok(two.t - one.t >= 200,
-    `the highlight moved attacker 1 -> attacker 2, a beat apart: ${two.t - one.t}ms`);
+  assert.ok(two.t - one.t >= 700,
+    `the highlight moved attacker 1 -> attacker 2, a beat apart (the UX-4 beat is 1000ms): ${two.t - one.t}ms`);
+});
+
+// ---------------------------------------------------------------------------
+// UX-4: the DRAW is a visible DEAL. The complaint under the slice: cards landed
+// "almost together" (a 30ms ripple over a 0.3s fade) and the play barely registered.
+// The claims, measured on the fight's own opening deal:
+//   * every card's entry is a real animation (juice-deal) with a >=400ms flight
+//     (the paced 600ms);
+//   * consecutive cards land a >=150ms beat apart (the paced 180ms step) — an 8-card
+//     deal therefore spans 7x180 + 600 ≈ 1.86s of visible sequential landing;
+//   * the entry is a TRAVEL, not a fade: mid-deal, wraps sit away from their seats;
+//   * the deal lands in the layout's OWN fan: the settled live hand's wrap rects equal
+//     an off-screen lab copy built without the deal class (the UX-3 lab pattern), and
+//     no transform residue is left on any wrap — the cards land where the layout put
+//     them, only the entry animates.
+// (The opening hand is 5 cards; the step assertion is what generalises to 8.)
+// ---------------------------------------------------------------------------
+test('the opening draw is a visible deal: staggered, travelling, layout-stable (UX-4)', { timeout: 60000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t);
+  await bootToMap(page);
+  await travelToFight(page);
+
+  // MID-DEAL sample, taken as soon as the fight paints: the deal clock is still running
+  // (a 5-card deal spans ~1.32s), so late wraps are held at their entry frame and early
+  // ones are mid-flight. Each wrap reports its own juice-deal timing off the Web
+  // Animations API — the deal's own clock, not a stylesheet constant.
+  const mid = await page.evaluate(() => {
+    const wraps = [...document.querySelectorAll('.hand.deal-in > .card-wrap')];
+    return {
+      n: wraps.length,
+      anims: wraps.map((w) => {
+        const a = (w.getAnimations ? w.getAnimations() : []).find((x) => x.animationName === 'juice-deal');
+        if (!a) return null;
+        const t2 = a.effect.getComputedTiming();
+        return { delay: t2.delay, dur: t2.duration };
+      }),
+      cardRects: wraps.map((w) => {
+        const r = w.querySelector('.card').getBoundingClientRect();
+        return { x: Math.round(r.x * 10) / 10, y: Math.round(r.y * 10) / 10 };
+      }),
+      wrapRects: wraps.map((w) => {
+        const r = w.getBoundingClientRect();
+        return { x: Math.round(r.x * 10) / 10, y: Math.round(r.y * 10) / 10 };
+      }),
+    };
+  });
+
+  assert.ok(mid.n >= 5, `the opening hand is dealt (${mid.n} cards)`);
+  assert.ok(mid.anims.every((a) => a), `every dealt card carries the deal entry: ${JSON.stringify(mid.anims)}`);
+  for (const a of mid.anims) {
+    assert.ok(a.dur >= 400, `each card's flight is a visible >=400ms (got ${a.dur}ms)`);
+  }
+  for (let i = 1; i < mid.anims.length; i += 1) {
+    const gap = mid.anims[i].delay - mid.anims[i - 1].delay;
+    assert.ok(gap >= 150, `cards land one by one: card ${i + 1} starts >=150ms after card ${i} (got ${gap}ms)`);
+  }
+  const span = mid.anims[mid.anims.length - 1].delay + mid.anims[mid.anims.length - 1].dur;
+  assert.ok(span >= 1000, `the deal spans a readable >=1s (${Math.round(span)}ms for ${mid.n} cards)`);
+
+  // Settle, then prove the LANDING: the settled live hand must sit exactly where the
+  // ordinary layout puts a hand — measured against an off-screen lab copy built without
+  // the deal class (the UX-3 gem probe's lab pattern). Only the entry animates; the fan
+  // the deal lands in is the layout's own, and no entry residue is left on the wraps.
+  await sleep(2400);
+  const end = await page.evaluate(() => {
+    const hand = document.querySelector('.hand');
+    const lab = document.createElement('div');
+    lab.className = 'stage-combat';
+    lab.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;';
+    const labHand = document.createElement('div');
+    labHand.className = 'hand';
+    labHand.style.width = hand.clientWidth + 'px';
+    lab.append(labHand);
+    document.body.append(lab);
+    const live = [...hand.querySelectorAll(':scope > .card-wrap')];
+    for (const w of live) labHand.append(w.cloneNode(true));
+    const off = (w, parent) => {
+      const r = w.getBoundingClientRect();
+      const p = parent.getBoundingClientRect();
+      return { x: Math.round((r.x - p.x) * 10) / 10, y: Math.round((r.y - p.y) * 10) / 10 };
+    };
+    const out = {
+      live: live.map((w) => off(w, hand)),
+      lab: [...labHand.querySelectorAll(':scope > .card-wrap')].map((w) => off(w, labHand)),
+      residue: live.map((w) => getComputedStyle(w).transform),
+    };
+    lab.remove();
+    return out;
+  });
+  assert.equal(end.live.length, mid.n, 'the settled hand is the dealt hand');
+  assert.deepEqual(end.residue, Array(end.live.length).fill('none'),
+    'the entry released every wrap: no transform left after the deal');
+  for (let i = 0; i < end.live.length; i += 1) {
+    const dx = Math.abs(end.live[i].x - end.lab[i].x);
+    const dy = Math.abs(end.live[i].y - end.lab[i].y);
+    assert.ok(dx <= 1 && dy <= 1,
+      `card ${i + 1} lands exactly in the layout's own fan position (off by ${dx},${dy}px)`);
+  }
+  const travelled = mid.wrapRects.some((r, i) =>
+    Math.abs(r.x - end.live[i].x) >= 20 || Math.abs(r.y - end.live[i].y) >= 20);
+  assert.ok(travelled, 'the deal entry is a travel: a card was away from its seat mid-deal');
 });
 
 test('kill: the stroke plays against the hold stage, then the reward arrives', { timeout: 240000 }, async (t) => {
@@ -818,7 +922,9 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
     'the pending card must announce its targeting state');
 
   await page.locator(`.enemy[data-target-index="${tank.index + 1}"]`).click();
-  await sleep(3200); // pose 1150ms; impact beat at 66% = 759ms; shockwave lives 560ms
+  // UX-4 pace: pose animMs(1150) = 2300ms; impact beat at 66% ≈ 1518ms; the shockwave
+  // lives a paced 1120ms beyond that.
+  await sleep(5200);
 
   const fx = await page.evaluate(() => window.__fx);
   const after = await readState(page);
@@ -918,7 +1024,8 @@ async function probeHammerArc(t, seed) {
     // enemy plays on the click alone. Either way the hammer flies after the aim.
     const aiming = page.locator('.enemy.targeting');
     if ((await aiming.count()) > 0) await aiming.first().click();
-    await sleep(2600);
+    // UX-4 pace: the salvo's flight is animMs(900) = 1800ms and lands at ~1512ms.
+    await sleep(3200);
     return { arc: await page.evaluate(() => window.__arc) };
   } finally {
     await browser.close();
@@ -988,7 +1095,6 @@ async function probeKillSlot(t, seed) {
     }
     const victim = s.enemies.reduce((a, b) => (b.hp < a.hp ? b : a));
     if (victim.hp > 10) return null; // the salvo must KILL, or there is no reflow to pin
-
     const before = await page.evaluate(() => [...document.querySelectorAll('.enemy[data-target-index]')]
       .map((el) => { const r = el.getBoundingClientRect(); return { t: el.getAttribute('data-target-index'), x: Math.round(r.x + r.width / 2) }; }));
 
@@ -996,7 +1102,7 @@ async function probeKillSlot(t, seed) {
     await twin.first().click();
     await page.waitForSelector('.enemy.targeting', { timeout: 3000 });
     await page.locator(`.enemy[data-target-index="${victim.index + 1}"]`).click();
-    await sleep(500); // mid-flight; the ghost holds until ~756ms, then shatters
+    await sleep(500); // mid-flight; the ghost holds until ~1512ms now (UX-4), then shatters
 
     const mid = await page.evaluate((victimIdx) => {
       const g = document.querySelector(`.enemy.is-dying[data-death-index="${victimIdx}"]`);
@@ -1096,8 +1202,10 @@ async function probeSignatureFx(t, seed) {
         if ((await page.locator('.enemy.targeting').count()) > 0) {
           await page.locator('.enemy[data-target-index]').first().click();
         }
-        await sleep(2000); // beat + fx life; also keeps the next play from retiring this
-                           // one's pending signature timer (the animGen guard)
+        // UX-4 pace: the impact beat fires at up to animMs(0.66 x pose) ≈ 1518ms and the
+        // effect lives a paced ~1120ms beyond; also keeps the next play from retiring
+        // this one's pending signature timer (the animGen guard).
+        await sleep(3200);
         if ((await page.evaluate((k) => window.__fx[k], key)) > seen) pending.delete(key);
       }
       if (pending.size === 0) break;

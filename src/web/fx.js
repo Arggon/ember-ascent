@@ -81,12 +81,12 @@ export function sceneBeat(from, to) {
       fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
         el('span', { cls: 'fx-act-num', text: 'Act I' }),
         el('span', { cls: 'fx-act-name', text: snap.biomeName ?? BIOMES[DEFAULT_BIOME].name }),
-        el('span', { cls: 'fx-act-rule' })), 2300);
+        el('span', { cls: 'fx-act-rule' })), animMs(2300));
     }
     return;
   }
   if (to === 'ended') return;
-  fxAdd(el('div', { cls: `fx-scene to-${to}`, attrs: { 'aria-hidden': 'true' } }), 700);
+  fxAdd(el('div', { cls: `fx-scene to-${to}`, attrs: { 'aria-hidden': 'true' } }), animMs(700));
 }
 
 /**
@@ -178,7 +178,10 @@ export function dispatchFx() {
   for (const b of list) {
     switch (b.kind) {
       case 'vignette':
-        fxAdd(el('div', { cls: 'fx-vignette' }), 620);
+        // Every fx-layer LIFETIME is a paced beat (animMs), so the node always outlives
+        // its stylesheet animation — whose duration is the same base multiplied by
+        // `--pace` — and » (animMs → 0) removes it at once.
+        fxAdd(el('div', { cls: 'fx-vignette' }), animMs(620));
         break;
       case 'enemy-turn': {
         // UX-2: the enemy turn as a SEQUENCE of named attacks. The plan (armed in act()
@@ -207,12 +210,12 @@ export function dispatchFx() {
         // hit. (The aggregate "You take N" toast keeps the net fact for everyone else.)
         if (b.playerLost > 0) {
           const last = plan.attacks.length - 1;
-          fire(() => fxAdd(el('div', { cls: 'fx-vignette' }), 620), plan.beatMs * last + plan.impactMs);
+          fire(() => fxAdd(el('div', { cls: 'fx-vignette' }), animMs(620)), plan.beatMs * last + plan.impactMs);
         }
         break;
       }
       case 'wipe':
-        fxAdd(el('div', { cls: 'fx-turn-wipe' }), 460);
+        fxAdd(el('div', { cls: 'fx-turn-wipe' }), animMs(460));
         break;
       case 'card-fly':
         // `b.side` is already my own full lane class (`side-0` / `side-mid` / `side-1` /
@@ -287,18 +290,18 @@ export function dispatchFx() {
   // The boss arrives as a BEAT, not a bigger fade: a red wash, a heavier and slower
   // title card, plus a ring that expands out of the enemy row.
   if (welcome) {
-    fxBanner('SLAG WARDEN', 'boss', '', 1350);
-    fxAdd(el('div', { cls: 'fx-boss-ring' }), 1100);
+    fxBanner('SLAG WARDEN', 'boss', '', animMs(1350));
+    fxAdd(el('div', { cls: 'fx-boss-ring' }), animMs(1100));
   }
   // The run's last two moments, each with its own weight: a bright hold for the win, a
   // slow darkening for the loss. Both are words as well as motion.
   if (won) {
-    fxBanner('VICTORY', 'victory', '', 1500);
-    fxAdd(el('div', { cls: 'fx-run-bloom' }), 1400);
+    fxBanner('VICTORY', 'victory', '', animMs(1500));
+    fxAdd(el('div', { cls: 'fx-run-bloom' }), animMs(1400));
   }
   if (lost) {
-    fxBanner('DEFEAT', 'defeat', '', 1700);
-    fxAdd(el('div', { cls: 'fx-darken' }), 1700);
+    fxBanner('DEFEAT', 'defeat', '', animMs(1700));
+    fxAdd(el('div', { cls: 'fx-darken' }), animMs(1700));
   }
   // Feel queue: the card is already in flight. Hold the stage for a short hit-stop,
   // then let the damage and block numbers rise. Uses the SAME action generation captured

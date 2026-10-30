@@ -84,11 +84,11 @@ Cards you **cannot afford** are visually disabled — if it won't play, you don'
 - **Energy orb** — the energy you have left this turn, large, beside the hand
 - **Draw and discard** — piles in the corners. Click one to read the cards in it
 - **Hand** — your cards fanned along the bottom, each with its cost and a plain-English description
-- **End Turn** — the enemies then act. Each enemy attacks **one at a time**: it winds up, dashes in, and a floating line over your hero names the attacker and its damage ("Kiln Mite −6") as it lands — block eating the whole attack says "absorbed". The attacker's intent badge lights up while it strikes. A fully-blocked attack still shows the swing; a hard turn takes about a second and a half, and `2×` halves every beat.
+- **End Turn** — the enemies then act. Each enemy attacks **one at a time**: it winds up, dashes in, and a floating line over your hero names the attacker and its damage ("Kiln Mite −6") as it lands — block eating the whole attack says "absorbed". The attacker's intent badge lights up while it strikes. A fully-blocked attack still shows the swing; at `1×` a hard turn takes about three seconds, and `2×` brings it back to the classic pace.
 - **Map** — the path through the act, with clickable nodes
 - **Rewards** — pick one of three cards after each fight
 - **`Help` button** — how to play plus the full keyword glossary
-- **Speed** — `1×`, `2×`, and `»` above the fight. `»` skips the combat animations. The same skip happens if you click the empty foundry floor.
+- **Speed** — `1×`, `2×`, and `»` above the fight. Since the UX-4 pace change, `1×` is the cinematic pace: every combat animation — card plays, the hammer arc, the enemy turn, the kill collapse, the draw being dealt card by card — runs at double the classic length, so nothing flashes past. **`2×` is the classic pace** — the timing the game shipped with before UX-4. `»` skips the combat animations entirely. The same skip happens if you click the empty foundry floor. The pace never changes what a card does.
 
 ### How the game works
 

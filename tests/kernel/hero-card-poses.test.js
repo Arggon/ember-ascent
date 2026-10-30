@@ -322,8 +322,10 @@ test('a hover repaint during the movement hold keeps the pose (the swing is not 
   // an enemy repaints the stage, and that paint must STILL draw the movement.
   api.injectBursts([]);
   assert.equal(api.heroPose(), 'heavy', 'an incidental repaint during the hold keeps the movement');
-  // After the window (0.72s movement + 0.26s hit-stop grace) the hold must be released.
-  await new Promise((r) => setTimeout(r, 1100));
+  // After the window the hold must be released. The window is the pose's PACED length
+  // (UX-4: animMs(720) = 1440ms at 1×) plus the 260ms hit-stop grace, so the probe waits
+  // past 1700ms — the same claim at the halved pace, not a weaker one.
+  await new Promise((r) => setTimeout(r, 1800));
   assert.notEqual(api.heroPose(), 'heavy', 'once the window elapses the hold is released');
 });
 
