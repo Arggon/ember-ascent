@@ -207,10 +207,53 @@ export function generateMap(seed, startDraw, act = 1) {
 
   rows.push([{ id: `r${ROWS - 1}n0`, type: 'boss', next: [] }]);
 
-  // Link every node to every node of the following row.
+  // UX-5 PART A — THE EDGE RULE (the format): node i of row r connects to the BAND
+  // j ∈ {i−1, i, i+1} ∩ next-row width — the classic StS ladder. A choice between
+  // steps must be a real choice: under the old full-row linking every node reached
+  // every next-row node, so "which node" carried no information and no reward was
+  // ever exclusive. Under the band, adjacent-row rewards can be mutually exclusive
+  // per run (take the left fork, forgo the right) — that is the point. The widths
+  // above (2 for rows 1-3, 3 for rows 4-6, 1 for the fixed opener and the boss) are
+  // what make the rule SAFE, for every seed, by construction — no widening exception
+  // is needed and no placement moves:
+  //   * EVERY node of row r+1 is linked from SOME node of row r — the widest gap
+  //     between a next-row slot j and the row-r slots that reach it is |i−j| ≤ 1,
+  //     and row widths grow or hold (2→2, 2→3, 3→3) except into the single-node
+  //     rows. So reachability from the entry composes by induction over the rows:
+  //     the entry row is offered whole at floor < 0, every later row is reachable
+  //     from the row before it, therefore EVERY placed node — act 1's shop r5n1 and
+  //     events r2n1/r6n1, act 2's shop r4n1 and events r3n1/r5n2 — is reachable on
+  //     every seed (tests/kernel/map-topology.test.js proves it over 60 seeds ×
+  //     both acts).
+  //   * NO DEAD ENDS: into a multi-node row every band is non-empty (i ≤ w_r − 1 ≤
+  //     w_{r+1} always leaves at least j = i in range); into the 1-wide boss row the
+  //     summit convergence below links every node.
+  //   * The boss is reachable from every row-6 node, so no seed can produce an
+  //     impossible climb.
+  // A first-travel walker still passes the waysides: neither placed slot is its
+  // row's first node (the EVENT_NODES / ACT2_EVENT_NODES ruling above), and a band
+  // never FORCES the event — from any node the band holds a non-event choice too.
+  // LEGACY SAVES carry maps generated under the full-row rule, with their own
+  // full `next` arrays stored in state; every reader below walks the STORED edges
+  // (availableNodes, the snapshot, the map view), so an old save keeps playing its
+  // own lattice unchanged and no new field is needed.
   for (let row = 0; row < rows.length - 1; row += 1) {
-    for (const node of rows[row]) {
-      node.next = rows[row + 1].map((n) => n.id);
+    const nextRow = rows[row + 1];
+    for (let k = 0; k < rows[row].length; k += 1) {
+      const node = rows[row][k];
+      node.next = [];
+      for (let j = k - 1; j <= k + 1; j += 1) {
+        if (j >= 0 && j < nextRow.length) node.next.push(nextRow[j].id);
+      }
+      // The ONE documented exception, and it is the summit's, not a placed node's:
+      // into a 1-wide row the band of slot 2 is empty ({1,2,3} ∩ {0}), which would
+      // strand the row's rightmost node a step below the boss. Every climb funnels
+      // into the warden — the boss row links from EVERY node of the row before it
+      // (the widths make this transition the only one that can need it; a node whose
+      // band is empty on any other transition would be a format bug the topology
+      // test fails on). No placed node needed widening or moving: with the fixed
+      // widths every shop/event slot is inside some feeder's band on every seed.
+      if (node.next.length === 0) node.next.push(nextRow[0].id);
     }
   }
   return { rows, draws: i - startDraw };
@@ -231,8 +274,13 @@ export function findNode(rows, id) {
 }
 
 /**
- * Legal moves from the current position: every node of the NEXT row (the current
- * row's outgoing links), or the whole first row at the start.
+ * Legal moves from the current position: the CURRENT node's own outgoing edges (its
+ * band — see the edge rule in generateMap), or the whole first row at the start
+ * (the run opens before row 0 and the entry row is offered whole). The edges are
+ * read from the STORED map, so a legacy save's full-linked lattice keeps offering
+ * the whole next row and plays exactly as it always did, while a generated band
+ * map offers only the real branches — "which node" is now the decision it looks like.
+ * Dangling ids (impossible in a well-formed map) are dropped, never thrown.
  * @param {any} state
  * @returns {any[]} node descriptors
  */
@@ -241,5 +289,7 @@ export function availableNodes(state) {
   if (state.floor < 0) return rows[0];
   const current = rows[state.floor]?.find((n) => n.id === state.mapNodeId);
   if (!current) return [];
-  return rows[state.floor + 1] ?? [];
+  return (current.next ?? [])
+    .map((id) => rows[state.floor + 1]?.find((n) => n.id === id))
+    .filter(Boolean);
 }

@@ -89,6 +89,16 @@ after(() => { child?.kill(); });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Wait for the UX-5 input gate to release. While a play's animation, the enemy-turn
+ *  sequence, a hand deal or a kill hold is on screen, the hand and End Turn are locked
+ *  (aria-disabled, natively disabled) and the combat shortcuts are swallowed — the gate
+ *  is the surface's own published truth (window.__dlb.busy, runtime.busyReason), so the
+ *  walks wait on IT instead of guessing at animation lengths. Under reduced motion or »
+ *  the gate never engages and this returns at once. */
+async function waitIdle(page, timeoutMs = 8000) {
+  await page.waitForFunction(() => window.__dlb && window.__dlb.busy() === null, null, { timeout: timeoutMs });
+}
+
 /** A fresh browser + page with the first-run help dismissed. Caller closes the browser.
  *  `seed` defaults to 7; a test whose claim is pinned to a specific first fight picks
  *  its own (the S4 map shift moved every seed's encounter rolls). */
@@ -153,7 +163,10 @@ async function injectMaulDeck(page) {
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
 }
 
-/** Travel to the first reachable ordinary fight (Skirmish / Hard fight — never Elite). */
+/** Travel to the first reachable ordinary fight (Skirmish / Hard fight — never Elite).
+ *  NO gate wait here: the UX-4 deal test samples the hand MID-DEAL through this helper,
+ *  and every interaction path (playCard/endTurn, the locators' own enabled-wait) gates
+ *  on the UX-5 lock itself. */
 async function travelToFight(page) {
   const nodes = page.locator('button[aria-label*="Skirmish"], button[aria-label*="Hard fight"]');
   assert.ok((await nodes.count()) > 0, 'no fight node reachable');
@@ -161,27 +174,36 @@ async function travelToFight(page) {
   await page.waitForSelector('.enemy', { timeout: 5000 });
 }
 
-/** Click an enabled card by name prefix; a target-needing play resolves on `pickIndex`. */
+/** Click an enabled card by name prefix; a target-needing play resolves on `pickIndex`.
+ *  The walk waits for the UX-5 gate FIRST (a previous play's animation, the enemy turn or
+ *  a deal locks the hand — the enabled tile IS the gate's release), and again after the
+ *  play resolves, so the caller resumes with the input actually back. */
 async function playCard(page, namePrefix, pickIndex = null) {
+  await waitIdle(page);
   const card = page.locator(`button[data-slot][aria-label^="${namePrefix}"][aria-disabled="false"]`);
   assert.ok((await card.count()) > 0, `${namePrefix} not playable in hand`);
   await card.first().click();
-  if (pickIndex === null) return;
+  if (pickIndex === null) { await waitIdle(page); return; }
   await page.waitForSelector('.enemy.targeting', { timeout: 3000 });
   const target = page.locator(`.enemy[data-target-index="${pickIndex}"]`);
   assert.equal(await target.count(), 1, `aimed enemy ${pickIndex} not found`);
   await target.click();
+  await waitIdle(page);
 }
 
 async function endTurn(page) {
+  await waitIdle(page);
   const end = page.locator('button', { hasText: 'End Turn' });
   assert.equal(await end.count(), 1, 'End Turn button not found');
   await end.click();
+  await waitIdle(page);
 }
 
-/** Skip (or take) the floor reward until the map is back. */
+/** Skip (or take) the floor reward until the map is back. The kill hold may still own
+ *  the input when the phase flips, so each attempt waits for the gate first. */
 async function leaveReward(page) {
   for (let guard = 0; guard < 6; guard += 1) {
+    await waitIdle(page);
     if ((await readState(page)).phase !== 'reward') return;
     const skip = page.locator('button[data-action]', { hasText: /skip/i });
     if ((await skip.count()) >= 1) await skip.first().click();
@@ -199,7 +221,10 @@ async function reachQualifyingFight(page) {
   for (let step = 0; step < 16; step += 1) {
     const s = await readState(page);
     if (s.phase === 'combat') {
-      if (s.enemies.length > 1 && s.enemies.some((e) => e.hp > 32)) return s;
+      if (s.enemies.length > 1 && s.enemies.some((e) => e.hp > 32)) {
+        await waitIdle(page); // the arriving hand's deal gates the input; wait it out
+        return s;
+      }
       await playOutTransitFight(page);
       continue;
     }
@@ -215,25 +240,26 @@ async function reachQualifyingFight(page) {
   assert.fail('no qualifying fight within 16 steps');
 }
 
-/** Transit fight: spend attacks (kills are fine here — no claim is taken from these). */
+/** Transit fight: spend attacks (kills are fine here — no claim is taken from these).
+ *  The UX-5 gate owns the pacing now: waitIdle returns when the play's span (or the
+ *  enemy turn, or a deal) has landed, so no blind animation-length sleeps remain. */
 async function playOutTransitFight(page) {
   for (let guard = 0; guard < 24; guard += 1) {
     const s = await readState(page);
     if (s.phase !== 'combat') return;
+    await waitIdle(page);
     const attack = page.locator('button[data-slot].type-attack[aria-disabled="false"]');
     if ((await attack.count()) > 0) {
       await attack.first().click();
-      await sleep(300);
       if (s.enemies.length > 1) {
         const toughest = s.enemies.reduce((a, b) => (b.hp > a.hp ? b : a));
         const tgt = page.locator(`.enemy[data-target-index="${toughest.index + 1}"]`);
         if ((await tgt.count()) === 1) await tgt.click();
         else await page.keyboard.press('Escape');
       }
-      await sleep(3400);
+      await waitIdle(page);
     } else {
       await endTurn(page);
-      await sleep(2200);
     }
   }
 }
@@ -417,8 +443,9 @@ test('combat: a basic attack deals its printed damage without targeting', { time
   const energyBefore = before.player.energy;
 
   // `strike` is named Hammerfall on the card face: "Deal 6 damage to the enemy."
+  // playCard waits for the UX-5 gate to release (the play's own span), so no blind
+  // animation-length sleep is needed before the state is read.
   await playCard(page, 'Hammerfall');
-  await sleep(2600); // pose + floats
 
   const after = await readState(page);
   const worm = after.enemies[0];
@@ -472,7 +499,8 @@ test('UX-3: every cost gem is a whole circle inside its card, and the type word 
   const page = await freshPage(t, 7);
   await bootToMap(page);
   await travelToFight(page);
-  await sleep(2400); // the deal-in settles before any rect is read (UX-4: a 5-card deal spans ~1.32s)
+  await waitIdle(page); // the deal gates the input; past it the deal-in has settled
+  await sleep(200);
 
   const GEM_PROBE = () => {
     const out = { gemOutsideCard: [], gemOutsideVp: [], wordUnderGem: [], cardOutsideVp: [], cards: 0 };
@@ -644,10 +672,8 @@ test('the enemy turn plays as ordered, named attacks (UX-2 sequence)', { timeout
 
   const before = await readState(page);
   await endTurn(page);
-  // The sequence at the UX-4 1x (doubled beat: 1000ms gap, 1280ms slam, impact at 589ms):
-  // floats land ~0.6s and ~1.6s in, the turn settles by ~2.3s and the last named float
-  // lives ~1.9s beyond its landing.
-  await sleep(3600);
+  // endTurn waits for the UX-5 gate to release — the strike sequence IS that gate — so
+  // by the time it returns every beat has fired and been sampled by the collector.
   const seq = await page.evaluate(() => { clearInterval(window.__seqTimer); return window.__seq; });
   const after = await readState(page);
 
@@ -739,7 +765,8 @@ test('the opening draw is a visible deal: staggered, travelling, layout-stable (
   // ordinary layout puts a hand — measured against an off-screen lab copy built without
   // the deal class (the UX-3 gem probe's lab pattern). Only the entry animates; the fan
   // the deal lands in is the layout's own, and no entry residue is left on the wraps.
-  await sleep(2400);
+  await waitIdle(page); // the deal clock retires the gate; the entry is over past it
+  await sleep(200);
   const end = await page.evaluate(() => {
     const hand = document.querySelector('.hand');
     const lab = document.createElement('div');
@@ -804,19 +831,17 @@ test('kill: the stroke plays against the hold stage, then the reward arrives', {
     }, 40);
   });
 
-  // Turn 1: Maul (32) leaves the 43-HP Jaw Worm at 11.
+  // Turn 1: Maul (32) leaves the 43-HP Jaw Worm at 11. playCard/endTurn wait on the
+  // UX-5 gate (the play span, the enemy turn, the deal), so no blind sleeps remain.
   let s = await readState(page);
   if (!s.hand.some((c) => c.cardId === 'bludgeon')) {
     await endTurn(page);
-    await sleep(2200);
     s = await readState(page);
     assert.ok(s.hand.some((c) => c.cardId === 'bludgeon'), 'no Maul dealt in two hands');
   }
   await playCard(page, 'Maul');
-  await sleep(3400);
 
   await endTurn(page);
-  await sleep(2200);
 
   // Turn 2: Maul kills. The stroke must PLAY — hold stage with the hero + the shockwave
   // beat — and only then hand over to the reward screen.
@@ -860,16 +885,16 @@ test('kill: the stroke plays against the hold stage, then the reward arrives', {
   for (let guard = 0; guard < 24; guard += 1) {
     const st = await readState(page);
     if (st.phase !== 'combat') break;
+    await waitIdle(page);
     const maul = page.locator('button[data-slot][aria-label^="Maul"][aria-disabled="false"]');
     if ((await maul.count()) > 0) {
       await maul.first().click();
       if ((await page.locator('.enemy.targeting').count()) > 0) {
         await page.locator('.enemy[data-target-index]').first().click();
       }
-      await sleep(1200);
+      await waitIdle(page);
     } else {
       await endTurn(page);
-      await sleep(1800);
     }
   }
   let reward2 = null;
@@ -923,8 +948,10 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
 
   await page.locator(`.enemy[data-target-index="${tank.index + 1}"]`).click();
   // UX-4 pace: pose animMs(1150) = 2300ms; impact beat at 66% ≈ 1518ms; the shockwave
-  // lives a paced 1120ms beyond that.
-  await sleep(5200);
+  // lives a paced 1120ms beyond that. The UX-5 play span (pose 2300 + the signature
+  // tail ≈ 2910ms) covers every beat, and the gate releases past it.
+  await waitIdle(page);
+  await sleep(300);
 
   const fx = await page.evaluate(() => window.__fx);
   const after = await readState(page);
@@ -995,10 +1022,10 @@ async function probeHammerArc(t, seed) {
     let s = await readState(page);
     if (!s.hand.some((c) => c.cardId === 'twin_strike')) {
       await endTurn(page);
-      await sleep(2200);
       s = await readState(page);
-      if (s.phase !== 'combat' || !s.hand.includes('twin_strike')) return null;
+      if (s.phase !== 'combat' || !s.hand.some((c) => c.cardId === 'twin_strike')) return null;
     }
+    await waitIdle(page); // the hand's deal gates the input; wait it out before the aim
 
     // Sample the flying hammer against the enemy's live position.
     await page.evaluate(() => {
@@ -1024,8 +1051,11 @@ async function probeHammerArc(t, seed) {
     // enemy plays on the click alone. Either way the hammer flies after the aim.
     const aiming = page.locator('.enemy.targeting');
     if ((await aiming.count()) > 0) await aiming.first().click();
-    // UX-4 pace: the salvo's flight is animMs(900) = 1800ms and lands at ~1512ms.
-    await sleep(3200);
+    // UX-4 pace: the salvo's flight is animMs(900) = 1800ms and lands at ~1512ms —
+    // inside the play's own input span (pose 2200 + signature tail ≈ 2840ms), so the
+    // gate releases after the arc has been fully sampled.
+    await waitIdle(page);
+    await sleep(200);
     return { arc: await page.evaluate(() => window.__arc) };
   } finally {
     await browser.close();
@@ -1089,7 +1119,6 @@ async function probeKillSlot(t, seed) {
     if (s.enemies.length !== 2) return null;
     if (!s.hand.some((c) => c.cardId === 'twin_strike')) {
       await endTurn(page);
-      await sleep(2200);
       s = await readState(page);
       if (s.phase !== 'combat' || !s.hand.some((c) => c.cardId === 'twin_strike')) return null;
     }
@@ -1189,10 +1218,20 @@ async function probeSignatureFx(t, seed) {
       ['platestack', 'Unbroken'],   // impervious
     ];
     const pending = new Set(FACES.map(([key]) => key));
-    for (let hand = 0; hand < 8 && pending.size > 0; hand += 1) {
-      if ((await readState(page)).phase !== 'combat') return null;
+    // The band routes the walk across REAL fights, and a signature play can KILL the
+    // very foe it was demonstrating on — so the collection walks ON (reward skipped,
+    // the next fight entered) instead of giving up when the first fight ends. Fights,
+    // not hands, are the budget now.
+    for (let fight = 0; fight < 8 && pending.size > 0; fight += 1) {
+      const st = await readState(page);
+      if (st.phase === 'ended') return null;
+      if (st.phase === 'map') { await travelToFight(page); continue; }
+      if (st.phase === 'reward') { await leaveReward(page); continue; }
+      if (st.phase !== 'combat') { await sleep(400); continue; }
       for (const [key, face] of FACES) {
         if (!pending.has(key)) continue;
+        if ((await readState(page)).phase !== 'combat') break; // the stroke ended the fight
+        await waitIdle(page); // the previous play's span owns the input until it lands
         const btn = page.locator(`button[data-slot][aria-label^="${face}"][aria-disabled="false"]`);
         if ((await btn.count()) === 0) continue;
         const seen = await page.evaluate((k) => window.__fx[k], key);
@@ -1202,15 +1241,16 @@ async function probeSignatureFx(t, seed) {
         if ((await page.locator('.enemy.targeting').count()) > 0) {
           await page.locator('.enemy[data-target-index]').first().click();
         }
-        // UX-4 pace: the impact beat fires at up to animMs(0.66 x pose) ≈ 1518ms and the
-        // effect lives a paced ~1120ms beyond; also keeps the next play from retiring
-        // this one's pending signature timer (the animGen guard).
-        await sleep(3200);
+        // The play's own input span (pose + signature tail) covers the impact beat and
+        // the effect's lifetime, so the gate releasing means the fx have fired AND been
+        // sampled — and it keeps the next play from retiring this one's pending
+        // signature timer (the animGen guard).
+        await waitIdle(page);
+        await sleep(200);
         if ((await page.evaluate((k) => window.__fx[k], key)) > seen) pending.delete(key);
       }
       if (pending.size === 0) break;
-      await endTurn(page);
-      await sleep(2200);
+      if ((await readState(page)).phase === 'combat') await endTurn(page);
     }
     return pending.size === 0 ? await page.evaluate(() => window.__fx) : null;
   } catch {
@@ -1972,6 +2012,12 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
     } else if (phase === 'rest') {
       await page.getByRole('button', { name: 'Move on' }).first().click();
       await sleep(500);
+    } else if (phase === 'shop') {
+      // The band routing can force the walk through the vendor (the shop's placed slot
+      // is inside every row-4 node's band): leave at once, the walk's claims are the
+      // relic screen's.
+      await page.locator('button', { hasText: /leave/i }).first().click();
+      await sleep(600);
     } else if (phase === 'event') {
       // A wayside sits on some seed-7 paths: take the free choice, then continue.
       // Affordable choices carry no `disabled` attribute (dimmed ones carry
@@ -2136,6 +2182,11 @@ test('a fresh profile: the vault offers down-tier commons and the first win unlo
     } else if (phase === 'rest') {
       await page.getByRole('button', { name: 'Move on' }).first().click();
       await sleep(500);
+    } else if (phase === 'shop') {
+      // The band routing can force the walk through the vendor (the shop's placed slot
+      // is inside every row-4 node's band): leave at once, the claims are the vault's.
+      await page.locator('button', { hasText: /leave/i }).first().click();
+      await sleep(600);
     } else if (phase === 'event') {
       await page.locator('.event-choices .boon:not([disabled])').first().click();
       await page.waitForSelector('.event-result, button[data-action="v0"]', { timeout: 5000 });

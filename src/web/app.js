@@ -37,7 +37,7 @@
 // creates the first controller for the URL's seed/hero/biome, registers the keyboard
 // listener, exposes `window.__dlb` for a curious viewer, and paints the first screen.
 
-import { ctl, snap } from './runtime.js';
+import { ctl, snap, busyReason } from './runtime.js';
 import { biomeChoice, heroChoice, act, newGame } from './actions.js';
 import { cancelTargeting, clickCard, pendingSlot, pickTarget } from './targeting.js';
 import { deckOpen, toggleDeck, codexOpen, toggleCodex, beltOpenSlot, toggleBelt, helpOpen, toggleHelp, HELP_SEEN_KEY } from './hud.js';
@@ -110,6 +110,22 @@ document.addEventListener('keydown', (ev) => {
     return;
   }
 
+  // --- the UX-5 input gate owns combat's shortcuts while an animation is landing -----
+  // One contract, the open-sheet guard's shape: while the surface is busy — a play's
+  // animation (pose, throw, signature, hit-stop), the enemy-turn sequence, a hand
+  // mid-deal, a kill hold — every combat shortcut is swallowed, because the hand and
+  // the End Turn button are painted locked for the same span. The kernel never sees
+  // the key: the gate is presentation only (runtime.busyReason, derived from the same
+  // lifetimes the effects use), and under reduced motion it never engages at all.
+  // Sheets (d/k and the modal guards above) and the targeting step stay live; the speed
+  // dock and the backdrop's skip stay clickable, so » is always reachable.
+  if (busyReason()) {
+    if (snap.phase === 'combat' || snap.phase === 'reward' || snap.phase === 'ended') {
+      ev.preventDefault();
+      return;
+    }
+  }
+
   if (snap.phase === 'combat') {
     if (k === 'e' || k === 'E' || k === ' ') {
       const endTurn = snap.actions.find((a) => a.kind === 'end_turn');
@@ -138,8 +154,11 @@ document.addEventListener('keydown', (ev) => {
   if (k === 'n' || k === 'N') { ev.preventDefault(); newGame(); }
 });
 
-/** Expose the controller for a curious viewer (read-only use). Not required by the game. */
-window.__dlb = { controller: () => ctl, snapshot: () => snap };
+/** Expose the controller for a curious viewer (read-only use). Not required by the game.
+ *  `busy` publishes the UX-5 input gate's current reason (runtime.busyReason) — the same
+ *  presentation truth the hand and End Turn paint — so tooling and the e2e walks can wait
+ *  for the surface to take input again instead of guessing at animation lengths. */
+window.__dlb = { controller: () => ctl, snapshot: () => snap, busy: () => busyReason() };
 
 // The first run of the page IS newGame() — the exact construction, not a copy of it.
 // The old inline build "minus the profile narrowing" was an honesty hole the S2 codex

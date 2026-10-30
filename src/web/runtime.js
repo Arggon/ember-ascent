@@ -175,6 +175,77 @@ export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, 
  * nothing and the stylesheet forces every animation to 0.001ms; the fast form stays
  * fast — reduced motion is an accessibility need, not a pace preference.
  */
+/* ------------------------------------------------------ UX-5: the input lock -------
+ * "Treat each card as a turn": while a play's animation is still on screen, the next
+ * card must not be playable, and while the enemy-turn sequence or a kill hold is
+ * playing, nothing player-facing is. The gate is PRESENTATION ONLY — the kernel's
+ * legality is untouched (the sim and the stepping tests never route through it) — and
+ * it is derived from the SAME lifetimes the effects already use, not a parallel timer
+ * system:
+ *
+ *   * a play (dispatchFx's `card-fly` case) arms `inputLock` for exactly the span the
+ *     case itself schedules — the pose hold (`heroMoveHold.dur`, the same paced figure
+ *     combat-view paints), the throw choreography (`HERO_THROWS` delay + flight), a
+ *     signature's tail (the render.js kill-hold convention: ~70% of the pose + a paced
+ *     650ms beat) — with the hit-stop beat where the play's numbers land as the FLOOR
+ *     of that span, not an addition (fx.js playInputSpan);
+ *   * the enemy turn gates on `strikeSeq` — the plan UX-2 armed, read directly, so the
+ *     gate retires exactly when the plan does (its own timer, totalMs + 400);
+ *   * a deal gates on `dealClock` — the clock UX-4 armed in render(), read directly;
+ *   * a kill hold (render.js's endHeld branch) arms `inputLock` for exactly the hold's
+ *     own `wait`.
+ *
+ * `busyReason()` reads the lock lazily (the heroMoveHold shape), but every armed span
+ * schedules its own RELEASE PAINT (setInputLock), so the locked shape on the hand and
+ * End Turn always comes off on time, painted — a player who never moves the mouse is
+ * not left staring at a locked hand. The gate NEVER engages under reduced motion —
+ * animations are instant there, so there is nothing to wait for. The dock scales every
+ * span through `animMs`, and » clears the lock in `skipAnim` — skipping the animation
+ * also skips the wait.
+ */
+export let inputLock = null; // { until, why } — busy while Date.now() < until
+/**
+ * Arm (or extend) the input lock. Max semantics: a second lifetime landing while one is
+ * already armed must hold until BOTH end — a new play may not shorten a lock an older,
+ * longer play is still entitled to.
+ *
+ * Each arm also schedules the RELEASE PAINT: the lock's expiry is read lazily (the
+ * heroMoveHold shape), but unlike the pose — which only styles a paint that is already
+ * happening — the locked shape sits on the hand and End Turn BUTTONS, and a paint that
+ * never comes would leave them disabled forever. The timer repaints when this lock's
+ * span is over and it is still the current lock — OR when it is already gone: the lazy
+ * expiry in busyReason() nulls an expired lock, and a reader that raced the expiry
+ * (a polling wait) must not talk the release paint out of firing, or the last paint —
+ * still locked — is the one the player keeps. A replaced (longer) lock skips this
+ * paint: the arm that replaced it scheduled its own.
+ */
+export function setInputLock(lock) {
+  if (lock && inputLock && inputLock.until > lock.until) return;
+  inputLock = lock;
+  if (lock) {
+    const armed = lock;
+    laterPaint(() => { if (inputLock === armed || inputLock === null) repaint(); }, (armed.until - Date.now()) + 30);
+  }
+}
+/**
+ * Why the hand and End Turn are locked right now, or null. The reasons the surface
+ * shows: 'play' (a card's animation is landing), 'enemy-turn' (the strike sequence),
+ * 'deal' (a hand is arriving), 'hold' (a kill hold owns the stage). Reduced motion
+ * short-circuits first: the gate never engages when nothing animates.
+ * @returns {string|null}
+ */
+export function busyReason() {
+  if (reducedMotion) return null;
+  if (strikeSeq) return 'enemy-turn';
+  if (inputLock) {
+    if (Date.now() < inputLock.until) return inputLock.why;
+    inputLock = null; // expired — released lazily, the way heroMoveHold expires
+  }
+  // The deal is reported last: a play that also replaces the hand reads as its play
+  // (the longer span), and a bare turn draw reads as the deal that it is.
+  if (dealClock) return 'deal';
+  return null;
+}
 export const SLOW_FACTOR = 2;
 /**
  * Publish the pace factor to the stylesheet. Called once at module load and on every
@@ -209,6 +280,11 @@ export function skipAnim() {
   // » also retires a playing strike sequence: the remaining beats never fire, and the
   // next paint drops the slam poses (the past floats stay until their own removal timers).
   setStrikeSeq(null);
+  // UX-5: skipping the animation also skips the wait — the gate releases with the
+  // effects it was derived from (the lock and the deal clock; the strike sequence is
+  // retired directly above).
+  setInputLock(null);
+  setDealClock(null);
   revealFloats();
 }
 

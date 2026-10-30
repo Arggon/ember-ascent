@@ -84,7 +84,7 @@ test('log header carries the flag and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:6cb87b1b1d701d02f89a8281cff621198ad402840661ba832de7ebf8ba87e211';
+const GOLDEN = 'sha256:04aa0ac5ca103c212a928a039065bd6a51f7e646b797d52613a14b3ffe186a8f';
 
 // ---------------------------------------------------------------------------
 // Visible tempers: every rendering of a tempered card shows what it really plays.

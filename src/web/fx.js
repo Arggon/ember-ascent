@@ -150,6 +150,39 @@ function heroLane() {
 }
 
 /**
+ * The input span of one play, from its card-fly burst: the LONGEST beat of the
+ * choreography dispatchFx will schedule for it, in paced milliseconds. UX-5 arms the
+ * input lock for exactly this figure in `act()` — BEFORE the paint, the same place and
+ * order the UX-2 strike plan is armed, so the hand the player sees after the play is
+ * already painted locked. The span comes from the same lifetimes the beats use, never
+ * a fixed sleep:
+ *   * the pose — `(sig.poseMs) || HERO_POSE_MS[move] || 400`, paced (the base combat
+ *     view's heroPose() will arm the hold with this very action);
+ *   * a signature's tail — the render.js kill-hold convention: its impact beat fires
+ *     at ~70% of the pose and the effect lives a paced 650ms beyond;
+ *   * a throw's flight — HERO_THROWS' condense delay plus the flight itself;
+ *   * the hit-stop beat (the 240+70 feel queue) where the play's numbers land — a
+ *     FLOOR on the whole span, not an addition: the numbers land at a fixed ~620ms,
+ *     so every beat that outlives them already covers them and summing would hold
+ *     the hand dead for another paced 620ms past the last real beat.
+ * `animMs` paces every figure, so the dock scales the gate with the animation. The
+ * caller gates on the same condition dispatchFx plays under (not reduced motion, dock
+ * not at »), so the gate never engages where nothing animates.
+ * @param {{id?: string, type?: string}} b the card-fly burst
+ * @returns {number} paced milliseconds the input should stay locked
+ */
+export function playInputSpan(b) {
+  const sig = signatureFor(b);
+  let span = animMs((sig && sig.poseMs) || HERO_POSE_MS[heroMove(b)] || 400);
+  if (sig) span = Math.max(span, Math.round(span * 0.7) + animMs(650));
+  if (b && b.id && HERO_THROWS[b.id]) {
+    const spec = HERO_THROWS[b.id];
+    span = Math.max(span, animMs(spec.delayMs ?? 0) + animMs(spec.ms ?? THROW_MS));
+  }
+  return Math.max(span, animMs(310));
+}
+
+/**
  * Play the bursts collected for the action just taken. Called AFTER `render()`, so any
  * node an effect wants to attach to already exists in its final tree.
  */
@@ -282,6 +315,9 @@ export function dispatchFx() {
             if (sig[knob]) play(fire, lane, b, sigMs, gen);
           }
         }
+        // UX-5: this play's input lock was armed by act() for `playInputSpan(b)` — the
+        // figure this case's own choreography adds up to — BEFORE the paint, so the
+        // hand repainted locked. There is nothing to arm here.
         break;
       default:
         break;

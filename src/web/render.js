@@ -30,6 +30,8 @@ import {
   setDyingThisPaint,
   setEndFocusPending,
   setEnteringIds,
+  setInputLock,
+  setBursts,
   setLastPlayerStatuses,
   setLastTravel,
   setPaintedPhase,
@@ -111,7 +113,15 @@ export function render() {
     if (stepMs > 0 && durMs > 0) {
       const clock = { start: Date.now(), stepMs, durMs };
       setDealClock(clock);
-      laterPaint(() => { if (dealClock === clock) setDealClock(null); },
+      // UX-5: the release REPAINTS — the deal's busy reason sits painted on the hand
+      // and End Turn, so the clock retiring without a paint would leave the locked
+      // shape up until some incidental repaint. The release also CONSUMES the bursts:
+      // a paint whose bursts were never consumed by dispatchFx (a direct render in a
+      // test harness) would otherwise re-derive `dealPending` from the same stale
+      // deal burst on every release render and re-arm the clock — an infinite timer
+      // chain that never lets the event loop rest. In the real flow bursts is already
+      // empty here (dispatchFx consumed it right after the paint).
+      laterPaint(() => { if (dealClock === clock) { setBursts([]); setDealClock(null); render(); } },
         stepMs * Math.max(0, (snap.hand.length || 1) - 1) + durMs + 120);
     }
   }
@@ -233,6 +243,12 @@ export function render() {
     const sig = signatureFor(bursts.find((b) => b.kind === 'card-fly'));
     const strokeMs = held && sig ? Math.round(held.dur * 0.7) + animMs(650) : 0;
     const wait = reducedMotion ? 0 : Math.max(Math.min(animMs(END_DELAY_MS), animMs(COLLAPSE_MS)), strokeMs);
+    // UX-5: the hold OWNS the stage while it plays, so the gate holds too — armed for
+    // exactly the hold's own `wait` (the same lifetime the re-render timer below uses),
+    // which keeps the reward/summary hotkeys (digits, 0, r, n) from acting mid-collapse.
+    // Reduced motion computes wait 0 and arms nothing; setInputLock keeps the longer of
+    // the two locks (the killing stroke's own play lock may outlive this hold).
+    if (wait > 0) setInputLock({ until: Date.now() + wait, why: 'hold' });
     laterPaint(() => { if (snap.phase === 'ended' || snap.phase === 'reward') render(); }, wait);
     // Keep the fight as the painted phase after a reward hold, so the spoils panel still
     // gets its entrance animation when the beat ends. The ended panel paints plain.

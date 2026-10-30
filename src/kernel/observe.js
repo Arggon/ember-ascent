@@ -710,13 +710,16 @@ function snapshotMap(state, legal) {
     current: state.mapNodeId,
     // Every node, grouped by row, with flags the view can paint: `available` (a legal
     // destination) and `current` (where the player stands). Availability is decided
-    // here, not guessed by the renderer.
+    // here, not guessed by the renderer. `next` is the node's OWN stored edge list —
+    // the band the edge rule generated (a legacy save's full row) — so the map view
+    // draws the real branches instead of assuming a lattice.
     rows: state.map.rows.map((row, r) =>
       row.map((n) => ({
         id: n.id,
         type: n.type,
         label: NODE_TYPES[n.type].label,
         row: r,
+        next: n.next ?? [],
         current: r === state.floor && n.id === state.mapNodeId,
         available: nextNodes.some((a) => a.id === n.id),
         actionId: travel.get(n.id) ?? null,

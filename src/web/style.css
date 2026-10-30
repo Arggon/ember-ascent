@@ -781,6 +781,18 @@ html, body {
 .btn:hover { filter: brightness(1.08); }
 .btn:active { transform: translateY(1px); }
 .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* UX-5: the input gate. While a play, the enemy turn, a deal or a kill hold is on
+   screen, End Turn wears the same locked language as the unplayable cards: the button
+   is dimmed and greyed (the .card.disabled treatment) and takes no hover/press motion.
+   The gate is presentation only — the kernel's legality is untouched — and the speed
+   dock and the backdrop skip stay live, so » is always reachable. */
+.btn.is-locked,
+.btn.is-locked:hover {
+  cursor: default;
+  filter: grayscale(0.72) brightness(0.66);
+}
+.btn.is-locked:active { transform: none; }
+.hand.is-busy .card { cursor: default; }
 .btn.secondary {
   color: var(--ink);
   background: linear-gradient(180deg, #242c40, #171d29);
