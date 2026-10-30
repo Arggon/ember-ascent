@@ -625,3 +625,11 @@ Process rules (standing):
   locked shape or record the exclusion); playInputSpan's 400 fallback diverges from
   dispatchFx's 800 (latent, factor the shared pose-base lookup). Release rebuilt at
   round close. **THE ROADMAP IS COMPLETE.**
+- 2026-10-30 — UX-6 committed 3f235e5 after QA PASS 7/7 (the headline measured: standing
+  r1n0 offers [r2n0,r2n1]; standing r1n1 offers [r2n1] ONLY — the choice blocks; 64/64
+  offer==band; drawn legs 25=25; the shop skippable AND reachable by different routes;
+  a forced-wayside lane live; a full two-act victory with the lock intact; zero
+  errors). Dev note on record: the brief's one-line formula contradicted its own
+  worked-shapes table — the table is the spec (direction-by-growth), documented in
+  map.js. Sim census: 9 balanced outcome flips across 200 seeds, each diverging at a
+  lane the weave removed. Solo review next; release rebuild after.
