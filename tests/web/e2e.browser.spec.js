@@ -2013,16 +2013,20 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
       await page.getByRole('button', { name: 'Move on' }).first().click();
       await sleep(500);
     } else if (phase === 'shop') {
-      // The band routing can force the walk through the vendor (the shop's placed slot
-      // is inside every row-4 node's band): leave at once, the walk's claims are the
-      // relic screen's.
+      // The weave can route the walk through the vendor (a feeder lane reaches the
+      // placed slot): leave at once, the walk's claims are the relic screen's.
       await page.locator('button', { hasText: /leave/i }).first().click();
       await sleep(600);
     } else if (phase === 'event') {
-      // A wayside sits on some seed-7 paths: take the free choice, then continue.
+      // A wayside sits on some seed-7 paths (the weave can even make it a one-edge
+      // band's only step): take the free choice, then continue.
       // Affordable choices carry no `disabled` attribute (dimmed ones carry
       // disabled="disabled"), so :not([disabled]) is the enabled-selector form.
+      // UX-6: the smith's TEMPER choice (now reachable on funneled lanes) opens the
+      // committed modal instead of a result — pick an offer, then continue.
       await page.locator('.event-choices .boon:not([disabled])').first().click();
+      const modal = page.locator('.boon-list.temper-list .temper-offer');
+      if (await modal.count()) { await modal.first().click(); await sleep(500); }
       await page.waitForSelector('.event-result, button[data-action="v0"]', { timeout: 5000 });
       const cont = page.locator('button[data-action="v0"]').first();
       if (await cont.count()) { await cont.click(); await sleep(500); }
@@ -2183,12 +2187,17 @@ test('a fresh profile: the vault offers down-tier commons and the first win unlo
       await page.getByRole('button', { name: 'Move on' }).first().click();
       await sleep(500);
     } else if (phase === 'shop') {
-      // The band routing can force the walk through the vendor (the shop's placed slot
-      // is inside every row-4 node's band): leave at once, the claims are the vault's.
+      // The weave can route the walk through the vendor (a feeder lane reaches the
+      // placed slot): leave at once, the claims are the vault's.
       await page.locator('button', { hasText: /leave/i }).first().click();
       await sleep(600);
     } else if (phase === 'event') {
+      // The weave can funnel the walk into a wayside whose first enabled choice is
+      // the smith's TEMPER — that opens the committed modal instead of a result:
+      // pick an offer, then continue.
       await page.locator('.event-choices .boon:not([disabled])').first().click();
+      const modal = page.locator('.boon-list.temper-list .temper-offer');
+      if (await modal.count()) { await modal.first().click(); await sleep(500); }
       await page.waitForSelector('.event-result, button[data-action="v0"]', { timeout: 5000 });
       const cont = page.locator('button[data-action="v0"]').first();
       if (await cont.count()) { await cont.click(); await sleep(500); }

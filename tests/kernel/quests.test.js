@@ -70,4 +70,4 @@ test('log header carries the flag and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:430bb5774256536415baef95a0e0c1977ef1e448275c9a68a53c3bb4ff09ee6f';
+const GOLDEN = 'sha256:a4998838dfe44e47f41fc447819a69026a2a8134ccb03d1c284f10b17a117273';

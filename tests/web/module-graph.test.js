@@ -208,14 +208,16 @@ test('the real module graph survives a full run and paints the restart menu', as
     // real timer, which a synchronous walk would never let fire.
     await new Promise((r) => setTimeout(r, 10));
     if (phase === 'map') {
-      // S6: the row-2 event is now its row's LAST node, so the old "last travel" rule
-      // would stumble into the wayside and gamble the walk on an event choice. The
-      // walk's job is the restart-menu regression, so it routes AROUND events the way
-      // its node order always routed around the shop; the event screen has its own
-      // dedicated e2e in tests/web/e2e.browser.spec.js.
-      const travel = buttons().filter((n) => label(n).startsWith('Travel to') && !/Wayside/i.test(label(n)));
+      // S6: the row-2 event is its row's LAST node, so the walk prefers a non-wayside
+      // travel whenever the band offers one (the event screen has its own dedicated
+      // e2e in tests/web/e2e.browser.spec.js). UX-6's weave can make a wayside a
+      // one-edge band's ONLY step (the structural singletons the map-topology test
+      // pins), so when the filter empties the set the walk takes the wayside — the
+      // generic branch below resolves the event's free choice and continues.
+      const all = buttons().filter((n) => label(n).startsWith('Travel to'));
+      const travel = all.filter((n) => !/Wayside/i.test(label(n)));
       const boss = travel.find((n) => /boss/i.test(label(n)));
-      click(boss ?? travel[travel.length - 1]);
+      click(boss ?? travel[travel.length - 1] ?? all[all.length - 1]);
     } else if (phase === 'combat') {
       const names = snapOf().enemies.map((e) => e.name).join(',');
       if (/warden/i.test(names)) sawBossFight = true;
@@ -228,6 +230,27 @@ test('the real module graph survives a full run and paints the restart menu', as
         if (targets.length > 0) click(targets[targets.length - 1]);
       } else {
         click(buttons().find((n) => /End Turn/i.test(label(n))));
+      }
+    } else if (phase === 'event') {
+      // UX-6: the weave can funnel this walk through a wayside (the structural
+      // singleton the map-topology test pins). The walk's job is the restart-menu
+      // regression, so it takes the same stance as the built-in policies: a FREE
+      // choice when one is offered (every event carries at least one — no "Pay",
+      // no "Lose"), else the first live choice; then the continue. Affordance is
+      // the data-action attribute (a dimmed choice carries none), and the choice
+      // text rides the aria-label — both real in this fake DOM.
+      const cont = buttons().find((n) => n.attrs['data-action'] === 'v0');
+      if (cont) click(cont);
+      else {
+        // The smith's temper modal renders `.boon.temper-offer` picks instead of
+        // event choices — the pick is committed, so take the first one.
+        const temper = stageNodes().find((n) => n._cls.split(/\s+/).includes('temper-offer') && n.attrs['data-action']);
+        if (temper) { click(temper); }
+        else {
+          const choices = stageNodes().filter((n) => n._cls.split(/\s+/).includes('event-choice') && n.attrs['data-action']);
+          const free = choices.find((n) => !/Lose|Pay/.test(n.attrs['aria-label'] ?? ''));
+          click(free ?? choices[0]);
+        }
       }
     } else {
       const tile = stageNodes().find((n) => n._cls.split(/\s+/).includes('card')

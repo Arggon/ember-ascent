@@ -2,8 +2,10 @@
 //
 // Pins:
 //   - Exactly ONE shop node per generated act run, at row 5's middle slot, reachable
-//     from every row-4 node (full-row linking), labelled through NODE_TYPES like any
-//     other node. Its encounter-table entry spawns nothing and consumes no draw.
+//     from the entry on every seed (UX-6 weave: from the feeder lanes r4n0/r4n1 —
+//     NOT from r4n2, whose lane band is {r5n2} alone; the vendor is now
+//     route-conditional by design), labelled through NODE_TYPES like any other node.
+//     Its encounter-table entry spawns nothing and consumes no draw.
 //   - Inventory and prices roll at ENTRY time from the live counter: a full inventory
 //     is exactly 10 draws (one pickAt pick + one price roll per offer). Same seed =>
 //     same shelves; offers come from the run's OWN narrowed draft pool, never repeat,
@@ -58,16 +60,32 @@ function shopVisit(seed, over = {}) {
   return out.state;
 }
 
-test('every generated act map holds exactly one shop, at row 5, reachable from all of row 4', () => {
+test('every generated act map holds exactly one shop, at row 5, reachable from its feeder lanes', () => {
+  // Reachability from the entry (BFS over the stored edges) — the weave's guarantee.
+  const reachable = (rows) => {
+    const seen = new Set(rows[0].map((n) => n.id));
+    for (let r = 1; r < rows.length; r += 1) {
+      for (const node of rows[r]) {
+        if (rows[r - 1].some((prev) => seen.has(prev.id) && prev.next.includes(node.id))) seen.add(node.id);
+      }
+    }
+    return seen;
+  };
   for (let seed = 0; seed < 60; seed += 1) {
     const s = newRun({ seed });
     const shops = s.map.rows.flat().filter((n) => n.type === 'shop');
     assert.equal(shops.length, 1, `seed ${seed}: exactly one shop node`);
     assert.equal(shops[0].id, `r${SHOP_ROW}n${SHOP_SLOT}`, `seed ${seed}: the shop is row 5's middle slot`);
-    // Full-row linking: every row-4 node connects to it (so every run can reach it).
-    for (const n of s.map.rows[SHOP_ROW - 1]) {
-      assert.ok(n.next.includes(shops[0].id), `seed ${seed}: ${n.id} links to the shop`);
-    }
+    // Reachable on every seed — from the FEEDER LANES, not from all of row 4: under
+    // the weave node 0 → {0,1} and node 1 → {1,2}, so r4n0 and r4n1 link to r5n1
+    // while r4n2's lane is {r5n2} alone. The vendor is route-conditional by design
+    // (the S4-era "every row-4 node links to the shop" pin is superseded — that
+    // full-row linking was exactly the "no choice ever blocks anything" shape UX-6
+    // replaced).
+    const seen = reachable(s.map.rows);
+    assert.ok(seen.has(shops[0].id), `seed ${seed}: the shop is reachable from the entry`);
+    const feeders = s.map.rows[SHOP_ROW - 1].filter((n) => n.next.includes(shops[0].id)).map((n) => n.id);
+    assert.deepEqual(feeders.sort(), ['r4n0', 'r4n1'], `seed ${seed}: the shop's feeder lanes are r4n0/r4n1`);
     // And no other row grew a shop.
     assert.equal(s.map.rows[SHOP_ROW].filter((n) => n.type === 'shop').length, 1);
   }

@@ -2,10 +2,12 @@
 //
 // Pins:
 //   - Exactly TWO event nodes per generated act map, at rows 2 and 6's placed slots,
-//     reachable from every node of the rows before them (full-row linking), labelled
-//     through NODE_TYPES like any other node. Neither slot is its row's first node, so
-//     a first-travel walker passes the wayside by construction. Their encounter-table
-//     entries spawn nothing and consume no draw.
+//     reachable from the entry on every seed (UX-6 weave: the row-2 wayside from BOTH
+//     row-1 lanes, the row-6 wayside from its feeder lane r5n0 alone — route-
+//     conditional by design), labelled through NODE_TYPES like any other node. Neither
+//     slot is its row's first node; the weave CAN make a wayside a one-edge band's
+//     only step (the structural singleton the map-topology test pins). Their
+//     encounter-table entries spawn nothing and consume no draw.
 //   - WHICH event a node holds rolls at ENTRY: exactly ONE draw, same seed => same
 //     story, every roster id reachable across seeds, and the roll reproduces
 //     byte-identically from the pre-entry counter (the shop's own convention).
@@ -70,19 +72,35 @@ function eventOf(id, over = {}) {
   return null;
 }
 
-test('every generated act map holds exactly two events, at rows 2 and 6, reachable from the rows before them', () => {
+test('every generated act map holds exactly two events, at rows 2 and 6, reachable from their feeder lanes', () => {
+  // Reachability from the entry (BFS over the stored edges) — the weave's guarantee.
+  const reachable = (rows) => {
+    const seen = new Set(rows[0].map((n) => n.id));
+    for (let r = 1; r < rows.length; r += 1) {
+      for (const node of rows[r]) {
+        if (rows[r - 1].some((prev) => seen.has(prev.id) && prev.next.includes(node.id))) seen.add(node.id);
+      }
+    }
+    return seen;
+  };
   for (let seed = 0; seed < 60; seed += 1) {
     const s = newRun({ seed });
     const events = s.map.rows.flat().filter((n) => n.type === 'event');
     assert.equal(events.length, 2, `seed ${seed}: exactly two event nodes`);
     assert.deepEqual(events.map((n) => n.id).sort(), EVENT_NODES.map((e) => `r${e.row}n${e.slot}`).sort(),
       `seed ${seed}: the events sit on the placed slots`);
-    // Full-row linking: every node of the row before each event connects to it.
-    for (const { row } of EVENT_NODES) {
-      for (const n of s.map.rows[row - 1]) {
-        assert.ok(n.next.includes(`r${row}n${EVENT_NODES.find((e) => e.row === row).slot}`),
-          `seed ${seed}: ${n.id} links to the row-${row} event`);
-      }
+    // Reachable on every seed — from FEEDER LANES, not full-row linking: the weave's
+    // 2→2 lanes give row-2's wayside both row-1 feeders (r1n0 → {0,1}, r1n1 → {1}),
+    // while 3→3 lanes leave row-6's wayside fed by r5n0/r5n1 ({0,1} and {1,2});
+    // r5n2's lane {2} passes it by. Route-conditional by design — the S6-era
+    // "every node of the rows before links to it" pin is superseded.
+    const seen = reachable(s.map.rows);
+    for (const event of events) {
+      assert.ok(seen.has(event.id), `seed ${seed}: ${event.id} is reachable from the entry`);
+      const row = Number(event.id.slice(1, event.id.indexOf('n')));
+      const feeders = s.map.rows[row - 1].filter((n) => n.next.includes(event.id)).map((n) => n.id);
+      const want = row === 2 ? ['r1n0', 'r1n1'] : ['r5n0', 'r5n1'];
+      assert.deepEqual(feeders.sort(), want.sort(), `seed ${seed}: ${event.id}'s feeder lanes are ${want.join('/')}`);
     }
     // Neither event is its row's first node: a first-travel walker passes the wayside.
     for (const { row, slot } of EVENT_NODES) {
