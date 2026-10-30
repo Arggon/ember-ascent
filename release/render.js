@@ -11,6 +11,7 @@ import { BIOMES, DEFAULT_BIOME } from './src/kernel/index.js';
 import {
   arriving,
   bursts,
+  dealClock,
   dealPending,
   dyingThisPaint,
   endFocusPending,
@@ -24,10 +25,13 @@ import {
   prevMapCurrent,
   reducedMotion,
   setArriving,
+  setDealClock,
   setDealPending,
   setDyingThisPaint,
   setEndFocusPending,
   setEnteringIds,
+  setInputLock,
+  setBursts,
   setLastPlayerStatuses,
   setLastTravel,
   setPaintedPhase,
@@ -35,6 +39,8 @@ import {
   setPrevEnemies,
   snap,
   stageEl,
+  DEAL,
+  animMs,
 } from './runtime.js';
 import { el } from './dom.js';
 import { enemyLook } from './glyphs.js';
@@ -62,11 +68,12 @@ import { setRepaint } from './runtime.js';
  * beat of its own instead of a frame: "the enemy dies, THEN the summary arrives".
  *
  * It is clamped to the COLLAPSE ITSELF, not to how long a boss is worth pausing for. The
- * dying enemy's ghost animates `juice-shatter` for exactly `COLLAPSE_MS` (`.enemy.is-dying`
- * in style.css), with `fill: both`, so from 500 ms on it is at `opacity: 0`. A hold longer
- * than the collapse could only ever hold an EMPTY stage — which is what the old boss window
- * did for 1150 ms. The load-bearing bound on an empty stage is AC-5.6's 250 ms, and the
- * hold now ends while the collapse is still on screen.
+ * dying enemy's ghost animates `juice-shatter` for the collapse's PACED length
+ * (`animMs(COLLAPSE_MS)` — the stylesheet multiplies the same base by `--pace`), with
+ * `fill: both`, so it is at `opacity: 0` from that moment on. A hold longer than the
+ * collapse could only ever hold an EMPTY stage — which is what the old boss window did
+ * for 1150 ms. The load-bearing bound on an empty stage is AC-5.6's 250 ms, and the hold
+ * now ends while the collapse is still on screen.
  *
  * These are read at ONE instant per action (the boot/restart calls have no death to wait
  * for), and `act()` never reads them, so the 8-token action line and the action ids are
@@ -93,6 +100,31 @@ export function render() {
    * re-draw a dying enemy. */
   setDealPending(bursts.some((b) => b.kind === 'deal'));
   setDyingThisPaint(bursts.filter((b) => b.kind === 'death'));
+  // UX-4: arm the deal clock ONCE for the deal that just arrived (a later repaint must
+  // not re-deal the hand — bursts is emptied right after this paint, so `dealPending`
+  // is only true here). The clock carries the PACED step and flight (`animMs`), and its
+  // release timer waits out the whole span — every card's landing plus one flight — so
+  // the `deal-in` entry survives an incidental repaint as a RESUME, never a restart.
+  // Speed 0 and reduced motion pace the clock to 0, so no clock is armed and the hand
+  // paints statically — the fast form the dock promises.
+  if (dealPending && !dealClock) {
+    const stepMs = animMs(DEAL.step);
+    const durMs = animMs(DEAL.dur);
+    if (stepMs > 0 && durMs > 0) {
+      const clock = { start: Date.now(), stepMs, durMs };
+      setDealClock(clock);
+      // UX-5: the release REPAINTS — the deal's busy reason sits painted on the hand
+      // and End Turn, so the clock retiring without a paint would leave the locked
+      // shape up until some incidental repaint. The release also CONSUMES the bursts:
+      // a paint whose bursts were never consumed by dispatchFx (a direct render in a
+      // test harness) would otherwise re-derive `dealPending` from the same stale
+      // deal burst on every release render and re-arm the clock — an infinite timer
+      // chain that never lets the event loop rest. In the real flow bursts is already
+      // empty here (dispatchFx consumed it right after the paint).
+      laterPaint(() => { if (dealClock === clock) { setBursts([]); setDealClock(null); render(); } },
+        stepMs * Math.max(0, (snap.hand.length || 1) - 1) + durMs + 120);
+    }
+  }
   const travelPending = bursts.find((b) => b.kind === 'travel') || null;
   // The status keys of the snapshot BEFORE this action, so a status can be told apart from
   // one that merely restacked. Captured before renderHud() reads it.
@@ -197,16 +229,26 @@ export function render() {
     // sizes and positions the fight), or the hero lands outside the frame and the
     // backdrop loses its lighting — a near-black stage instead of the fight it ended.
     stageEl.replaceChildren(page('combat', 'II — The Fight', 'blade', '', [holdWrap]));
-    // How long the stage holds. The collapse ghost reads for COLLAPSE_MS; a killing
-    // stroke with a SIGNATURE needs longer, because its impact beat fires at ~70% of the
-    // pose and the effect (shockwave, anvil, salvo, rend, launch) lives ~600ms beyond
-    // that — on the persistent fx layer, so it plays against THIS stage only while the
-    // stage is up. heroFigure() above armed the pose hold, so `heroMoveHold.dur` is the
-    // pose's true length (the signature's poseMs, or its move's base when it has none).
+    // How long the stage holds. The collapse ghost reads for the PACED collapse
+    // (`animMs(COLLAPSE_MS)`, the stylesheet's own paced `juice-shatter`); a killing
+    // stroke with a SIGNATURE needs longer, because its impact beat fires at ~70% of
+    // the pose and the effect (shockwave, anvil, salvo, rend, launch) lives a paced
+    // beat beyond that — on the persistent fx layer, so it plays against THIS stage
+    // only while the stage is up. heroFigure() above armed the pose hold, so
+    // `heroMoveHold.dur` is the pose's true PACED length (animMs of the signature's
+    // poseMs, or its move's base when it has none) — and the effect's tail is paced
+    // through `animMs` with it, so the hold scales with the dock exactly as the
+    // effects it protects do.
     const held = heroMoveHold;
     const sig = signatureFor(bursts.find((b) => b.kind === 'card-fly'));
-    const strokeMs = held && sig ? Math.round(held.dur * 0.7) + 650 : 0;
-    const wait = reducedMotion ? 0 : Math.max(Math.min(END_DELAY_MS, COLLAPSE_MS), strokeMs);
+    const strokeMs = held && sig ? Math.round(held.dur * 0.7) + animMs(650) : 0;
+    const wait = reducedMotion ? 0 : Math.max(Math.min(animMs(END_DELAY_MS), animMs(COLLAPSE_MS)), strokeMs);
+    // UX-5: the hold OWNS the stage while it plays, so the gate holds too — armed for
+    // exactly the hold's own `wait` (the same lifetime the re-render timer below uses),
+    // which keeps the reward/summary hotkeys (digits, 0, r, n) from acting mid-collapse.
+    // Reduced motion computes wait 0 and arms nothing; setInputLock keeps the longer of
+    // the two locks (the killing stroke's own play lock may outlive this hold).
+    if (wait > 0) setInputLock({ until: Date.now() + wait, why: 'hold' });
     laterPaint(() => { if (snap.phase === 'ended' || snap.phase === 'reward') render(); }, wait);
     // Keep the fight as the painted phase after a reward hold, so the spoils panel still
     // gets its entrance animation when the beat ends. The ended panel paints plain.

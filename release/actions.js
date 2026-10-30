@@ -29,6 +29,7 @@ import {
   runEvents,
   seedFromUrl,
   setBursts,
+  setDealClock,
   setDealPending,
   setDyingThisPaint,
   setEndFocusPending,
@@ -37,6 +38,7 @@ import {
   setEnteringIds,
   setFlash,
   setHeroMoveHold,
+  setInputLock,
   setLastPlayerStatuses,
   setLastTravel,
   setPaintedPhase,
@@ -60,7 +62,7 @@ import {
 import { announce, toast } from './dom.js';
 import { enemyLook } from './glyphs.js';
 import { currentProfile, recordRun, resetRunOutcome } from './run-history.js';
-import { dispatchFx } from './fx.js';
+import { dispatchFx, playInputSpan } from './fx.js';
 
 /** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it. */
 export const HEROES = [
@@ -217,6 +219,12 @@ export function act(actionId, targetK = null) {
       // The hand the player is looking at changed: the replacement cards fan in.
       if (handKey(before.hand) !== handKey(after.hand)) fx.push({ kind: 'deal' });
     }
+    // UX-4: the OPENING hand is a draw too. Entering a fight (map/reward/rest/event ->
+    // combat) lands the first hand fully formed — the deal burst above only fired on
+    // IN-combat hand changes, so the most-seen draw in the game was the one with no
+    // animation at all. The fight's first paint now deals its hand the same way every
+    // later draw plays. Presentation only: a burst the renderer consumes; no rule reads it.
+    if (after.phase === 'combat' && before.phase !== 'combat') fx.push({ kind: 'deal' });
 
     // A TRAVEL along the map. The map is rebuilt on every paint too, so the departing node
     // is gone by the time the new one is drawn. The node the player stood on is therefore
@@ -322,11 +330,12 @@ export function act(actionId, targetK = null) {
   }
   // UX-2: arm the strike sequence BEFORE the paint, so the slam poses it schedules are
   // painted with their per-attacker delays from the first frame. The plan carries the
-  // ALREADY-DIVIDED durations (animMs applies the speed dock once, here), so 2× halves
-  // every beat and reduced motion / » never arm one at all — those shapes collapse to the
-  // simultaneous fast form the turn had before this slice. A flip that ENDS the run (the
-  // hero died on the enemy turn) arms nothing: the defeat panel is the moment, and
-  // unplaced floats would land unpositioned over it (UX-2 review P3).
+  // ALREADY-PACED durations (animMs applies the dock and the UX-4 base factor once,
+  // here), so the dock scales every beat and reduced motion / » never arm one at all —
+  // those shapes collapse to the simultaneous fast form the turn had before this slice.
+  // A flip that ENDS the run (the hero died on the enemy turn) arms nothing: the defeat
+  // panel is the moment, and unplaced floats would land unpositioned over it (UX-2
+  // review P3).
   const seqBurst = after.phase === 'ended' ? null : fx.find((b) => b.kind === 'enemy-turn');
   if (seqBurst && !reducedMotion && animSpeed !== 0) {
     const beatMs = animMs(STRIKE_SEQ.beat);
@@ -345,13 +354,31 @@ export function act(actionId, targetK = null) {
     // generation), but it must not leave the plan armed — a leaked plan would re-slam
     // its attackers on every hover repaint forever. The identity check keeps a stale
     // cleanup from clearing a NEWER sequence armed by an action in between.
-    later(() => { if (strikeSeq === plan) setStrikeSeq(null); }, plan.totalMs + 400);
+    // UX-5: the retirement now REPAINTS — the plan's busy reason sits painted on the
+    // hand and End Turn, and a player who never moves the mouse would keep seeing the
+    // locked shape after the sequence is over.
+    later(() => {
+      if (strikeSeq !== plan) return;
+      setStrikeSeq(null);
+      repaint();
+    }, plan.totalMs + 400);
   } else if (!seqBurst) {
     // UX-2 review P2: the turn-flip that is NOT an enemy attack (the player's own
     // actions, the reward/rest flips) must retire any plan still armed — the
     // End-Turn timer above only covers the sequence's own lifetime, and an unguarded
     // plan re-slams stale attackers over the player's next action for ~1.5s.
     setStrikeSeq(null);
+  }
+  // UX-5: arm the play's input lock BEFORE the paint, the same place and order the
+  // strike plan above is armed — so the hand the player sees after the play is already
+  // painted locked and no card can start mid-swing. The span is `playInputSpan`, the
+  // longest beat of the choreography dispatchFx is about to schedule, from the same
+  // lifetimes the beats use; the SAME condition gates it that dispatchFx plays under
+  // (reduced motion and » never animate, so they never lock), and setInputLock keeps
+  // the longer of the two spans when a play chains onto a still-running one.
+  const flyBurst = fx.find((b) => b.kind === 'card-fly');
+  if (flyBurst && !reducedMotion && animSpeed !== 0) {
+    setInputLock({ until: Date.now() + playInputSpan(flyBurst), why: 'play' });
   }
   repaint();
   dispatchFx();
@@ -411,6 +438,10 @@ export function newGame(seed = null, opts = {}) {
   bumpAnimGen();
   clearHitstop();
   setDealPending(false);
+  setDealClock(null);
+  // UX-5: the input lock is run-scoped motion state like the rest — a restart must not
+  // inherit a wait a dead run's animation armed.
+  setInputLock(null);
   setDyingThisPaint([]);
   setLastPlayerStatuses([]);
   setPaintedPhase(null);

@@ -35,7 +35,9 @@ export const fxEl = document.getElementById('fx-layer');
 export const reducedMotion = typeof matchMedia === 'function'
   ? matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
-/** Presentation speed. 1 and 2 scale the feel queue; 0 skips it. Never a rule. */
+/** Presentation speed. 1 and 2 scale the feel queue; 0 skips it. Never a rule.
+ *  UX-4 dock semantics at the halved base pace: 1× is the cinematic pace, 2×
+ *  reproduces the pre-UX-4 pace ("the classic pace"), » skips everything. */
 export const SPEED_KEY = 'ea.animSpeed';
 function readAnimSpeed() {
   try {
@@ -52,7 +54,10 @@ function readAnimSpeed() {
 }
 export let animSpeed = readAnimSpeed();
 /** Speed is the one piece of motion state the player changes at runtime (the speed dock). */
-export function setAnimSpeed(n) { animSpeed = n; }
+export function setAnimSpeed(n) {
+  animSpeed = n;
+  applyPace();
+}
 export let animGen = 0;
 /** Advance the action generation; returns the NEW value, as `++animGen` would. */
 export function bumpAnimGen() { animGen += 1; return animGen; }
@@ -69,6 +74,35 @@ export function bumpAnimGen() { animGen += 1; return animGen; }
 export let heroMoveHold = null; // { pose, start, dur } — the pose to keep painting, and its window
 export function setHeroMoveHold(hold) { heroMoveHold = hold; }
 
+/* --------------------------------------------------- UX-4: the deal clock ---------
+ * The hand's deal is an EVENT the player must SEE: cards landing one by one, not eight
+ * tiles fading in as one. The stagger and the per-card flight therefore have real
+ * lengths — a base 90ms step (0.03s before UX-4) and a base 300ms flight — both routed
+ * through `animMs` like every other beat, so the dock scales the deal with everything
+ * else and » collapses it to an instant.
+ *
+ * `dealClock` is the armed clock for the deal in progress, held for its whole span (an
+ * 8-card deal runs ~1.9s at 1×) so an incidental repaint — a hover — can RESUME the
+ * flight instead of cutting it: the hand applies the clock's divided step and duration
+ * as CSS variables, and `--deal-offset` (the negative of the elapsed time) makes every
+ * card's animation-delay resume where the flight actually is. The same resume shape the
+ * hero's pose hold and the strike sequence use. `render()` arms it when a deal burst
+ * arrives (never twice — a repaint must not re-deal), and the release timer retires it
+ * after the last card lands; `newGame()` drops it with the rest of the run's motion
+ * state.
+ *
+ * The layout contract is unchanged: the clock only times the ENTRY. Every card's final
+ * position is the ordinary fan (`--i`/`--n` on the same tiles); `juice-deal` animates
+ * to `transform: none`, so the fan never shifts when the deal finishes.
+ */
+/** The deal's base timing, at the pre-factor base, in milliseconds: 90ms between two
+ *  cards' landings and a 300ms flight per card. At 1× the pace factor doubles both
+ *  (180ms step, 600ms flight) — an 8-card deal spans 7 × 180 + 600 ≈ 1.86s of visible
+ *  sequential landing; at the 2× dock they collapse to the classic 90/300. */
+export const DEAL = { step: 90, dur: 300 };
+export let dealClock = null; // { start, stepMs, durMs } — while the deal is on screen
+export function setDealClock(clock) { dealClock = clock; }
+
 /* ------------------------------------------------------- UX-2: the strike sequence ---
  * The enemy turn, SEQUENCED: one attacker at a time, each with its own windup-to-slam
  * beat, its own named damage float on the hero, and its own intent-badge highlight.
@@ -83,17 +117,19 @@ export function setHeroMoveHold(hold) { heroMoveHold = hold; }
  * `beatMs` is the gap between two attackers' slams, `slamMs` the CSS slam length, and
  * `impactMs` the moment inside a slam where the dash ARRIVES (the keyframe's impact beat)
  * — that is when the attacker's named float lands and the vignette pulse reads. All three
- * arrive already divided by the speed dock (`animMs`), so 2× halves every beat and » never
- * arms a plan at all. Reduced motion arms nothing: the turn collapses to the fast form.
+ * arrive already paced by the speed dock (`animMs`), so the dock scales every beat and »
+ * never arms a plan at all. Reduced motion arms nothing: the turn collapses to the fast
+ * form.
  */
 export let strikeSeq = null; // { attacks, beatMs, slamMs, impactMs, start, totalMs }
 export function setStrikeSeq(seq) { strikeSeq = seq; }
 /**
- * The sequence's base timing, at 1x, in milliseconds — the numbers the audit targets:
- * a beat (windup-to-slam gap between two attackers) of 500ms and a slam of 640ms whose
- * dash arrives at 46% of its run, so a 3-attacker turn's INFORMATION (every named float
- * and the closing vignette) completes in about 1.6s. `animMs` divides all of it: 2×
- * halves every beat, » never arms a plan at all.
+ * The sequence's base timing, at the pre-factor base, in milliseconds — the numbers the
+ * audit targets: a beat (windup-to-slam gap between two attackers) of 500ms and a slam
+ * of 640ms whose dash arrives at 46% of its run. `animMs` paces all of it (× SLOW_FACTOR
+ * ÷ the dock), so the new 1× plays a 1000ms beat and a 1280ms slam and a 3-attacker
+ * turn's INFORMATION (every named float and the closing vignette) completes in about
+ * 3.3s; 2× restores the classic pace, » never arms a plan at all.
  */
 export const STRIKE_SEQ = { beat: 500, slam: 640, impactAt: 0.46, floatMs: 950 };
 /**
@@ -114,12 +150,120 @@ export function strikeSlot(index) {
   };
 }
 export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800, uppercut: 700, hammerfall: 560, quench: 620, bellowspush: 640, snapcast: 480, fanflames: 700, arccut: 620, collarline: 680, headbutt: 600, surge: 760, haftjab: 520, forgeclap: 780, wildflail: 740, bellowsflex: 560, dropkick: 820, bloodhammer: 900, castaside: 640, truetemper: 700, fitplate: 660, kilncry: 620, vent: 600, heattrance: 760, hailblows: 880, climbcut: 720, veintap: 560, reapsweep: 1000, heatwash: 900, bracelock: 800, flameward: 760, cindershroud: 720, stoke: 640, scaleup: 700, bankcoal: 680, ashembrace: 720, cinderskin: 660, lockdown: 900, overtemper: 820, tithe: 780, splitseam: 700 };
+/* ------------------------------------------------------- UX-4: the global pace ---
+ * The user played at 1× and could not follow the game: strokes, throws and draws
+ * flashed past. UX-4 halves the pace — every combat animation timing DOUBLES at the
+ * new 1× — and it does so as ONE factor, not by editing every constant.
+ *
+ * The factor has two expressions over the same number, so JS-scheduled beats and
+ * CSS keyframes can never drift apart:
+ *
+ *   * `SLOW_FACTOR` inside `animMs()` — every duration the JS schedules (pose holds,
+ *     card-fly and hammer flights, hit impacts, hit-stop, the strike sequence's
+ *     beat/slam/impact, kill holds, the deal clock) is a base milliseconds figure,
+ *     and `animMs(ms) = ms × SLOW_FACTOR / animSpeed` is the ONLY door it goes through.
+ *   * the `--pace` custom property on the document root — every ONE-SHOT combat
+ *     animation in style.css declares its duration (and delay) as
+ *     `calc(<base>s * var(--pace, 1))`, and `applyPace()` keeps the property in step
+ *     with the dock: `--pace = SLOW_FACTOR / animSpeed` (0 at »). Ambient loops
+ *     (idle breathing, wind-up, embers) and screen-level arrivals (fade-up, settle,
+ *     travel-in) stay at their base — they are not combat beats.
+ *
+ * At the 2× dock both expressions collapse to the base figures, which is exactly the
+ * pre-UX-4 pace — that is what the dock's "2× = the classic pace" label promises.
+ * At » animMs returns 0, --pace is 0, and nothing animates. Reduced motion arms
+ * nothing and the stylesheet forces every animation to 0.001ms; the fast form stays
+ * fast — reduced motion is an accessibility need, not a pace preference.
+ */
+/* ------------------------------------------------------ UX-5: the input lock -------
+ * "Treat each card as a turn": while a play's animation is still on screen, the next
+ * card must not be playable, and while the enemy-turn sequence or a kill hold is
+ * playing, nothing player-facing is. The gate is PRESENTATION ONLY — the kernel's
+ * legality is untouched (the sim and the stepping tests never route through it) — and
+ * it is derived from the SAME lifetimes the effects already use, not a parallel timer
+ * system:
+ *
+ *   * a play (dispatchFx's `card-fly` case) arms `inputLock` for exactly the span the
+ *     case itself schedules — the pose hold (`heroMoveHold.dur`, the same paced figure
+ *     combat-view paints), the throw choreography (`HERO_THROWS` delay + flight), a
+ *     signature's tail (the render.js kill-hold convention: ~70% of the pose + a paced
+ *     650ms beat) — with the hit-stop beat where the play's numbers land as the FLOOR
+ *     of that span, not an addition (fx.js playInputSpan);
+ *   * the enemy turn gates on `strikeSeq` — the plan UX-2 armed, read directly, so the
+ *     gate retires exactly when the plan does (its own timer, totalMs + 400);
+ *   * a deal gates on `dealClock` — the clock UX-4 armed in render(), read directly;
+ *   * a kill hold (render.js's endHeld branch) arms `inputLock` for exactly the hold's
+ *     own `wait`.
+ *
+ * `busyReason()` reads the lock lazily (the heroMoveHold shape), but every armed span
+ * schedules its own RELEASE PAINT (setInputLock), so the locked shape on the hand and
+ * End Turn always comes off on time, painted — a player who never moves the mouse is
+ * not left staring at a locked hand. The gate NEVER engages under reduced motion —
+ * animations are instant there, so there is nothing to wait for. The dock scales every
+ * span through `animMs`, and » clears the lock in `skipAnim` — skipping the animation
+ * also skips the wait.
+ */
+export let inputLock = null; // { until, why } — busy while Date.now() < until
+/**
+ * Arm (or extend) the input lock. Max semantics: a second lifetime landing while one is
+ * already armed must hold until BOTH end — a new play may not shorten a lock an older,
+ * longer play is still entitled to.
+ *
+ * Each arm also schedules the RELEASE PAINT: the lock's expiry is read lazily (the
+ * heroMoveHold shape), but unlike the pose — which only styles a paint that is already
+ * happening — the locked shape sits on the hand and End Turn BUTTONS, and a paint that
+ * never comes would leave them disabled forever. The timer repaints when this lock's
+ * span is over and it is still the current lock — OR when it is already gone: the lazy
+ * expiry in busyReason() nulls an expired lock, and a reader that raced the expiry
+ * (a polling wait) must not talk the release paint out of firing, or the last paint —
+ * still locked — is the one the player keeps. A replaced (longer) lock skips this
+ * paint: the arm that replaced it scheduled its own.
+ */
+export function setInputLock(lock) {
+  if (lock && inputLock && inputLock.until > lock.until) return;
+  inputLock = lock;
+  if (lock) {
+    const armed = lock;
+    laterPaint(() => { if (inputLock === armed || inputLock === null) repaint(); }, (armed.until - Date.now()) + 30);
+  }
+}
+/**
+ * Why the hand and End Turn are locked right now, or null. The reasons the surface
+ * shows: 'play' (a card's animation is landing), 'enemy-turn' (the strike sequence),
+ * 'deal' (a hand is arriving), 'hold' (a kill hold owns the stage). Reduced motion
+ * short-circuits first: the gate never engages when nothing animates.
+ * @returns {string|null}
+ */
+export function busyReason() {
+  if (reducedMotion) return null;
+  if (strikeSeq) return 'enemy-turn';
+  if (inputLock) {
+    if (Date.now() < inputLock.until) return inputLock.why;
+    inputLock = null; // expired — released lazily, the way heroMoveHold expires
+  }
+  // The deal is reported last: a play that also replaces the hand reads as its play
+  // (the longer span), and a bare turn draw reads as the deal that it is.
+  if (dealClock) return 'deal';
+  return null;
+}
+export const SLOW_FACTOR = 2;
+/**
+ * Publish the pace factor to the stylesheet. Called once at module load and on every
+ * dock change; guarded because the narrow test hosts carry a document without a root
+ * element (and only a real CSSOM can hold custom properties anyway).
+ */
+export function applyPace() {
+  const root = typeof document !== 'undefined' ? document.documentElement : null;
+  if (!root || !root.style || !root.style.setProperty) return;
+  root.style.setProperty('--pace', String(animSpeed === 0 ? 0 : SLOW_FACTOR / animSpeed));
+}
+applyPace();
 export let pileOpen = null;
 export function setPileOpen(v) { pileOpen = v; }
 
 export function animMs(ms) {
   if (reducedMotion || animSpeed === 0) return 0;
-  return Math.max(0, Math.round(ms / animSpeed));
+  return Math.max(0, Math.round((ms * SLOW_FACTOR) / animSpeed));
 }
 export function clearHitstop() {
   if (stageEl && stageEl.classList) stageEl.classList.remove('hitstop');
@@ -136,6 +280,11 @@ export function skipAnim() {
   // » also retires a playing strike sequence: the remaining beats never fire, and the
   // next paint drops the slam poses (the past floats stay until their own removal timers).
   setStrikeSeq(null);
+  // UX-5: skipping the animation also skips the wait — the gate releases with the
+  // effects it was derived from (the lock and the deal clock; the strike sequence is
+  // retired directly above).
+  setInputLock(null);
+  setDealClock(null);
   revealFloats();
 }
 

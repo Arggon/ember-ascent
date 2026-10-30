@@ -11,9 +11,11 @@ import { BIOMES, DEFAULT_BIOME } from './src/kernel/index.js';
 import {
   HERO_POSE_MS,
   SPEED_KEY,
+  animMs,
   animSpeed,
   bursts,
-  dealPending,
+  busyReason,
+  dealClock,
   dyingThisPaint,
   enteringIds,
   flash,
@@ -38,8 +40,20 @@ import { aimed, cancelTargeting, clickCard, consumeClick, enemyLabel, pendingCar
 import { act } from './actions.js';
 import { page } from './page-frame.js';
 
-export function heroPose() {
-  // Precedence: getting hit outranks the card's own movement — a hero who just lost HP
+/**
+ * UX-5: the input gate's reader-facing sentences, one per busy reason. `tile` names the
+ * wait inside a locked card's aria-label; `aria` does the same for the End Turn button.
+ * The gate is the surface refusing to ASK the kernel while an animation is landing —
+ * every reason is a presentation lifetime (runtime.busyReason), never a rule.
+ */
+const BUSY_TEXT = {
+  play: { tile: 'the last card is landing', aria: 'the last card lands' },
+  'enemy-turn': { tile: 'the enemies are acting', aria: 'the enemies act' },
+  deal: { tile: 'the hand is arriving', aria: 'the hand arrives' },
+  hold: { tile: 'the stroke is landing', aria: 'the stroke lands' },
+};
+
+export function heroPose() {  // Precedence: getting hit outranks the card's own movement — a hero who just lost HP
   // flinches, even while playing an attack (and HP-cost cards like bloodletting always
   // read as hurt, never as their HERO_MOVES entry).
   if (bursts.some((b) => b.kind === 'hero-float' && b.tone === 'dmg')) {
@@ -50,16 +64,17 @@ export function heroPose() {
   const move = heroMove(bursts.find((b) => b.kind === 'card-fly'));
   if (move) {
     // Reduced motion and speed 0 skip the animation; do not hold a pose that never plays.
-    // The hold length is the CSS animation's own duration (the keyframes do not scale
-    // with the JS speed setting), so the pose is never dropped mid-swing on a repaint.
-    // A per-card SIGNATURE (HERO_SIGNATURES) may override the pose's base duration.
+    // The hold length is the pose's PACED duration — the same `animMs` figure the
+    // stylesheet's `calc(<base>s * var(--pace, 1))` resolves to — so the pose is never
+    // dropped mid-swing on a repaint and the swing plays at the dock's pace. A per-card
+    // SIGNATURE (HERO_SIGNATURES) may override the pose's base duration.
     const sig = move ? signatureFor(bursts.find((b) => b.kind === 'card-fly')) : null;
     const base = (sig && sig.poseMs) || HERO_POSE_MS[move] || 400;
     if (reducedMotion || animSpeed === 0) setHeroMoveHold(null);
     // `melee` arms the approach (`.hero.is-approach`): a stroke that is not a throw or a
     // cast carries the hero into the enemy lane. fx.js measures the real gap right after
     // the paint and writes it back as `approachX` on this same hold.
-    else setHeroMoveHold({ pose: move, start: Date.now(), dur: base, melee: isMeleeMove(move) });
+    else setHeroMoveHold({ pose: move, start: Date.now(), dur: animMs(base), melee: isMeleeMove(move) });
     return move;
   }
   // An incidental repaint (hover, aim) during the hold repaints the SAME pose rather
@@ -259,7 +274,7 @@ function pileModal(which) {
   return back;
 }
 
-function combatControls(targeting) {
+function combatControls(targeting, busy) {
   const hit = pendingCard();
   const controls = el('div', { cls: 'controls' });
   if (targeting && hit) {
@@ -272,18 +287,37 @@ function combatControls(targeting) {
     }));
   } else {
     const endTurn = snap.actions.find((a) => a.kind === 'end_turn');
-    controls.append(el('button', {
-      cls: 'btn',
+    // UX-5: the input gate. While the surface is busy the turn cannot be ended from
+    // here — the same locked shape the unplayable cards wear (aria-disabled + the
+    // disabled visual), and the handler is not wired at all, so a click during the
+    // animation is inert even before the hotkey swallow in app.js. The kernel never
+    // saw a rejected action: this is the surface refusing to ask.
+    const btn = el('button', {
+      cls: 'btn' + (busy ? ' is-locked' : ''),
       text: 'End Turn  (e)',
-      attrs: { type: 'button' },
-      on: { click: () => act(endTurn && endTurn.id) },
-    }));
+      attrs: {
+        type: 'button',
+        ...(busy ? {
+          'aria-disabled': 'true',
+          'aria-label': `End Turn — locked while ${BUSY_TEXT[busy] ? BUSY_TEXT[busy].aria : 'the fight animates'}`,
+          title: `Waiting: ${BUSY_TEXT[busy] ? BUSY_TEXT[busy].tile : 'the fight is animating'}`,
+        } : {}),
+      },
+      on: busy ? {} : { click: () => act(endTurn && endTurn.id) },
+    });
+    if (busy) btn.disabled = true;
+    controls.append(btn);
   }
   return controls;
 }
 
 export function combatView() {
   const targeting = pendingSlot !== null && snap.enemies.length > 1;
+  // UX-5: the input gate. While a play's animation, the enemy-turn sequence, a hand
+  // deal or a kill hold is on screen, the hand and End Turn paint the locked shape and
+  // app.js swallows the shortcuts — the gate is presentation only, derived from the
+  // same lifetimes the effects use (runtime.busyReason). Reduced motion never arms it.
+  const busy = busyReason();
   const wrap = el('div', { cls: 'stage-combat' + (targeting ? ' sc-targeting' : '') });
 
   const fight = el('div', { cls: 'fight' });
@@ -314,13 +348,24 @@ export function combatView() {
   const dock = el('div', { cls: 'dock' });
   dock.append(pileButton('draw'));
   dock.append(energyOrb());
+  // UX-4: the deal is a visible EVENT. While the deal clock is armed the hand carries
+  // `deal-in` and the clock's PACED step/duration as CSS variables, plus `--deal-offset`
+  // (the negative elapsed time) so a mid-deal repaint — a hover — RESUMES each card's
+  // flight where it is instead of cutting it (the same resume shape the hero pose uses).
+  // The layout contract is unchanged: the entry animates, the fan it lands in does not.
+  const deal = dealClock;
+  const dealStyle = deal
+    ? `;--deal-step:${deal.stepMs}ms;--deal-dur:${deal.durMs}ms;--deal-offset:${Math.min(0, deal.start - Date.now())}ms`
+    : '';
   // Fan rotation lives on the inner card (`--i`), never on this wrap, so the hand stays one row.
+  // The `is-busy` marker scopes the gate's CSS and gives the tests a hook; the locked
+  // shape itself rides each tile (below), the way unplayable cards always read.
   dock.append(el('div', {
-    cls: 'hand' + (dealPending ? ' deal-in' : ''),
-    attrs: { style: `--n:${snap.hand.length}` },
-  }, ...snap.hand.map((c, i) => cardTile(c, { index: i + 1 }))));
+    cls: 'hand' + (deal ? ' deal-in' : '') + (busy ? ' is-busy' : ''),
+    attrs: { style: `--n:${snap.hand.length}${dealStyle}` },
+  }, ...snap.hand.map((c, i) => cardTile(c, { index: i + 1, locked: busy }))));
   dock.append(pileButton('discard'));
-  dock.append(combatControls(targeting));
+  dock.append(combatControls(targeting, busy));
   wrap.append(dock);
 
   wrap.append(el('p', { cls: 'hint', text: targeting
@@ -448,16 +493,21 @@ function enemyCard(e, position) {
  * effect, then the compact CLI code. Auto height means a 3-line effect grows the tile
  * rather than clipping it.
  * @param {any} card the snapshot's card view
- * @param {{index?: number, onClick?: Function, actionId?: string}} [opts]
+ * @param {{index?: number, onClick?: Function, actionId?: string, locked?: string|null}} [opts]
  *        `index` draws the keyboard digit badge (hand only); `onClick` overrides the default
- *        hand-play action (reward tiles need it, because taking a card is a different verb)
+ *        hand-play action (reward tiles need it, because taking a card is a different verb);
+ *        `locked` is the UX-5 busy reason — the tile wears the disabled shape even though
+ *        the kernel would take it, because the previous animation is still landing
  */
 export function cardTile(card, opts = {}) {
   const isPending = pendingSlot !== null && card.slot === pendingSlot;
   // While one card is waiting for a target the OTHER cards cannot be played by accident:
   // clicking them cancels the step instead. They read as inert but stay focusable, so a
   // keyboard user can still click out of the step with the digit shortcuts and Escape.
-  const disabled = !card.playable;
+  // UX-5: a busy hand is disabled the SAME way — the unplayable visual, aria-disabled,
+  // and the native disabled flag — with the honest wait named instead of the Energy one.
+  const locked = opts.locked ?? null;
+  const disabled = !card.playable || locked !== null;
   // A tile is clicked for two different reasons: playing it from the hand, or taking it from
   // a reward. `opts.onClick` supplies the second. Before this existed every tile called
   // `clickCard(slot)`, which only searches `snap.hand` — so a reward tile (slot `s1`)
@@ -469,6 +519,11 @@ export function cardTile(card, opts = {}) {
   // reader who meets "A6" in the CLI can still connect the two.
   const desc = card.description || card.summary;
   const awaiting = isPending ? ' Choosing a target: click a highlighted enemy, or press Escape to cancel.' : '';
+  // The locked wait is named in the tile's own sentence (the BUSY_TEXT table), so a
+  // screen reader hears why the playable card is not taking input right now.
+  const lockedNote = locked !== null
+    ? ` Waiting: ${BUSY_TEXT[locked] ? BUSY_TEXT[locked].tile : 'the fight is animating'}.`
+    : '';
   const tile = el('button', {
     cls: `card type-${card.type}` + (disabled ? ' disabled is-unplayable' : ''),
     attrs: {
@@ -480,7 +535,7 @@ export function cardTile(card, opts = {}) {
       // The inert reason belongs to the CARD'S CONTEXT: a hand tile lacks Energy, a
       // shop shelf (S4) lacks gold. `disabledNote` lets a caller state the real reason
       // instead of the Energy default.
-      'aria-label': `${card.name}. Costs ${card.cost} Energy. ${desc}${disabled ? ` ${card.disabledNote ?? 'Not playable: not enough Energy.'}` : ''}${awaiting}`,
+      'aria-label': `${card.name}. Costs ${card.cost} Energy. ${desc}${lockedNote || (disabled ? ` ${card.disabledNote ?? 'Not playable: not enough Energy.'}` : '')}${awaiting}`,
       // UX-2 (review P3): the rules row is line-clamped at several tiers, and the
       // clamped tail was reachable only through the aria-label — invisible to a
       // sighted hover. The native title carries the FULL sentence, which makes the

@@ -590,7 +590,7 @@ Process rules (standing):
   lock) resumes next on top; note the orchestrator stopped its first dispatch because
   it had been started against the same uncommitted tree UX-4's QA was testing — the
   quiescent-tree rule now applies to QA too, not only reviews.
-- 2026-10-29 — UX-5 committed a591e8d after QA PASS 8/8 (41 map decisions band-true,
+- 2026-10-29 — UX-5 committed a591e8d after QA PASS 8/8 (CLOSED — re-review APPROVE) (41 map decisions band-true,
   drawn legs 32=32; the lock lifecycle proven both directions — release with zero mouse
   movement, 2x halves it, reduced motion never engages, hotkeys byte-identical under
   the lock; a full TWO-ACT VICTORY with the lock live: 31 transitions, input returned
@@ -607,3 +607,21 @@ Process rules (standing):
 - RECIPE NOTE (from the UX-5 QA): the save/load lever used MID-RUN can re-derive map
   node types (observed elite->rest after a belt injection at floor 2) - inject at
   floor -1 for determinism. Recorded here; a lever doc pass is backlog.
+- 2026-10-29 — UX-5 re-review VERDICT: APPROVE. Verified: the summit exception is
+  exactly the r6n2->boss fallback and nothing else (an empty band requires slot >=
+  nextWidth; the fixed widths make 3->1/k=2 the only case; the band-shape test would
+  fail any other fallback); deterministic (pure index math after the intAt calls — the
+  RNG stream offset after map generation is IDENTICAL to pre-UX-5, so band routing
+  cannot change combat outcomes, only routes); all 35 hash flips with 0 outcome flips
+  confirmed by an independent census; `next` was already hashed/embedded so the save
+  format shape did not change. The lock: every ordering walked (expire->re-arm->timer,
+  overlapping timers, equal-until replacement, skip, newGame), no repaint storms, the
+  hero cannot be mid-lock-killed, hotkey swallow scope correct (d/k live, targeting
+  cannot engage while busy), the kernel-authoritative proof holds by construction
+  (src/kernel and src/surface import nothing from src/web). P3s -> BACKLOG: the
+  "unavoidable shop" wording overstates (a non-shop row-5 node is offered from every
+  row-4 node; only deterministic first-slot walks route through it); the potion belt
+  is not gated by the input lock (inconsistent with the card-as-turn story — wear the
+  locked shape or record the exclusion); playInputSpan's 400 fallback diverges from
+  dispatchFx's 800 (latent, factor the shared pose-base lookup). Release rebuilt at
+  round close. **THE ROADMAP IS COMPLETE.**

@@ -81,12 +81,12 @@ export function sceneBeat(from, to) {
       fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
         el('span', { cls: 'fx-act-num', text: 'Act I' }),
         el('span', { cls: 'fx-act-name', text: snap.biomeName ?? BIOMES[DEFAULT_BIOME].name }),
-        el('span', { cls: 'fx-act-rule' })), 2300);
+        el('span', { cls: 'fx-act-rule' })), animMs(2300));
     }
     return;
   }
   if (to === 'ended') return;
-  fxAdd(el('div', { cls: `fx-scene to-${to}`, attrs: { 'aria-hidden': 'true' } }), 700);
+  fxAdd(el('div', { cls: `fx-scene to-${to}`, attrs: { 'aria-hidden': 'true' } }), animMs(700));
 }
 
 /**
@@ -150,6 +150,39 @@ function heroLane() {
 }
 
 /**
+ * The input span of one play, from its card-fly burst: the LONGEST beat of the
+ * choreography dispatchFx will schedule for it, in paced milliseconds. UX-5 arms the
+ * input lock for exactly this figure in `act()` — BEFORE the paint, the same place and
+ * order the UX-2 strike plan is armed, so the hand the player sees after the play is
+ * already painted locked. The span comes from the same lifetimes the beats use, never
+ * a fixed sleep:
+ *   * the pose — `(sig.poseMs) || HERO_POSE_MS[move] || 400`, paced (the base combat
+ *     view's heroPose() will arm the hold with this very action);
+ *   * a signature's tail — the render.js kill-hold convention: its impact beat fires
+ *     at ~70% of the pose and the effect lives a paced 650ms beyond;
+ *   * a throw's flight — HERO_THROWS' condense delay plus the flight itself;
+ *   * the hit-stop beat (the 240+70 feel queue) where the play's numbers land — a
+ *     FLOOR on the whole span, not an addition: the numbers land at a fixed ~620ms,
+ *     so every beat that outlives them already covers them and summing would hold
+ *     the hand dead for another paced 620ms past the last real beat.
+ * `animMs` paces every figure, so the dock scales the gate with the animation. The
+ * caller gates on the same condition dispatchFx plays under (not reduced motion, dock
+ * not at »), so the gate never engages where nothing animates.
+ * @param {{id?: string, type?: string}} b the card-fly burst
+ * @returns {number} paced milliseconds the input should stay locked
+ */
+export function playInputSpan(b) {
+  const sig = signatureFor(b);
+  let span = animMs((sig && sig.poseMs) || HERO_POSE_MS[heroMove(b)] || 400);
+  if (sig) span = Math.max(span, Math.round(span * 0.7) + animMs(650));
+  if (b && b.id && HERO_THROWS[b.id]) {
+    const spec = HERO_THROWS[b.id];
+    span = Math.max(span, animMs(spec.delayMs ?? 0) + animMs(spec.ms ?? THROW_MS));
+  }
+  return Math.max(span, animMs(310));
+}
+
+/**
  * Play the bursts collected for the action just taken. Called AFTER `render()`, so any
  * node an effect wants to attach to already exists in its final tree.
  */
@@ -178,7 +211,10 @@ export function dispatchFx() {
   for (const b of list) {
     switch (b.kind) {
       case 'vignette':
-        fxAdd(el('div', { cls: 'fx-vignette' }), 620);
+        // Every fx-layer LIFETIME is a paced beat (animMs), so the node always outlives
+        // its stylesheet animation — whose duration is the same base multiplied by
+        // `--pace` — and » (animMs → 0) removes it at once.
+        fxAdd(el('div', { cls: 'fx-vignette' }), animMs(620));
         break;
       case 'enemy-turn': {
         // UX-2: the enemy turn as a SEQUENCE of named attacks. The plan (armed in act()
@@ -207,12 +243,12 @@ export function dispatchFx() {
         // hit. (The aggregate "You take N" toast keeps the net fact for everyone else.)
         if (b.playerLost > 0) {
           const last = plan.attacks.length - 1;
-          fire(() => fxAdd(el('div', { cls: 'fx-vignette' }), 620), plan.beatMs * last + plan.impactMs);
+          fire(() => fxAdd(el('div', { cls: 'fx-vignette' }), animMs(620)), plan.beatMs * last + plan.impactMs);
         }
         break;
       }
       case 'wipe':
-        fxAdd(el('div', { cls: 'fx-turn-wipe' }), 460);
+        fxAdd(el('div', { cls: 'fx-turn-wipe' }), animMs(460));
         break;
       case 'card-fly':
         // `b.side` is already my own full lane class (`side-0` / `side-mid` / `side-1` /
@@ -279,6 +315,9 @@ export function dispatchFx() {
             if (sig[knob]) play(fire, lane, b, sigMs, gen);
           }
         }
+        // UX-5: this play's input lock was armed by act() for `playInputSpan(b)` — the
+        // figure this case's own choreography adds up to — BEFORE the paint, so the
+        // hand repainted locked. There is nothing to arm here.
         break;
       default:
         break;
@@ -287,18 +326,18 @@ export function dispatchFx() {
   // The boss arrives as a BEAT, not a bigger fade: a red wash, a heavier and slower
   // title card, plus a ring that expands out of the enemy row.
   if (welcome) {
-    fxBanner('SLAG WARDEN', 'boss', '', 1350);
-    fxAdd(el('div', { cls: 'fx-boss-ring' }), 1100);
+    fxBanner('SLAG WARDEN', 'boss', '', animMs(1350));
+    fxAdd(el('div', { cls: 'fx-boss-ring' }), animMs(1100));
   }
   // The run's last two moments, each with its own weight: a bright hold for the win, a
   // slow darkening for the loss. Both are words as well as motion.
   if (won) {
-    fxBanner('VICTORY', 'victory', '', 1500);
-    fxAdd(el('div', { cls: 'fx-run-bloom' }), 1400);
+    fxBanner('VICTORY', 'victory', '', animMs(1500));
+    fxAdd(el('div', { cls: 'fx-run-bloom' }), animMs(1400));
   }
   if (lost) {
-    fxBanner('DEFEAT', 'defeat', '', 1700);
-    fxAdd(el('div', { cls: 'fx-darken' }), 1700);
+    fxBanner('DEFEAT', 'defeat', '', animMs(1700));
+    fxAdd(el('div', { cls: 'fx-darken' }), animMs(1700));
   }
   // Feel queue: the card is already in flight. Hold the stage for a short hit-stop,
   // then let the damage and block numbers rise. Uses the SAME action generation captured

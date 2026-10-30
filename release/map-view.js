@@ -1,9 +1,11 @@
 // src/web/map-view.js — the ascent map: nodes, routes, quests, travel marker, pins.
 //
-// The kernel connects every node on a floor to every node on the next one, so every pair
-// is drawn; the legs the player can take right now are lit. Geometry is read from the
-// laid-out nodes, so it follows any breakpoint. Map pins are browser-only planning marks
-// in localStorage, keyed by the run's seed and NEVER in run state.
+// The kernel's snapshot carries each node's OWN edge list (`next` — the band the
+// edge rule in rules/map.js generated; a legacy save's stored map is full-linked and
+// draws its own lattice), so the routes drawn are the map's REAL branches; the legs
+// the player can take right now are lit. Geometry is read from the laid-out nodes, so
+// it follows any breakpoint. Map pins are browser-only planning marks in localStorage,
+// keyed by the run's seed and NEVER in run state.
 
 import { prevMapCurrent, prevMapFloor, repaint, snap } from './runtime.js';
 import { el, announce } from './dom.js';
@@ -87,11 +89,15 @@ const MAP_WORLD = '<svg viewBox="0 0 400 600" preserveAspectRatio="none">'
   + '</svg>';
 
 /**
- * Draw the routes between floors. The kernel connects every node on a floor to every node
- * on the next one (rules/map.js availableNodes), so every pair is drawn; the legs the player
- * can take right now are lit. Geometry is read from the laid-out nodes, so it follows any
- * breakpoint. Decorative: aria-hidden, pointer-inert, and it carries no fact the node
- * buttons do not already state.
+ * Draw the routes between floors. The snapshot carries each node's OWN edge list
+ * (`next` — the band rules/map.js generated; a legacy save's stored map is full-linked
+ * and draws its own lattice), so exactly the real branches are drawn; the legs the
+ * player can take right now are lit. The painted rows index 1:1 with the snapshot's
+ * rows (only `.node` elements are collected — the travel marker and the "you are here"
+ * ribbon carry other classes), so node k of row r is snapshot row r's k-th node.
+ * Geometry is read from the laid-out nodes, so it follows any breakpoint. Decorative:
+ * aria-hidden, pointer-inert, and it carries no fact the node buttons do not already
+ * state.
  * @param {HTMLElement} map
  */
 function drawRoutes(map) {
@@ -105,8 +111,17 @@ function drawRoutes(map) {
   let lit = '';
   let dim = '';
   for (let r = 0; r + 1 < rows.length; r += 1) {
-    for (const a of rows[r]) {
-      for (const b of rows[r + 1]) {
+    const dataRow = snap.map.rows[r] ?? [];
+    const nextRow = snap.map.rows[r + 1] ?? [];
+    for (let k = 0; k < rows[r].length; k += 1) {
+      const a = rows[r][k];
+      const from = dataRow[k];
+      if (!from) continue;
+      for (const id of from.next ?? []) {
+        const j = nextRow.findIndex((x) => x.id === id);
+        if (j === -1) continue;
+        const b = rows[r + 1][j];
+        if (!b) continue;
         const [x1, y1] = c(a); const [x2, y2] = c(b);
         const my = (y1 + y2) / 2;
         const d = `M${x1.toFixed(1)} ${y1.toFixed(1)} C${x1.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)} `;
