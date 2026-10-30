@@ -590,3 +590,20 @@ Process rules (standing):
   lock) resumes next on top; note the orchestrator stopped its first dispatch because
   it had been started against the same uncommitted tree UX-4's QA was testing — the
   quiescent-tree rule now applies to QA too, not only reviews.
+- 2026-10-29 — UX-5 committed a591e8d after QA PASS 8/8 (41 map decisions band-true,
+  drawn legs 32=32; the lock lifecycle proven both directions — release with zero mouse
+  movement, 2x halves it, reduced motion never engages, hotkeys byte-identical under
+  the lock; a full TWO-ACT VICTORY with the lock live: 31 transitions, input returned
+  after every one, zero errors). Dev summary: Part B's landed design verified with FOUR
+  defects found and fixed (the release paint did not exist; lazy expiry defeated it;
+  the play span double-counted the hit-stop; an infinite timer-chain hazard); Part A
+  band edges with the documented summit-convergence exception, 120-seed reachability
+  sweep (0 impossible climbs, 0 dead ends), map view draws 32=32 real edges, all 35
+  golden hashes flip with ZERO outcome flips, 5 pinned constants recomputed, Part B
+  proven hash-neutral by direct replay. Known consequence: the act-1 shop is
+  unavoidable from some row-4 bands (placement decision, not a band bug). Gates:
+  390/389/1 node, gate OK, art OK, 22/22 browser, sim exit 0. Solo review next;
+  release rebuild after.
+- RECIPE NOTE (from the UX-5 QA): the save/load lever used MID-RUN can re-derive map
+  node types (observed elite->rest after a belt injection at floor 2) - inject at
+  floor -1 for determinism. Recorded here; a lever doc pass is backlog.
