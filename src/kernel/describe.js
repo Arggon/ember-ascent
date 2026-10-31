@@ -720,7 +720,7 @@ const GLOSSARY_CORE = {
     glossRow('VULN', 'Vulnerable', 'Recibe 50% más de daño de los ataques. Se reduce en 1 cada turno.', 'B'),
     glossRow('WK', 'Débil', 'Los ataques infligen 25% menos de daño. Se reduce en 1 cada turno.', 'B'),
     glossRow('DEX', 'Destreza', 'El Bloqueo ganado con cartas es esa cantidad mayor. Dura todo el combate.', 'B'),
-    glossRow('METAL', 'Metalizado', 'Ganas esa cantidad de Bloqueo al final de cada turno. La carta Forja Escalada lo aplica.', 'B'),
+    glossRow('METAL', 'Metalizado', 'Ganas esa cantidad de Bloqueo al final de cada turno. La carta Metalizado lo aplica.', 'B'),
   ],
 };
 

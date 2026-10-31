@@ -274,7 +274,10 @@ export function relicThresholdLine(ids, winsAfter) {
       marks: marks.join(currentLang() === 'es' ? ' y ' : ' and '),
       marksPlural: marks.length === 1 ? '' : 's',
       marksClause: t(marks.length === 1 ? 'relicThreshold.marksClause' : 'relicThreshold.marksClausePlural'),
-      verb: t(marks.length === 1 ? 'relicThreshold.verb1' : 'relicThreshold.verb'),
+      // The verb agrees with the SENTENCE SUBJECT (winsAfter wins), not the mark-row
+      // count — the I18N-2 re-review caught the wrong key: at the 3/7/10/15-win
+      // milestones marks.length is always 1, so the plural verb was unreachable.
+      verb: t(winsAfter === 1 ? 'relicThreshold.verb1' : 'relicThreshold.verb'),
     });
   }
   return t('relicThreshold.plain', { n: winsAfter, plural: winWord(winsAfter) });
@@ -406,23 +409,6 @@ export function cumulativeAt(record) {
 }
 
 /** The persistent unlock line for a stored entry, if that run crossed a threshold. */
-export function unlockPersistentLine(record) {
-  const ids = unlocksState.byRecord?.[record.id] ?? [];
-  const names = [];
-  let score = null;
-  let runs = null;
-  for (const id of ids) {
-    const entry = (UNLOCK_CATALOG ?? []).find((e) => e.id === id);
-    if (!entry) continue;
-    names.push(entry.name);
-    if (typeof entry.at?.score === 'number') score = entry.at.score;
-    if (typeof entry.at?.runs === 'number') runs = entry.at.runs;
-  }
-  if (names.length === 0) return null;
-  if (score !== null) return `Unlocked at score ${cumulativeAt(record)}: ${names.join('; ')}.`;
-  if (runs !== null) return `Unlocked after ${runs} ${runs === 1 ? 'run' : 'runs'}: ${names.join('; ')}.`;
-  return `Unlocked by this run: ${names.join('; ')}.`;
-}
 
 /**
  * Reset the run-outcome bookkeeping for a NEW run (`newGame` calls this): the ended

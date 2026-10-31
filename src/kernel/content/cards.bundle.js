@@ -366,7 +366,7 @@ export const cardsBundle = {
     {
       "id": "shrug",
       "name": "Cast Aside",
-      "name_es": "A Un Lado",
+      "name_es": "A un Lado",
       "cost": 1,
       "type": "skill",
       "rarity": "common",
