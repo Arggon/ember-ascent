@@ -667,3 +667,11 @@ Process rules (standing):
   recorded). I18N-1 CLOSED. I18N-2 (the content sweep: 70 card names_es/flavor_es,
   enemy names, kindling/quests, the article ruling carried: genderless "Ashwright ha
   caído." unless the user rules otherwise) dispatched; release rebuild after.
+- 2026-10-30 — I18N-2 QA PASS: a FULL two-act Spanish playthrough (boot -> kindling ->
+  both acts -> end; every screen es) with the leak list as the deliverable — EXACTLY
+  two small leaks found, both fixed in 8b6a94a: the end-screen ledger flag rows route
+  through the dead ledger.yes/no keys (si/no now render), and the codex rarity chips
+  render the localized tier word. Plus: the act-2 chapter capitalized, and the unlock
+  narration's es verb agrees with its subject (1 victoria ... cruzo). Contract
+  re-verified mid-toggle (state byte-identical). Solo review next (I18N-2 + the leak
+  fixes), then the 0.4.1 release rebuild.
