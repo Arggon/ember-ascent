@@ -53,10 +53,11 @@ export const SHOP_SLOT = 1;
  *  (mirroring the shop's placed-middle precedent). Placed, not rolled: a seeded pool
  *  entry the draw could miss would leave some runs eventless, and "two events per act"
  *  is a promise about the FORMAT, not about luck — the same ruling the shop's placement
- *  made. NEITHER slot is its row's first node: a deterministic walker that takes the
- *  first travel (the built-in policies rank the event last, exactly like the shop; the
- *  test drivers do the same by construction) walks past the wayside instead of being
- *  forced into it, while full-row linking keeps it reachable from every approach. */
+ *  made. NEITHER slot is its row's first node, so the row's first approach is never the
+ *  wayside itself; UX-6's parity weave (the edge rule in generateMap) keeps both slots
+ *  reachable on every seed from named feeder bands, and — the honest cost of genuine
+ *  blocking — can present a wayside as a one-edge band's ONLY step (the structural
+ *  singletons the map-topology test names). */
 export const EVENT_NODES = Object.freeze([
   Object.freeze({ row: 2, slot: 1 }),
   Object.freeze({ row: 6, slot: 1 }),
@@ -67,9 +68,10 @@ export const EVENT_NODES = Object.freeze([
  *  the act's elite push (act 1's shop sat after its own), so the second act's spending
  *  decision comes one row earlier. The events sit at row 3's rightmost slot and row 5's
  *  rightmost slot — one per half of the act, NEITHER ever a row's first node (the same
- *  deterministic-walker ruling as act 1: a walker that takes the first travel walks
- *  past the wayside instead of being forced into it, while full-row linking keeps it
- *  reachable from every approach). */
+ *  ruling as act 1). UX-6's parity weave (the edge rule in generateMap) keeps every
+ *  placed slot reachable on every seed from named feeder bands, and — the honest cost
+ *  of genuine blocking — can present a wayside as a one-edge band's ONLY step (the
+ *  structural singletons the map-topology test names). */
 export const ACT2_SHOP_ROW = 4;
 export const ACT2_SHOP_SLOT = 1;
 export const ACT2_EVENT_NODES = Object.freeze([
@@ -207,53 +209,84 @@ export function generateMap(seed, startDraw, act = 1) {
 
   rows.push([{ id: `r${ROWS - 1}n0`, type: 'boss', next: [] }]);
 
-  // UX-5 PART A — THE EDGE RULE (the format): node i of row r connects to the BAND
-  // j ∈ {i−1, i, i+1} ∩ next-row width — the classic StS ladder. A choice between
-  // steps must be a real choice: under the old full-row linking every node reached
-  // every next-row node, so "which node" carried no information and no reward was
-  // ever exclusive. Under the band, adjacent-row rewards can be mutually exclusive
-  // per run (take the left fork, forgo the right) — that is the point. The widths
-  // above (2 for rows 1-3, 3 for rows 4-6, 1 for the fixed opener and the boss) are
-  // what make the rule SAFE, for every seed, by construction — no widening exception
-  // is needed and no placement moves:
-  //   * EVERY node of row r+1 is linked from SOME node of row r — the widest gap
-  //     between a next-row slot j and the row-r slots that reach it is |i−j| ≤ 1,
-  //     and row widths grow or hold (2→2, 2→3, 3→3) except into the single-node
-  //     rows. So reachability from the entry composes by induction over the rows:
-  //     the entry row is offered whole at floor < 0, every later row is reachable
-  //     from the row before it, therefore EVERY placed node — act 1's shop r5n1 and
-  //     events r2n1/r6n1, act 2's shop r4n1 and events r3n1/r5n2 — is reachable on
-  //     every seed (tests/kernel/map-topology.test.js proves it over 60 seeds ×
-  //     both acts).
-  //   * NO DEAD ENDS: into a multi-node row every band is non-empty (i ≤ w_r − 1 ≤
-  //     w_{r+1} always leaves at least j = i in range); into the 1-wide boss row the
-  //     summit convergence below links every node.
+  // UX-6 — THE EDGE RULE (the format): the PARITY WEAVE. Node i of row r connects to
+  // the next row by its LANE, not by the ±1 ladder:
+  //   * next row GROWING or HOLDING width (w_next >= w): node i connects to
+  //     j ∈ {i, i+1} — itself and the slot to its right;
+  //   * next row CONTRACTING (w_next < w): node i connects to j ∈ {i−1, i} — the slot
+  //     to its left and itself.
+  // Each candidate is clamped into the next row's slots; a node whose clamped band is
+  // EMPTY widens one step toward the row's interior (below). Worked shapes:
+  //   1→2: node 0 → {0,1}                              (the entry: both row-1 slots)
+  //   2→2: node 0 → {0,1},          node 1 → {1}
+  //   2→3: node 0 → {0,1},          node 1 → {1,2}
+  //   3→3: node 0 → {0,1}, node 1 → {1,2}, node 2 → {2}
+  //   3→2: node 0 → {0},  node 1 → {0,1},  node 2 → {1}
+  // (Spec note: the design brief's one-line parity alternation "even i → {i,i+1},
+  // odd i → {i−1,i}" disagrees with its own worked-shapes table on exactly the
+  // same-width rows — the alternation would give 2→2 node 1 the band {0,1}, which
+  // leaves a 2-wide row fully two-way connected, the precise complaint UX-6 replaces.
+  // The worked table and the acceptance sentence ("from row-1 node 1 you CANNOT reach
+  // row-2 node 0") are the spec; direction-by-growth is the rule that generates them.)
+  // EVERY choice now blocks something: from row-1 node 1 the run CANNOT reach row-2
+  // node 0; from row-4 node 2 the run CANNOT reach row-5 node 0. Under the ±1 band a
+  // 2-wide row's pick foreclosed nothing — the whole next row stayed on the table.
+  // The guarantees the fixed widths (1 opener, 2 for rows 1-3, 3 for rows 4-6, 1
+  // boss) make SAFE for every seed, by construction — no placement moves:
+  //   * EVERY node of row r+1 is linked from SOME node of row r. Hold and grow-by-one
+  //     cover slots 0..w−1 from slots 0..w−1 ({i,i+1} from every i, clamped at the
+  //     right edge); a contraction covers slots 0..w_next−1 from slots 0..w−1
+  //     ({i−1,i} from every i, clamped at the left edge). Growth here is by at most
+  //     one slot (the format's widths), so no next-row slot is ever stranded above
+  //     the lanes. Reachability from the entry therefore composes by induction over
+  //     the rows: the entry row is offered whole at floor < 0, every later row is
+  //     reachable from the row before it, and EVERY placed node — act 1's shop r5n1
+  //     and events r2n1/r6n1, act 2's shop r4n1 and events r3n1/r5n2 — is reachable
+  //     on every seed (tests/kernel/map-topology.test.js proves it over 60 seeds ×
+  //     both acts). Reachable, not unavoidable: a placed node is offered from the
+  //     feeder lanes that reach it — the act-1 shop from r4n0/r4n1, not r4n2 — which
+  //     is route-conditional by design (the user asked for exactly this blocking).
+  //   * NO DEAD ENDS: a clamped band is empty only when BOTH candidates leave the
+  //     next row on the same side; in this geometry that happens once — the summit
+  //     funnel below. The widening guarantee (this node steps one lane toward the
+  //     row's interior until a slot is in range) covers it and any future shape.
+  //   * THE SUMMIT CONVERGENCE (the ONE documented exception, unchanged in effect):
+  //     the 3-wide row 6 funnels into the 1-wide boss row. Every row-6 node connects
+  //     to the warden — slot 2's raw contraction band {1,2} clamps empty and widens
+  //     to the boss itself. No climb can strand a node a step below the summit.
   //   * The boss is reachable from every row-6 node, so no seed can produce an
   //     impossible climb.
-  // A first-travel walker still passes the waysides: neither placed slot is its
-  // row's first node (the EVENT_NODES / ACT2_EVENT_NODES ruling above), and a band
-  // never FORCES the event — from any node the band holds a non-event choice too.
-  // LEGACY SAVES carry maps generated under the full-row rule, with their own
-  // full `next` arrays stored in state; every reader below walks the STORED edges
-  // (availableNodes, the snapshot, the map view), so an old save keeps playing its
-  // own lattice unchanged and no new field is needed.
+  // The HONEST cost of genuine blocking: a one-edge band can end at a WAYSIDE. These
+  // are structural, not seed luck, and exactly three exist — act 1's r1n1 → {r2n1},
+  // act 2's r2n1 → {r3n1} and r4n2 → {r5n2}. A deterministic walker that ranks the
+  // wayside last (the built-in policies) can be FUNNELED into one on those lanes; no
+  // band is ever a singleton SHOP, and every multi-edge band holds a non-wayside
+  // choice. The map-topology test pins the exact singleton set.
+  // LEGACY SAVES carry maps generated under the ±1 rule, with their own full `next`
+  // arrays stored in state; every reader below walks the STORED edges (availableNodes,
+  // the snapshot, the map view), so an old save keeps playing its own lattice
+  // unchanged and no new field is needed.
   for (let row = 0; row < rows.length - 1; row += 1) {
+    const curRow = rows[row];
     const nextRow = rows[row + 1];
-    for (let k = 0; k < rows[row].length; k += 1) {
-      const node = rows[row][k];
+    const contract = nextRow.length < curRow.length;
+    for (let k = 0; k < curRow.length; k += 1) {
+      const node = curRow[k];
       node.next = [];
-      for (let j = k - 1; j <= k + 1; j += 1) {
+      const lanes = contract ? [k - 1, k] : [k, k + 1];
+      for (const j of lanes) {
         if (j >= 0 && j < nextRow.length) node.next.push(nextRow[j].id);
       }
-      // The ONE documented exception, and it is the summit's, not a placed node's:
-      // into a 1-wide row the band of slot 2 is empty ({1,2,3} ∩ {0}), which would
-      // strand the row's rightmost node a step below the boss. Every climb funnels
-      // into the warden — the boss row links from EVERY node of the row before it
-      // (the widths make this transition the only one that can need it; a node whose
-      // band is empty on any other transition would be a format bug the topology
-      // test fails on). No placed node needed widening or moving: with the fixed
-      // widths every shop/event slot is inside some feeder's band on every seed.
-      if (node.next.length === 0) node.next.push(nextRow[0].id);
+      // The non-empty guarantee: a clamped-empty band widens one lane toward the
+      // row's interior (downward, the direction the lanes step). In the fixed widths
+      // this fires exactly once per act — row 6's rightmost node into the 1-wide
+      // boss row, which IS the summit convergence documented above — and the test
+      // fails any other firing as a format bug.
+      if (node.next.length === 0) {
+        let j = lanes[0] - 1;
+        while (j >= nextRow.length) j -= 1;
+        node.next.push(nextRow[Math.max(j, 0)].id);
+      }
     }
   }
   return { rows, draws: i - startDraw };

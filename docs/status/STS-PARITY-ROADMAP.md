@@ -633,3 +633,16 @@ Process rules (standing):
   worked-shapes table — the table is the spec (direction-by-growth), documented in
   map.js. Sim census: 9 balanced outcome flips across 200 seeds, each diverging at a
   lane the weave removed. Solo review next; release rebuild after.
+- 2026-10-30 — UX-6 re-review VERDICT: APPROVE. The brief override judged CORRECT (the
+  formula would have left 2-wide rows fully connected; direction-by-growth generates
+  every worked shape, is deterministic and total). Mutation-tested: reverting to +/-1
+  fails 3/6 topology tests; the brief's literal alternation fails 5/6. Hash cascade
+  reproduced independently (35/35 moved, 2 balanced flips; the 200-seed census: 9
+  flips, boss-reached 60%->62%). P3s -> BACKLOG (docs nits): the "independent witness"
+  comment claims construction-independence but is import-independence (the concrete
+  worked-shapes pin covers the gap); map.js's worked-shapes table lists a 3->2
+  transition the format never performs (3->1 is the only contraction); the funnel
+  honesty undercounts two-row forced chains (act-1 r1n1->r2n1->r3n1 is two consecutive
+  no-decision rows); an unreproducible route-length figure (seed 18 144->74) was quoted
+  from a dev artifact. Release rebuilt at round close. **UX-6 CLOSED — the entire
+  quality list is delivered and shipped.**
