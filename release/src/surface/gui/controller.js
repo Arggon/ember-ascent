@@ -77,9 +77,12 @@ export function createController(opts = {}) {
      * The kernel's structured view of the current state — a JSON-safe value model
      * with card names/costs, enemy intents, reachable map nodes, etc. All of it is
      * computed in the kernel; the controller (and any renderer) only transports it.
+     * `opts` rides through to the kernel snapshot (I18N-1's `{ lang }` presentation
+     * choice); omitted is the default English snapshot.
+     * @param {{lang?: string}} [opts]
      */
-    snapshot() {
-      return snapshotOf(session);
+    snapshot(opts = {}) {
+      return snapshotOf(session, opts);
     },
 
     /**

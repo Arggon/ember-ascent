@@ -13,6 +13,7 @@ import { NODE_GLYPH, NODE_WORDS, glyphBox } from './glyphs.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
 import { storeGet, storePut } from './run-history.js';
+import { t } from './i18n.js';
 
 /* ---------------------------------------------------------------------- MAP */
 
@@ -26,7 +27,7 @@ import { storeGet, storePut } from './run-history.js';
 export function mapView(travel = null) {
   // The wrapper carries `.panel`; this inner div is content only.
   const wrap = el('div');
-  wrap.append(el('p', { cls: 'section-title', text: `Map — floor ${snap.map.floor + 1}/${snap.map.floorCount}` }));
+  wrap.append(el('p', { cls: 'section-title', text: t('map.title', { a: snap.map.floor + 1, b: snap.map.floorCount }) }));
   if (snap.quests) wrap.append(questStrip(snap.quests));
   const travelFromId = travel ? (prevMapCurrent ?? null) : null;
   const travelFromRow = travel ? (prevMapFloor ?? null) : null;
@@ -40,7 +41,7 @@ export function mapView(travel = null) {
     const showTravel = travel !== null && travelFromId !== null && r === travelFromRow;
     // "You are here" as TEXT (UX rev 3): the fact survives reduced motion and greyscale, and
     // on a phone a ribbon answers "where am I" better than a tint ever does.
-    if (row.some((n) => n.current)) rowEl.append(el('div', { cls: 'node-you', text: 'you are here' }));
+    if (row.some((n) => n.current)) rowEl.append(el('div', { cls: 'node-you', text: t('map.youAreHere') }));
     for (const n of row) rowEl.append(mapNode(n));
     if (showTravel) rowEl.append(travelMarker(travel));
     map.append(rowEl);
@@ -52,24 +53,24 @@ export function mapView(travel = null) {
   map.prepend(world);
   wrap.append(map);
   requestAnimationFrame(() => drawRoutes(map));
-  wrap.append(el('p', { cls: 'hint', text: 'Click a glowing node to travel. Fight something weak, risk an elite, or rest.' }));
+  wrap.append(el('p', { cls: 'hint', text: t('map.hint') }));
   // S9: the climb is two acts — the map's chapter names the one you are walking.
   const actNo = snap.act ?? 1;
-  const chapter = actNo >= 2 ? 'II — The Kiln Deeps' : 'I — The Path';
+  const chapter = actNo >= 2 ? t('map.chapter.2') : t('map.chapter.1');
   return page('map', chapter, 'route', 'panel', [wrap]);
 }
 
 /** B3 Ember quests: one compact chip per quest, progress as text and as a bar. */
 function questStrip(quests) {
-  const strip = el('div', { cls: 'quests', attrs: { 'aria-label': 'Ember quests' } });
+  const strip = el('div', { cls: 'quests', attrs: { 'aria-label': t('map.quests.aria') } });
   for (const q of quests) {
     const pct = Math.round((100 * q.progress) / q.goal);
     const chip = el('div', {
       cls: `quest${q.done ? ' done' : ''}`,
-      attrs: { title: `${q.text} Reward: ${q.rewardText}.` },
+      attrs: { title: t('map.quest.title', { text: q.text, reward: q.rewardText }) },
     },
     el('span', { cls: 'q-name', text: q.name }),
-    el('span', { cls: 'q-prog', text: q.done ? `done · ${q.rewardText}` : `${q.progress}/${q.goal} · ${q.rewardText}` }));
+    el('span', { cls: 'q-prog', text: q.done ? t('map.quest.done', { reward: q.rewardText }) : `${q.progress}/${q.goal} · ${q.rewardText}` }));
     const bar = el('span', { cls: 'q-bar' });
     bar.style.setProperty('--q', `${pct}%`);
     chip.append(bar);
@@ -147,9 +148,9 @@ function drawRoutes(map) {
  */
 function travelMarker(travel) {
   const mark = el('span', { cls: 'node-travel' + (travel.boss ? ' to-boss' : ''),
-    attrs: { title: `Just travelled from floor ${(prevMapFloor ?? 0) + 1}` } },
-    el('span', { cls: 'ntravel-from', text: 'you were here' }),
-    el('span', { cls: 'ntravel-to', text: travel.label ? `→ ${travel.label}` : '→ next' }),
+    attrs: { title: t('map.travelFrom', { n: (prevMapFloor ?? 0) + 1 }) } },
+    el('span', { cls: 'ntravel-from', text: t('map.youWereHere') }),
+    el('span', { cls: 'ntravel-to', text: travel.label ? `→ ${travel.label}` : t('map.next') }),
   );
   return mark;
 }
@@ -168,33 +169,42 @@ function toggleMapPin(id) {
   list = list.includes(id) ? list.filter((x) => x !== id) : [...list, id].slice(-PIN_MAX);
   // Only the current seed is kept, so the store never grows across runs.
   storePut(PINS_KEY, { [String(snap.seed)]: list });
-  announce(list.includes(id) ? 'Pin placed.' : 'Pin removed.');
+  announce(list.includes(id) ? t('map.pin.placed') : t('map.pin.removed'));
 }
 
 function mapNode(n) {
   const short = n.type.replace('combat_', '');
-  // S9: the boss word names ITS warden — act 2's Kiln Deeps boss is the Cinder
-  // Foreman, not the Slag Warden, and the shared words table is act-blind. Computed
-  // BEFORE the node so the aria-label and the visible word cannot disagree.
+  // I18N-1: the node words are chrome, resolved per paint in the current language.
+  // I18N-2: the warden words localize too ("El Guardián de Escoria" / "El Capataz de
+  // Ascuas" — the enemies table's own twins). Computed BEFORE the node so the
+  // aria-label and the visible word cannot disagree.
+  const word = t(`map.node.${short}`);
+  const sub = t(`map.node.${short}.sub`);
   const words = short === 'boss' && (snap.act ?? 1) >= 2
-    ? ['Cinder Foreman', 'final fight']
-    : (NODE_WORDS[short] || [n.label, '']);
+    ? [(t('map.bossAct2') || 'Cinder Foreman'), t('map.bossSub')]
+    : [(word || (NODE_WORDS[short] || [n.label])[0]), (sub || (NODE_WORDS[short] || ['', ''])[1] || '')];
   const cls = `node t-${short}` + (n.available ? ' available' : '') + (n.current ? ' current' : '');
+  // The travel TOOLTIP interpolates the LOCALIZED node label (map.label.<type>), never
+  // the kernel's agent-facing English one — "Viajar a pelea", not "Viajar a fight". The
+  // kernel label stays the fallback for a type the dictionary does not name. The
+  // aria-label keeps the pretty node word ("Skirmish"), which is what the announced
+  // form has always carried and what the e2e walks locate by.
+  const labelWord = t(`map.label.${n.type}`) || n.label;
   const node = el(n.available ? 'button' : 'span', {
     cls,
-    attrs: n.available ? { type: 'button', title: `Travel to ${n.label}`, 'aria-label': `Travel to ${words[0]}` } : {},
+    attrs: n.available ? { type: 'button', title: t('map.travel', { label: labelWord }), 'aria-label': t('map.travel', { label: words[0] }) } : {},
     on: {
       ...(n.available && n.actionId ? { click: () => act(n.actionId) } : {}),
       // Right-click (long-press on touch) drops or lifts a planning pin. Browser-only state.
       contextmenu: (ev) => { ev.preventDefault(); toggleMapPin(n.id); repaint(); },
     },
   });
-  if (n.available) node.title = `Travel to ${n.label} · right-click to pin`;
-  else node.setAttribute('title', 'Right-click to pin this node');
+  if (n.available) node.title = t('map.travel.pin', { label: labelWord });
+  else node.setAttribute('title', t('map.pin.hint'));
   node.append(glyphBox(NODE_GLYPH[short] || 'rune', 'ntype-mark'));
   if (mapPins().includes(n.id)) {
     node.classList.add('pinned');
-    node.append(el('span', { cls: 'node-pin', attrs: { 'aria-label': 'pinned' } }));
+    node.append(el('span', { cls: 'node-pin', attrs: { 'aria-label': t('map.pin.pinned') } }));
   }
   node.append(el('span', { cls: 'ntype', text: words[0] }));
   if (words[1]) node.append(el('span', { cls: 'nsub', text: words[1] }));

@@ -13,6 +13,10 @@ export const ENEMIES = {
   jaw_worm: {
     id: 'jaw_worm',
     name: 'Cinder Maw',
+    // I18N-2: the Spanish display twins. `stateName` is deliberately NOT twinned — it is
+    // copied into run state and therefore into the content hash (the NAMES.md contract),
+    // so every save and every golden fixture keeps verifying whatever the language.
+    name_es: 'Fauce de Ascuas',
     // Copied into run state and therefore into the content hash. Do not edit.
     stateName: 'Jaw Worm',
     maxHp: [40, 44],
@@ -26,6 +30,7 @@ export const ENEMIES = {
   cultist: {
     id: 'cultist',
     name: 'Ash Cantor',
+    name_es: 'El Cantor de Ceniza',
     stateName: 'Cultist',
     maxHp: [48, 54],
     moves: [
@@ -38,6 +43,7 @@ export const ENEMIES = {
   red_louse: {
     id: 'red_louse',
     name: 'Kiln Mite',
+    name_es: 'Ácaro del Horno',
     stateName: 'Red Louse',
     maxHp: [10, 15],
     moves: [
@@ -49,6 +55,7 @@ export const ENEMIES = {
   acid_slime: {
     id: 'acid_slime',
     name: 'Slag Ooze',
+    name_es: 'Babosa de Escoria',
     stateName: 'Acid Slime',
     maxHp: [28, 32],
     moves: [
@@ -59,6 +66,7 @@ export const ENEMIES = {
   gremlin_nob: {
     id: 'gremlin_nob',
     name: 'Cinder Brute',
+    name_es: 'El Bruto de Ascuas',
     stateName: 'Gremlin Nob',
     maxHp: [82, 86],
     elite: true,
@@ -71,6 +79,7 @@ export const ENEMIES = {
   the_guardian: {
     id: 'the_guardian',
     name: 'Slag Warden',
+    name_es: 'El Guardián de Escoria',
     stateName: 'The Guardian',
     maxHp: [110, 110],
     boss: true,
@@ -88,6 +97,7 @@ export const ENEMIES = {
   slag_crawler: {
     id: 'slag_crawler',
     name: 'Slag Crawler',
+    name_es: 'Reptador de Escoria',
     maxHp: [32, 36],
     // A shell that hardens, then a pincer flurry: hit it on the turns it is not armoured.
     moves: [
@@ -100,6 +110,7 @@ export const ENEMIES = {
   ash_wraith: {
     id: 'ash_wraith',
     name: 'Ash Wraith',
+    name_es: 'Espectro de Ceniza',
     maxHp: [24, 28],
     // Fragile but sapping: it always opens by weakening you, then drains.
     moves: [
@@ -113,6 +124,7 @@ export const ENEMIES = {
   ash_wraith_elite: {
     id: 'ash_wraith_elite',
     name: 'Ash Matriarch',
+    name_es: 'Matriarca de Ceniza',
     maxHp: [74, 78],
     elite: true,
     // A fixed rhythm the player can learn: shroud, double strike, curse, reap.
@@ -127,6 +139,7 @@ export const ENEMIES = {
   cinder_foreman: {
     id: 'cinder_foreman',
     name: 'Cinder Foreman',
+    name_es: 'El Capataz de Ascuas',
     maxHp: [125, 125],
     boss: true,
     // Surveys (armour + Strength), swings twice, then brings the roof down.
@@ -190,11 +203,13 @@ export const ENCOUNTERS = {
 export const BIOMES = Object.freeze({
   foundry: {
     name: 'The Foundry',
+    name_es: 'La Fundición',
     backdrop: 'forge',
     byType: { combat_weak: ['weak_1', 'weak_2', 'weak_3', 'weak_4'], combat_strong: ['strong_1', 'strong_2', 'strong_3'], elite: ['elite_1'], boss: ['boss_1'] },
   },
   mines: {
     name: 'The Cinder Mines',
+    name_es: 'Las Minas de Ascuas',
     backdrop: 'tunnel',
     byType: { combat_weak: ['mines_weak_1', 'mines_weak_2', 'mines_weak_3'], combat_strong: ['mines_strong_1', 'mines_strong_2'], elite: ['mines_elite_1'], boss: ['mines_boss_1'] },
   },
@@ -204,6 +219,7 @@ export const BIOMES = Object.freeze({
   // roster into bigger groups with bigger total HP. It reuses the tunnel backdrop.
   kiln: {
     name: 'The Kiln Deeps',
+    name_es: 'Las Hondonadas del Horno',
     backdrop: 'tunnel',
     byType: { combat_weak: ['kiln_weak_1', 'kiln_weak_2', 'kiln_weak_3'], combat_strong: ['kiln_strong_1', 'kiln_strong_2', 'kiln_strong_3'], elite: ['kiln_elite_1', 'kiln_elite_2'], boss: ['kiln_boss_1'] },
   },

@@ -23,6 +23,7 @@
 import { snap, repaint, setEndTargeting, stageEl } from './runtime.js';
 import { announce, toast } from './dom.js';
 import { act } from './actions.js';
+import { t } from './i18n.js';
 
 /** The hand slot ('p3') of the card currently waiting for a target, or null. */
 export let pendingSlot = null;
@@ -67,13 +68,14 @@ export function targetCommand(card, k) {
   return known ? known.actionId : `${card.slot}_${k}`;
 }
 
-/** The spoken description of one enemy, including its telegraphed intent. */
+/** The spoken description of one enemy, including its telegraphed intent (I18N-1: the
+ *  intent sentence arrives in the snapshot's language; the frame around it localizes here). */
 export function enemyLabel(e, position, targeting) {
   const total = snap.enemies.length;
   const intent = String(e.intent.text || e.intent.label || '').replace(/\.\s*$/, '');
-  const say = intent ? intent.charAt(0).toLowerCase() + intent.slice(1) : 'intent unknown';
-  const base = `Enemy ${position + 1} of ${total} — ${e.name}, ${e.hp} of ${e.maxHp} HP, ${say}.`;
-  return targeting ? `${base} Press ${position + 1} to target.` : base;
+  const say = intent ? intent.charAt(0).toLowerCase() + intent.slice(1) : t('target.intentUnknown');
+  const base = t('target.aria', { p: position + 1, t: total, name: e.name, hp: e.hp, max: e.maxHp, intent: say });
+  return targeting ? `${base}${t('target.press', { n: position + 1 })}` : base;
 }
 
 /**
@@ -104,7 +106,7 @@ export function enableTargeting(slot) {
   aimed = snap.enemies.length > 0 ? 1 : null;
   repaint();
   const card = snap.hand.find((c) => c.slot === slot);
-  announce(`${card ? card.name : 'That card'} needs a target. ${snap.enemies.length} enemies alive. Press 1 to ${snap.enemies.length} to choose one, Escape to cancel.`);
+  announce(t('target.needsTarget', { name: card ? card.name : t('target.thatCard'), n: snap.enemies.length, m: snap.enemies.length }));
   focusFirstTarget();
 }
 
@@ -115,8 +117,8 @@ export function cancelTargeting() {
   pendingSlot = null;
   aimed = null;
   repaint();
-  toast('Target cancelled — nothing was played', 'info');
-  announce('Target cancelled. Nothing was played.');
+  toast(t('target.cancelled.toast'), 'info');
+  announce(t('target.cancelled.aria'));
   focusSlot(slot);
 }
 

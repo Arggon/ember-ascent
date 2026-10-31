@@ -58,6 +58,17 @@ export const TORCH_HEAL = 15;
 export const STORIES_HEAL = 8;
 
 /**
+ * A bilingual requirement reason: `{en, es}`. The compact dump (observe.js eventBody)
+ * renders the ENGLISH string — the agent-facing contract — and snapshot({lang:'es'})
+ * renders the Spanish one. Truthiness is unchanged everywhere a guard is checked
+ * (resolveChoice), so a pair is a drop-in for the old plain string.
+ * @param {string} en
+ * @param {string} es
+ * @returns {{en: string, es: string}}
+ */
+const R = (en, es) => Object.freeze({ en, es });
+
+/**
  * The roster. Order is the pick order: the entry roll indexes THIS array, so reordering
  * changes which event every seed meets — the order is part of the format, exactly like
  * the potion table's. Every event carries at least one zero-cost, unconditional choice
@@ -65,31 +76,39 @@ export const STORIES_HEAL = 8;
  *
  * `effect` is the preview sentence surfaces show on the button; `req` is a REQUIRED
  * guard evaluated per state (null = unconditional). A guard returns null when the
- * choice is offerable, or the REASON string when it is not — the reason is the fact the
- * dimmed button shows.
+ * choice is offerable, or the REASON when it is not — the reason is the fact the
+ * dimmed button shows (a bilingual `{en, es}` pair, see R above).
+ *
+ * I18N-1: `name_es`/`story_es` and per-choice `label_es`/`effect_es` are the Spanish
+ * twins, read by offerEventChoices(..., 'es') through the snapshot's language; every
+ * English field is the honest fallback when a twin is absent.
  */
 export const EVENT_ROSTER = Object.freeze([
   Object.freeze({
     id: 'sleeping_forge',
     name: 'The Sleeping Forge',
+    name_es: 'La Forja Dormida',
     story: 'A forge sleeps under a skin of grey ash, but its heart is not cold — something down in the coals still breathes, slow and patient. The warmth reaches for your hands like it remembers being fed.',
+    story_es: 'Una forja duerme bajo una piel de ceniza gris, pero su corazón no está frío: algo, allá abajo entre los carbones, todavía respira, lento y paciente. El calor te busca las manos como si recordara haber sido alimentado.',
     choices: Object.freeze([
       Object.freeze({
-        slug: 'stoke', label: 'Stoke it awake', cost: null, hpLoss: FORGE_HP,
+        slug: 'stoke', label: 'Stoke it awake', label_es: 'Avívala', cost: null, hpLoss: FORGE_HP,
         effect: `Lose ${FORGE_HP} HP. Gain a random Uncommon card.`,
-        req: (state, defs) => (uncommonPool(state, defs).length > 0 ? null : 'the run\u2019s pool holds no Uncommon card'),
+        effect_es: `Pierdes ${FORGE_HP} HP. Ganas una carta Infrecuente al azar.`,
+        req: (state, defs) => (uncommonPool(state, defs).length > 0 ? null : R('the run\u2019s pool holds no Uncommon card', 'la reserva de esta partida no tiene cartas Infrecuentes')),
         // Draw: ONE `pickAt` pick of an Uncommon card from the run's narrowed pool.
       }),
       Object.freeze({
-        slug: 'leave', label: 'Leave it sleeping', cost: null, hpLoss: null,
-        effect: 'Nothing happens.', req: null,
+        slug: 'leave', label: 'Leave it sleeping', label_es: 'Déjala dormir', cost: null, hpLoss: null,
+        effect: 'Nothing happens.', effect_es: 'No pasa nada.', req: null,
       }),
       Object.freeze({
-        slug: 'ember', label: 'Buy the ember', cost: EMBER_PRICE, hpLoss: null,
+        slug: 'ember', label: 'Buy the ember', label_es: 'Compra el ascua', cost: EMBER_PRICE, hpLoss: null,
         effect: `Pay ${EMBER_PRICE} gold. Gain a random Rare card.`,
+        effect_es: `Pagas ${EMBER_PRICE} de oro. Ganas una carta Rara al azar.`,
         req: (state, defs) => {
-          if ((state.player.gold ?? 0) < EMBER_PRICE) return `needs ${EMBER_PRICE} gold`;
-          if (rarePool(state, defs).length === 0) return 'the run\u2019s pool holds no Rare card';
+          if ((state.player.gold ?? 0) < EMBER_PRICE) return R(`needs ${EMBER_PRICE} gold`, `necesitas ${EMBER_PRICE} de oro`);
+          if (rarePool(state, defs).length === 0) return R('the run\u2019s pool holds no Rare card', 'la reserva de esta partida no tiene cartas Raras');
           return null;
         },
         // Draw: ONE `pickAt` pick of a Rare card from the run's narrowed pool.
@@ -99,82 +118,96 @@ export const EVENT_ROSTER = Object.freeze([
   Object.freeze({
     id: 'ash_peddler',
     name: 'The Ash Peddler',
+    name_es: 'El Vendedor de Ceniza',
     story: 'A bent figure wheels a cart of bottles and bones through the cinders, calling prices like blessings. Nothing on the cart carries a label, and the peddler likes it that way.',
+    story_es: 'Una figura encorvada empuja un carrito de botellas y huesos entre las ascuas, pregonando precios como bendiciones. Nada en el carrito lleva etiqueta, y al vendedor le gusta que sea así.',
     choices: Object.freeze([
       Object.freeze({
-        slug: 'potion', label: 'Buy a bottle', cost: POTION_PRICE, hpLoss: null,
+        slug: 'potion', label: 'Buy a bottle', label_es: 'Compra una botella', cost: POTION_PRICE, hpLoss: null,
         effect: `Pay ${POTION_PRICE} gold. Gain a random potion.`,
+        effect_es: `Pagas ${POTION_PRICE} de oro. Ganas una poción al azar.`,
         req: (state) => {
-          if ((state.player.gold ?? 0) < POTION_PRICE) return `needs ${POTION_PRICE} gold`;
-          if ((Array.isArray(state.potions) ? state.potions : []).length >= POTION_SLOTS) return 'your belt is full';
+          if ((state.player.gold ?? 0) < POTION_PRICE) return R(`needs ${POTION_PRICE} gold`, `necesitas ${POTION_PRICE} de oro`);
+          if ((Array.isArray(state.potions) ? state.potions : []).length >= POTION_SLOTS) return R('your belt is full', 'tu cinturón está lleno');
           return null;
         },
         // Draw: ONE `intAt` over the potion table (the drop's own convention).
       }),
       Object.freeze({
-        slug: 'sell', label: 'Sell a card', cost: null, hpLoss: null,
+        slug: 'sell', label: 'Sell a card', label_es: 'Vende una carta', cost: null, hpLoss: null,
         effect: `Remove one random Common or Uncommon card from your deck. Gain ${SELL_GAIN} gold.`,
+        effect_es: `Quita una carta Común o Infrecuente al azar de tu mazo. Ganas ${SELL_GAIN} de oro.`,
         req: (state, defs) => {
-          if (sellTargets(state, defs).length === 0) return 'your deck holds no Common or Uncommon card';
-          if (((state.deck ?? []).length - 1) <= EVENT_DECK_FLOOR) return `your deck must stay above ${EVENT_DECK_FLOOR} cards`;
+          if (sellTargets(state, defs).length === 0) return R('your deck holds no Common or Uncommon card', 'tu mazo no tiene cartas Comunes ni Infrecuentes');
+          if (((state.deck ?? []).length - 1) <= EVENT_DECK_FLOOR) return R(`your deck must stay above ${EVENT_DECK_FLOOR} cards`, `tu mazo debe quedarse con más de ${EVENT_DECK_FLOOR} cartas`);
           return null;
         },
         // Draw: ONE `pickAt` pick of the deck instance that leaves (shown in the result).
       }),
       Object.freeze({
-        slug: 'wave', label: 'Wave them on', cost: null, hpLoss: null,
-        effect: 'Nothing happens.', req: null,
+        slug: 'wave', label: 'Wave them on', label_es: 'Despídete y sigue', cost: null, hpLoss: null,
+        effect: 'Nothing happens.', effect_es: 'No pasa nada.', req: null,
       }),
     ]),
   }),
   Object.freeze({
     id: 'collapsed_shaft',
     name: 'The Collapsed Shaft',
+    name_es: 'El Pozo Derrumbado',
     story: 'A shaft drops into the dark beside the track, its ladder burned to a stub. Far below, something glints — coin-bright, or only the eyes of the dark looking back.',
+    story_es: 'Un pozo cae hacia la oscuridad junto al sendero; su escalera quedó reducida a un muñón quemado. Muy abajo brilla algo: brillante como una moneda, o solo los ojos de la oscuridad que te devuelven la mirada.',
     choices: Object.freeze([
       Object.freeze({
-        slug: 'climb', label: 'Climb down', cost: null, hpLoss: SHAFT_HP,
-        effect: `Gain ${SHAFT_GOLD} gold. Lose ${SHAFT_HP} HP.`, req: null,
+        slug: 'climb', label: 'Climb down', label_es: 'Baja al pozo', cost: null, hpLoss: SHAFT_HP,
+        effect: `Gain ${SHAFT_GOLD} gold. Lose ${SHAFT_HP} HP.`,
+        effect_es: `Ganas ${SHAFT_GOLD} de oro. Pierdes ${SHAFT_HP} HP.`, req: null,
       }),
       Object.freeze({
-        slug: 'torch', label: 'Drop a torch', cost: TORCH_PRICE, hpLoss: null,
+        slug: 'torch', label: 'Drop a torch', label_es: 'Deja caer una antorcha', cost: TORCH_PRICE, hpLoss: null,
         effect: `Pay ${TORCH_PRICE} gold. Recover ${TORCH_HEAL} HP.`,
+        effect_es: `Pagas ${TORCH_PRICE} de oro. Recuperas ${TORCH_HEAL} HP.`,
         // The torch comes out of your own pack and the pack is priced: a spend the
         // purse cannot cover is not an action (the shop's own ruling), so the torch
         // guards on gold like every other price.
-        req: (state) => ((state.player.gold ?? 0) < TORCH_PRICE ? `needs ${TORCH_PRICE} gold` : null),
+        req: (state) => ((state.player.gold ?? 0) < TORCH_PRICE ? R(`needs ${TORCH_PRICE} gold`, `necesitas ${TORCH_PRICE} de oro`) : null),
       }),
       Object.freeze({
-        slug: 'walk', label: 'Walk past', cost: null, hpLoss: null,
-        effect: 'Nothing happens.', req: null,
+        slug: 'walk', label: 'Walk past', label_es: 'Sigue de largo', cost: null, hpLoss: null,
+        effect: 'Nothing happens.', effect_es: 'No pasa nada.', req: null,
       }),
     ]),
   }),
   Object.freeze({
     id: 'wandering_smith',
     name: 'The Wandering Smith',
+    name_es: 'El Herrero Errante',
     story: 'An anvil walks on legs of knotted iron, and the smith under its shadow offers a hammer and a bench. Every traveller pays in a different coin; today the price is a moment of your climb.',
+    story_es: 'Un yunque camina sobre patas de hierro anudado, y el herrero a su sombra ofrece un martillo y un banco. Cada viajero paga con una moneda distinta; hoy el precio es un momento de tu ascenso.',
     choices: Object.freeze([
       Object.freeze({
-        slug: 'temper', label: 'Temper a card', cost: null, hpLoss: null,
+        slug: 'temper', label: 'Temper a card', label_es: 'Templa una carta', cost: null, hpLoss: null,
         effect: 'Pick one of three cards and temper it, exactly as at a rest site\u2019s forge.',
+        effect_es: 'Elige una de tres cartas y témplala, igual que en la forja de un sitio de descanso.',
         // The rest site's own gating, mirrored: the run must carry tempers (opt-in),
         // and the offer builder must find at least one untempered, known card — an
         // empty modal would be a softlock, so the choice is never offered into one.
         req: (state, defs) => {
-          if (!state.tempers) return 'this run carries no tempers';
-          return offerTempers(state, defs).offers.length > 0 ? null : 'every card in your deck is already tempered';
+          if (!state.tempers) return R('this run carries no tempers', 'esta partida no lleva temple');
+          return offerTempers(state, defs).offers.length > 0
+            ? null
+            : R('every card in your deck is already tempered', 'todas las cartas de tu mazo ya están templadas');
         },
         // Draw: the offer roll itself — `offerTempers` consumes 3 `pickAt` picks plus
         // one fit roll per offer (6 for a full three-card offer, fewer on a thin deck).
       }),
       Object.freeze({
-        slug: 'stories', label: 'Ask for stories', cost: null, hpLoss: null,
-        effect: `Recover ${STORIES_HEAL} HP.`, req: null,
+        slug: 'stories', label: 'Ask for stories', label_es: 'Pide historias', cost: null, hpLoss: null,
+        effect: `Recover ${STORIES_HEAL} HP.`,
+        effect_es: `Recuperas ${STORIES_HEAL} HP.`, req: null,
       }),
       Object.freeze({
-        slug: 'move', label: 'Move on', cost: null, hpLoss: null,
-        effect: 'Nothing happens.', req: null,
+        slug: 'move', label: 'Move on', label_es: 'Sigue adelante', cost: null, hpLoss: null,
+        effect: 'Nothing happens.', effect_es: 'No pasa nada.', req: null,
       }),
     ]),
   }),
@@ -186,6 +219,153 @@ const EVENT_DEFS = new Map(EVENT_ROSTER.map((e) => [e.id, e]));
 /** @param {string} id @returns {any | undefined} */
 export function eventDef(id) {
   return EVENT_DEFS.get(id);
+}
+
+/* ----------------------------------------------------------------- resolved beats
+ *
+ * I18N-2 — THE FORMAT DECISION (the slice's flagged risk, argued):
+ *
+ * The resolved beat used to be baked ENGLISH SENTENCES into state
+ * (`state.event.resolved.lines`), which made the beat the one player-facing string the
+ * snapshot could not localize — and a beat that names a card could never name it in
+ * Spanish, because the sentence pre-dates the language choice. So the lines are now
+ * STRUCTURED SLUGS + PARAMS: `{ slug: 'pay_gold', n: 30 }`, one row per result, and the
+ * wording lives in the BEATS table below — one English column (the agent-facing compact
+ * dump renders it byte-identically to the old baked sentences) and one Spanish column
+ * the snapshot({lang:'es'}) renders, with card names resolved through the content's
+ * own `_es` twins at render time.
+ *
+ * WHY SLUGS AND NOT A LOOKUP KEYED BY THE ENGLISH SENTENCE (the zero-migration
+ * alternative): a sentence-keyed table silently reverts a beat to English the first
+ * time anyone copy-edits the English wording — exactly the class of silent drift this
+ * codebase refuses (a typo must fail a test, not ship as a fallback). Slug keys are
+ * stable identifiers; the wording can move in either column without re-keying.
+ *
+ * THE COST, HANDLED HONESTLY: this is a save-shape change, so a state that stands at a
+ * resolved event hashes differently than before — the golden logs are regenerated
+ * beside this change (their per-step hashes move only at event-resolution steps), and
+ * LEGACY SAVES whose beat still carries the old English sentence strings keep loading
+ * and render those strings VERBATIM in either language (renderEventLines below passes
+ * plain strings through untouched). An old save reads its beats in English even in a
+ * Spanish session — documented in docs/guides/PLAYING.md, the same honesty as every
+ * other torn-format degrade, never a throw and never a guess.
+ */
+
+/**
+ * One bilingual beat sentence per slug. `en` renders the compact dump's line (byte-
+ * identical to the pre-I18N-2 baked sentence); `es` renders the Spanish one. Params:
+ * `n` = a number; `cardId` = a card id, resolved to the card's display NAME at render
+ * time (English name in the en column, `name_es` twin in the es one — the temper beat
+ * keeps its historical raw-id form in English, the agent-facing contract, and names
+ * the card properly in Spanish); `who` = the taking thing's short word, en/es mapped
+ * in BEAT_WHO below.
+ */
+const BEATS = {
+  pay_gold: {
+    en: (p) => `- You paid ${p.n} gold.`,
+    es: (p) => `- Pagas ${p.n} de oro.`,
+  },
+  toll: {
+    en: (p) => `- The ${p.who.en} took its due: ${p.n} HP.`,
+    es: (p) => `- ${p.who.es} se cobró lo suyo: ${p.n} HP.`,
+  },
+  card_joined: {
+    en: (p, name) => `- The coals give up a card: ${name} joins your deck.`,
+    es: (p, name) => `- Las ascuas entregan una carta: ${name} se une a tu mazo.`,
+  },
+  card_bought: {
+    en: (p, name) => `- The ember cools into ${name}, and the card is yours.`,
+    es: (p, name) => `- El ascua se enfría en ${name}, y la carta es tuya.`,
+  },
+  potion_gift: {
+    en: () => '- The peddler presses a bottle into your hands. No label, as promised.',
+    es: () => '- El vendedor te mete una botella en las manos. Sin etiqueta, como prometió.',
+  },
+  card_sold: {
+    en: (p, name) => `- ${name} leaves your deck. The peddler counts out ${p.n} gold.`,
+    es: (p, name) => `- ${name} sale de tu mazo. El vendedor cuenta ${p.n} de oro.`,
+  },
+  shaft_gold: {
+    en: (p) => `- The glint was coin after all: ${p.n} gold, heavy and real.`,
+    es: (p) => `- El brillo era moneda al fin: ${p.n} de oro, pesado y real.`,
+  },
+  torch_heal: {
+    en: (p) => `- The light falls and falls. In its glow you bind your scrapes and breathe (+${p.n} HP).`,
+    es: (p) => `- La luz cae y cae. Bajo su resplandor vendas tus rasguños y respiras (+${p.n} HP).`,
+  },
+  torch_whole: {
+    en: () => '- The light falls and falls. You are already whole — the glow finds nothing to mend.',
+    es: () => '- La luz cae y cae. Ya no tienes heridas: el resplandor no encuentra nada que remendar.',
+  },
+  stories_heal: {
+    en: (p) => `- The smith talks of old fires and older mistakes. You stand easier (+${p.n} HP).`,
+    es: (p) => `- El herrero habla de fuegos viejos y de errores más viejos. Recuperas el aliento (+${p.n} HP).`,
+  },
+  stories_whole: {
+    en: () => '- The smith talks of old fires and older mistakes. You are already whole, and he nods like he knew.',
+    es: () => '- El herrero habla de fuegos viejos y de errores más viejos. Ya no tienes heridas, y él asiente como si lo supiera.',
+  },
+  temper_done: {
+    en: (p) => `- The smith takes ${p.cardId} to the anvil. It comes back changed.`,
+    es: (p, name) => `- El herrero lleva ${name} al yunque. Vuelve cambiada.`,
+  },
+  nothing: {
+    en: () => '- Nothing happens.',
+    es: () => '- No pasa nada.',
+  },
+};
+
+/** The slug table, exported for the sweep's own test: the table IS the format contract
+ *  (every slug carries BOTH columns, and the en column is pinned to the legacy baked
+ *  sentences it replaced). Not for surfaces — render through renderEventLine(s). */
+export const BEATS_TABLE = BEATS;
+
+/** The toll beat's actor word, per event shape: the English word the old baked sentence
+ *  derived (`def.name.split(' ').slice(-1)[0].toLowerCase()`) beside its Spanish twin. */
+const BEAT_WHO = {
+  forge: { en: 'forge', es: 'La forja' },
+  shaft: { en: 'shaft', es: 'El pozo' },
+};
+
+/**
+ * Render one stored resolved-beat line for the requested language.
+ *
+ * A PLAIN STRING renders verbatim — a legacy save's baked English sentence (or any
+ * string a torn save carries) is shown as-is, in either language: the honest degrade,
+ * never a throw. An object with a known slug renders the table's sentence for `lang`,
+ * resolving `cardId` to the content's display name for that language (the raw id when
+ * the content no longer knows it). An unknown slug degrades to the slug itself, the
+ * same raw-token honesty as an unknown potion or relic id.
+ * @param {any} line a stored line: a legacy string, or `{slug, ...params}`
+ * @param {string} lang 'en' (default) or 'es'
+ * @param {Map<string, any>} [defs] card definitions, for the card-name beats
+ * @returns {string} the sentence to show (no leading/trailing whitespace)
+ */
+export function renderEventLine(line, lang = 'en', defs = null) {
+  if (typeof line === 'string') return line;
+  if (!line || typeof line !== 'object' || typeof line.slug !== 'string') {
+    return typeof line === 'number' || typeof line === 'boolean' ? String(line) : '?';
+  }
+  const beat = BEATS[line.slug];
+  if (!beat) return line.slug;
+  const es = lang === 'es';
+  const fn = es ? (beat.es ?? beat.en) : beat.en;
+  const name = typeof line.cardId === 'string'
+    ? (defs?.get(line.cardId)?.[es ? 'name_es' : 'name'] ?? line.cardId)
+    : '';
+  return fn(line, name);
+}
+
+/**
+ * Render a whole stored beat array, lines in order. Legacy string lines pass through.
+ * @param {any} lines the stored `resolved.lines` (array of strings or beat objects)
+ * @param {string} [lang]
+ * @param {Map<string, any>} [defs]
+ * @returns {string[]}
+ */
+export function renderEventLines(lines, lang = 'en', defs = null) {
+  if (!Array.isArray(lines)) return [];
+  return lines.map((l) => renderEventLine(l, lang, defs));
 }
 
 /** The run's narrowed draft pool filtered to one rarity, ids the content still knows. */
@@ -205,11 +385,18 @@ function sellTargets(state, defs) {
 /**
  * Evaluate every choice of the state's event: the ONE offer table both actions() and
  * the snapshot read, so the id list and the visible list cannot drift.
+ *
+ * I18N-1: `lang` (default 'en') picks the choice's label/effect/reason words. The
+ * compact dump calls with the default and gets the English strings byte-identically;
+ * snapshot({lang:'es'}) gets the Spanish twins, with the English field as the honest
+ * fallback whenever a `_es` twin is absent. The guard VALUES are unchanged: a reason
+ * is null exactly when the choice is offerable, whatever the language.
  * @param {any} state
  * @param {Map<string, any>} defs card definitions (injected; rules never import content)
+ * @param {string} [lang]
  * @returns {Array<{index: number, slug: string, label: string, effect: string, cost: number | null, hpLoss: number | null, offered: boolean, reason: string | null}>}
  */
-export function offerEventChoices(state, defs) {
+export function offerEventChoices(state, defs, lang = 'en') {
   const def = eventDef(state.event?.id);
   if (!def) return [];
   // actions.js may call before kernel init (its cardDefs() defensive null); the
@@ -217,15 +404,20 @@ export function offerEventChoices(state, defs) {
   // offerable" instead of throwing.
   const D = defs ?? new Map();
   return def.choices.map((choice, index) => {
-    const reason = choice.req ? choice.req(state, D) : null;
+    const req = choice.req ? choice.req(state, D) : null;
+    // The guard's shape: null = offerable, otherwise the reason pair (or a plain
+    // string from an older table shape). The TEXT is resolved here, once, so both
+    // surfaces read the same resolved string.
+    const reason = req === null ? null
+      : (typeof req === 'string' ? req : (lang === 'es' ? (req.es ?? req.en) : req.en));
     return {
       index,
       slug: choice.slug,
-      label: choice.label,
-      effect: choice.effect,
+      label: lang === 'es' ? (choice.label_es ?? choice.label) : choice.label,
+      effect: lang === 'es' ? (choice.effect_es ?? choice.effect) : choice.effect,
       cost: choice.cost,
       hpLoss: choice.hpLoss,
-      offered: reason === null,
+      offered: req === null,
       reason,
     };
   });
@@ -292,7 +484,7 @@ export function resolveChoice(state, match, defs) {
   if (choice.cost !== null) {
     next = { ...next, player: { ...next.player, gold: (next.player.gold ?? 0) - choice.cost } };
     events.push({ t: 'gold_spent', amount: choice.cost, what: `${def.id}:${choice.slug}` });
-    lines.push(`- You paid ${choice.cost} gold.`);
+    lines.push({ slug: 'pay_gold', n: choice.cost });
   }
 
   // 2. HP — losses through the non-combat loseHp path (vocabulary.js): block ignored,
@@ -304,7 +496,13 @@ export function resolveChoice(state, match, defs) {
     next = { ...next, player: loseHp(next.player, choice.hpLoss) };
     const paid = before - next.player.hp;
     events.push({ t: 'hp_cost', amount: paid, source: 'event' });
-    lines.push(`- The ${def.name.split(' ').slice(-1)[0].toLowerCase()} took its due: ${paid} HP.`);
+    // The toll's actor word: the OLD baked sentence derived it from the event name's
+    // last word ("The Sleeping Forge" -> "forge"); the structured beat carries the same
+    // word beside its Spanish twin (BEAT_WHO). An unknown event shape degrades to its
+    // own id as the word, in both languages.
+    const whoKey = def.name.split(' ').slice(-1)[0].toLowerCase();
+    const who = BEAT_WHO[whoKey] ?? { en: whoKey, es: whoKey };
+    lines.push({ slug: 'toll', who, n: paid });
   }
 
   // 3. The choice's own consequence, each through the path its shop/reward/rest
@@ -316,7 +514,7 @@ export function resolveChoice(state, match, defs) {
       const uid = `c${next.deck.length}_${next.stepIndex}`;
       next = { ...next, deck: [...next.deck, { uid, cardId: roll.cardId }] };
       events.push({ t: 'card_taken', cardId: roll.cardId, uid });
-      lines.push(`- The coals give up a card: ${defs.get(roll.cardId)?.name ?? roll.cardId} joins your deck.`);
+      lines.push({ slug: 'card_joined', cardId: roll.cardId });
     }
   } else if (def.id === 'sleeping_forge' && choice.slug === 'ember') {
     const roll = rollCardOfRarity(next, defs, 'rare');
@@ -325,7 +523,7 @@ export function resolveChoice(state, match, defs) {
       const uid = `c${next.deck.length}_${next.stepIndex}`;
       next = { ...next, deck: [...next.deck, { uid, cardId: roll.cardId }] };
       events.push({ t: 'card_bought', cardId: roll.cardId, uid, price: choice.cost });
-      lines.push(`- The ember cools into ${defs.get(roll.cardId)?.name ?? roll.cardId}, and the card is yours.`);
+      lines.push({ slug: 'card_bought', cardId: roll.cardId });
     }
   } else if (def.id === 'ash_peddler' && choice.slug === 'potion') {
     const potionId = POTIONS[intAt(next.seed, next.rngDraws, POTIONS.length)].id;
@@ -334,7 +532,7 @@ export function resolveChoice(state, match, defs) {
     belt.push(potionId);
     next = { ...next, potions: belt };
     events.push({ t: 'potion_drop', potion: potionId, beltSize: belt.length, source: 'event' });
-    lines.push('- The peddler presses a bottle into your hands. No label, as promised.');
+    lines.push({ slug: 'potion_gift' });
   } else if (def.id === 'ash_peddler' && choice.slug === 'sell') {
     const pick = pickAt(next.seed, next.rngDraws, sellTargets(next, defs), 1);
     draws += pick.draws;
@@ -345,12 +543,12 @@ export function resolveChoice(state, match, defs) {
       events.push({ t: 'gold', who: 'player', amount: SELL_GAIN, source: 'event' });
       next = { ...next, deck: next.deck.filter((c) => c.uid !== inst.uid) };
       events.push({ t: 'card_removed', uid: inst.uid, cardId: inst.cardId });
-      lines.push(`- ${defs.get(inst.cardId)?.name ?? inst.cardId} leaves your deck. The peddler counts out ${SELL_GAIN} gold.`);
+      lines.push({ slug: 'card_sold', cardId: inst.cardId, n: SELL_GAIN });
     }
   } else if (def.id === 'collapsed_shaft' && choice.slug === 'climb') {
     next = { ...next, player: { ...next.player, gold: (next.player.gold ?? 0) + SHAFT_GOLD } };
     events.push({ t: 'gold', who: 'player', amount: SHAFT_GOLD, source: 'event' });
-    lines.push(`- The glint was coin after all: ${SHAFT_GOLD} gold, heavy and real.`);
+    lines.push({ slug: 'shaft_gold', n: SHAFT_GOLD });
   } else if (def.id === 'collapsed_shaft' && choice.slug === 'torch') {
     const healed = Math.min(TORCH_HEAL, next.player.maxHp - next.player.hp);
     if (healed > 0) {
@@ -360,20 +558,16 @@ export function resolveChoice(state, match, defs) {
     // The beat says what HAPPENED: the heal phrase is gated exactly like the event it
     // describes (S6.1 review P3 — a full-health torch printed "+0 HP" beside a
     // suppressed heal event). The accounting above is untouched.
-    lines.push(healed > 0
-      ? `- The light falls and falls. In its glow you bind your scrapes and breathe (+${healed} HP).`
-      : '- The light falls and falls. You are already whole — the glow finds nothing to mend.');
+    lines.push(healed > 0 ? { slug: 'torch_heal', n: healed } : { slug: 'torch_whole' });
   } else if (def.id === 'wandering_smith' && choice.slug === 'stories') {
     const healed = Math.min(STORIES_HEAL, next.player.maxHp - next.player.hp);
     if (healed > 0) {
       next = { ...next, player: { ...next.player, hp: next.player.hp + healed } };
       events.push({ t: 'heal', who: 'player', amount: healed, source: 'event' });
     }
-    lines.push(healed > 0
-      ? `- The smith talks of old fires and older mistakes. You stand easier (+${healed} HP).`
-      : '- The smith talks of old fires and older mistakes. You are already whole, and he nods like he knew.');
+    lines.push(healed > 0 ? { slug: 'stories_heal', n: healed } : { slug: 'stories_whole' });
   } else {
-    lines.push('- Nothing happens.');
+    lines.push({ slug: 'nothing' });
   }
 
   // The resolved beat: the phase STAYS `event`, the concrete results travel in state
@@ -443,7 +637,9 @@ export function resolveTemper(state, match) {
   // The offer passed temperOfferOpen when it was enumerated; a stale resolve
   // degrades rather than half-applies (and can never be reached through legal ids).
   if (!temperOfferOpen(offer, state)) return { state, events: [] };
-  const line = `- The smith takes ${offer.cardId} to the anvil. It comes back changed.`;
+  // I18N-2: the beat is a structured slug (the English column keeps the historical
+  // raw-id sentence; the Spanish one names the card properly — see BEATS above).
+  const line = { slug: 'temper_done', cardId: offer.cardId };
   return {
     state: {
       ...state,

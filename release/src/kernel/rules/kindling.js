@@ -13,23 +13,68 @@ export const KINDLING_OFFERS = 3;
 /**
  * Boon table. `text` is the player-facing sentence (upside, then cost); `label` is the
  * compact R4 token. Effects are data interpreted by applyBoon() below.
+ *
+ * I18N-2: `name_es`/`text_es` are the Spanish twins, read through the snapshot's
+ * language (the honest fallback keeps the English fields); `label` stays the compact
+ * agent-facing token in both languages. The text may interpolate `{relic}` (the hero's
+ * starter) and `{relicOff}` (what it stops doing) — boonText() fills both, in the
+ * requested language.
  */
 export const BOONS = Object.freeze({
-  bellows: { name: 'Bellows Breath', label: 'EN+1 MAXHP-12', text: 'Gain 1 Energy every turn. Lose 12 max HP.', energy: 1, maxHp: -12 },
-  ironskin: { name: 'Iron Skin', label: 'MAXHP+15 RELIC-OFF', text: 'Gain 15 max HP and heal fully. Your {relic} {relicOff}.', maxHp: 15, fullHeal: true, relicOff: true },
-  sparkfall: { name: 'Sparkfall', label: 'ADD 2 Spark HP-6', text: 'Add 2 Spark to your deck. Lose 6 HP.', add: ['anger', 'anger'], hp: -6 },
-  purge: { name: 'Ash Purge', label: 'DEL 2 Hammerfall MAXHP-6', text: 'Remove 2 Hammerfall from your deck. Lose 6 max HP.', remove: ['strike', 'strike'], maxHp: -6 },
-  stoke: { name: 'Banked Coals', label: 'ADD Stoke HP-15', text: 'Add Stoke to your deck. Lose 15 HP.', add: ['inflame'], hp: -15 },
+  bellows: {
+    name: 'Bellows Breath', name_es: 'Aliento del Fuelle',
+    label: 'EN+1 MAXHP-12',
+    text: 'Gain 1 Energy every turn. Lose 12 max HP.',
+    text_es: 'Ganas 1 de Energía cada turno. Pierdes 12 de HP máximo.',
+    energy: 1, maxHp: -12,
+  },
+  ironskin: {
+    name: 'Iron Skin', name_es: 'Piel de Hierro',
+    label: 'MAXHP+15 RELIC-OFF',
+    text: 'Gain 15 max HP and heal fully. Your {relic} {relicOff}.',
+    text_es: 'Ganas 15 de HP máximo y te curas por completo. Tu {relic} {relicOff}.',
+    maxHp: 15, fullHeal: true, relicOff: true,
+  },
+  sparkfall: {
+    name: 'Sparkfall', name_es: 'Lluvia de Chispas',
+    label: 'ADD 2 Spark HP-6',
+    text: 'Add 2 Spark to your deck. Lose 6 HP.',
+    text_es: 'Añades 2 Chispa a tu mazo. Pierdes 6 HP.',
+    add: ['anger', 'anger'], hp: -6,
+  },
+  purge: {
+    name: 'Ash Purge', name_es: 'Purga de Ceniza',
+    label: 'DEL 2 Hammerfall MAXHP-6',
+    text: 'Remove 2 Hammerfall from your deck. Lose 6 max HP.',
+    text_es: 'Quitas 2 Martillazo de tu mazo. Pierdes 6 de HP máximo.',
+    remove: ['strike', 'strike'], maxHp: -6,
+  },
+  stoke: {
+    name: 'Banked Coals', name_es: 'Brasas Guardadas',
+    label: 'ADD Stoke HP-15',
+    text: 'Add Stoke to your deck. Lose 15 HP.',
+    text_es: 'Añades Avivar a tu mazo. Pierdes 15 HP.',
+    add: ['inflame'], hp: -15,
+  },
 });
 
 /**
  * Player-facing boon text for one hero. A relic-off boon names that hero's own relic and
  * what it stops doing (`relic` = the hero's relic name, `relicOff` = its RELICS offText).
+ *
+ * I18N-2: `lang` (default 'en') picks the twin sentence AND the relic words inside it —
+ * both sides of the interpolation localize or neither does, so a Spanish boon never
+ * quotes an English relic name.
  * @param {string} id
- * @param {{name: string, offText: string}} relic
+ * @param {{name: string, name_es?: string, offText: string, offText_es?: string}} relic
+ * @param {string} [lang] 'en' (default) or 'es'
  */
-export function boonText(id, relic) {
-  return BOONS[id].text.replace('{relic}', relic.name).replace('{relicOff}', relic.offText);
+export function boonText(id, relic, lang = 'en') {
+  const es = lang === 'es';
+  const text = es ? (BOONS[id].text_es ?? BOONS[id].text) : BOONS[id].text;
+  const relicName = es ? (relic?.name_es ?? relic?.name) : relic?.name;
+  const relicOff = es ? (relic?.offText_es ?? relic?.offText) : relic?.offText;
+  return text.replace('{relic}', relicName ?? '').replace('{relicOff}', relicOff ?? '');
 }
 
 /** Stable boon order: the pick indexes into this list, so it is part of the format. */

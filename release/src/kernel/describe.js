@@ -27,6 +27,31 @@ import { effectSummary, CUSTOM_SUMMARY, STATUS_ABBREV } from './observe.js';
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const sentence = (s) => (/[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
 
+/* --------------------------------------------------------------------- languages
+ *
+ * I18N-1: the describe layer speaks two languages. `lang` is a PRESENTATION choice
+ * threaded through every describe function as a trailing `'en'`-defaulted parameter —
+ * it never enters run state, the save format or the action log (a save reads in either
+ * language; hashes and the compact dump are untouched). The compact layer (observe.js's
+ * `effectSummary`/`observe`) stays English-only by contract: it is the agent-facing
+ * payload pinned by the goldens and the budget test.
+ *
+ * Grammar: neutral Latin American Spanish (es-419) — no vosotros, no Spain-isms, "el
+ * enemigo"/"TODOS los enemigos", and the compact codes kept visible where the English
+ * keeps them ("HP", not "PV"), so a reader can still connect "Pierdes 3 HP" to "HP3".
+ * A missing Spanish row falls back to the English one (the honest-fallback rule); the
+ * es tables below are complete, so the fallback only ever fires for an unknown key.
+ */
+
+/** The languages the describe layer speaks, in the order a surface may offer them. */
+export const LANGUAGES = Object.freeze(['en', 'es']);
+
+/** The one language resolver: exactly 'es' picks Spanish, everything else English. */
+export const langOf = (lang) => (lang === 'es' ? 'es' : 'en');
+
+/** Spanish plural, mirroring the English `plural` above. */
+const pluralEs = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
 /**
  * The three fields of a glossary row, kept as DATA.
  *
@@ -56,16 +81,28 @@ function glossRow(abbrev, label, meaning, group = 'A') {
   return Object.fromEntries(GLOSS_KEYS.map((k, i) => [k, [abbrev, label, meaning, group][i]]));
 }
 
-/** The glossary sections, in the order a new player should meet them. */
+/** The glossary sections, in the order a new player should meet them (English). */
 export const GLOSSARY_SECTIONS = [
   { key: 'A', title: 'Every card', blurb: 'The shapes you will see on almost every card.' },
   { key: 'B', title: 'Statuses and powers', blurb: 'Names for lingering effects. Each shows a number for how many stacks you have.' },
   { key: 'C', title: 'Whole-card codes', blurb: 'Shorthand for one specific card. The card itself always says this in words.' },
 ];
 
+/** The same sections in Spanish (I18N-1). Keyed the same way so a surface can switch. */
+export const GLOSSARY_SECTIONS_ES = [
+  { key: 'A', title: 'Todas las cartas', blurb: 'Las formas que verás en casi todas las cartas.' },
+  { key: 'B', title: 'Estados y poderes', blurb: 'Nombres para efectos que permanecen. Cada uno muestra un número con tus acumulaciones.' },
+  { key: 'C', title: 'Códigos de carta completa', blurb: 'Abreviatura de una carta concreta. La propia carta siempre lo dice con palabras.' },
+];
+
+/** The glossary sections for one language (the exported const stays the English form). */
+export function glossarySections(lang = 'en') {
+  return langOf(lang) === 'es' ? GLOSSARY_SECTIONS_ES : GLOSSARY_SECTIONS;
+}
+
 /* ------------------------------------------------------------------------ glossary */
 
-/** The card types a tile can show. */
+/** The card types a tile can show (English). */
 export const CARD_TYPE_LABEL = {
   attack: 'Attack',
   skill: 'Skill',
@@ -73,6 +110,21 @@ export const CARD_TYPE_LABEL = {
   status: 'Status',
   curse: 'Curse',
 };
+
+/** The same type words in Spanish. */
+export const CARD_TYPE_LABEL_ES = {
+  attack: 'Ataque',
+  skill: 'Habilidad',
+  power: 'Poder',
+  status: 'Estado',
+  curse: 'Maldición',
+};
+
+/** The type word for one language; unknown types fall through unchanged. */
+export function typeLabel(type, lang = 'en') {
+  const table = langOf(lang) === 'es' ? CARD_TYPE_LABEL_ES : CARD_TYPE_LABEL;
+  return table[type] ?? CARD_TYPE_LABEL[type] ?? String(type);
+}
 
 /** Plain English for one status/power key, used by the header and the glossary. */
 const STATUS_MEANING = {
@@ -108,6 +160,40 @@ const STATUS_MEANING = {
   },
 };
 
+/** The same plain-language rows in Spanish (I18N-1). Same keys, same shape. */
+const STATUS_MEANING_ES = {
+  strength: {
+    label: 'Fuerza',
+    player: (n) => `tus ataques infligen ${n} de daño más`,
+    enemy: (n) => `sus ataques infligen ${n} de daño más`,
+    detail: 'Dura todo el combate. Se suma a cada ataque que juegues.',
+  },
+  vulnerable: {
+    label: 'Vulnerable',
+    player: () => 'recibes 50% más de daño de los ataques',
+    enemy: () => 'recibe 50% más de daño de los ataques',
+    detail: 'Se reduce en 1 al final de cada uno de tus turnos.',
+  },
+  weak: {
+    label: 'Débil',
+    player: () => 'tus ataques infligen 25% menos de daño',
+    enemy: () => 'sus ataques infligen 25% menos de daño',
+    detail: 'Se reduce en 1 al final de cada uno de tus turnos.',
+  },
+  dexterity: {
+    label: 'Destreza',
+    player: (n) => `el Bloqueo que ganas con cartas es ${n} mayor`,
+    enemy: (n) => `el Bloqueo que gana es ${n} mayor`,
+    detail: 'Dura todo el combate.',
+  },
+  metallicize: {
+    label: 'Metalizado',
+    player: (n) => `ganas ${n} de Bloqueo al final de cada turno`,
+    enemy: (n) => `gana ${n} de Bloqueo al final de cada turno`,
+    detail: 'El Bloqueo se consume al inicio del siguiente turno.',
+  },
+};
+
 /** Plain English for one persistent power key. */
 const POWER_MEANING = {
   combust: { label: 'Banked Coal', per: 'at the end of each turn: deal 1 damage to ALL enemies and lose 1 HP' },
@@ -116,22 +202,33 @@ const POWER_MEANING = {
   rupture: { label: 'Split Seam', per: 'whenever a card makes you lose HP: gain 1 Strength' },
 };
 
+/** The same power rows in Spanish (I18N-1). */
+const POWER_MEANING_ES = {
+  combust: { label: 'Carbón Guardado', per: 'al final de cada turno: infliges 1 de daño a TODOS los enemigos y pierdes 1 HP' },
+  dark_embrace: { label: 'Abrazo de Ceniza', per: 'cada vez que una carta se agota: robas 1 carta' },
+  feel_no_pain: { label: 'Piel de Ascuas', per: 'cada vez que una carta se agota: ganas 1 de Bloqueo' },
+  rupture: { label: 'Costura Abierta', per: 'cada vez que una carta te hace perder HP: ganas 1 de Fuerza' },
+};
+
 /** Every power lasts for the rest of the fight, so one shared note says so. */
 const POWER_NOTE = 'Stays for the rest of the fight.';
+const POWER_NOTE_ES = 'Permanece por el resto del combate.';
 
 /**
- * Plain English for one status counter.
+ * Plain-language sentence for one status counter, in the requested language.
  * @param {string} key status key, e.g. 'strength'
  * @param {number} stacks how many stacks are on the combatant
  * @param {'player'|'enemy'} [who] whose counter this is; 'player' is the default so the
  *   common case (the player's own header line) reads as "your attacks…".
+ * @param {string} [lang] 'en' (default) or 'es' — presentation only, never run state.
  * @returns {string} e.g. "Strength 2 — your attacks deal 2 more damage."
  */
-export function describeStatus(key, stacks, who = 'player') {
+export function describeStatus(key, stacks, who = 'player', lang = 'en') {
   const n = stacks ?? 0;
-  const m = STATUS_MEANING[key];
+  const es = langOf(lang) === 'es';
+  const m = (es ? STATUS_MEANING_ES[key] : null) ?? STATUS_MEANING[key];
   if (!m) return `${String(key).replace(/_/g, ' ')} ${n}.`;
-  return `${m.label} ${n} — ${statusClause(key, n, who)}.`;
+  return `${m.label} ${n} — ${statusClause(key, n, who, lang)}.`;
 }
 
 /**
@@ -141,32 +238,52 @@ export function describeStatus(key, stacks, who = 'player') {
  * @param {string} key status key
  * @param {number} stacks
  * @param {'player'|'enemy'} [who]
- * @returns {string} '' when the key has no plain-English voice
+ * @param {string} [lang]
+ * @returns {string} '' when the key has no plain-language voice
  */
-function statusClause(key, stacks, who = 'player') {
-  const m = STATUS_MEANING[key];
+function statusClause(key, stacks, who = 'player', lang = 'en') {
+  const es = langOf(lang) === 'es';
+  const m = (es ? STATUS_MEANING_ES[key] : null) ?? STATUS_MEANING[key];
   if (!m) return '';
   return m[who === 'enemy' ? 'enemy' : 'player'](stacks ?? 0);
 }
 
 /**
- * Plain English sentence for one persistent power counter.
+ * Plain-language sentence for one persistent power counter.
  * @param {string} key power key, e.g. 'combust'
  * @param {number} stacks
+ * @param {string} [lang]
  * @returns {string}
  */
-export function describePower(key, stacks) {
+export function describePower(key, stacks, lang = 'en') {
   const n = stacks ?? 0;
-  const m = POWER_MEANING[key];
+  const es = langOf(lang) === 'es';
+  const m = (es ? POWER_MEANING_ES[key] : null) ?? POWER_MEANING[key];
   if (!m) return `${String(key).replace(/_/g, ' ')} ${n}.`;
-  return `${m.label} ${n} — ${m.per}. ${POWER_NOTE}`;
+  return `${m.label} ${n} — ${m.per}. ${es ? POWER_NOTE_ES : POWER_NOTE}`;
 }
 
 /** Short human label for one status counter, e.g. "Strength 2". */
-export const statusName = (key) => (STATUS_MEANING[key]?.label ?? String(key).replace(/_/g, ' '));
+export const statusName = (key, lang = 'en') => {
+  const es = langOf(lang) === 'es';
+  return (es ? STATUS_MEANING_ES[key]?.label : null) ?? STATUS_MEANING[key]?.label
+    ?? String(key).replace(/_/g, ' ');
+};
 
 /** One-line description of a card type, for tiles and the help panel. */
-export function describeCardType(type) {
+export function describeCardType(type, lang = 'en') {
+  if (langOf(lang) === 'es') {
+    switch (type) {
+      case 'attack':
+        return 'Ataque: inflige daño. Cuesta Energía jugarla.';
+      case 'skill':
+        return 'Habilidad: una carta de utilidad (Bloqueo, robar, Energía). Cuesta Energía jugarla.';
+      case 'power':
+        return 'Poder: un efecto duradero por el resto del combate.';
+      default:
+        return `${CARD_TYPE_LABEL_ES[type] ?? CARD_TYPE_LABEL[type] ?? type}.`;
+    }
+  }
   switch (type) {
     case 'attack':
       return 'Attack — deals damage. Costs Energy to play.';
@@ -204,65 +321,111 @@ const CUSTOM_SENTENCE = {
   rampage: 'Deal 8 damage. This card gains +5 damage permanently each time you play it.',
 };
 
+/** The same handler sentences in Spanish (I18N-1). The power names reuse the es labels
+ *  of POWER_MEANING_ES, so a card and its pill can never disagree in either language. */
+const CUSTOM_SENTENCE_ES = {
+  bloodletting: 'Pierdes 3 HP. Ganas 2 de Energía.',
+  hemokinesis: 'Pierdes 2 HP. Infliges 15 de daño.',
+  reaper: 'Infliges 4 de daño a TODOS los enemigos. Recuperas HP igual al daño infligido.',
+  limit_break: 'Duplicas tu Fuerza actual. No hace nada si no tienes Fuerza.',
+  offering: 'Pierdes 6 HP. Ganas 2 de Energía. Robas 3 cartas.',
+  combust: `Ganas ${POWER_MEANING_ES.combust.label}: al final de cada turno, infliges 1 de daño a TODOS los enemigos y pierdes 1 HP.`,
+  dark_embrace: `Ganas ${POWER_MEANING_ES.dark_embrace.label}: cada vez que una carta se agota, robas 1 carta.`,
+  feel_no_pain: `Ganas ${POWER_MEANING_ES.feel_no_pain.label}: cada vez que una carta se agota, ganas 1 de Bloqueo.`,
+  rupture: `Ganas ${POWER_MEANING_ES.rupture.label}: cada vez que una carta te hace perder HP, ganas 1 de Fuerza.`,
+  entrench: 'Duplicas tu Bloqueo actual. No hace nada si no tienes Bloqueo.',
+  rampage: 'Infliges 8 de daño. Esta carta gana +5 de daño de forma permanente cada vez que la juegas.',
+};
+
 /**
  * One sentence per effect verb in the CLOSED vocabulary
  * (src/kernel/rules/vocabulary.js: damage, block, draw, energy, status, discard,
- * exhaust, custom).
+ * exhaust, custom) — one template TABLE per language, keyed by the same verb.
  *
  * `amount` is the printed card number; Strength and Dexterity are added at play time and
- * are deliberately NOT folded in here (the card cannot know your counters, and the
- * status pills already explain those).
+ * are deliberately NOT folded in here (the card cannot know your counters, and the status
+ * pills already explain those).
  * @param {any} effect one entry of a card definition's `effects` array
  * @param {any} def the card definition the effect belongs to
+ * @param {string} [lang] 'en' (default) or 'es'
  * @returns {string} a complete sentence
  */
-export function describeEffect(effect, def = {}) {
-  const amount = effect.amount;
-  switch (effect.verb) {
-    case 'damage': {
-      const hits = effect.hits ?? 1;
-      const who = effect.target === 'all_enemies'
+const TEMPLATES = {
+  en: {
+    damage: (e, def) => {
+      const hits = e.hits ?? 1;
+      const who = e.target === 'all_enemies'
         ? 'ALL enemies'
         : def.target === 'random_enemy' ? 'a random enemy' : 'the enemy';
-      if (hits > 1) return `Deal ${amount} damage to ${who} ${hits} times.`;
-      return `Deal ${amount} damage to ${who}.`;
-    }
-    case 'block':
-      return `Gain ${amount} Block.`;
-    case 'draw':
-      return `Draw ${plural(amount, 'card', 'cards')}.`;
-    case 'energy':
-      return `Gain ${amount} Energy.`;
-    case 'status': {
-      const name = statusName(effect.status);
-      const self = effect.to === 'self' || effect.to === 'player';
+      if (hits > 1) return `Deal ${e.amount} damage to ${who} ${hits} times.`;
+      return `Deal ${e.amount} damage to ${who}.`;
+    },
+    block: (e) => `Gain ${e.amount} Block.`,
+    draw: (e) => `Draw ${plural(e.amount, 'card', 'cards')}.`,
+    energy: (e) => `Gain ${e.amount} Energy.`,
+    status: (e) => {
+      const name = statusName(e.status);
+      const self = e.to === 'self' || e.to === 'player';
       // The clause is the plain-English consequence, so a card that grants a keyword
       // explains it on the card instead of making the player open the glossary.
       if (self) {
-        const clause = statusClause(effect.status, amount, 'player');
-        return clause ? `Gain ${amount} ${name} — ${clause}.` : `Gain ${amount} ${name}.`;
+        const clause = statusClause(e.status, e.amount, 'player');
+        return clause ? `Gain ${e.amount} ${name} — ${clause}.` : `Gain ${e.amount} ${name}.`;
       }
-      const who = effect.target === 'all_enemies' ? 'ALL enemies' : 'the enemy';
-      const clause = statusClause(effect.status, amount, 'enemy');
+      const who = e.target === 'all_enemies' ? 'ALL enemies' : 'the enemy';
+      const clause = statusClause(e.status, e.amount, 'enemy');
       return clause
-        ? `Apply ${amount} ${name} to ${who} — ${clause}.`
-        : `Apply ${amount} ${name} to ${who}.`;
-    }
-    case 'discard':
-      return `Discard ${plural(amount, 'card', 'cards')} at random.`;
-    case 'exhaust':
-      return 'Exhaust this card for the rest of the fight.';
-    case 'heal':
-      // The engine caps the restore at maxHp (rules/vocabulary.js), so "up to" is the
-      // honest wording — a full-HP play restores nothing.
-      return `Restore up to ${amount} HP.`;
-    case 'retain':
-      return 'Retain this card — it stays in your hand when your turn ends.';
-    case 'custom':
-      return CUSTOM_SENTENCE[effect.handler] ?? `Special effect (${effect.handler}).`;
-    default:
-      return `Unknown effect (${effect.verb}).`;
-  }
+        ? `Apply ${e.amount} ${name} to ${who} — ${clause}.`
+        : `Apply ${e.amount} ${name} to ${who}.`;
+    },
+    discard: (e) => `Discard ${plural(e.amount, 'card', 'cards')} at random.`,
+    exhaust: () => 'Exhaust this card for the rest of the fight.',
+    // The engine caps the restore at maxHp (rules/vocabulary.js), so "up to" is the
+    // honest wording — a full-HP play restores nothing.
+    heal: (e) => `Restore up to ${e.amount} HP.`,
+    retain: () => 'Retain this card — it stays in your hand when your turn ends.',
+    custom: (e) => CUSTOM_SENTENCE[e.handler] ?? `Special effect (${e.handler}).`,
+  },
+  es: {
+    damage: (e, def) => {
+      const hits = e.hits ?? 1;
+      // The target phrase carries its own preposition: Spanish contracts "a el" into
+      // "al", so each form is written whole ("al enemigo", "a TODOS los enemigos").
+      const who = e.target === 'all_enemies'
+        ? 'a TODOS los enemigos'
+        : def.target === 'random_enemy' ? 'a un enemigo al azar' : 'al enemigo';
+      if (hits > 1) return `Infliges ${e.amount} de daño ${who} ${hits} veces.`;
+      return `Infliges ${e.amount} de daño ${who}.`;
+    },
+    block: (e) => `Ganas ${e.amount} de Bloqueo.`,
+    draw: (e) => `Robas ${pluralEs(e.amount, 'carta', 'cartas')}.`,
+    energy: (e) => `Ganas ${e.amount} de Energía.`,
+    status: (e) => {
+      const name = statusName(e.status, 'es');
+      const self = e.to === 'self' || e.to === 'player';
+      if (self) {
+        const clause = statusClause(e.status, e.amount, 'player', 'es');
+        return clause ? `Ganas ${e.amount} de ${name} — ${clause}.` : `Ganas ${e.amount} de ${name}.`;
+      }
+      const who = e.target === 'all_enemies' ? 'a TODOS los enemigos' : 'al enemigo';
+      const clause = statusClause(e.status, e.amount, 'enemy', 'es');
+      return clause
+        ? `Aplicas ${e.amount} de ${name} ${who} — ${clause}.`
+        : `Aplicas ${e.amount} de ${name} ${who}.`;
+    },
+    discard: (e) => `Descartas ${pluralEs(e.amount, 'carta', 'cartas')} al azar.`,
+    exhaust: () => 'Agotas esta carta por el resto del combate.',
+    heal: (e) => `Restauras hasta ${e.amount} HP.`,
+    retain: () => 'Retienes esta carta: se queda en tu mano cuando termina tu turno.',
+    custom: (e) => CUSTOM_SENTENCE_ES[e.handler] ?? CUSTOM_SENTENCE[e.handler] ?? `Special effect (${e.handler}).`,
+  },
+};
+
+export function describeEffect(effect, def = {}, lang = 'en') {
+  const table = TEMPLATES[langOf(lang)] ?? TEMPLATES.en;
+  const fn = table[effect.verb];
+  if (!fn) return `Unknown effect (${effect.verb}).`;
+  return fn(effect, def);
 }
 
 /* ------------------------------------------------------------------ card describe */
@@ -293,25 +456,30 @@ function foldRepeatedDamage(effects) {
 }
 
 /**
- * Plain English description of a card, as a human would read it aloud.
+ * Plain-language description of a card, as a human would read it aloud.
  *
- * `Hammerfall` -> "Deal 6 damage to the enemy."
+ * `Hammerfall` -> "Deal 6 damage to the enemy." / "Infliges 6 de daño al enemigo."
  * `Anvil Blow` -> "Deal 8 damage to the enemy. Apply 2 Vulnerable to the enemy."
  *
  * @param {any} def card definition from content (cards.json shape)
  * @param {{perPlay?: number}} [instance] runtime instance, when one is available:
  *   Rampage's damage depends on how often it has been played this run.
+ * @param {string} [lang] 'en' (default) or 'es'
  * @returns {string} at least one complete sentence, never empty
  */
-export function describeCard(def, instance = {}) {
-  if (!def || !Array.isArray(def.effects)) return 'No description available.';
+export function describeCard(def, instance = {}, lang = 'en') {
+  if (!def || !Array.isArray(def.effects)) {
+    return langOf(lang) === 'es' ? 'Sin descripción disponible.' : 'No description available.';
+  }
   const effects = foldRepeatedDamage(def.effects);
   const parts = effects.map((e) => {
     // Rampage is the one handler whose numbers move with the instance.
     if (e.verb === 'custom' && e.handler === 'rampage' && instance.perPlay) {
-      return `Deal ${8 + instance.perPlay} damage (+5 more each time you play it).`;
+      return langOf(lang) === 'es'
+        ? `Infliges ${8 + instance.perPlay} de daño (+5 más cada vez que la juegas).`
+        : `Deal ${8 + instance.perPlay} damage (+5 more each time you play it).`;
     }
-    return describeEffect(e, def);
+    return describeEffect(e, def, lang);
   });
   return parts.map(sentence).join(' ');
 }
@@ -321,10 +489,15 @@ export function describeCard(def, instance = {}) {
  * Reads the kernel's own snapshot fields (`cost`, `playable`) — no rule is restated.
  * @param {{cost?: number, playable?: boolean}} card
  * @param {number} energy current energy
+ * @param {string} [lang]
  * @returns {string} '' when the card is playable
  */
-export function describePlayability(card, energy) {
+export function describePlayability(card, energy, lang = 'en') {
   if (card?.playable) return '';
+  if (langOf(lang) === 'es') {
+    if ((card?.cost ?? 0) > energy) return `Necesita ${card.cost} de Energía: tienes ${energy}.`;
+    return 'No se puede jugar ahora.';
+  }
   if ((card?.cost ?? 0) > energy) return `Needs ${card.cost} Energy — you have ${energy}.`;
   return 'Not playable right now.';
 }
@@ -359,18 +532,22 @@ function intentNumber(enemy, move) {
 }
 
 /**
- * Plain English sentence for an enemy's chosen intent, e.g.
+ * Plain-language sentence for an enemy's chosen intent, e.g.
  * "Will attack for 7 and block 5." / "Will apply 2 Vulnerable and 2 Weak to you."
+ * Spanish: "Atacará con 7 de daño y se cubrirá con 5 de Bloqueo."
  *
  * The damage number comes from the kernel's own `intentDamage()` (Strength already
  * added, Weak already applied) when it can be computed, so the sentence and the compact
- * number can never disagree.
+ * number can never disagree. A move whose kind the table does not know falls back to its
+ * code-owned label — which stays English until I18N-2 sweeps the enemy tables.
  * @param {any} enemy snapshot enemy or raw state enemy
+ * @param {string} [lang]
  * @returns {string}
  */
-export function describeIntent(enemy) {
+export function describeIntent(enemy, lang = 'en') {
+  const es = langOf(lang) === 'es';
   const move = moveOf(enemy);
-  if (!move) return 'Intent unknown.';
+  if (!move) return es ? 'Intención desconocida.' : 'Intent unknown.';
   const intent = enemy.intent ?? {};
   const hits = intent.hits ?? move.hits ?? 1;
   const damage = intent.kind === 'attack' && typeof intent.damage === 'number'
@@ -381,23 +558,25 @@ export function describeIntent(enemy) {
     case 'attack': {
       const per = hits > 1 ? Math.round(damage / hits) : damage;
       const swing = hits > 1
-        ? `Will attack for ${per} damage ${hits} times`
-        : `Will attack for ${damage}`;
-      return sentence(move.block ? `${swing} and block ${move.block}` : swing);
+        ? (es ? `Atacará ${hits} veces con ${per} de daño` : `Will attack for ${per} damage ${hits} times`)
+        : (es ? `Atacará con ${damage} de daño` : `Will attack for ${damage}`);
+      return sentence(es
+        ? (move.block ? `${swing} y se cubrirá con ${move.block} de Bloqueo` : swing)
+        : (move.block ? `${swing} and block ${move.block}` : swing));
     }
     case 'block':
-      return `Will gain ${move.block} Block.`;
+      return es ? `Ganará ${move.block} de Bloqueo.` : `Will gain ${move.block} Block.`;
     case 'buff': {
       const parts = [];
-      if (move.strength) parts.push(`+${move.strength} Strength`);
-      if (move.block) parts.push(`gain ${move.block} Block`);
-      return sentence(`Will power up: ${parts.join(' and ')}`);
+      if (move.strength) parts.push(es ? `+${move.strength} de Fuerza` : `+${move.strength} Strength`);
+      if (move.block) parts.push(es ? `ganará ${move.block} de Bloqueo` : `gain ${move.block} Block`);
+      return sentence(es ? `Se potenciará: ${parts.join(' y ')}` : `Will power up: ${parts.join(' and ')}`);
     }
     case 'debuff': {
       const parts = [];
-      if (move.vulnerable) parts.push(`${move.vulnerable} Vulnerable`);
-      if (move.weak) parts.push(`${move.weak} Weak`);
-      return sentence(`Will apply ${parts.join(' and ')} to you`);
+      if (move.vulnerable) parts.push(es ? `${move.vulnerable} de Vulnerable` : `${move.vulnerable} Vulnerable`);
+      if (move.weak) parts.push(es ? `${move.weak} de Débil` : `${move.weak} Weak`);
+      return sentence(es ? `Te aplicará ${parts.join(' y ')}` : `Will apply ${parts.join(' and ')} to you`);
     }
     default:
       return `${move.label}.`;
@@ -429,7 +608,8 @@ export function emittedTokens() {
   return { abbrevs: [...abbrevs].sort(), custom: [...custom].sort() };
 }
 
-/** Whole-card shorthand for shapes no table can derive, seen in CUSTOM_SUMMARY. */
+/** Whole-card shorthand for shapes no table can derive, seen in CUSTOM_SUMMARY
+ *  (English rows; the Spanish twins live in SHORTHAND_ENTRIES_ES below). */
 const SHORTHAND_ENTRIES = [
   glossRow('A x n', 'attack × n', 'Multi-hit attack: the number after "x" is how many times it hits.', 'C'),
   glossRow('A n + m', 'attack grows by m', 'The attack damage grows by m each time you play the card (Climbing Heat).', 'C'),
@@ -443,6 +623,19 @@ const SHORTHAND_ENTRIES = [
   glossRow('DEX+n', 'gain n Dexterity', 'A plus on a power means GAIN that many stacks. "DEX+1" = gain 1 Dexterity, so the Block you gain from cards is 1 higher.', 'B'),
   glossRow('PWRx', 'double your Strength', 'An "x" after a power means MULTIPLY the stacks you already have. "PWRx2" doubles your Strength; it does nothing if you have none.', 'C'),
   glossRow('BLKx', 'double your Block', 'An "x" after Block means MULTIPLY the Block you currently have. "BLKx2" doubles it; it does nothing if you have none.', 'C'),
+];
+
+/** The same shorthand rows in Spanish (I18N-1), same keys and groups. */
+const SHORTHAND_ENTRIES_ES = [
+  glossRow('A x n', 'ataque × n', 'Ataque de varios golpes: el número tras la "x" es cuántas veces golpea.', 'C'),
+  glossRow('A n + m', 'el ataque crece en m', 'El daño del ataque crece en m cada vez que juegas la carta (Calor Ascendente).', 'C'),
+  glossRow('PWR+n', 'ganas n de Fuerza', 'Un signo + en un poder significa GANAR esas acumulaciones. "PWR+2" = ganas 2 de Fuerza.', 'B'),
+  glossRow('VULN+n', 'aplica n de Vulnerable', 'Un signo + en un estado significa APLICAR esas acumulaciones al objetivo: el número no crece. "VULN+2" = aplica 2 de Vulnerable, así que el objetivo recibe 50% más de daño mientras dure.', 'B'),
+  glossRow('WK+n', 'aplica n de Débil', 'Un signo + en un estado significa APLICAR esas acumulaciones al objetivo. "WK+2" = aplica 2 de Débil, así que ataca con 25% menos.', 'B'),
+  glossRow('METAL+n', 'ganas n de Metalizado', 'Un signo + en un poder significa GANAR esas acumulaciones. "METAL+3" = ganas 3 de Metalizado, que da 3 de Bloqueo al final de cada turno.', 'B'),
+  glossRow('DEX+n', 'ganas n de Destreza', 'Un signo + en un poder significa GANAR esas acumulaciones. "DEX+1" = ganas 1 de Destreza, así que el Bloqueo que ganas con cartas es 1 mayor.', 'B'),
+  glossRow('PWRx', 'duplica tu Fuerza', 'Una "x" tras un poder significa MULTIPLICAR las acumulaciones que ya tienes. "PWRx2" duplica tu Fuerza; no hace nada si no tienes.', 'C'),
+  glossRow('BLKx', 'duplica tu Bloqueo', 'Una "x" tras el Bloqueo significa MULTIPLICAR el Bloqueo que tienes ahora. "BLKx2" lo duplica; no hace nada si no tienes.', 'C'),
 ];
 
 /** The escape hatch: what each `custom` handler's cryptic summary really means. */
@@ -461,26 +654,39 @@ const CUSTOM_SHORTHAND = {
   'PWR+': 'Gain 1 stack of a lasting power.',
 };
 
+/** The same shorthand meanings in Spanish (I18N-1). */
+const CUSTOM_SHORTHAND_ES = {
+  HP3: 'Pierdes 3 HP (ignora el Bloqueo; nunca te deja por debajo de 1 HP).',
+  HP2: 'Pierdes 2 HP (ignora el Bloqueo; nunca te deja por debajo de 1 HP).',
+  HP6: 'Pierdes 6 HP (ignora el Bloqueo; nunca te deja por debajo de 1 HP).',
+  'HP+': 'Recuperas HP igual al daño que infligió esta carta.',
+  E2: 'Ganas 2 de Energía de inmediato.',
+  D3: 'Robas 3 cartas.',
+  A15: 'Atacas con 15 de daño.',
+  A4xall: 'Atacas a todos los enemigos con 4 de daño.',
+  'A8+5': 'Atacas con 8 de daño, +5 más cada vez que juegas esta carta.',
+  BLKx2: 'Duplicas tu Bloqueo actual.',
+  PWRx2: 'Duplicas tu Fuerza actual.',
+  'PWR+': 'Ganas 1 acumulación de un poder duradero.',
+};
+
 /** Human label for a whole-card shorthand token, e.g. "HP6" -> "HP cost 6". */
-function labelForShorthand(abbrev) {
+function labelForShorthand(abbrev, lang = 'en') {
   const m = /^([A-Za-z]{1,4})(\d*)(?:x(\d*))?$/.exec(abbrev);
   if (!m) return abbrev;
   const [, letters, num, times] = m;
-  const names = { HP: 'HP cost', A: 'Attack', BLK: 'Block', PWR: 'Strength', D: 'Draw', E: 'Energy' };
+  const es = langOf(lang) === 'es';
+  const names = es
+    ? { HP: 'Coste de HP', A: 'Ataque', BLK: 'Bloqueo', PWR: 'Fuerza', D: 'Robo', E: 'Energía' }
+    : { HP: 'HP cost', A: 'Attack', BLK: 'Block', PWR: 'Strength', D: 'Draw', E: 'Energy' };
   const name = names[letters] ?? letters;
-  if (times !== undefined) return `${name} ${num} ×${times || 'all'}`;
+  if (times !== undefined) return `${name} ${num} ×${times || (es ? 'todos' : 'all')}`;
   return num ? `${name} ${num}` : name;
 }
 
-/**
- * The glossary: every abbreviation the compact CLI summary still emits, in plain
- * English. Covers the effect vocabulary (A, B, D, E, d, EXH, A x n, +), the status
- * abbreviations (PWR, VULN, WK, DEX, METAL), the HP cost (HP) and the whole-card
- * shorthands that no table can derive (BLKx2, PWRx2, HP+, …).
- * @returns {Array<object>} rows of `{token, label, meaning}`
- */
-export function glossary() {
-  const core = [
+/** The core glossary rows (the frozen vocabulary), per language. */
+const GLOSSARY_CORE = {
+  en: () => [
     glossRow('A', 'Attack', 'Deal the shown damage to one enemy. "A6" means an attack for 6 damage.'),
     glossRow('B', 'Block', 'Gain the shown Block. Block soaks damage and is used up at the start of your turn.'),
     glossRow('D', 'Draw', 'Draw that many cards from your draw pile.'),
@@ -497,7 +703,39 @@ export function glossary() {
     glossRow('WK', 'Weak', 'Attacks deal 25% less damage. Wears off by 1 each turn.', 'B'),
     glossRow('DEX', 'Dexterity', 'Block gained from cards is that much higher. Lasts the whole fight.', 'B'),
     glossRow('METAL', 'Metallicize', 'Gain that much Block at the end of each turn. The Scale Up card applies it.', 'B'),
-  ];
+  ],
+  es: () => [
+    glossRow('A', 'Ataque', 'Inflige el daño mostrado a un enemigo. "A6" es un ataque de 6 de daño.'),
+    glossRow('B', 'Bloqueo', 'Ganas el Bloqueo mostrado. El Bloqueo absorbe daño y se consume al inicio de tu turno.'),
+    glossRow('D', 'Robo', 'Robas esa cantidad de cartas de tu pila de robo.'),
+    glossRow('E', 'Energía', 'Ganas esa Energía de inmediato. La Energía paga las cartas; recibes 3 cada turno.'),
+    glossRow('d', 'Descarte', 'Descartas esa cantidad de cartas de tu mano (d minúscula, para no confundirla con Robo).'),
+    glossRow('EXH', 'Agotar', 'La carta sale del combate para siempre: no vuelve en un rebarajado.'),
+    glossRow('H', 'Curar', 'Recuperas esa cantidad de HP, nunca más allá de tu máximo. Una carta jugada con todo el HP no recupera nada.'),
+    glossRow('RTN', 'Retener', 'La carta se queda en tu mano cuando termina tu turno, en vez de descartarse. Sigue ahí hasta que la juegues o la descartes.'),
+    glossRow('+', 'crece', 'Un signo + tras un valor de ATAQUE o BLOQUEO significa que el número crece: cada vez que juegas la carta, o cada turno mientras dure un poder.'),
+    // Status and power names: the B group.
+    glossRow('HP', 'Tu HP', 'Pierdes esa cantidad de HP. Es un COSTE que pagas, no curación: ignora el Bloqueo y nunca te deja por debajo de 1 HP.', 'B'),
+    glossRow('PWR', 'Fuerza', 'Los ataques infligen esa cantidad de daño más. Dura todo el combate.', 'B'),
+    glossRow('VULN', 'Vulnerable', 'Recibe 50% más de daño de los ataques. Se reduce en 1 cada turno.', 'B'),
+    glossRow('WK', 'Débil', 'Los ataques infligen 25% menos de daño. Se reduce en 1 cada turno.', 'B'),
+    glossRow('DEX', 'Destreza', 'El Bloqueo ganado con cartas es esa cantidad mayor. Dura todo el combate.', 'B'),
+    glossRow('METAL', 'Metalizado', 'Ganas esa cantidad de Bloqueo al final de cada turno. La carta Metalizado lo aplica.', 'B'),
+  ],
+};
+
+/**
+ * The glossary: every abbreviation the compact CLI summary still emits, in plain
+ * English (or Spanish — I18N-1). Covers the effect vocabulary (A, B, D, E, d, EXH,
+ * A x n, +), the status abbreviations (PWR, VULN, WK, DEX, METAL), the HP cost (HP) and
+ * the whole-card shorthands that no table can derive (BLKx2, PWRx2, HP+, …). The TOKENS
+ * stay the compact codes in both languages — they are the agent-facing vocabulary.
+ * @param {string} [lang] 'en' (default) or 'es'
+ * @returns {Array<object>} rows of `{token, label, meaning}`
+ */
+export function glossary(lang = 'en') {
+  const es = langOf(lang) === 'es';
+  const core = es ? GLOSSARY_CORE.es() : GLOSSARY_CORE.en();
 
   // Every whole-card shorthand the generators can really emit: the tokens of the
   // per-card string list, each token of every per-card string in CUSTOM_SUMMARY (one
@@ -508,15 +746,17 @@ export function glossary() {
   }
   for (const id of Object.keys(CUSTOM_SHORTHAND)) wholeCard.add(id);
 
+  const shorthandMeaning = es ? CUSTOM_SHORTHAND_ES : CUSTOM_SHORTHAND;
   const expanded = [...wholeCard]
     .sort()
-    .filter((abbrev) => Object.prototype.hasOwnProperty.call(CUSTOM_SHORTHAND, abbrev))
-    .map((abbrev) => glossRow(abbrev, labelForShorthand(abbrev), CUSTOM_SHORTHAND[abbrev], 'C'));
+    .filter((abbrev) => Object.prototype.hasOwnProperty.call(shorthandMeaning, abbrev))
+    .map((abbrev) => glossRow(abbrev, labelForShorthand(abbrev, lang), shorthandMeaning[abbrev], 'C'));
 
   // De-duplicate, core entries first so the frozen vocabulary wins any clash.
+  const entries = es ? [...core, ...SHORTHAND_ENTRIES_ES, ...expanded] : [...core, ...SHORTHAND_ENTRIES, ...expanded];
   const seen = new Set();
   const out = [];
-  for (const entry of [...core, ...SHORTHAND_ENTRIES, ...expanded]) {
+  for (const entry of entries) {
     if (seen.has(entry.token)) continue;
     seen.add(entry.token);
     out.push(entry);
@@ -533,7 +773,19 @@ export function glossary() {
  * Block resets to 0 in beginTurn, after the enemy turn has already resolved against it).
  * @returns {Array<{title: string, body: string}>}
  */
-export function helpTopics() {
+export function helpTopics(lang = 'en') {
+  if (langOf(lang) === 'es') {
+    return [
+      { title: 'Tienes 3 de Energía cada turno', body: 'Cada carta muestra su coste de Energía en la esquina superior izquierda. La Energía vuelve a 3 al inicio de cada uno de tus turnos y no se acumula.' },
+      { title: 'Haz clic en una carta para jugarla', body: 'Jugar una carta gasta su Energía y hace lo que dice su texto. Las cartas atenuadas cuestan más Energía de la que te queda este turno.' },
+      { title: 'Pulsa Terminar turno cuando acabes', body: 'Tu mano se descarta, los enemigos hacen su turno cumpliendo lo que anunció su intención, y luego robas una mano nueva de 5.' },
+      { title: 'El Bloqueo te protege y luego desaparece', body: 'El Bloqueo absorbe el daño de los ataques enemigos. Tu Bloqueo se consume al inicio de tu siguiente turno, así que solo te cubre hasta entonces.' },
+      { title: 'Matar a un enemigo impide que ataque', body: 'Los enemigos muertos no vuelven a actuar, y su intención anunciada se va con ellos. Golpear primero al enemigo que está a punto de pegarte más fuerte suele ser la mejor jugada.' },
+      { title: 'Lee la intención del enemigo', body: 'La línea bajo cada enemigo dice qué hará en su próximo turno — por ejemplo "Atacará con 11 de daño". Planea tu Bloqueo alrededor de ese número.' },
+      { title: 'Corazón Encendido', body: 'Después de cada combate que ganes, Corazón Encendido recupera 6 HP. Es la reliquia inicial de Ashwright.' },
+      { title: 'Reliquias', body: 'Las reliquias son tesoros pasivos, listados junto a tu cinturón de pociones. Un élite siempre suelta una, y el guardián ofrece tres al final: toma una o vete. Dos reliquias pueden compartir un efecto y ambas se aplican.' },
+    ];
+  }
   return [
     { title: 'You have 3 Energy every turn', body: 'Each card shows its Energy cost in the top-left corner. Energy refills to 3 at the start of each of your turns and does not carry over.' },
     { title: 'Click a card to play it', body: 'Playing a card spends its Energy and does what its text says. Greyed-out cards cost more Energy than you have left this turn.' },
@@ -549,23 +801,27 @@ export function helpTopics() {
 /**
  * Describe one hand card exactly as a tile needs it: name, cost, sentences and where the
  * compact form came from. Everything a human surface shows about a card comes from here,
- * so a tile cannot invent a number.
+ * so a tile cannot invent a number. The card NAME is content data: a `name_es` twin in
+ * cards.json (I18N-2's sweep) is used when present, and the English name is the honest
+ * fallback until then.
  * @param {any} def card definition
  * @param {{cost?: number, perPlay?: number, playable?: boolean}} [instance]
  * @param {number} [energy]
+ * @param {string} [lang]
  * @returns {{name: string, cost: number, type: string, typeLabel: string, blurb: string, description: string, compact: string, compactLabel: string, hint: string}}
  */
-export function describeTile(def, instance = {}, energy = 0) {
+export function describeTile(def, instance = {}, energy = 0, lang = 'en') {
+  const es = langOf(lang) === 'es';
   const cost = instance.cost ?? def.cost ?? 0;
   return {
-    name: def.name,
+    name: es && typeof def.name_es === 'string' && def.name_es.length > 0 ? def.name_es : def.name,
     cost,
     type: def.type,
-    typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
-    blurb: describeCardType(def.type),
-    description: describeCard(def, instance),
+    typeLabel: typeLabel(def.type, lang),
+    blurb: describeCardType(def.type, lang),
+    description: describeCard(def, instance, lang),
     compact: effectSummary(def),
-    compactLabel: 'Compact form (what the CLI prints)',
-    hint: describePlayability({ cost, playable: instance.playable ?? true }, energy),
+    compactLabel: es ? 'Forma compacta (lo que imprime el CLI)' : 'Compact form (what the CLI prints)',
+    hint: describePlayability({ cost, playable: instance.playable ?? true }, energy, lang),
   };
 }

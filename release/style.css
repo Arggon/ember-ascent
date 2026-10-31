@@ -7778,3 +7778,13 @@ button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
   .belt-name { display: none; }
   .belt-modal { max-width: none; }
 }
+
+/* ---------------------------------------------------------------- I18N-1: language toggle
+   The EN/ES switch in the HUD. It wears the shared .btn.ghost chrome; this rule only
+   fixes its width so the label swap (EN <-> ES) never reflows the row. */
+.lang-toggle {
+  min-width: 44px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}

@@ -11,10 +11,14 @@ import { pickAt, intAt } from '../rng.js';
 /** How many (card, temper) pairs a rest site offers. */
 export const TEMPER_OFFERS = 3;
 
+// I18N-1: `name_es`/`text_es` are the Spanish twins of the player-facing fields, read by
+// snapshot({lang:'es'}) with the English field as the honest fallback. The compact
+// `label` (Q / RH / BAL) is agent-facing and stays as-is in both languages. The es text
+// keeps the "Name: rest" colon shape the surfaces split on.
 export const TEMPERS = Object.freeze({
-  quenched: { name: 'Quenched', label: 'Q', text: 'Quenched: also gain 3 Block.' },
-  redhot: { name: 'Red-hot', label: 'RH', text: 'Red-hot: +50% damage. Lose 2 HP when played.' },
-  balanced: { name: 'Balanced', label: 'BAL', text: 'Balanced: also draw 1 card. Exhausts.' },
+  quenched: { name: 'Quenched', name_es: 'Templado', label: 'Q', text: 'Quenched: also gain 3 Block.', text_es: 'Templado: además ganas 3 de Bloqueo.' },
+  redhot: { name: 'Red-hot', name_es: 'Al rojo vivo', label: 'RH', text: 'Red-hot: +50% damage. Lose 2 HP when played.', text_es: 'Al rojo vivo: +50% de daño. Pierdes 2 HP al jugarla.' },
+  balanced: { name: 'Balanced', name_es: 'Equilibrado', label: 'BAL', text: 'Balanced: also draw 1 card. Exhausts.', text_es: 'Equilibrado: además robas 1 carta. Se agota.' },
 });
 /** Stable order, part of the format (the seeded roll indexes into it). */
 export const TEMPER_IDS = Object.freeze(['quenched', 'redhot', 'balanced']);

@@ -57,14 +57,17 @@ export const POTION_SLOTS = 3;
  * more than one enemy is alive (q<n>_<k>), every other target never asks (plain q<n>).
  * `summary` is the compact CLI form; `text` is the describe-layer sentence a human
  * surface shows verbatim. Both live HERE, kernel-side, so no surface re-derives words.
+ * I18N-1: `name_es`/`text_es` are the Spanish twins of the player-facing fields, read
+ * by snapshot({lang:'es'}) with the English field as the honest fallback; `summary`
+ * stays the compact English-only code.
  */
 export const POTIONS = Object.freeze([
-  Object.freeze({ id: 'ember_draught', name: 'Ember Draught', target: 'enemy', summary: 'A20', text: 'Deal 20 damage to one enemy.' }),
-  Object.freeze({ id: 'stone_skin', name: 'Stone Skin', target: 'none', summary: 'B12', text: 'Gain 12 Block.' }),
-  Object.freeze({ id: 'ash_salts', name: 'Ash Salts', target: 'none', summary: 'HP+20%', text: 'Heal 20% of your max HP, rounded down.' }),
-  Object.freeze({ id: 'bellows_fuel', name: 'Bellows Fuel', target: 'none', summary: 'E2', text: 'Gain 2 Energy.' }),
-  Object.freeze({ id: 'whetstone', name: 'Whetstone', target: 'none', summary: 'PWR+2', text: 'Gain 2 Strength for the rest of this combat.' }),
-  Object.freeze({ id: 'purge_flask', name: 'Purge Flask', target: 'none', summary: 'PURGE', text: 'Remove ALL of your debuffs (Vulnerable and Weak). Buffs stay.' }),
+  Object.freeze({ id: 'ember_draught', name: 'Ember Draught', name_es: 'Brebaje de Ascuas', target: 'enemy', summary: 'A20', text: 'Deal 20 damage to one enemy.', text_es: 'Inflige 20 de daño a un enemigo.' }),
+  Object.freeze({ id: 'stone_skin', name: 'Stone Skin', name_es: 'Piel de Piedra', target: 'none', summary: 'B12', text: 'Gain 12 Block.', text_es: 'Ganas 12 de Bloqueo.' }),
+  Object.freeze({ id: 'ash_salts', name: 'Ash Salts', name_es: 'Sales de Ceniza', target: 'none', summary: 'HP+20%', text: 'Heal 20% of your max HP, rounded down.', text_es: 'Recuperas el 20% de tu HP máximo, redondeado hacia abajo.' }),
+  Object.freeze({ id: 'bellows_fuel', name: 'Bellows Fuel', name_es: 'Combustible de Fuelle', target: 'none', summary: 'E2', text: 'Gain 2 Energy.', text_es: 'Ganas 2 de Energía.' }),
+  Object.freeze({ id: 'whetstone', name: 'Whetstone', name_es: 'Piedra de Afilar', target: 'none', summary: 'PWR+2', text: 'Gain 2 Strength for the rest of this combat.', text_es: 'Ganas 2 de Fuerza por el resto de este combate.' }),
+  Object.freeze({ id: 'purge_flask', name: 'Purge Flask', name_es: 'Frasco Purgador', target: 'none', summary: 'PURGE', text: 'Remove ALL of your debuffs (Vulnerable and Weak). Buffs stay.', text_es: 'Elimina TODOS tus estados negativos (Vulnerable y Débil). Los positivos se quedan.' }),
 ]);
 
 /** id -> definition. The ONE lookup; unknown ids yield undefined (never a throw). */

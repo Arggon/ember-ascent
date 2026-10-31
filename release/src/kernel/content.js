@@ -17,6 +17,14 @@ import { cardsBundle } from './content/cards.bundle.js';
 const REQUIRED_CARD_FIELDS = ['id', 'name', 'cost', 'type', 'rarity', 'target', 'effects'];
 const CARD_TYPES = ['attack', 'skill', 'power', 'status', 'curse'];
 const TARGETS = ['enemy', 'all', 'self', 'none', 'random_enemy'];
+// I18N-1: the OPTIONAL Spanish twins. Absent is the normal case (the I18N-2 content
+// sweep fills them in); present they must be a non-empty string, so a typo can never
+// ship as an empty tile or a broken fallback. The twins are independent: a card MAY
+// carry name_es without flavor_es (or the reverse) and renders MIXED by design — each
+// field falls back to its own English twin, per the honest-fallback rule.
+const OPTIONAL_ES_FIELDS = ['name_es', 'flavor_es'];
+// I18N-2: the same twin rule for the character table (display name + starter relic name).
+const OPTIONAL_CHARACTER_ES_FIELDS = ['name_es', 'relicName_es'];
 
 /**
  * Parse and validate content.
@@ -65,6 +73,12 @@ export function loadContent(input = cardsBundle) {
       }
       if (e.verb === 'custom' && !e.handler) problems.push(`card "${card.id}": custom effect needs a handler`);
     }
+    for (const field of OPTIONAL_ES_FIELDS) {
+      const v = card[field];
+      if (v !== undefined && (typeof v !== 'string' || v.length === 0)) {
+        problems.push(`card "${card.id}": "${field}" must be a non-empty string when present`);
+      }
+    }
     if (!problems.some((p) => p.startsWith(`card "${card.id}"`))) cards.set(card.id, Object.freeze({ ...card }));
   }
 
@@ -72,6 +86,12 @@ export function loadContent(input = cardsBundle) {
   for (const [id, ch] of Object.entries(raw.characters)) {
     for (const cardId of ch.startingDeck) {
       if (!cards.has(cardId)) problems.push(`character "${id}": starting deck references unknown card "${cardId}"`);
+    }
+    for (const field of OPTIONAL_CHARACTER_ES_FIELDS) {
+      const v = ch[field];
+      if (v !== undefined && (typeof v !== 'string' || v.length === 0)) {
+        problems.push(`character "${id}": "${field}" must be a non-empty string when present`);
+      }
     }
     characters.set(id, Object.freeze({ ...ch, id }));
   }

@@ -140,7 +140,10 @@ export const NODE_GLYPH = { weak: 'sword', strong: 'swords', elite: 'spikes', re
 
 /** Node type -> the words a player reads on the map. Presentation only: the kernel's
  *  own label ("fight", "fight+") still drives the title and the travel banner. The second
- *  line states only what the kernel's NODE_TYPES.reward says (card, heal or shop). */
+ *  line states only what the kernel's NODE_TYPES.reward says (card, heal or shop).
+ *  I18N-1: these are UI chrome, so the map view resolves them as i18n keys
+ *  (`map.node.<type>` / `map.node.<type>.sub`) at paint time; this table is the English
+ *  reference and the fallback for a type the i18n table does not name. */
 export const NODE_WORDS = {
   weak: ['Skirmish', 'card reward'], strong: ['Hard fight', 'card reward'], elite: ['Elite', 'card reward'],
   rest: ['Campfire', 'heal'], boss: ['Slag Warden', 'final fight'], shop: ['Shop', 'buy · remove'],

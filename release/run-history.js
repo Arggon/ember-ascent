@@ -20,9 +20,11 @@
 // (`newGame` resets the run outcome through `resetRunOutcome()`), so they need no setters.
 
 import {
+  BADGE_CATALOG,
   RELIC_TOTAL,
   RELIC_UNLOCK_TABLE,
   RETAIN,
+  SCORE_TABLE,
   SHIPPED_CARDS,
   UNLOCK_CATALOG,
   aggregate,
@@ -42,6 +44,7 @@ import {
 
 import { el } from './dom.js';
 import { ctl, runEvents } from './runtime.js';
+import { currentLang, t } from './i18n.js';
 
 /* -------------------------------------------------------------------- RUN HISTORY */
 //
@@ -163,7 +166,7 @@ export function ledgerMath(record) {
     return {
       key: row.key,
       label: row.label,
-      math: flag ? (row.count > 0 ? 'yes' : 'no') : `${row.count} × ${row.each}`,
+      math: flag ? t(row.count > 0 ? 'ledger.yes' : 'ledger.no') : `${row.count} × ${row.each}`,
       points: flag ? `+${row.points}` : String(row.points),
     };
   });
@@ -174,33 +177,73 @@ export function ledgerMath(record) {
   return { total: score.total, lines, counts, earned };
 }
 
+/**
+ * A code-owned catalog's field in the CURRENT language: the `_es` twin when the row
+ * carries one and the session is Spanish, the English field otherwise — the honest
+ * fallback, twin-shaped like the kernel's own fieldFor. The PERSISTED record keeps its
+ * English words; the twins are a paint-time choice (I18N-2).
+ * @param {any} row a SCORE_TABLE / UNLOCK_CATALOG / BADGE_CATALOG row
+ * @param {string} key the field name, e.g. 'label', 'name', 'condition', 'narration'
+ * @returns {string}
+ */
+function catalogField(row, key) {
+  if (!row) return '';
+  if (currentLang() === 'es') {
+    const es = row[`${key}_es`];
+    if (typeof es === 'string' && es.length > 0) return es;
+  }
+  return row[key] ?? '';
+}
+
 /** The factual recognition that replaces an advice-only line on a hollow run (AC-7.4). */
 export function recognitionText(math) {
   const c = math.counts ?? {};
   const floor = c.floors ?? 0;
   const kills = c.kills ?? 0;
-  return `This run ended on floor ${floor}. You climbed ${floor} ${floor === 1 ? 'floor' : 'floors'} `
-    + `and killed ${kills} ${kills === 1 ? 'enemy' : 'enemies'}. `
-    + 'Killing an elite (+10) or the boss (+50) is where the larger totals come from.';
+  return t('ledger.recognition', {
+    floor,
+    floorPlural: floor === 1 ? t('end.floors.one') : t('end.floors', { n: floor }),
+    kills: kills === 1 ? t('end.enemies.one') : t('end.enemies', { n: kills }),
+  });
+}
+
+/**
+ * One run mark (a persisted record badge, English words) re-worded in the CURRENT
+ * language through the kernel's BADGE_CATALOG twins (I18N-2): the record keeps its
+ * English name/condition, and an id the catalog no longer knows degrades to its own
+ * words — the same raw-token honesty as every other torn id.
+ * @param {{id: string, name: string, condition: string}} mark
+ */
+export function localizedMark(mark) {
+  const row = (BADGE_CATALOG ?? []).find((b) => b.id === mark?.id) ?? null;
+  return {
+    ...mark,
+    name: catalogField(row, 'name') || (mark?.name ?? ''),
+    condition: catalogField(row, 'condition') || (mark?.condition ?? ''),
+  };
 }
 
 /**
  * The score ledger. A REAL list, so every contributing line is individually reachable
  * (AC-7.1) rather than being one text block whose arithmetic must be re-derived by hand.
+ * The line LABELS come from the kernel's frozen SCORE_TABLE, localized by key at paint
+ * time (I18N-2 — the record itself keeps its English words); the math words
+ * ("yes"/"no") and the Total are this file's own and localize here.
  * @param {ReturnType<typeof ledgerMath>} math
  */
 export function ledgerBlock(math) {
-  const block = el('div', { cls: 'run-ledger', attrs: { role: 'list', 'aria-label': 'Score ledger' } });
+  const block = el('div', { cls: 'run-ledger', attrs: { role: 'list', 'aria-label': t('ledger.aria') } });
   for (const line of math.lines) {
+    const row = SCORE_TABLE.find((r) => r.key === line.key) ?? null;
     block.append(el('div', { cls: 'ledger-line', attrs: { role: 'listitem' } },
-      el('span', { cls: 'ledger-label', text: line.label }),
+      el('span', { cls: 'ledger-label', text: catalogField(row, 'label') || line.label }),
       el('span', { cls: 'ledger-math', text: line.math }),
       el('span', { cls: 'ledger-points', text: line.points }),
     ));
   }
   block.append(el('div', { cls: 'ledger-rule', attrs: { 'aria-hidden': 'true' } }));
   block.append(el('div', { cls: 'ledger-total' + (math.earned ? ' is-earned' : ''), attrs: { role: 'listitem' } },
-    el('span', { cls: 'ledger-total-label', text: 'Total' }),
+    el('span', { cls: 'ledger-total-label', text: t('ledger.total') }),
     el('span', { cls: 'ledger-total-value', text: String(math.total) }),
   ));
   return block;
@@ -210,31 +253,49 @@ export function ledgerBlock(math) {
  *  CROSSED is half of what has to be stated, not just "unlocked!"). */
 export function unlockThresholdLine(entry, info) {
   const at = entry?.at ?? null;
-  if (at && typeof at.score === 'number') return `Score ${info.scoreTotalAfter} crossed the ${at.score}-point mark.`;
-  if (at && typeof at.runs === 'number') return `Run ${info.runCountAfter} crossed the ${at.runs}-run mark.`;
-  return `Condition met: ${entry?.condition ?? 'a threshold'}.`;
+  if (at && typeof at.score === 'number') return t('unlock.threshold.score', { score: info.scoreTotalAfter, mark: at.score });
+  if (at && typeof at.runs === 'number') return t('unlock.threshold.runs', { runs: info.runCountAfter, mark: at.runs });
+  // I18N-2: the condition words are the catalog's own twins, localized at paint time.
+  return t('unlock.threshold.condition', { condition: catalogField(entry, 'condition') || (entry?.condition ?? 'a threshold') });
 }
 
 /** The relic milestone an unlock was met by, as a sentence — the AC-9.2 rule in its
- *  S10 register: the WINS mark crossed, never just "unlocked!". */
+ *  S10 register: the WINS mark crossed, never just "unlocked!". The sentence frames are
+ *  dictionary keys (relicThreshold.*), so a future sweep finds them like every other
+ *  string; only the marks list's own join word stays composed here. */
 export function relicThresholdLine(ids, winsAfter) {
   const rows = (RELIC_UNLOCK_TABLE ?? []).filter((row) => row.ids.some((id) => ids.includes(id)));
-  const marks = rows.map((row) => `${row.at} ${row.at === 1 ? 'win' : 'wins'}`);
-  return marks.length > 0
-    ? `${winsAfter} lifetime ${winsAfter === 1 ? 'win' : 'wins'} crossed the ${marks.join(' and ')} mark${marks.length === 1 ? '' : 's'}.`
-    : `${winsAfter} lifetime ${winsAfter === 1 ? 'win' : 'wins'} on the ledger.`;
+  const winWord = (n) => (n === 1 ? t('unlock.win.one') : t('unlock.win'));
+  const marks = rows.map((row) => `${row.at} ${winWord(row.at)}`);
+  if (marks.length > 0) {
+    return t('relicThreshold.crossed', {
+      n: winsAfter,
+      plural: winWord(winsAfter),
+      marks: marks.join(currentLang() === 'es' ? ' y ' : ' and '),
+      marksPlural: marks.length === 1 ? '' : 's',
+      marksClause: t(marks.length === 1 ? 'relicThreshold.marksClause' : 'relicThreshold.marksClausePlural'),
+      // The verb agrees with the SENTENCE SUBJECT (winsAfter wins), not the mark-row
+      // count — the I18N-2 re-review caught the wrong key: at the 3/7/10/15-win
+      // milestones marks.length is always 1, so the plural verb was unreachable.
+      verb: t(winsAfter === 1 ? 'relicThreshold.verb1' : 'relicThreshold.verb'),
+    });
+  }
+  return t('relicThreshold.plain', { n: winsAfter, plural: winWord(winsAfter) });
 }
 
-/** The post-run narration block: threshold crossed, option opened, pool size, limitation. */
+/** The post-run narration block: threshold crossed, option opened, pool size, limitation.
+ *  I18N-2: the unlock's name, condition and narration are the catalog's own twins,
+ *  localized by id at paint time — the verdict/record keeps its English words. */
 export function unlockBlock(info) {
   const block = el('div', { cls: 'unlock-block' });
   for (const unlocked of info.newly) {
     const entry = (UNLOCK_CATALOG ?? []).find((e) => e.id === unlocked.id) ?? null;
-    block.append(el('p', { cls: 'unlock-head', text: `UNLOCKED — ${unlocked.name}` }));
+    block.append(el('p', { cls: 'unlock-head', text: t('unlock.head', { name: catalogField(entry, 'name') || unlocked.name }) }));
     block.append(el('p', { cls: 'unlock-that', text: unlockThresholdLine(entry, info) }));
     // The kernel's own narration sentence: what the option now IS. Never "you are
     // stronger" — an unlock adds an OPTION, and the framing may not imply the game eased.
-    block.append(el('p', { cls: 'unlock-line', text: unlocked.narration }));
+    // The narration text is frozen kernel content, twinned in the catalog (I18N-2).
+    block.append(el('p', { cls: 'unlock-line', text: catalogField(entry, 'narration') || unlocked.narration }));
   }
   // S10 RELICS: the same narration, relic-shaped. A win that crossed a milestone names
   // what future climbs can now be offered (the run's own rewards are unchanged — an
@@ -243,22 +304,27 @@ export function unlockBlock(info) {
   // themselves — the raw-id degrade, never a blank.
   const relics = info.relics ?? null;
   if (relics && relics.newly.length > 0) {
-    const names = relics.newly.map((id) => relicDef(id)?.name ?? id);
-    block.append(el('p', { cls: 'unlock-head', text: 'UNLOCKED — relics for the climbs ahead' }));
-    block.append(el('p', { cls: 'unlock-line', text: `Your climbs unlocked: ${names.join(', ')}.` }));
+    // I18N-2: the relic names come from the relics table's own twins (I18N-1), read at
+    // paint time; an id the table no longer knows names itself.
+    const names = relics.newly.map((id) => {
+      const def = relicDef(id);
+      if (!def) return id;
+      return currentLang() === 'es' && typeof def.name_es === 'string' && def.name_es.length > 0 ? def.name_es : def.name;
+    });
+    block.append(el('p', { cls: 'unlock-head', text: t('unlock.relics.head') }));
+    block.append(el('p', { cls: 'unlock-line', text: t('unlock.relics.line', { names: names.join(', ') }) }));
     block.append(el('p', { cls: 'unlock-that', text: relicThresholdLine(relics.newly, relics.winsAfter) }));
   }
   const inPlay = info.cardsAfter;
   if (typeof inPlay === 'number') {
-    block.append(el('p', { cls: 'unlock-pool', text: `Cards in play: ${inPlay} of ${SHIPPED_CARDS}.` }));
+    block.append(el('p', { cls: 'unlock-pool', text: t('unlock.pool.cards', { n: inPlay, m: SHIPPED_CARDS }) }));
   }
   if (relics && typeof relics.countAfter === 'number') {
-    block.append(el('p', { cls: 'unlock-pool', text: `Relics in play: ${relics.countAfter} of ${RELIC_TOTAL}.` }));
+    block.append(el('p', { cls: 'unlock-pool', text: t('unlock.pool.relics', { n: relics.countAfter, m: RELIC_TOTAL }) }));
   }
   // The limitation, stated plainly ONCE, in the kernel's frozen-content terms: the pool is
   // re-ordered and gated, it is never enlarged.
-  block.append(el('p', { cls: 'unlock-limit', text: `The card pool is the same ${SHIPPED_CARDS} cards. `
-    + 'Unlocking changes which of them you are offered — it does not add cards.' }));
+  block.append(el('p', { cls: 'unlock-limit', text: t('unlock.limit', { n: SHIPPED_CARDS }) }));
   return block;
 }
 
@@ -343,23 +409,6 @@ export function cumulativeAt(record) {
 }
 
 /** The persistent unlock line for a stored entry, if that run crossed a threshold. */
-export function unlockPersistentLine(record) {
-  const ids = unlocksState.byRecord?.[record.id] ?? [];
-  const names = [];
-  let score = null;
-  let runs = null;
-  for (const id of ids) {
-    const entry = (UNLOCK_CATALOG ?? []).find((e) => e.id === id);
-    if (!entry) continue;
-    names.push(entry.name);
-    if (typeof entry.at?.score === 'number') score = entry.at.score;
-    if (typeof entry.at?.runs === 'number') runs = entry.at.runs;
-  }
-  if (names.length === 0) return null;
-  if (score !== null) return `Unlocked at score ${cumulativeAt(record)}: ${names.join('; ')}.`;
-  if (runs !== null) return `Unlocked after ${runs} ${runs === 1 ? 'run' : 'runs'}: ${names.join('; ')}.`;
-  return `Unlocked by this run: ${names.join('; ')}.`;
-}
 
 /**
  * Reset the run-outcome bookkeeping for a NEW run (`newGame` calls this): the ended

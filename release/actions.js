@@ -63,11 +63,16 @@ import { announce, toast } from './dom.js';
 import { enemyLook } from './glyphs.js';
 import { currentProfile, recordRun, resetRunOutcome } from './run-history.js';
 import { dispatchFx, playInputSpan } from './fx.js';
+import { currentLang, setLang, t } from './i18n.js';
 
-/** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it. */
+/** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it.
+ *  The NAMES are proper nouns in every language. The blurbs are NOT carried here: the
+ *  kindling picker builds the key `hero.<id>.blurb` from the id and resolves it through
+ *  i18n at paint time (I18N-1) — the wiring test pins that every id below has that key
+ *  in the dictionary, so a renamed id fails a test instead of rendering an empty node. */
 export const HEROES = [
-  { id: 'ironclad', name: 'Ashwright', blurb: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.' },
-  { id: 'bellows', name: 'Bellows Keeper', blurb: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.' },
+  { id: 'ironclad', name: 'Ashwright' },
+  { id: 'bellows', name: 'Bellows Keeper' },
 ];
 /** B5: the chosen biome (an id from the kernel BIOMES table); `?biome=` seeds it. */
 const biomeParam = new URLSearchParams(location.search).get('biome');
@@ -94,7 +99,10 @@ export function act(actionId, targetK = null) {
   // living position before the play, which may not exist at all after it (it can die).
   const aimedAt = targetK != null ? before.enemies[targetK - 1] ?? null : null;
   const res = ctl.dispatch(actionId);
-  const after = ctl.snapshot();
+  // I18N-1: every repaint's snapshot is taken in the persisted presentation language —
+  // the kernel re-derives its sentences in it. The language rides the OPTS only: run
+  // state, hashes and the log are untouched.
+  const after = ctl.snapshot({ lang: currentLang() });
   // The kernel's event stream for this step, kept for the run record. `submit()` inside the
   // controller accumulates the same events on the session; the renderer accumulates them
   // here because it builds the record at the end, and a record built from a dropped stream
@@ -103,16 +111,16 @@ export function act(actionId, targetK = null) {
 
   const fx = [];
   if (res.error) {
-    toast(`✗ ${res.error.error} — "${res.error.id}" is not legal right now`);
-    announce(`That action was rejected: ${res.error.error}.`);
+    toast(t('toast.illegal', { err: res.error.error, id: res.error.id }));
+    announce(t('toast.rejected.aria', { err: res.error.error }));
   } else {
     // Presentation-only feedback: compare the two kernel snapshots we already have.
     const playerLost = before.player.hp - after.player.hp;
     const enemyLost = sumEnemyHp(before) - sumEnemyHp(after);
     const gainedBlock = after.player.block - before.player.block;
-    if (playerLost > 0) toast(`You take ${playerLost} damage`, 'warn');
-    else if (enemyLost > 0) toast(aimedAt ? `Dealt ${enemyLost} damage to ${aimedAt.name}` : `Dealt ${enemyLost} damage`, 'info');
-    else if (gainedBlock > 0) toast(`+${gainedBlock} block`, 'info');
+    if (playerLost > 0) toast(t('toast.playerHit', { n: playerLost }), 'warn');
+    else if (enemyLost > 0) toast(aimedAt ? t('toast.dealtTo', { n: enemyLost, name: aimedAt.name }) : t('toast.dealt', { n: enemyLost }), 'info');
+    else if (gainedBlock > 0) toast(t('toast.block', { n: gainedBlock }), 'info');
 
     /* ------------------------------------------------------------ JUICE ----------
      * The SAME diff that produced the toast above is read again for the visual effects.
@@ -136,7 +144,7 @@ export function act(actionId, targetK = null) {
         let a = attacks.find((x) => x.enemy === ev.enemy);
         if (!a) {
           const foe = before.enemies.find((e) => e.index === ev.enemy);
-          a = { enemy: ev.enemy, name: foe ? foe.name : 'The enemy', dealt: 0, blocked: 0, hits: 0 };
+          a = { enemy: ev.enemy, name: foe ? foe.name : t('toast.enemyFallback'), dealt: 0, blocked: 0, hits: 0 };
           attacks.push(a);
         }
         a.dealt += ev.dealt ?? 0;
@@ -424,7 +432,7 @@ export function newGame(seed = null, opts = {}) {
   // card pool takes. `?pool=full` bypasses both narrowings for a tester.
   const profile = currentProfile();
   setCtl(createController({ run: { seed: seed ?? seedFromUrl(), content: contentForProfile(profile), character: heroChoice, biome: biomeChoice, kindling: true, tempers: true, quests: true, wins: profile.wins } }));
-  setSnap(ctl.snapshot());
+  setSnap(ctl.snapshot({ lang: currentLang() }));
   // The event stream is per-RUN, so it dies with the run. It is the only source of the kill
   // / elite / boss counts the score needs, which is why it is accumulated rather than
   // re-derived later from a snapshot that never carried them.
@@ -488,4 +496,18 @@ export function switchPath(id) {
   newGame(snap.seed, { quiet: true });
   const picked = document.querySelector('.biome-pick.on');
   if (picked && typeof picked.focus === 'function') picked.focus();
+}
+
+/**
+ * I18N-1: flip the presentation language, persist it, and re-narrate the CURRENT run in
+ * the new language — a fresh `ctl.snapshot({ lang })` (the kernel re-derives every
+ * sentence; nothing is cached per-language here) and a repaint. The run state, its hash
+ * and the action log are untouched: the same run, re-narrated. This lives beside
+ * newGame() because it is a run-lifecycle move over the same handles (the language
+ * itself, its persistence and its strings live in i18n.js, a dependency-free leaf).
+ */
+export function switchLang() {
+  setLang(currentLang() === 'es' ? 'en' : 'es');
+  if (ctl) setSnap(ctl.snapshot({ lang: currentLang() }));
+  repaint();
 }

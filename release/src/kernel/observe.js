@@ -21,7 +21,7 @@ import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
 import { POTION_SLOTS, potionDef } from './rules/potions.js';
-import { eventDef, offerEventChoices, temperOfferOpen } from './rules/events.js';
+import { eventDef, offerEventChoices, renderEventLines, temperOfferOpen } from './rules/events.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -31,11 +31,43 @@ import {
   describePlayability,
   describePower,
   describeStatus,
-  GLOSSARY_SECTIONS,
   glossary,
+  glossarySections,
   helpTopics,
+  typeLabel,
   CARD_TYPE_LABEL,
+  CARD_TYPE_LABEL_ES,
 } from './describe.js';
+
+/* ------------------------------------------------------------------ I18N-1 language
+ *
+ * `snapshot(state, { lang })` (and `cardPool({ lang })`) localize the PLAYER-FACING
+ * derived strings — card sentences, status/power text, intent sentences, glossary/help
+ * rows, and the code-owned relic/potion/temper/event words via their `_es` twins. The
+ * language is a SURFACE choice that rides the opts and lands nowhere else: it never
+ * enters run state, the save format, the action log, or the compact dump (`observe()`
+ * and `observeActions()` below are English-only by contract, pinned by the goldens).
+ * 'en' is the default, and exactly 'es' selects Spanish — anything else reads English.
+ */
+const langOf = (opts) => (opts && opts.lang === 'es' ? 'es' : 'en');
+
+/**
+ * A code-owned table's field in the requested language: the `_es` twin when the table
+ * carries one AND the lang asks for it, the English field otherwise — the honest
+ * fallback (a not-yet-swept string renders in English, never a key name, never empty).
+ * @param {any} def a code-owned definition (relic/potion/temper/event/card)
+ * @param {string} key the field name, e.g. 'name', 'text', 'story'
+ * @param {string} lang the resolved language
+ * @returns {string}
+ */
+function fieldFor(def, key, lang) {
+  if (!def) return '';
+  if (lang === 'es') {
+    const es = def[`${key}_es`];
+    if (typeof es === 'string' && es.length > 0) return es;
+  }
+  return def[key] ?? '';
+}
 
 /** Compact status label for the header, e.g. PWR2 VULN1. Exported so the plain-English
  * layer (describe.js) can derive its glossary from these tables instead of copying them. */
@@ -294,7 +326,8 @@ function beltBody(state) {
 // Pile renderings tolerate an unknown id the way rewardBody does: the raw id stands in
 // for the name instead of a throw (defOrNull above).
 const pileNames = (pile) => (pile.length === 0 ? '-' : pile.map((c) => defOrNull(c)?.name ?? cardIdOf(c)).join(', '));
-const pileCardNames = (pile) => (pile ?? []).map((c) => defOrNull(c)?.name ?? cardIdOf(c));
+// I18N-2: the snapshot's pile viewer takes the language; the compact dump's pileNames above does not.
+const pileCardNames = (pile, lang = 'en') => (pile ?? []).map((c) => fieldFor(defOrNull(c), 'name', lang) || cardIdOf(c));
 
 function rewardBody(state) {
   // S7: the BOSS reward — the warden's relic offers replace the cards (StS
@@ -417,7 +450,9 @@ function eventBody(state) {
     lines.push('RESOLVED');
     // Array.isArray, not `?? []`: a torn resolved beat (lines = 42, or a string) is
     // validateSave-accepted and used to throw straight out of observe() (S6.1 review P2).
-    const beat = Array.isArray(ev.resolved?.lines) ? ev.resolved.lines : [];
+    // I18N-2: the stored beat is structured slugs now; the dump renders their ENGLISH
+    // column (byte-identical to the pre-I18N-2 baked sentences) — the agent contract.
+    const beat = renderEventLines(ev.resolved?.lines, 'en', CARD_DEFS ?? defaultContent().cards);
     beat.forEach((l) => lines.push(` ${l}`));
     lines.push(` v0 continue (HP ${state.player.hp}/${state.player.maxHp}, purse ${state.player.gold ?? 0})`);
     return lines;
@@ -557,7 +592,7 @@ export function observeActions(state) {
 }
 
 /** Status labels for the structured snapshot (same abbreviations as the text dump). */
-function statusPairs(statuses) {
+function statusPairs(statuses, lang = 'en') {
   return Object.entries(statuses ?? {})
     .filter(([, v]) => (v ?? 0) > 0)
     .map(([key, stacks]) => ({
@@ -567,16 +602,21 @@ function statusPairs(statuses) {
       label: `${STATUS_ABBREV[key] ?? key.toUpperCase()}${stacks}`,
       // The same fact in words, for a reader meeting it for the first time. Derived
       // here, in the kernel, so no surface can invent its own wording.
-      text: `${describeStatus(key, stacks).replace(/\.$/, '')}`,
-      explain: describeStatus(key, stacks),
+      text: `${describeStatus(key, stacks, 'player', lang).replace(/\.$/, '')}`,
+      explain: describeStatus(key, stacks, 'player', lang),
     }));
 }
 
 /** The hero's relic name and switched-off text, for relic-off boon text. */
-function heroRelic(state) {
+function heroRelic(state, lang = 'en') {
+  const es = lang === 'es';
+  const ch = defaultContent().characters.get(state.character);
+  const def = RELICS[relicId(state)];
   return {
-    name: defaultContent().characters.get(state.character)?.relicName ?? 'relic',
-    offText: RELICS[relicId(state)]?.offText ?? 'stops working',
+    name: (es ? ch?.relicName_es : null) || ch?.relicName || 'relic',
+    name_es: ch?.relicName_es,
+    offText: (es ? def?.offText_es : null) || def?.offText || 'stops working',
+    offText_es: def?.offText_es,
   };
 }
 
@@ -585,19 +625,22 @@ function heroRelic(state) {
  * HUD chip shows them everywhere). Row facts mirror the belt's: `known: false` marks an
  * id the relic table no longer knows (a torn save) — it still renders, the raw id is
  * its own name, and it contributes no hooks (relicSum skips it). `text` is the kernel
- * table's own sentence, verbatim; `tier` feeds the codex-style hue a surface may paint.
+ * table's own sentence (in the snapshot's language, via the relic table's `_es` twins);
+ * `tier` feeds the codex-style hue a surface may paint. `summary` stays the compact CLI
+ * form — English-only, like the dump it came from.
  * @param {any} state
+ * @param {string} [lang]
  */
-function relicRows(state) {
+function relicRows(state, lang = 'en') {
   return relicList(state).map((id, i) => {
     const def = relicDef(id);
     return {
       slot: i + 1,
       relicId: id,
       known: Boolean(def),
-      name: def ? def.name : id,
+      name: def ? fieldFor(def, 'name', lang) : id,
       summary: def ? def.summary : '',
-      text: def ? def.text : '',
+      text: def ? fieldFor(def, 'text', lang) : '',
       tier: def ? def.tier : 'unknown',
       // relics[0] is the starter the kindling Iron Skin boon can switch off.
       starting: i === 0,
@@ -632,7 +675,7 @@ function playTargets(legal) {
 }
 
 /** The hand section of a snapshot: one tile's worth of facts per card. */
-function snapshotHand(state, legal) {
+function snapshotHand(state, legal, lang = 'en') {
   const { playableSlots, targetsBySlot } = playTargets(legal);
   return (state.combat?.hand ?? []).map((card, i) => {
     const { def, temper } = temperedView(state, card, defOf(card));
@@ -643,21 +686,24 @@ function snapshotHand(state, legal) {
     return {
       slot,
       cardId: card.cardId,
-      name: def.name,
-      flavor: typeof def.flavor === 'string' ? def.flavor : '',
+      // A `name_es` twin in cards.json renders when the lang asks for it (I18N-2's
+      // content sweep fills the field in; until then every card falls back honestly).
+      name: fieldFor(def, 'name', lang),
+      flavor: fieldFor(def, 'flavor', lang),
       cost: card.cost,
       type: def.type,
       rarity: def.rarity,
       // B2: the instance's temper (null when untempered or the run has none).
       temper,
-      temperName: temper ? TEMPERS[temper].name : '',
-      temperText: temper ? TEMPERS[temper].text : '',
+      temperName: temper ? fieldFor(TEMPERS[temper], 'name', lang) : '',
+      temperText: temper ? fieldFor(TEMPERS[temper], 'text', lang) : '',
       // Same card, second rendering. `summary` stays the CLI's compact form (frozen by
       // tests/budget.test.js); `description` is the sentence a human reads instead.
-      typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
+      typeLabel: typeLabel(def.type, lang),
       // Both read the TEMPERED definition, so a Red-hot Hammerfall says "Deal 9 damage."
       summary: effectSummary(def),
-      description: describeCard(def, card) + (hpCost > 0 ? ` Lose ${hpCost} HP when played.` : ''),
+      description: describeCard(def, card, lang)
+        + (hpCost > 0 ? (lang === 'es' ? ` Pierdes ${hpCost} HP al jugarla.` : ` Lose ${hpCost} HP when played.`) : ''),
       playable,
       // The engine's own answer to "may this card be aimed?" — so a renderer never has to
       // infer it from the card type (Defend is type 'skill', Bash is 'attack', but the
@@ -666,13 +712,13 @@ function snapshotHand(state, legal) {
       // Non-empty only when the player actually has a choice to make: more than one living
       // enemy AND a card that must be aimed. Empty means "one click plays it".
       targets: targets.length > 1 ? targets : [],
-      hint: describePlayability({ cost: card.cost, playable }, state.player.energy),
+      hint: describePlayability({ cost: card.cost, playable }, state.player.energy, lang),
     };
   });
 }
 
 /** The enemies section of a snapshot: intent included, dead enemies omitted. */
-function snapshotEnemies(state) {
+function snapshotEnemies(state, lang = 'en') {
   return (state.combat?.enemies ?? [])
     .filter((e) => !e.dead)
     .map((e) => {
@@ -681,19 +727,22 @@ function snapshotEnemies(state) {
       return {
         index: e.index,
         id: e.id,
-        name: def.name,
+        // I18N-2: the display twin renders in the snapshot's language; the state's own
+        // `name` (stateName) stays English — the hash never moves for a language choice.
+        name: fieldFor(def, 'name', lang),
         hp: e.hp,
         maxHp: e.maxHp,
         block: e.block,
-        statuses: statusPairs(e.statuses),
+        statuses: statusPairs(e.statuses, lang),
         intent: {
           label: intentLabel(e),
           kind: move.kind,
           damage: intentDamage(e),
           hits: move.hits ?? 1,
           // The sentence for the SAME intent, from the same rules, so the compact number
-          // and the readable line can never disagree.
-          text: describeIntent(e),
+          // and the readable line can never disagree. The enemy NAME stays English until
+          // I18N-2 sweeps the encounter tables.
+          text: describeIntent(e, lang),
         },
       };
     });
@@ -730,7 +779,7 @@ function snapshotMap(state, legal) {
 }
 
 /** The reward section of a snapshot, or null when no reward is open. */
-function snapshotReward(state, legal) {
+function snapshotReward(state, legal, lang = 'en') {
   if (!state.reward) return null;
   const pick = new Map(legal.filter((a) => a.kind === 'pick').map((a) => [a.cardId, a.id]));
   // S7: the boss's relic offers. The r-ids resolve here from the SAME legal list the
@@ -756,9 +805,9 @@ function snapshotReward(state, legal) {
         actionId: relicPicks.get(i) ?? null,
         relicId: id,
         known: Boolean(def),
-        name: def ? def.name : id,
+        name: def ? fieldFor(def, 'name', lang) : id,
         summary: def ? def.summary : '',
-        text: def ? def.text : '',
+        text: def ? fieldFor(def, 'text', lang) : '',
         tier: def ? def.tier : 'unknown',
         affordable: relicPicks.has(i),
       };
@@ -768,7 +817,7 @@ function snapshotReward(state, legal) {
     relicGained: typeof state.reward.relic === 'string'
       ? (() => {
         const def = relicDef(state.reward.relic);
-        return { relicId: state.reward.relic, known: Boolean(def), name: def ? def.name : state.reward.relic, summary: def ? def.summary : '', text: def ? def.text : '' };
+        return { relicId: state.reward.relic, known: Boolean(def), name: def ? fieldFor(def, 'name', lang) : state.reward.relic, summary: def ? def.summary : '', text: def ? fieldFor(def, 'text', lang) : '' };
       })()
       : null,
     cards: state.reward.cards.map((id) => {
@@ -778,13 +827,13 @@ function snapshotReward(state, legal) {
       const def = defOrNull(id);
       return {
         cardId: id,
-        name: def?.name ?? id,
-        flavor: typeof def?.flavor === 'string' ? def.flavor : '',
+        name: def ? fieldFor(def, 'name', lang) : id,
+        flavor: fieldFor(def, 'flavor', lang),
         cost: def?.cost ?? 0,
         type: def?.type ?? 'unknown',
-        typeLabel: def ? (CARD_TYPE_LABEL[def.type] ?? def.type) : 'unknown',
+        typeLabel: def ? typeLabel(def.type, lang) : 'unknown',
         summary: def ? effectSummary(def) : '',
-        description: def ? describeCard(def) : '',
+        description: def ? describeCard(def, {}, lang) : '',
         actionId: pick.get(id) ?? null,
       };
     }),
@@ -792,7 +841,7 @@ function snapshotReward(state, legal) {
 }
 
 /** The rest-site section of a snapshot, or null when the player is not resting. */
-function snapshotRest(state, legal) {
+function snapshotRest(state, legal, lang = 'en') {
   if (state.phase !== 'rest') return null;
   return {
     healId: legal.find((a) => a.kind === 'rest_heal')?.id ?? null,
@@ -800,18 +849,23 @@ function snapshotRest(state, legal) {
     heal: REST_HEAL,
     tempers: (state.temperOffers ?? []).map((o, i) => ({
       // Tolerant like rewardBody (defOrNull): an unknown offer id shows its raw id.
-      actionId: `t${i + 1}`, cardId: o.cardId, cardName: defOrNull(o.cardId)?.name ?? o.cardId,
-      temper: o.temper, temperName: TEMPERS[o.temper]?.name ?? o.temper, text: TEMPERS[o.temper]?.text ?? '',
+      actionId: `t${i + 1}`, cardId: o.cardId, cardName: fieldFor(defOrNull(o.cardId), 'name', lang) || o.cardId,
+      temper: o.temper, temperName: fieldFor(TEMPERS[o.temper], 'name', lang) || o.temper, text: fieldFor(TEMPERS[o.temper], 'text', lang),
     })),
   };
 }
 
 /** The kindling section of a snapshot, or null when no boon is being chosen. */
-function snapshotKindling(state) {
+function snapshotKindling(state, lang = 'en') {
   if (state.phase !== 'kindling') return null;
   return {
     boons: state.kindling.offers.map((id, i) => ({
-      id, name: BOONS[id].name, text: boonText(id, heroRelic(state)), label: BOONS[id].label, actionId: `k${i + 1}`,
+      id,
+      // I18N-2: the boon's display twin; `label` stays the compact agent-facing token.
+      name: fieldFor(BOONS[id], 'name', lang),
+      text: boonText(id, heroRelic(state, lang), lang),
+      label: BOONS[id].label,
+      actionId: `k${i + 1}`,
     })),
   };
 }
@@ -828,12 +882,13 @@ function snapshotKindling(state) {
  *   - `quaffIds` holds ONE id (q<n>) or one per living enemy (q<n>_1, q<n>_2) when the
  *     potion must be aimed, in living-enemy order — the same list shape the hand's
  *     `targets` field uses, so a renderer can drive the choice without re-deriving it.
- *   - `summary`/`text` are the kernel table's own words, verbatim: no surface
- *     re-derives what a potion does.
+ *   - `summary`/`text` are the kernel table's own words (the text in the snapshot's
+ *     language, via the `_es` twins), verbatim: no surface re-derives what a potion does.
  * @param {any} state
  * @param {any[]} legal
+ * @param {string} [lang]
  */
-function snapshotBelt(state, legal) {
+function snapshotBelt(state, legal, lang = 'en') {
   const quaffs = new Map();
   const discards = new Map();
   for (const a of legal) {
@@ -851,9 +906,9 @@ function snapshotBelt(state, legal) {
       slot: i + 1,
       potionId,
       known: Boolean(def),
-      name: def ? def.name : potionId,
+      name: def ? fieldFor(def, 'name', lang) : potionId,
       summary: def ? def.summary : '',
-      text: def ? def.text : '',
+      text: def ? fieldFor(def, 'text', lang) : '',
       target: def ? def.target : 'none',
       quaffIds: quaffs.get(i) ?? [],
       discardId: discards.get(i) ?? null,
@@ -877,8 +932,9 @@ function snapshotBelt(state, legal) {
  * pick's `index` is the deck position the kernel's `x<n>` action removes.
  * @param {any} state
  * @param {any[]} legal
+ * @param {string} [lang]
  */
-function snapshotShop(state, legal) {
+function snapshotShop(state, legal, lang = 'en') {
   if (state.phase !== 'shop') return null;
   const shop = state.shop ?? { offers: [], removal: {}, removing: false };
   const buys = new Map(legal.filter((a) => a.kind === 'shop_buy').map((a) => [a.index, a.id]));
@@ -905,10 +961,10 @@ function snapshotShop(state, legal) {
       actionId: picks[i]?.id ?? null,
       cardId: inst.cardId,
       uid: inst.uid,
-      name: def?.name ?? inst.cardId,
+      name: fieldFor(def, 'name', lang) || inst.cardId,
       cost: def?.cost ?? 0,
       temper,
-      temperName: temper ? TEMPERS[temper]?.name ?? temper : '',
+      temperName: temper ? fieldFor(TEMPERS[temper], 'name', lang) || temper : '',
       copy,
       copies: census.get(key) ?? 1,
     };
@@ -925,14 +981,14 @@ function snapshotShop(state, legal) {
         index: i,
         actionId,
         cardId: o.cardId,
-        name: def?.name ?? o.cardId,
-        flavor: typeof def?.flavor === 'string' ? def.flavor : '',
+        name: def ? fieldFor(def, 'name', lang) : o.cardId,
+        flavor: fieldFor(def, 'flavor', lang),
         cost: def?.cost ?? 0,
         type: def?.type ?? 'unknown',
-        typeLabel: def ? (CARD_TYPE_LABEL[def.type] ?? def.type) : 'unknown',
+        typeLabel: def ? typeLabel(def.type, lang) : 'unknown',
         rarity: def?.rarity ?? 'unknown',
         summary: def ? effectSummary(def) : '',
-        description: def ? describeCard(def) : '',
+        description: def ? describeCard(def, {}, lang) : '',
         price: o.price,
         sold: Boolean(o.sold),
         affordable: actionId !== null,
@@ -966,19 +1022,20 @@ function snapshotShop(state, legal) {
  * is false, the story is empty, no choices, and `continueId` is still the way out.
  * @param {any} state
  * @param {any[]} legal
+ * @param {string} [lang]
  */
-function snapshotEvent(state, legal) {
+function snapshotEvent(state, legal, lang = 'en') {
   if (state.phase !== 'event') return null;
   const ev = state.event ?? null;
   const def = eventDef(ev?.id);
   const choices = new Map(legal.filter((a) => a.kind === 'event_choice').map((a) => [a.index, a.id]));
   const temperPicks = new Map(legal.filter((a) => a.kind === 'event_temper').map((a) => [a.index, a.id]));
-  const evald = def ? offerEventChoices(state, CARD_DEFS ?? defaultContent().cards) : [];
+  const evald = def ? offerEventChoices(state, CARD_DEFS ?? defaultContent().cards, lang) : [];
   return {
     eventId: def ? def.id : (ev?.id ?? null),
     known: Boolean(def),
-    name: def ? def.name : (ev?.id ?? 'the wayside'),
-    story: def ? def.story : '',
+    name: def ? fieldFor(def, 'name', lang) : (ev?.id ?? (lang === 'es' ? 'el camino' : 'the wayside')),
+    story: def ? fieldFor(def, 'story', lang) : '',
     purse: state.player.gold ?? 0,
     hp: state.player.hp,
     maxHp: state.player.maxHp,
@@ -994,10 +1051,10 @@ function snapshotEvent(state, legal) {
       .map((o, i) => (temperOfferOpen(o, state) ? {
         actionId: temperPicks.get(i) ?? null,
         cardId: o.cardId,
-        cardName: defOrNull(o.cardId)?.name ?? o.cardId,
+        cardName: fieldFor(defOrNull(o.cardId), 'name', lang) || o.cardId,
         temper: o.temper,
-        temperName: TEMPERS[o.temper]?.name ?? o.temper,
-        text: TEMPERS[o.temper]?.text ?? '',
+        temperName: fieldFor(TEMPERS[o.temper], 'name', lang) || o.temper,
+        text: fieldFor(TEMPERS[o.temper], 'text', lang),
       } : null))
       .filter(Boolean),
     choices: evald.map((c) => ({
@@ -1014,8 +1071,14 @@ function snapshotEvent(state, legal) {
     // Array.isArray, not a spread default: a torn beat (lines = 42, or a string) is
     // validateSave-accepted and `[...(lines ?? [])]` threw straight out of snapshot()
     // (S6.1 review P2) — the same guard the dump applies to the same field.
+    // I18N-2: the beat renders in the snapshot's language from its structured slugs
+    // (rules/events.js renderEventLines); a legacy save's baked English sentence
+    // strings pass through verbatim — the honest degrade, documented in PLAYING.md.
     resolved: ev?.resolved
-      ? { choice: ev.resolved.choice, lines: Array.isArray(ev.resolved?.lines) ? ev.resolved.lines : [] }
+      ? {
+          choice: ev.resolved.choice,
+          lines: renderEventLines(ev.resolved?.lines, lang, CARD_DEFS ?? defaultContent().cards),
+        }
       : null,
     continueId: legal.find((a) => a.kind === 'event_continue')?.id ?? null,
   };
@@ -1037,10 +1100,16 @@ const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
  * Read-only by construction: it reads `state.deck` and `state.tempers` and allocates
  * fresh rows, so the frozen state is never touched.
  * @param {any} state
+ * @param {string} [lang]
  * @returns {Array<{cardId: string, name: string, cost: number, type: string, typeLabel: string, tempered: boolean, temper: string | null, temperName: string, temperText: string, count: number}>}
  */
-function snapshotDeck(state) {
+function snapshotDeck(state, lang = 'en') {
   const rows = new Map();
+  // The English face name per row key: the sheet's SORT key stays language-independent
+  // (cost, then English name, then id, then temper) while the row's `name` renders in
+  // the snapshot's language — an es sheet and an en one read the same rows in the same
+  // order, worded differently.
+  const enNames = new Map();
   for (const inst of state.deck ?? []) {
     // Tolerant on purpose (rewardBody's policy — the text dump's tolerant lookup, shared
     // as defOrNull above): a deck id the content no longer knows — a stale save after a
@@ -1052,6 +1121,7 @@ function snapshotDeck(state) {
     // is skipped. Its neutral cost (0) is a sort key, not a claim.
     const def = defOrNull(inst.cardId);
     if (!def) {
+      enNames.set(`${inst.cardId}|`, inst.cardId);
       const key = `${inst.cardId}|`;
       const row = rows.get(key);
       if (row) { row.count += 1; continue; }
@@ -1071,23 +1141,30 @@ function snapshotDeck(state) {
     }
     const { temper } = temperedView(state, inst, def);
     const key = `${inst.cardId}|${temper ?? ''}`;
+    enNames.set(key, def.name);
     const row = rows.get(key);
     if (row) { row.count += 1; continue; }
     rows.set(key, {
       cardId: inst.cardId,
-      name: def.name,
+      name: fieldFor(def, 'name', lang),
       cost: def.cost,
       type: def.type,
-      typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
+      typeLabel: typeLabel(def.type, lang),
       tempered: temper !== null,
       temper,
-      temperName: temper ? TEMPERS[temper].name : '',
-      temperText: temper ? TEMPERS[temper].text : '',
+      temperName: temper ? fieldFor(TEMPERS[temper], 'name', lang) : '',
+      temperText: temper ? fieldFor(TEMPERS[temper], 'text', lang) : '',
       count: 1,
     });
   }
-  return [...rows.values()].sort((a, b) =>
-    (a.cost - b.cost) || byStr(a.name, b.name) || byStr(a.cardId, b.cardId) || byStr(a.temper ?? '', b.temper ?? ''));
+  return [...rows.values()]
+    .map((row) => ({ row, sortName: enNames.get(`${row.cardId}|${row.temper ?? ''}`) ?? row.name }))
+    .sort((a, b) =>
+      (a.row.cost - b.row.cost)
+      || byStr(a.sortName, b.sortName)
+      || byStr(a.row.cardId, b.row.cardId)
+      || byStr(a.row.temper ?? '', b.row.temper ?? ''))
+    .map(({ row }) => row);
 }
 
 /** Rarity tiers in codex order; anything unknown sorts last, so a new tier cannot crash the sheet. */
@@ -1112,27 +1189,31 @@ const RARITY_TIER = { common: 0, uncommon: 1, rare: 2 };
  * Read-only: it reads the shipped content and allocates fresh rows, never the run state.
  * @returns {Array<{cardId: string, rarity: string, name: string, cost: number, type: string, typeLabel: string, summary: string, description: string}>}
  */
-export function cardPool() {
+export function cardPool(opts = {}) {
+  const lang = langOf(opts);
   const content = defaultContent();
+  // Sort on the DEFINITIONS (whose `name` is the English face name) BEFORE the rows
+  // are worded: the row order is language-independent, so an es surface and an en one
+  // show the same list order while each renders its own names.
   return draftPoolFrom(content)
     .map((id) => content.cards.get(id))
-    .map((def) => ({
-      cardId: def.id,
-      rarity: def.rarity,
-      name: def.name,
-      cost: def.cost,
-      type: def.type,
-      typeLabel: CARD_TYPE_LABEL[def.type] ?? def.type,
-      // Both renderings, as on the hand tiles: `summary` is the CLI's compact form,
-      // `description` the sentence a human reads.
-      summary: effectSummary(def),
-      description: describeCard(def),
-    }))
     .sort((a, b) =>
       ((RARITY_TIER[a.rarity] ?? 9) - (RARITY_TIER[b.rarity] ?? 9))
       || (a.cost - b.cost)
       || byStr(a.name, b.name)
-      || byStr(a.cardId, b.cardId));
+      || byStr(a.id, b.id))
+    .map((def) => ({
+      cardId: def.id,
+      rarity: def.rarity,
+      name: fieldFor(def, 'name', lang),
+      cost: def.cost,
+      type: def.type,
+      typeLabel: typeLabel(def.type, lang),
+      // Both renderings, as on the hand tiles: `summary` is the CLI's compact form,
+      // `description` the sentence a human reads.
+      summary: effectSummary(def),
+      description: describeCard(def, {}, lang),
+    }));
 }
 
 /**
@@ -1150,10 +1231,14 @@ export function cardPool() {
  * one builder plus one line in the return — the shape of the whole snapshot stays
  * readable at a glance.
  * @param {any} state
- * @param {{verbose?: boolean}} [opts]
+ * @param {{verbose?: boolean, lang?: string}} [opts] `lang` — I18N-1: the PRESENTATION
+ *   language for the player-facing derived strings ('en' default, 'es' Spanish). It is
+ *   a surface choice carried in the opts and nowhere else: no state field, no hash
+ *   input, no log change, and the compact `text` dump stays English in either language.
  * @returns {object} JSON-safe value model
  */
-export function snapshot(state) {
+export function snapshot(state, opts = {}) {
+  const lang = langOf(opts);
   const legal = legalActions(state);
 
   return {
@@ -1172,13 +1257,16 @@ export function snapshot(state) {
     // after the transition — derived kernel-side (rules/encounters.js currentBiome),
     // because state.biome stays the STARTING biome (the log header's meaning).
     biome: currentBiome(state),
-    biomeName: BIOMES[currentBiome(state)].name,
+    // I18N-2: the biome's display twin renders with the snapshot's language.
+    biomeName: fieldFor(BIOMES[currentBiome(state)], 'name', lang),
     // S9: the START paths — every biome but the act-2 one (rules/encounters.js
     // startBiomeIds). The kindling picker renders these; the full table (including the
     // Deeps) stays in the public BIOMES export.
-    biomes: startBiomeIds().map((id) => ({ id, name: BIOMES[id].name })),
-    characterName: defaultContent().characters.get(state.character)?.name ?? state.character,
-    relicName: defaultContent().characters.get(state.character)?.relicName ?? '',
+    biomes: startBiomeIds().map((id) => ({ id, name: fieldFor(BIOMES[id], 'name', lang) })),
+    // I18N-2: the hero's display name. Ashwright is a proper noun and carries no twin
+    // (it renders identically in either language); the Bellows Keeper's title localizes.
+    characterName: fieldFor(defaultContent().characters.get(state.character), 'name', lang) || state.character,
+    relicName: fieldFor(defaultContent().characters.get(state.character), 'relicName', lang),
     difficulty: state.difficulty,
     seed: state.seed,
     player: {
@@ -1189,31 +1277,33 @@ export function snapshot(state) {
       // S3 gold economy: the run's purse. `?? 0` keeps a pre-gold legacy save reading
       // as an empty purse instead of undefined leaking into a renderer.
       gold: state.player.gold ?? 0,
-      statuses: statusPairs(state.player.statuses),
+      statuses: statusPairs(state.player.statuses, lang),
       powers: Object.entries(state.powers ?? {})
         .filter(([, v]) => v > 0)
         .map(([key, stacks]) => ({
           key,
           stacks,
           label: `${STATUS_ABBREV[key] ?? key.toUpperCase()}`,
-          text: `${describePower(key, stacks).replace(/\.$/, '')}`,
-          explain: describePower(key, stacks),
+          text: `${describePower(key, stacks, lang).replace(/\.$/, '')}`,
+          explain: describePower(key, stacks, lang),
         })),
     },
-    hand: snapshotHand(state, legal),
+    hand: snapshotHand(state, legal, lang),
     piles: {
       draw: state.combat?.draw?.length ?? 0,
       discard: state.combat?.discard?.length ?? 0,
       exhaust: state.combat?.exhaust?.length ?? 0,
       // Names only, for the pile viewer. Counts above stay the compact facts.
-      drawCards: pileCardNames(state.combat?.draw),
-      discardCards: pileCardNames(state.combat?.discard),
-      exhaustCards: pileCardNames(state.combat?.exhaust),
+      // I18N-2: the viewer's names render in the snapshot's language; the compact
+      // dump's pile line (pileNames) stays English — the agent-facing contract.
+      drawCards: pileCardNames(state.combat?.draw, lang),
+      discardCards: pileCardNames(state.combat?.discard, lang),
+      exhaustCards: pileCardNames(state.combat?.exhaust, lang),
     },
     // S1 master-deck viewer: the whole run deck, aggregated and sorted (snapshotDeck
     // above). `deckCount` is the fact the HUD badge shows; the rows carry the rest.
     deckCount: (state.deck ?? []).length,
-    deckCards: snapshotDeck(state),
+    deckCards: snapshotDeck(state, lang),
     // S2 card codex: the ids THIS run's rewards actually roll from (rules/act.js
     // rollReward picks from state.draftPool, which newRun narrowed to the profile's
     // content). Bare ids only — the describe-layer rows live behind the cardPool()
@@ -1228,36 +1318,45 @@ export function snapshot(state) {
     // begun without profile info: such a run draws from the FULL table, and a surface
     // must show the full table rather than lie about an empty pool.
     relicPool: Array.isArray(state.relicPool) ? [...state.relicPool] : null,
-    enemies: snapshotEnemies(state),
+    enemies: snapshotEnemies(state, lang),
     // S5 potion belt: every phase (run state), with the combat-only q/d ids resolved
     // here so a renderer greys nothing it would have to guess at.
-    belt: snapshotBelt(state, legal),
+    belt: snapshotBelt(state, legal, lang),
     beltSlots: POTION_SLOTS,
     // S7 relics: every phase (run state) — the held rows with names, tiers and the
     // kernel's own effect sentences; the HUD chip and any relic readout paints these.
-    relics: relicRows(state),
+    relics: relicRows(state, lang),
     map: snapshotMap(state, legal),
-    reward: snapshotReward(state, legal),
-    rest: snapshotRest(state, legal),
-    kindling: snapshotKindling(state),
-    shop: snapshotShop(state, legal),
+    reward: snapshotReward(state, legal, lang),
+    rest: snapshotRest(state, legal, lang),
+    kindling: snapshotKindling(state, lang),
+    shop: snapshotShop(state, legal, lang),
     // S6 event: null outside the phase; the wayside story, its choice table, and the
     // resolved beat inside it.
-    event: snapshotEvent(state, legal),
+    event: snapshotEvent(state, legal, lang),
     quests: state.quests
-      ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))
+      ? state.quests.map((q) => ({
+          id: q.id,
+          name: fieldFor(QUESTS[q.id], 'name', lang),
+          text: fieldFor(QUESTS[q.id], 'text', lang),
+          goal: QUESTS[q.id].goal,
+          progress: q.progress,
+          done: q.done,
+          rewardText: fieldFor(QUESTS[q.id], 'rewardText', lang),
+        }))
       : null,
     // S7: the summary gains the relic count — what the run carried to its end. S9:
     // beside them, the act the run ended in (the climb's last chapter, for the end
     // screen's flavor; a legacy save reads as act 1).
     ended: state.phase === 'ended' ? { outcome: state.outcome, floor: state.floor + 1, steps: state.stepIndex, relics: relicList(state).length, act: state.act ?? 1 } : null,
-    // The plain-English layer, computed from this same state. A human surface paints
-    // `description` / `text` / `glossary`; the compact fields above stay untouched for
-    // the CLI. One state, two renderings, one place that knows the rules.
-    cardTypes: CARD_TYPE_LABEL,
-    glossary: glossary(),
-    glossarySections: GLOSSARY_SECTIONS,
-    help: helpTopics(),
+    // The plain-language layer, computed from this same state — in the requested
+    // language (I18N-1). A human surface paints `description` / `text` / `glossary`;
+    // the compact fields above stay untouched for the CLI. One state, two renderings,
+    // one place that knows the rules.
+    cardTypes: lang === 'es' ? CARD_TYPE_LABEL_ES : CARD_TYPE_LABEL,
+    glossary: glossary(lang),
+    glossarySections: glossarySections(lang),
+    help: helpTopics(lang),
     // Legal actions, verbatim from the kernel, so a view can label its buttons without
     // inventing an id. Includes the R5 line text for parity with the CLI surface.
     actions: legal.map((a) => ({ id: a.id, kind: a.kind, cardId: a.cardId ?? null, nodeType: a.nodeType ?? null, nodeId: a.nodeId ?? null, potionId: a.potionId ?? null })),

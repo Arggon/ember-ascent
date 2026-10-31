@@ -15,48 +15,53 @@ import { consumeClick } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
 import { glyphBox } from './glyphs.js';
+import { t } from './i18n.js';
 
 export function shopView() {
   const shop = snap.shop;
   const wrap = el('div', { cls: 'shop' });
   wrap.append(sceneIllus('event'));
-  wrap.append(el('p', { cls: 'section-title', text: 'The Ember Vendor' }));
+  wrap.append(el('p', { cls: 'section-title', text: t('shop.title') }));
 
   // The purse is the kernel's own value (the same one the HUD chip shows) — one computed
   // number, never re-derived here, so the screen and the HUD cannot disagree about how
   // rich the player is while every price asks for a slice of it.
   const head = el('div', { cls: 'shop-head' },
-    el('div', { cls: 'big-title shop-title', text: shop.removing ? 'Choose what leaves' : 'Wares for the ascent' }),
-    el('span', { cls: 'shop-purse', attrs: { title: `Your purse: ${shop.purse} gold` } },
+    el('div', { cls: 'big-title shop-title', text: shop.removing ? t('shop.pickRemoval') : t('shop.wares') }),
+    el('span', { cls: 'shop-purse', attrs: { title: t('shop.purse.title', { n: shop.purse }) } },
       glyphBox('coin', 'coin-glyph'),
-      el('span', { text: `${shop.purse} gold` }),
+      el('span', { text: t('shop.gold', { n: shop.purse }) }),
     ),
   );
   wrap.append(head);
 
   if (shop.removing) {
-    wrap.append(el('p', { cls: 'shop-note', text: 'The service is paid. Pick the copy that leaves your deck — duplicates are separate choices, and the removal is final.' }));
+    wrap.append(el('p', { cls: 'shop-note', text: t('shop.removalNote') }));
     const list = el('div', { cls: 'boon-list remove-list' });
     for (const d of shop.deckInstances) {
-      const copyTag = d.copies > 1 ? ` · copy ${d.copy}/${d.copies}` : '';
+      const copyTag = d.copies > 1 ? t('shop.copy', { a: d.copy, b: d.copies }) : '';
       list.append(el('button', {
         cls: `boon remove-offer${d.temper ? ` temper-${d.temper}` : ''}`,
         attrs: {
           type: 'button',
           'data-action': d.actionId,
-          'aria-label': `Remove ${d.name}${copyTag}${d.temperName ? `, ${d.temperName}` : ''}. It leaves your deck for good.`,
+          'aria-label': t('shop.remove.aria', {
+            name: d.name,
+            copy: copyTag,
+            temper: d.temperName ? `, ${d.temperName}` : '',
+          }),
         },
         on: { click: () => act(d.actionId) },
       },
       el('span', { cls: 'boon-name', text: `${d.name}${copyTag}` }),
-      keywordText(el('span', { cls: 'boon-text' }), d.temperName ? `Tempered: ${d.temperName}` : `Costs ${d.cost} Energy`),
+      keywordText(el('span', { cls: 'boon-text' }), d.temperName ? t('shop.tempered', { name: d.temperName }) : t('shop.costsEnergy', { n: d.cost })),
       ));
     }
     wrap.append(list);
-    return page('shop', '✦ — The Vendor', 'coin', 'panel', [wrap]);
+    return page('shop', t('page.shop'), 'coin', 'panel', [wrap]);
   }
 
-  wrap.append(el('p', { cls: 'shop-note', text: 'Cards this run\u2019s rewards could still offer, priced by rarity. A grey shelf does not fit the purse \u2014 the vendor does not haggle.' }));
+  wrap.append(el('p', { cls: 'shop-note', text: t('shop.note') }));
   const row = el('div', { cls: 'shop-grid' });
   for (const o of shop.offers) {
     // Same tile the hand and the reward screen draw, with the same inert language:
@@ -76,7 +81,7 @@ export function shopView() {
       showSummary: false,
       // The tile carries no compact-code footer (reward-screen precedent), so the
       // inert reason lives in the aria label and in the price badge's tint.
-      disabledNote: o.sold ? ' Sold out.' : ` Not affordable: ${o.price} gold, purse ${shop.purse}.`,
+      disabledNote: o.sold ? t('shop.soldNote') : t('shop.cannotNote', { price: o.price, purse: shop.purse }),
     }, o.actionId ? {
       actionId: o.actionId,
       onClick: (ev) => { consumeClick(ev); act(o.actionId); },
@@ -85,10 +90,10 @@ export function shopView() {
     // one fact the reward tiles never needed and the shop always does.
     tile.append(el('span', {
       cls: 'shop-price' + (o.sold ? ' sold' : '') + (!o.affordable && !o.sold ? ' cannot' : ''),
-      attrs: { title: o.sold ? 'Sold' : `Price: ${o.price} gold` },
+      attrs: { title: o.sold ? t('shop.sold.title') : t('shop.price.title', { n: o.price }) },
     },
     glyphBox('coin', 'coin-glyph'),
-    el('span', { text: o.sold ? 'sold' : String(o.price) }),
+    el('span', { text: o.sold ? t('shop.sold') : String(o.price) }),
     ));
     row.append(tile);
   }
@@ -97,30 +102,28 @@ export function shopView() {
   const controls = el('div', { cls: 'controls shop-controls' });
   const rem = shop.removal;
   if (rem.done) {
-    controls.append(el('span', { cls: 'hint', text: 'The removal service is spent for this visit.' }));
+    controls.append(el('span', { cls: 'hint', text: t('shop.removalSpent') }));
   } else {
     // `sold` never reaches here: buying the service flips the view into the removal
     // list above in the same breath, so an inert button can only mean the purse.
     controls.append(el('button', {
       cls: 'btn' + (rem.actionId ? '' : ' secondary'),
-      text: `Remove a card \u2014 ${rem.price} gold`,
+      text: t('shop.removeBtn', { n: rem.price }),
       attrs: {
         type: 'button',
         ...(rem.actionId ? { 'data-action': rem.actionId } : {}),
         ...(rem.actionId ? {} : { disabled: 'disabled' }),
-        title: rem.actionId
-          ? 'One removal per visit: pay, then pick the exact copy to remove.'
-          : `The purse cannot cover ${rem.price} gold.`,
+        title: rem.actionId ? t('shop.removeBtn.title') : t('shop.removeBtn.poor', { n: rem.price }),
       },
       on: rem.actionId ? { click: () => act(rem.actionId) } : {},
     }));
   }
   controls.append(el('button', {
     cls: 'btn secondary',
-    text: 'Leave',
-    attrs: { type: 'button', 'data-action': shop.leaveId, title: 'Leaving is final \u2014 the shop is consumed like a fought node.' },
+    text: t('shop.leave'),
+    attrs: { type: 'button', 'data-action': shop.leaveId, title: t('shop.leave.title') },
     on: { click: () => act(shop.leaveId) },
   }));
   wrap.append(controls);
-  return page('shop', '✦ — The Vendor', 'coin', 'panel', [wrap]);
+  return page('shop', t('page.shop'), 'coin', 'panel', [wrap]);
 }

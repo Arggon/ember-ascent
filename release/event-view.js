@@ -6,7 +6,9 @@
 // the same afford-filter that greys an unaffordable shelf), what every choice costs
 // (`cost`/`hpLoss` are the chips' facts), and the resolved beat's own sentences. A
 // choice the purse or the belt cannot cover stays VISIBLE with its reason, dimmed —
-// the shop's inert-shelf contract.
+// the shop's inert-shelf contract. The story, choice labels and requirement reasons
+// arrive already in the snapshot's language (I18N-1); this module only localizes its
+// own chrome.
 
 import { snap } from './runtime.js';
 import { el, keywordText, sceneIllus } from './dom.js';
@@ -14,12 +16,13 @@ import { consumeClick } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
 import { glyphBox } from './glyphs.js';
+import { t } from './i18n.js';
 
 /** One cost chip: a coin for gold, a droplet for HP — the belt chip's own glyph family. */
 function costChip(kind, value) {
   const chip = el('span', {
     cls: `event-cost ${kind}`,
-    attrs: { title: kind === 'gold' ? `Costs ${value} gold` : `Costs ${value} HP` },
+    attrs: { title: kind === 'gold' ? t('event.cost.gold', { n: value }) : t('event.cost.hp', { n: value }) },
   },
   glyphBox(kind === 'gold' ? 'coin' : 'droplet', 'event-cost-glyph'),
   el('span', { text: kind === 'gold' ? `${value}g` : `${value} HP` }));
@@ -30,39 +33,39 @@ export function eventView() {
   const ev = snap.event;
   const wrap = el('div', { cls: 'event' });
   wrap.append(sceneIllus('event'));
-  wrap.append(el('p', { cls: 'section-title', text: 'The Wayside' }));
+  wrap.append(el('p', { cls: 'section-title', text: t('event.title') }));
   wrap.append(el('div', { cls: 'big-title event-head', text: ev.name }));
   if (ev.story) wrap.append(el('p', { cls: 'event-story', text: ev.story }));
 
   // The smith's temper modal: the same rendering the rest site's offers keep — the
   // offer is rolled and committed, so the picks are the only actions on the screen.
   if (ev.tempering) {
-    wrap.append(el('p', { cls: 'event-note', text: 'The hammer is in your hand. Pick the card to temper — the choice is committed.' }));
+    wrap.append(el('p', { cls: 'event-note', text: t('event.temperingNote') }));
     const list = el('div', { cls: 'boon-list temper-list' });
-    for (const t of ev.offers) {
+    for (const offer of ev.offers) {
       list.append(el('button', {
-        cls: `boon temper-offer temper-${t.temper}`,
-        attrs: { type: 'button', 'data-action': t.actionId, 'aria-label': `Temper ${t.cardName}. ${t.text}` },
-        on: { click: () => act(t.actionId) },
+        cls: `boon temper-offer temper-${offer.temper}`,
+        attrs: { type: 'button', 'data-action': offer.actionId, 'aria-label': t('rest.temper.aria', { name: offer.cardName, text: offer.text }) },
+        on: { click: () => act(offer.actionId) },
       },
-      el('span', { cls: 'boon-name', text: `${t.cardName} · ${t.temperName}` }),
-      keywordText(el('span', { cls: 'boon-text' }), t.text.split(': ').slice(1).join(': '))));
+      el('span', { cls: 'boon-name', text: `${offer.cardName} · ${offer.temperName}` }),
+      keywordText(el('span', { cls: 'boon-text' }), offer.text.split(': ').slice(1).join(': '))));
     }
     wrap.append(list);
-    return page('event', '✧ — The Wayside', 'rune', 'panel', [wrap]);
+    return page('event', t('page.event'), 'rune', 'panel', [wrap]);
   }
 
   // A torn save (an event id the kernel no longer knows): no story, no choices — but
   // the continue is always the way out, so the run can never strand on this screen.
   if (!ev.known && !ev.resolved) {
-    wrap.append(el('p', { cls: 'event-note', text: 'The way is unclear, but it is open.' }));
+    wrap.append(el('p', { cls: 'event-note', text: t('event.unclear') }));
     wrap.append(el('div', { cls: 'restart-row' },
       el('button', {
-        cls: 'btn', text: 'Continue',
+        cls: 'btn', text: t('event.continue'),
         attrs: { type: 'button', 'data-action': ev.continueId },
         on: { click: () => act(ev.continueId) },
       })));
-    return page('event', '✧ — The Wayside', 'rune', 'panel', [wrap]);
+    return page('event', t('page.event'), 'rune', 'panel', [wrap]);
   }
 
   // The resolved beat: the kernel's own result sentences, then the way out.
@@ -73,14 +76,14 @@ export function eventView() {
     wrap.append(el('div', { cls: 'restart-row' },
       el('button', {
         cls: 'btn',
-        text: 'Continue',
-        attrs: { type: 'button', 'data-action': ev.continueId, title: 'The wayside is spent — back to the ascent.' },
+        text: t('event.continue'),
+        attrs: { type: 'button', 'data-action': ev.continueId, title: t('event.continue.title') },
         on: { click: () => act(ev.continueId) },
       })));
-    return page('event', '✧ — The Wayside', 'rune', 'panel', [wrap]);
+    return page('event', t('page.event'), 'rune', 'panel', [wrap]);
   }
 
-  wrap.append(el('p', { cls: 'event-note', text: 'Choose. The wayside does not offer twice.' }));
+  wrap.append(el('p', { cls: 'event-note', text: t('event.choose') }));
   const list = el('div', { cls: 'event-choices' });
   for (const c of ev.choices) {
     const affordable = c.actionId !== null;
@@ -92,7 +95,7 @@ export function eventView() {
         ...(affordable ? {} : { disabled: 'disabled' }),
         'aria-label': affordable
           ? `${c.label}. ${c.effect}`
-          : `${c.label}. Unavailable: ${c.reason}.`,
+          : `${c.label}. ${t('event.unavailable', { reason: c.reason })}`,
       },
       on: affordable ? { click: (e) => { consumeClick(e); act(c.actionId); } } : {},
     },
@@ -110,5 +113,5 @@ export function eventView() {
     list.append(btn);
   }
   wrap.append(list);
-  return page('event', '✧ — The Wayside', 'rune', 'panel', [wrap]);
+  return page('event', t('page.event'), 'rune', 'panel', [wrap]);
 }
