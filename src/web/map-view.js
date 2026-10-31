@@ -184,16 +184,22 @@ function mapNode(n) {
     ? ['Cinder Foreman', t('map.bossSub')]
     : [(word || (NODE_WORDS[short] || [n.label])[0]), (sub || (NODE_WORDS[short] || ['', ''])[1] || '')];
   const cls = `node t-${short}` + (n.available ? ' available' : '') + (n.current ? ' current' : '');
+  // The travel TOOLTIP interpolates the LOCALIZED node label (map.label.<type>), never
+  // the kernel's agent-facing English one — "Viajar a pelea", not "Viajar a fight". The
+  // kernel label stays the fallback for a type the dictionary does not name. The
+  // aria-label keeps the pretty node word ("Skirmish"), which is what the announced
+  // form has always carried and what the e2e walks locate by.
+  const labelWord = t(`map.label.${n.type}`) || n.label;
   const node = el(n.available ? 'button' : 'span', {
     cls,
-    attrs: n.available ? { type: 'button', title: t('map.travel', { label: n.label }), 'aria-label': t('map.travel', { label: words[0] }) } : {},
+    attrs: n.available ? { type: 'button', title: t('map.travel', { label: labelWord }), 'aria-label': t('map.travel', { label: words[0] }) } : {},
     on: {
       ...(n.available && n.actionId ? { click: () => act(n.actionId) } : {}),
       // Right-click (long-press on touch) drops or lifts a planning pin. Browser-only state.
       contextmenu: (ev) => { ev.preventDefault(); toggleMapPin(n.id); repaint(); },
     },
   });
-  if (n.available) node.title = t('map.travel.pin', { label: n.label });
+  if (n.available) node.title = t('map.travel.pin', { label: labelWord });
   else node.setAttribute('title', t('map.pin.hint'));
   node.append(glyphBox(NODE_GLYPH[short] || 'rune', 'ntype-mark'));
   if (mapPins().includes(n.id)) {

@@ -8,6 +8,7 @@
 // the browser e2e (tests/web/e2e.browser.spec.js), which has a real DOM and storage.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { currentLang, setLang, strings, t } from '../../src/web/i18n.js';
 
 test('every key in the dictionary carries a non-empty English string', () => {
@@ -81,4 +82,26 @@ test('the player-facing combat chrome is fully present in both languages', () =>
     assert.ok(table[key]?.en?.length > 0, `${key}.en`);
     assert.ok(table[key]?.es?.length > 0, `${key}.es`);
   }
+});
+
+test('WIRING: every HEROES id has a kindling blurb that renders non-empty in en AND es', () => {
+  // The picker builds the key as `hero.<id>.blurb` from actions.js's HEROES ids — a
+  // renamed id with a stale key rendered an EMPTY blurb node in both languages (the
+  // P1 this test makes loud forever). Read the ids from the real source so the pin
+  // cannot drift from what the view actually renders.
+  const src = readFileSync(new URL('../../src/web/actions.js', import.meta.url), 'utf8');
+  const ids = [...src.matchAll(/id:\s*'([a-z_]+)',\s*name:/g)].map((m) => m[1]);
+  assert.ok(ids.length >= 2, `the two shipped heroes are declared (${ids.join(', ')})`);
+  const table = strings();
+  for (const id of ids) {
+    const row = table[`hero.${id}.blurb`];
+    assert.ok(row, `hero.${id}.blurb must exist in the dictionary (HEROES id "${id}")`);
+    assert.ok(row.en.length > 0, `hero.${id}.blurb.en is non-empty`);
+    assert.ok(row.es.length > 0, `hero.${id}.blurb.es is non-empty`);
+    setLang('en');
+    assert.ok(t(`hero.${id}.blurb`).length > 0, `t('hero.${id}.blurb') renders in en`);
+    setLang('es');
+    assert.ok(t(`hero.${id}.blurb`).length > 0, `t('hero.${id}.blurb') renders in es`);
+  }
+  setLang('en');
 });

@@ -106,7 +106,7 @@ export function enableTargeting(slot) {
   aimed = snap.enemies.length > 0 ? 1 : null;
   repaint();
   const card = snap.hand.find((c) => c.slot === slot);
-  announce(t('target.needsTarget', { name: card ? card.name : '', n: snap.enemies.length, m: snap.enemies.length }));
+  announce(t('target.needsTarget', { name: card ? card.name : t('target.thatCard'), n: snap.enemies.length, m: snap.enemies.length }));
   focusFirstTarget();
 }
 

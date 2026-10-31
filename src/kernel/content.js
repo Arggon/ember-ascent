@@ -19,7 +19,9 @@ const CARD_TYPES = ['attack', 'skill', 'power', 'status', 'curse'];
 const TARGETS = ['enemy', 'all', 'self', 'none', 'random_enemy'];
 // I18N-1: the OPTIONAL Spanish twins. Absent is the normal case (the I18N-2 content
 // sweep fills them in); present they must be a non-empty string, so a typo can never
-// ship as an empty tile or a broken fallback.
+// ship as an empty tile or a broken fallback. The twins are independent: a card MAY
+// carry name_es without flavor_es (or the reverse) and renders MIXED by design — each
+// field falls back to its own English twin, per the honest-fallback rule.
 const OPTIONAL_ES_FIELDS = ['name_es', 'flavor_es'];
 
 /**

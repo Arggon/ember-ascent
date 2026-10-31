@@ -106,6 +106,7 @@ const STRINGS = {
   'belt.click': { en: ' — click for quaff / discard', es: ' — haz clic para beber o descartar' },
   'belt.combatOnly': { en: ' — quaff and discard work in combat only', es: ' — beber y descartar funcionan solo en combate' },
   'belt.slot.aria': { en: 'Potion slot {n}: {name}. Open quaff or discard.', es: 'Espacio de poción {n}: {name}. Abre beber o descartar.' },
+  'belt.slot.inert.aria': { en: 'Potion slot {n}: {name}', es: 'Espacio de poción {n}: {name}' },
   'belt.panel.aria': { en: 'Potion', es: 'Poción' },
   'belt.panel.title': { en: '{name}: quaff or discard', es: '{name}: beber o descartar' },
   'belt.panel.unknownText': { en: 'An unknown potion — its id is not in this build’s table. Discard it to free the slot.', es: 'Una poción desconocida: su id no está en la tabla de esta versión. Descártala para liberar el espacio.' },
@@ -313,7 +314,9 @@ const STRINGS = {
   'kindling.path': { en: 'Path', es: 'Camino' },
   'kindling.head': { en: 'The forge offers a kindling', es: 'La forja ofrece un rescoldo' },
   'kindling.note': { en: 'Take one. Each gift has a price.', es: 'Toma uno. Cada regalo tiene un precio.' },
-  'hero.ashwright.blurb': { en: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.', es: '60 HP. Martillo y yunque. Corazón Encendido: recupera 6 tras cada combate.' },
+  // Keyed by the HERO ID (actions.js HEROES), not the display name — the picker builds
+  // the key as `hero.${h.id}.blurb`, so an id/key mismatch renders an empty node.
+  'hero.ironclad.blurb': { en: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.', es: '60 HP. Martillo y yunque. Corazón Encendido: recupera 6 tras cada combate.' },
   'hero.bellows.blurb': { en: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.', es: '54 HP. Soplo del Fuelle golpea a todos los enemigos; Abanica las Llamas aviva la Energía. Farol Cian: +1 de Energía en el primer turno de cada combate.' },
   'page.kindling': { en: '0 — The Kindling', es: '0 — El Rescoldo' },
 
@@ -327,7 +330,9 @@ const STRINGS = {
   'end.relics': { en: '{n} relics', es: '{n} reliquias' },
   'end.winAct1': { en: 'You cleared Act 1 and the Slag Warden fell.', es: 'Superaste el Acto 1 y el Guardián de Escoria cayó.' },
   'end.winAct2': { en: 'The Kiln Deeps are quiet. The climb is complete.', es: 'Las Hondonadas del Horno están en silencio. El ascenso está completo.' },
-  'end.defeatLine': { en: 'The Ashwright falls. Try a different route or a better card pick.', es: 'La Ashwright cae. Prueba otra ruta o una mejor elección de cartas.' },
+  // es is deliberately GENDERLESS ('Ashwright ha caído.') — the content never assigns
+  // the hero a grammatical gender; flagged for the user to rule on before I18N-2.
+  'end.defeatLine': { en: 'The Ashwright falls. Try a different route or a better card pick.', es: 'Ashwright ha caído. Prueba otra ruta o una mejor elección de cartas.' },
   'end.saveFailed': { en: 'This run could not be saved — your browser refused local storage.', es: 'Esta partida no pudo guardarse — tu navegador rechazó el almacenamiento local.' },
   'end.marks': { en: 'Marks', es: 'Distintivos' },
   'end.marksNote': { en: 'Marks do not add to the total.', es: 'Los distintivos no suman al total.' },
@@ -368,11 +373,35 @@ const STRINGS = {
   'target.aria': { en: 'Enemy {p} of {t} — {name}, {hp} of {max} HP, {intent}.', es: 'Enemigo {p} de {t} — {name}, {hp} de {max} HP, {intent}.' },
   'target.press': { en: ' Press {n} to target.', es: ' Pulsa {n} para apuntar.' },
   'target.intentUnknown': { en: 'intent unknown', es: 'intención desconocida' },
+  'target.thatCard': { en: 'That card', es: 'Esa carta' },
   'target.needsTarget': { en: '{name} needs a target. {n} enemies alive. Press 1 to {m} to choose one, Escape to cancel.', es: '{name} necesita un objetivo. {n} enemigos vivos. Pulsa 1 a {m} para elegir uno, Escape para cancelar.' },
   'target.cancelled.toast': { en: 'Target cancelled — nothing was played', es: 'Objetivo cancelado — no se jugó nada' },
   'target.cancelled.aria': { en: 'Target cancelled. Nothing was played.', es: 'Objetivo cancelado. No se jugó nada.' },
   'combat.chapter': { en: 'II — The Fight', es: 'II — El Combate' },
   'fx.act.one': { en: 'Act I', es: 'Acto I' },
+
+  /* ---- combat float words (floats.js) ---------------------------------- */
+  'fx.absorbed': { en: 'absorbed', es: 'absorbido' },
+  'fx.down': { en: 'down', es: 'caído' },
+  'fx.bossDown': { en: 'BOSS DOWN', es: 'JEFE CAÍDO' },
+
+  /* ---- the kernel node labels, localized for the travel tooltip ----------
+     The kernel's NODE_TYPES labels ('fight', 'fight+', …) are agent-facing English;
+     the travel tooltip interpolates THESE instead (map-view.js), with the kernel
+     label as the fallback for a type this table does not name. */
+  'map.label.combat_weak': { en: 'fight', es: 'pelea' },
+  'map.label.combat_strong': { en: 'fight+', es: 'pelea dura' },
+  'map.label.elite': { en: 'elite', es: 'élite' },
+  'map.label.rest': { en: 'rest', es: 'descanso' },
+  'map.label.shop': { en: 'shop', es: 'tienda' },
+  'map.label.event': { en: 'event', es: 'suceso' },
+  'map.label.boss': { en: 'boss', es: 'jefe' },
+
+  /* ---- relic unlock thresholds (run-history.js relicThresholdLine) ------- */
+  'relicThreshold.crossed': { en: '{n} lifetime {plural} crossed the {marks} mark{marksPlural}.', es: '{n} {plural} de por vida cruzaron {marksClause} {marks}.' },
+  'relicThreshold.plain': { en: '{n} lifetime {plural} on the ledger.', es: '{n} {plural} de por vida en el libro de cuentas.' },
+  'relicThreshold.marksClause': { en: 'the', es: 'la marca de' },
+  'relicThreshold.marksClausePlural': { en: 'the', es: 'las marcas de' },
 };
 
 /**

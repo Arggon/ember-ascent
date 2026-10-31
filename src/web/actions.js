@@ -66,11 +66,13 @@ import { dispatchFx, playInputSpan } from './fx.js';
 import { currentLang, setLang, t } from './i18n.js';
 
 /** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it.
- *  The NAMES are proper nouns in every language; the blurbs are keys the kindling picker
- *  resolves through i18n at paint time (I18N-1), so a language switch rewords them. */
+ *  The NAMES are proper nouns in every language. The blurbs are NOT carried here: the
+ *  kindling picker builds the key `hero.<id>.blurb` from the id and resolves it through
+ *  i18n at paint time (I18N-1) — the wiring test pins that every id below has that key
+ *  in the dictionary, so a renamed id fails a test instead of rendering an empty node. */
 export const HEROES = [
-  { id: 'ironclad', name: 'Ashwright', blurb: 'hero.ashwright.blurb' },
-  { id: 'bellows', name: 'Bellows Keeper', blurb: 'hero.bellows.blurb' },
+  { id: 'ironclad', name: 'Ashwright' },
+  { id: 'bellows', name: 'Bellows Keeper' },
 ];
 /** B5: the chosen biome (an id from the kernel BIOMES table); `?biome=` seeds it. */
 const biomeParam = new URLSearchParams(location.search).get('biome');

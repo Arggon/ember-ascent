@@ -654,5 +654,8 @@ Process rules (standing):
   bilingual per verb; _es twins for relics/potions/tempers/events (es-419); 265-key web
   dictionary + toggle; content.js optional es-field validation. Flagged to backlog: the
   390x844 HUD overflow is PRE-EXISTING in both languages (buttons unreachable at phone
-  width; es amplifies +30px). Solo review next; I18N-2 (card names/flavors, enemy names,
-  kindling/quests, the resolved-lines format decision) queued.
+  width), and of that overflow I18N-1's own contribution is the lang-toggle chip:
+  ~+44px at phone width (the button's 44px min-width plus the row gap) — it wraps to
+  the second HUD row like the other overflow chips rather than clipping, and es itself
+  adds ~+30px more through the wider Spanish labels. Solo review next; I18N-2 (card
+  names/flavors, enemy names, kindling/quests, the resolved-lines format decision) queued.

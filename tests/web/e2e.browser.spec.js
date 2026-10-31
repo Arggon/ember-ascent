@@ -2318,6 +2318,15 @@ test('a torn relic pool seals the warden\u2019s vault honestly (UX-2 fallback)',
 test('language: the toggle flips the combat UI and the card sentences to Spanish and back, persists across a reload, and never disturbs the run', { timeout: 120000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   const page = await freshPage(t);
+
+  // P1 WIRING (live DOM): the kindling picker is the first screen, so the hero blurbs
+  // are checkable in BOTH languages across this walk — the empty-blurb regression (a
+  // key/id mismatch) failed exactly here, silently, in both languages.
+  await page.waitForSelector('.hero-pick', { timeout: 5000 });
+  const blurbsEn = await page.locator('.hero-pick .hp-blurb').allTextContents();
+  assert.equal(blurbsEn.length, 2, 'both heroes render a blurb row');
+  for (const b of blurbsEn) assert.ok(b.trim().length > 0, `no empty hero blurb (en): "${b}"`);
+
   await bootToMap(page);
   await travelToFight(page);
   await waitIdle(page);
@@ -2374,6 +2383,13 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'es', 'the reload boots Spanish');
   assert.equal((await page.locator('#hud button.lang-toggle').textContent()).trim(), 'ES');
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'es');
+
+  // P1 WIRING, Spanish side: the fresh boot lands on kindling again, so the hero
+  // blurbs must render non-empty in es too.
+  await page.waitForSelector('.hero-pick', { timeout: 5000 });
+  const blurbsEs = await page.locator('.hero-pick .hp-blurb').allTextContents();
+  assert.equal(blurbsEs.length, 2, 'both heroes render a blurb row (es)');
+  for (const b of blurbsEs) assert.ok(b.trim().length > 0, `no empty hero blurb (es): "${b}"`);
 
   // BACK TO ENGLISH: one click restores the English chrome on the fresh run.
   await page.locator('#hud button.lang-toggle').click();

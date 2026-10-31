@@ -11,6 +11,7 @@ import { animMs, animSpeed, bursts, flash, lastPlayerStatuses, reducedMotion } f
 import { el } from './dom.js';
 import { HERO_THROWS, THROW_MS, heroMove, signatureFor } from './hero-moves.js';
 import { enemyMarkup } from './stage-art.js';
+import { t } from './i18n.js';
 
 /**
  * The floating marker for one enemy, appended INSIDE that enemy's own card.
@@ -29,7 +30,7 @@ export function floatNode(b) {
   const span = el('span', { cls: 'efloat' });
   if (b.kind === 'absorbed') {
     span.className = 'efloat efloat-absorbed' + floatHold();
-    span.append(el('b', { text: '⛨' }), el('b', { text: 'absorbed' }));
+    span.append(el('b', { text: '⛨' }), el('b', { text: t('fx.absorbed') }));
     return span;
   }
   const tier = b.tier || 1;
@@ -38,7 +39,7 @@ export function floatNode(b) {
   span.className = `efloat efloat-g${tier}${tone}` + floatHold();
   const text = b.tone === 'block' ? `+${b.amount}` : `−${b.amount}`;
   span.append(el('b', { text: glyph }), el('b', { text }));
-  if (b.defeated) span.append(el('b', { text: 'down' }));
+  if (b.defeated) span.append(el('b', { text: t('fx.down') }));
   return span;
 }
 
@@ -63,7 +64,7 @@ export function strikeFloatNode(a, hold = '') {
   span.className = `efloat efloat-g${tier} efloat-named${hold}`;
   span.append(el('b', { cls: 'efloat-who', text: a.name }));
   span.append(el('b', { text: glyph }));
-  span.append(el('b', { text: absorbedByBlock ? 'absorbed' : `−${a.dealt}` }));
+  span.append(el('b', { text: absorbedByBlock ? t('fx.absorbed') : `−${a.dealt}` }));
   if (a.hits > 1 && !absorbedByBlock) span.append(el('b', { cls: 'efloat-hits', text: `${a.hits}×` }));
   return span;
 }
@@ -192,7 +193,8 @@ export function dyingCard(d) {
   // A boss says so: its collapse is the biggest single event in the run, and the word is
   // what makes the difference readable with no motion at all (the row is also the only
   // place the boss's name is still on screen, its card having left the snapshot).
-  const label = d.boss ? 'BOSS DOWN' : 'DOWN';
+  // I18N-1: one key for the word, upper-cased here for the ghost's shout.
+  const label = d.boss ? t('fx.bossDown') : t('fx.down').toUpperCase();
   // No lane class here: the ghost sits in the flex row at its own slot, and the fx layer
   // aims by `data-death-index`, not by side (a `side-${d.side}` prefix produced the
   // meaningless `side-side-0` anyway).

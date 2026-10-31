@@ -165,6 +165,13 @@ test('THE CONTRACT: the language rides the opts — no state field, no hash inpu
   assert.equal(hash(base), hash(newRun({ seed: 1 })));
   assert.equal(JSON.stringify(base).includes('lang'), false, 'no lang field in run state');
 
+  // ...and the SERIALIZED SAVE is byte-identical before and after an es snapshot of the
+  // same state: the lang opt cannot leak into the save format any more than into the hash.
+  const before = K.serializeSave(K.toSave(state, []));
+  snapshot(state, { lang: 'es' });
+  const after = K.serializeSave(K.toSave(state, []));
+  assert.equal(before, after, 'save bytes identical across a snapshot({lang:"es"}) call');
+
   // The default snapshot IS the English one, field for field.
   assert.deepEqual(JSON.parse(JSON.stringify(dflt)), JSON.parse(JSON.stringify(en)));
 });

@@ -200,7 +200,7 @@ function renderBelt() {
     } else {
       belt.append(el('span', {
         cls: 'belt-slot filled inert',
-        attrs: { title: `${tip}${t('belt.combatOnly')}`, 'aria-label': `Potion slot ${i + 1}: ${row.name}` },
+        attrs: { title: `${tip}${t('belt.combatOnly')}`, 'aria-label': t('belt.slot.inert.aria', { n: i + 1, name: row.name }) },
       },
         glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
         el('span', { cls: 'belt-name', text: row.name }),

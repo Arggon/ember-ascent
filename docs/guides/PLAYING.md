@@ -45,12 +45,16 @@ relics, potions, tempers and wayside events. The choice is remembered
 (`localStorage`, key `dlb.lang`) and `<html lang>` follows it for screen readers.
 
 The language is a **display choice only**: it never enters a save, a run's hash or the
-action log, and a save plays identically in either language. Two honest exceptions —
+action log, and a save plays identically in either language. Honest exceptions —
 deliberate, not oversights: the small compact codes on each card (`A6`, `HP3`, the same
-shorthand the command-line agent reads) stay as they are in both languages, and any
+shorthand the command-line agent reads) stay as they are in both languages; the wayside
+events' **resolved-beat lines** (the "- You paid 30 gold." result lines) are stored in
+the run state itself, so they stay English until a save-format decision lands; and any
 string not yet swept (card **names** and flavor lines, enemy names, kindling boon text,
-quest text) still shows in English until a later pass translates it. Nothing is ever
-shown as a placeholder.
+quest text) still shows in English until a later pass translates it. A card may also
+carry a Spanish name without a Spanish flavor line (or the reverse) and renders **mixed
+by design** — each field falls back to its own English twin independently. Nothing is
+ever shown as a placeholder.
 
 ---
 

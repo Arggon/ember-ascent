@@ -222,20 +222,23 @@ export function unlockThresholdLine(entry, info) {
 }
 
 /** The relic milestone an unlock was met by, as a sentence — the AC-9.2 rule in its
- *  S10 register: the WINS mark crossed, never just "unlocked!". Composed here (rather
- *  than one template) because the marks list inflects in both languages. */
+ *  S10 register: the WINS mark crossed, never just "unlocked!". The sentence frames are
+ *  dictionary keys (relicThreshold.*), so a future sweep finds them like every other
+ *  string; only the marks list's own join word stays composed here. */
 export function relicThresholdLine(ids, winsAfter) {
   const rows = (RELIC_UNLOCK_TABLE ?? []).filter((row) => row.ids.some((id) => ids.includes(id)));
   const winWord = (n) => (n === 1 ? t('unlock.win.one') : t('unlock.win'));
   const marks = rows.map((row) => `${row.at} ${winWord(row.at)}`);
   if (marks.length > 0) {
-    if (currentLang() === 'es') {
-      return `${winsAfter} ${winWord(winsAfter)} de por vida cruzaron ${marks.length === 1 ? 'la marca de' : 'las marcas de'} ${marks.join(' y ')}.`;
-    }
-    return `${winsAfter} lifetime ${winWord(winsAfter)} crossed the ${marks.join(' and ')} mark${marks.length === 1 ? '' : 's'}.`;
+    return t('relicThreshold.crossed', {
+      n: winsAfter,
+      plural: winWord(winsAfter),
+      marks: marks.join(currentLang() === 'es' ? ' y ' : ' and '),
+      marksPlural: marks.length === 1 ? '' : 's',
+      marksClause: t(marks.length === 1 ? 'relicThreshold.marksClause' : 'relicThreshold.marksClausePlural'),
+    });
   }
-  if (currentLang() === 'es') return `${winsAfter} ${winWord(winsAfter)} de por vida en el libro de cuentas.`;
-  return `${winsAfter} lifetime ${winWord(winsAfter)} on the ledger.`;
+  return t('relicThreshold.plain', { n: winsAfter, plural: winWord(winsAfter) });
 }
 
 /** The post-run narration block: threshold crossed, option opened, pool size, limitation. */
