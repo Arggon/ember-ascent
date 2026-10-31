@@ -39,22 +39,32 @@ Add `?seed=42` to the URL for a reproducible run: `http://localhost:5173/src/web
 
 The game speaks **English and neutral Spanish (es-419)**. The **EN / ES** button in the
 top-right HUD switches the whole interface — buttons, hints, sheet titles, toasts, the
-combat HUD — and every player-facing sentence the engine computes: card descriptions,
-statuses, powers, enemy intents, the help topics, the glossary, and the words of the
-relics, potions, tempers and wayside events. The choice is remembered
+combat HUD — and every player-facing string the engine knows: card names and flavor
+lines, descriptions, statuses, powers, enemy intents, **enemy names**, **biome names**,
+the hero and starter-relic names, **kindling boons**, **quests**, the score ledger's
+line labels, the run marks and unlock narrations, the help topics, the glossary, and
+the words of the relics, potions, tempers and wayside events — including the wayside's
+**resolved-beat result lines** ("- Pagas 30 de oro."). The choice is remembered
 (`localStorage`, key `dlb.lang`) and `<html lang>` follows it for screen readers.
 
 The language is a **display choice only**: it never enters a save, a run's hash or the
 action log, and a save plays identically in either language. Honest exceptions —
-deliberate, not oversights: the small compact codes on each card (`A6`, `HP3`, the same
-shorthand the command-line agent reads) stay as they are in both languages; the wayside
-events' **resolved-beat lines** (the "- You paid 30 gold." result lines) are stored in
-the run state itself, so they stay English until a save-format decision lands; and any
-string not yet swept (card **names** and flavor lines, enemy names, kindling boon text,
-quest text) still shows in English until a later pass translates it. A card may also
-carry a Spanish name without a Spanish flavor line (or the reverse) and renders **mixed
-by design** — each field falls back to its own English twin independently. Nothing is
-ever shown as a placeholder.
+deliberate, not oversights:
+
+* The small compact codes on each card (`A6`, `HP3`, the same shorthand the
+  command-line agent reads) stay as they are in both languages, and the whole compact
+  text dump the agent surface reads is **English-only by contract**.
+* **Ashwright is a proper noun** and reads the same in either language (the hero is
+  never given a gendered article — "Ashwright ha caído."); the Bellows Keeper's title
+  translates ("Custodio del Fuelle", article-less by the same ruling).
+* **Old saves' resolved beats are baked English sentences.** New runs store their beat
+  as structured slugs and render them in either language; a save made before this
+  change keeps its English sentences and shows them verbatim **even in a Spanish
+  session** — the honest degrade, never a mistranslation-by-guess. Everything else in
+  that save (names, descriptions, intents) renders fully Spanish.
+* A card (or any swept table row) missing one of its twins renders **mixed by
+  design** — each field falls back to its own English twin independently. Nothing is
+  ever shown as a placeholder.
 
 ---
 

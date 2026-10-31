@@ -52,40 +52,55 @@ export const UNLOCK_CATALOG = Object.freeze([
     at: Object.freeze({ score: 25 }),
     grant: Object.freeze({ grantCard: Object.freeze({ size: 32, allowUncommon: true, allowRare: false }) }),
     name: 'More cards can appear in your rewards',
+    name_es: 'Más cartas pueden aparecer en tus recompensas',
     condition: 'Score 25 or more across your runs',
+    condition_es: 'Suma 25 o más entre tus partidas',
     narration: 'Eight more of the 70 cards are now in play (24 → 32), uncommon cards among them.',
+    narration_es: 'Ocho cartas más de las 70 entran en juego (24 → 32), incluidas las infrecuentes.',
   }),
   Object.freeze({
     id: 'wider_pool_2',
     at: Object.freeze({ score: 60 }),
     grant: Object.freeze({ grantCard: Object.freeze({ size: 48, allowUncommon: true, allowRare: false }) }),
     name: 'A wider reward pool still',
+    name_es: 'Un grupo de recompensas aún más amplio',
     condition: 'Score 60 or more across your runs',
+    condition_es: 'Suma 60 o más entre tus partidas',
     narration: 'Sixteen more cards are now in play (32 → 48).',
+    narration_es: 'Dieciséis cartas más entran en juego (32 → 48).',
   }),
   Object.freeze({
     id: 'rare_tier',
     at: Object.freeze({ score: 120 }),
     grant: Object.freeze({ grantCard: Object.freeze({ size: 68, allowUncommon: true, allowRare: true }) }),
     name: 'Rare cards can appear in your rewards',
+    name_es: 'Cartas raras pueden aparecer en tus recompensas',
     condition: 'Score 120 or more across your runs',
+    condition_es: 'Suma 120 o más entre tus partidas',
     narration: 'Twenty more cards are now in play (48 → 68). The rare tier is open — every card the forge holds is yours to draft.',
+    narration_es: 'Veinte cartas más entran en juego (48 → 68). El nivel de raras está abierto: toda carta que guarda la forja es tuya para elegir.',
   }),
   Object.freeze({
     id: 'play_this_seed',
     at: Object.freeze({ runs: 1 }),
     grant: Object.freeze({ grantMode: 'replay-seed' }),
     name: 'Play a past seed again',
+    name_es: 'Vuelve a jugar una semilla pasada',
     condition: 'Finish one run',
+    condition_es: 'Termina una partida',
     narration: 'You can now replay any seed from your history.',
+    narration_es: 'Ahora puedes rejugar cualquier semilla de tu historial.',
   }),
   Object.freeze({
     id: 'ledger_notes',
     at: Object.freeze({ badge: 'first_win' }),
     grant: Object.freeze({ grantOption: 'badge-notes' }),
     name: 'Your earned marks are explained in the ledger',
+    name_es: 'Tus distintivos ganados se explican en el libro de cuentas',
     condition: 'Win a run',
+    condition_es: 'Gana una partida',
     narration: 'Every mark you earn now carries the condition that earned it.',
+    narration_es: 'Cada distintivo que ganes indica ahora la condición que lo otorgó.',
   }),
 ]);
 
@@ -95,11 +110,11 @@ export const UNLOCK_CATALOG = Object.freeze([
  * recoverable from the history entry.
  */
 export const BADGE_CATALOG = Object.freeze([
-  Object.freeze({ id: 'first_win', name: 'Victory', condition: 'Win a run' }),
-  Object.freeze({ id: 'boss_down', name: 'Warden down', condition: 'Defeat the Slag Warden' }),
-  Object.freeze({ id: 'elite_hunter', name: 'Elite hunter', condition: 'Kill an elite' }),
-  Object.freeze({ id: 'deep_run', name: 'Deep run', condition: 'Reach the boss floor' }),
-  Object.freeze({ id: 'ten_kills', name: 'Ten down', condition: 'Kill ten enemies in one run' }),
+  Object.freeze({ id: 'first_win', name: 'Victory', name_es: 'Victoria', condition: 'Win a run', condition_es: 'Gana una partida' }),
+  Object.freeze({ id: 'boss_down', name: 'Warden down', name_es: 'Guardián abatido', condition: 'Defeat the Slag Warden', condition_es: 'Derrota al Guardián de Escoria' }),
+  Object.freeze({ id: 'elite_hunter', name: 'Elite hunter', name_es: 'Cazador de élites', condition: 'Kill an elite', condition_es: 'Mata a un élite' }),
+  Object.freeze({ id: 'deep_run', name: 'Deep run', name_es: 'Ascenso profundo', condition: 'Reach the boss floor', condition_es: 'Llega al piso del jefe' }),
+  Object.freeze({ id: 'ten_kills', name: 'Ten down', name_es: 'Diez caídos', condition: 'Kill ten enemies in one run', condition_es: 'Mata a diez enemigos en una partida' }),
 ]);
 
 /** Thresholds a profile is compared against — the ONLY profile fields an unlock reads. */

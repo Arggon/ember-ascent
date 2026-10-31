@@ -176,18 +176,18 @@ test('THE CONTRACT: the language rides the opts — no state field, no hash inpu
   assert.deepEqual(JSON.parse(JSON.stringify(dflt)), JSON.parse(JSON.stringify(en)));
 });
 
-test('an unknown lang reads English, and the fallback path renders English honestly', () => {
+test('an unknown lang reads English, and every shipped card now renders its es face name', () => {
   const state = combat();
   const fr = snapshot(state, { lang: 'fr' });
   const en = snapshot(state, { lang: 'en' });
   assert.deepEqual(JSON.parse(JSON.stringify(fr)), JSON.parse(JSON.stringify(en)));
 
-  // Every shipped card has no name_es yet (the I18N-2 sweep fills it in), so every
-  // es row falls back to the English face name — never a key name, never empty.
+  // I18N-2: the sweep filled every `name_es` in, so every es row renders the Spanish
+  // face name — never a key name, never empty, and never the English name.
   const es = snapshot(state, { lang: 'es' });
   for (const card of es.hand) {
     const def = C.cards.get(card.cardId);
-    assert.equal(card.name, def.name, `${card.cardId} falls back to its English name`);
+    assert.equal(card.name, def.name_es, `${card.cardId} renders its Spanish face name`);
     assert.ok(card.name.length > 0);
   }
 
@@ -210,11 +210,13 @@ test('cardPool({lang:"es"}) localizes the codex rows without touching the run po
   assert.equal(es.length, en.length, 'the same rows in either language');
   const rainEs = es.find((c) => c.cardId === 'anvil_rain');
   assert.ok(rainEs, 'anvil_rain is a draftable (non-starter) card');
-  assert.equal(rainEs.name, 'Anvil Rain', 'the face name falls back (no name_es until I18N-2)');
+  assert.equal(rainEs.name, 'Lluvia de Yunces', 'the face name renders its I18N-2 twin');
   assert.equal(rainEs.description, 'Infliges 6 de daño al enemigo 3 veces.');
   assert.equal(rainEs.typeLabel, 'Ataque');
   assert.equal(en.find((c) => c.cardId === 'anvil_rain').description, 'Deal 6 damage to the enemy 3 times.');
-  // Same sort order shape (rarity, cost, name, id) in both languages.
+  assert.equal(en.find((c) => c.cardId === 'anvil_rain').name, 'Anvil Rain');
+  // Same sort order shape (rarity, cost, ENGLISH face name, id) in both languages:
+  // the order is keyed on the definitions, so localizing names cannot re-order rows.
   assert.deepEqual(es.map((c) => c.cardId), en.map((c) => c.cardId), 'the row order is language-independent');
 });
 

@@ -20,9 +20,11 @@
 // (`newGame` resets the run outcome through `resetRunOutcome()`), so they need no setters.
 
 import {
+  BADGE_CATALOG,
   RELIC_TOTAL,
   RELIC_UNLOCK_TABLE,
   RETAIN,
+  SCORE_TABLE,
   SHIPPED_CARDS,
   UNLOCK_CATALOG,
   aggregate,
@@ -164,7 +166,7 @@ export function ledgerMath(record) {
     return {
       key: row.key,
       label: row.label,
-      math: flag ? (row.count > 0 ? 'yes' : 'no') : `${row.count} × ${row.each}`,
+      math: flag ? t(row.count > 0 ? 'ledger.yes' : 'ledger.no') : `${row.count} × ${row.each}`,
       points: flag ? `+${row.points}` : String(row.points),
     };
   });
@@ -173,6 +175,24 @@ export function ledgerMath(record) {
   // having played at all.
   const earned = (counts.elites ?? 0) > 0 || (counts.boss ?? 0) > 0 || (counts.victory ?? 0) > 0;
   return { total: score.total, lines, counts, earned };
+}
+
+/**
+ * A code-owned catalog's field in the CURRENT language: the `_es` twin when the row
+ * carries one and the session is Spanish, the English field otherwise — the honest
+ * fallback, twin-shaped like the kernel's own fieldFor. The PERSISTED record keeps its
+ * English words; the twins are a paint-time choice (I18N-2).
+ * @param {any} row a SCORE_TABLE / UNLOCK_CATALOG / BADGE_CATALOG row
+ * @param {string} key the field name, e.g. 'label', 'name', 'condition', 'narration'
+ * @returns {string}
+ */
+function catalogField(row, key) {
+  if (!row) return '';
+  if (currentLang() === 'es') {
+    const es = row[`${key}_es`];
+    if (typeof es === 'string' && es.length > 0) return es;
+  }
+  return row[key] ?? '';
 }
 
 /** The factual recognition that replaces an advice-only line on a hollow run (AC-7.4). */
@@ -188,18 +208,35 @@ export function recognitionText(math) {
 }
 
 /**
+ * One run mark (a persisted record badge, English words) re-worded in the CURRENT
+ * language through the kernel's BADGE_CATALOG twins (I18N-2): the record keeps its
+ * English name/condition, and an id the catalog no longer knows degrades to its own
+ * words — the same raw-token honesty as every other torn id.
+ * @param {{id: string, name: string, condition: string}} mark
+ */
+export function localizedMark(mark) {
+  const row = (BADGE_CATALOG ?? []).find((b) => b.id === mark?.id) ?? null;
+  return {
+    ...mark,
+    name: catalogField(row, 'name') || (mark?.name ?? ''),
+    condition: catalogField(row, 'condition') || (mark?.condition ?? ''),
+  };
+}
+
+/**
  * The score ledger. A REAL list, so every contributing line is individually reachable
  * (AC-7.1) rather than being one text block whose arithmetic must be re-derived by hand.
- * The line LABELS come from the kernel's frozen SCORE_TABLE (English until I18N-2 sweeps
- * the record layer); the math words ("yes"/"no") and the Total are this file's own and
- * localize here.
+ * The line LABELS come from the kernel's frozen SCORE_TABLE, localized by key at paint
+ * time (I18N-2 — the record itself keeps its English words); the math words
+ * ("yes"/"no") and the Total are this file's own and localize here.
  * @param {ReturnType<typeof ledgerMath>} math
  */
 export function ledgerBlock(math) {
   const block = el('div', { cls: 'run-ledger', attrs: { role: 'list', 'aria-label': t('ledger.aria') } });
   for (const line of math.lines) {
+    const row = SCORE_TABLE.find((r) => r.key === line.key) ?? null;
     block.append(el('div', { cls: 'ledger-line', attrs: { role: 'listitem' } },
-      el('span', { cls: 'ledger-label', text: line.label }),
+      el('span', { cls: 'ledger-label', text: catalogField(row, 'label') || line.label }),
       el('span', { cls: 'ledger-math', text: line.math }),
       el('span', { cls: 'ledger-points', text: line.points }),
     ));
@@ -218,7 +255,8 @@ export function unlockThresholdLine(entry, info) {
   const at = entry?.at ?? null;
   if (at && typeof at.score === 'number') return t('unlock.threshold.score', { score: info.scoreTotalAfter, mark: at.score });
   if (at && typeof at.runs === 'number') return t('unlock.threshold.runs', { runs: info.runCountAfter, mark: at.runs });
-  return t('unlock.threshold.condition', { condition: entry?.condition ?? 'a threshold' });
+  // I18N-2: the condition words are the catalog's own twins, localized at paint time.
+  return t('unlock.threshold.condition', { condition: catalogField(entry, 'condition') || (entry?.condition ?? 'a threshold') });
 }
 
 /** The relic milestone an unlock was met by, as a sentence — the AC-9.2 rule in its
@@ -236,23 +274,25 @@ export function relicThresholdLine(ids, winsAfter) {
       marks: marks.join(currentLang() === 'es' ? ' y ' : ' and '),
       marksPlural: marks.length === 1 ? '' : 's',
       marksClause: t(marks.length === 1 ? 'relicThreshold.marksClause' : 'relicThreshold.marksClausePlural'),
+      verb: t(marks.length === 1 ? 'relicThreshold.verb1' : 'relicThreshold.verb'),
     });
   }
   return t('relicThreshold.plain', { n: winsAfter, plural: winWord(winsAfter) });
 }
 
-/** The post-run narration block: threshold crossed, option opened, pool size, limitation. */
+/** The post-run narration block: threshold crossed, option opened, pool size, limitation.
+ *  I18N-2: the unlock's name, condition and narration are the catalog's own twins,
+ *  localized by id at paint time — the verdict/record keeps its English words. */
 export function unlockBlock(info) {
   const block = el('div', { cls: 'unlock-block' });
   for (const unlocked of info.newly) {
     const entry = (UNLOCK_CATALOG ?? []).find((e) => e.id === unlocked.id) ?? null;
-    block.append(el('p', { cls: 'unlock-head', text: t('unlock.head', { name: unlocked.name }) }));
+    block.append(el('p', { cls: 'unlock-head', text: t('unlock.head', { name: catalogField(entry, 'name') || unlocked.name }) }));
     block.append(el('p', { cls: 'unlock-that', text: unlockThresholdLine(entry, info) }));
     // The kernel's own narration sentence: what the option now IS. Never "you are
     // stronger" — an unlock adds an OPTION, and the framing may not imply the game eased.
-    // The narration text is frozen kernel content — English until I18N-2 sweeps the
-    // record layer (an honest fallback, like the card names).
-    block.append(el('p', { cls: 'unlock-line', text: unlocked.narration }));
+    // The narration text is frozen kernel content, twinned in the catalog (I18N-2).
+    block.append(el('p', { cls: 'unlock-line', text: catalogField(entry, 'narration') || unlocked.narration }));
   }
   // S10 RELICS: the same narration, relic-shaped. A win that crossed a milestone names
   // what future climbs can now be offered (the run's own rewards are unchanged — an
@@ -261,7 +301,13 @@ export function unlockBlock(info) {
   // themselves — the raw-id degrade, never a blank.
   const relics = info.relics ?? null;
   if (relics && relics.newly.length > 0) {
-    const names = relics.newly.map((id) => relicDef(id)?.name ?? id);
+    // I18N-2: the relic names come from the relics table's own twins (I18N-1), read at
+    // paint time; an id the table no longer knows names itself.
+    const names = relics.newly.map((id) => {
+      const def = relicDef(id);
+      if (!def) return id;
+      return currentLang() === 'es' && typeof def.name_es === 'string' && def.name_es.length > 0 ? def.name_es : def.name;
+    });
     block.append(el('p', { cls: 'unlock-head', text: t('unlock.relics.head') }));
     block.append(el('p', { cls: 'unlock-line', text: t('unlock.relics.line', { names: names.join(', ') }) }));
     block.append(el('p', { cls: 'unlock-that', text: relicThresholdLine(relics.newly, relics.winsAfter) }));

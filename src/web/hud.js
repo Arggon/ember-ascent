@@ -595,7 +595,7 @@ function codexRow(c, inDeck) {
   line.append(el('span', { cls: 'codex-cost', attrs: { title: t('deck.cost') }, text: String(c.cost) }));
   line.append(el('span', { cls: 'codex-type', text: c.typeLabel }));
   line.append(el('span', { cls: 'codex-name', text: c.name }));
-  line.append(el('span', { cls: 'codex-rarity', text: c.rarity, attrs: { title: t('codex.rarity', { r: c.rarity }) } }));
+  line.append(el('span', { cls: 'codex-rarity', text: t(`codex.${c.rarity}`) || c.rarity, attrs: { title: t('codex.rarity', { r: c.rarity }) } }));
   if (inDeck > 0) {
     line.append(el('span', {
       cls: 'codex-indeck',

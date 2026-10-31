@@ -54,13 +54,16 @@ export function kindlingView() {
     for (const h of HEROES) {
       const on = current === h.id;
       const blurb = t(`hero.${h.id}.blurb`);
+      // I18N-2: the pick name is chrome, resolved per paint (`hero.<id>.name`); the
+      // HEROES table's English name is the fallback for an unkeyed id.
+      const name = t(`hero.${h.id}.name`) || h.name;
       heroes.append(el('button', {
         cls: `hero-pick${on ? ' on' : ''} hp-${h.id}`,
         attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1', title: blurb },
         on: { click: () => switchHero(h.id) },
       },
       heroFace(h.id),
-      el('span', { cls: 'hp-name', text: h.name }),
+      el('span', { cls: 'hp-name', text: name }),
       el('span', { cls: 'hp-blurb', text: blurb })));
     }
     wrap.append(heroes);

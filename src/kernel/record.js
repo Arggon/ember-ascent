@@ -56,14 +56,19 @@ export const RETAIN = 100;
  * `count` is supplied by deriveCounts(); `boss` and `victory` are 0/1 flags rather
  * than tallies, so they read as "+50 for the boss" instead of "+50 each time".
  * BADGES ARE NOT HERE. They are a separate list and never add to the total (§11.1).
+ *
+ * I18N-2: `label_es` is the Spanish twin of the itemised line's label. It is a
+ * RENDERING twin, not a record field: scoreRun() keeps emitting the English `label`
+ * into the persisted record (records stay language-independent), and a surface that
+ * paints a ledger in Spanish looks the twin up here by `key`.
  */
 export const SCORE_TABLE = Object.freeze([
-  Object.freeze({ key: 'floors', label: 'Floors climbed', each: 5 }),
-  Object.freeze({ key: 'kills', label: 'Enemies killed', each: 2 }),
-  Object.freeze({ key: 'elites', label: 'Elites killed', each: 10 }),
-  Object.freeze({ key: 'boss', label: 'Boss defeated', each: 50 }),
-  Object.freeze({ key: 'victory', label: 'Victory', each: 100 }),
-  Object.freeze({ key: 'cards', label: 'Cards played', each: 1 }),
+  Object.freeze({ key: 'floors', label: 'Floors climbed', label_es: 'Pisos escalados', each: 5 }),
+  Object.freeze({ key: 'kills', label: 'Enemies killed', label_es: 'Enemigos muertos', each: 2 }),
+  Object.freeze({ key: 'elites', label: 'Elites killed', label_es: 'Élites muertos', each: 10 }),
+  Object.freeze({ key: 'boss', label: 'Boss defeated', label_es: 'Jefe derrotado', each: 50 }),
+  Object.freeze({ key: 'victory', label: 'Victory', label_es: 'Victoria', each: 100 }),
+  Object.freeze({ key: 'cards', label: 'Cards played', label_es: 'Cartas jugadas', each: 1 }),
 ]);
 
 /**

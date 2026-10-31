@@ -2339,6 +2339,7 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   const enDesc = await page.locator('.card .cdesc').first().textContent();
   assert.match(enDesc, /^(Deal|Gain|Draw|Discard|Restore|Exhaust|Retain|Lose|Apply|Double|Special)/,
     'an English kernel sentence shows before the switch');
+  const enEnemyName = (await page.locator('.enemy .ename').first().textContent()).trim();
   const before = await readState(page);
   assert.equal(before.phase, 'combat');
 
@@ -2357,6 +2358,13 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   assert.equal((await page.locator('.pile-discard .pile-name').textContent()).trim(), 'Descarte');
   assert.match(await page.locator('p.hint').last().textContent(), /Haz clic en una carta para jugarla/,
     'the combat hint renders Spanish');
+
+  // I18N-2: the CONTENT localizes too — the enemy's display name is the enemies
+  // table's own Spanish twin (the state's hashed stateName never moves, so the run
+  // above is untouched; only the word changed).
+  const esEnemyName = (await page.locator('.enemy .ename').first().textContent()).trim();
+  assert.notEqual(esEnemyName, enEnemyName, `the enemy name localizes ("${enEnemyName}" -> "${esEnemyName}")`);
+  assert.doesNotMatch(esEnemyName, /^(Cinder|Ash|Kiln|Slag|Gremlin|The) /, 'no English enemy name survives the switch');
 
   // Spanish card sentences, re-derived kernel-side from the same effect data.
   const esDesc = await page.locator('.card .cdesc').first().textContent();
@@ -2385,11 +2393,14 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'es');
 
   // P1 WIRING, Spanish side: the fresh boot lands on kindling again, so the hero
-  // blurbs must render non-empty in es too.
+  // blurbs must render non-empty in es too — and I18N-2 localizes the pick NAMES.
   await page.waitForSelector('.hero-pick', { timeout: 5000 });
   const blurbsEs = await page.locator('.hero-pick .hp-blurb').allTextContents();
   assert.equal(blurbsEs.length, 2, 'both heroes render a blurb row (es)');
   for (const b of blurbsEs) assert.ok(b.trim().length > 0, `no empty hero blurb (es): "${b}"`);
+  const namesEs = await page.locator('.hero-pick .hp-name').allTextContents();
+  assert.deepEqual(namesEs, ['Ashwright', 'Custodio del Fuelle'],
+    'the pick names localize: the proper noun stays, the Keeper title translates');
 
   // BACK TO ENGLISH: one click restores the English chrome on the fresh run.
   await page.locator('#hud button.lang-toggle').click();

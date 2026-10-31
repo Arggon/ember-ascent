@@ -25,10 +25,12 @@ export const cardsBundle = {
         "bash"
       ],
       "startingRelic": "burning_blood",
-      "relicName": "Kindled Heart"
+      "relicName": "Kindled Heart",
+      "relicName_es": "Corazón Encendido"
     },
     "bellows": {
       "name": "Bellows Keeper",
+      "name_es": "Custodio del Fuelle",
       "maxHp": 54,
       "startingDeck": [
         "strike",
@@ -43,13 +45,15 @@ export const cardsBundle = {
         "fan_flames"
       ],
       "startingRelic": "cyan_lantern",
-      "relicName": "Cyan Lantern"
+      "relicName": "Cyan Lantern",
+      "relicName_es": "Farol Cian"
     }
   },
   "cards": [
     {
       "id": "strike",
       "name": "Hammerfall",
+      "name_es": "Martillazo",
       "cost": 1,
       "type": "attack",
       "rarity": "starter",
@@ -60,11 +64,13 @@ export const cardsBundle = {
           "amount": 6
         }
       ],
-      "flavor": "The first lesson of the forge: hit it until it yields."
+      "flavor": "The first lesson of the forge: hit it until it yields.",
+      "flavor_es": "La primera lección de la forja: golpea hasta que ceda."
     },
     {
       "id": "defend",
       "name": "Quench",
+      "name_es": "Enfriar",
       "cost": 1,
       "type": "skill",
       "rarity": "starter",
@@ -75,11 +81,13 @@ export const cardsBundle = {
           "amount": 5
         }
       ],
-      "flavor": "Cool iron holds."
+      "flavor": "Cool iron holds.",
+      "flavor_es": "El hierro frío aguanta."
     },
     {
       "id": "bash",
       "name": "Anvil Blow",
+      "name_es": "Golpe de Yunque",
       "cost": 2,
       "type": "attack",
       "rarity": "starter",
@@ -96,11 +104,13 @@ export const cardsBundle = {
           "to": "enemy"
         }
       ],
-      "flavor": "The anvil answers louder than the hammer."
+      "flavor": "The anvil answers louder than the hammer.",
+      "flavor_es": "El yunque responde más fuerte que el martillo."
     },
     {
       "id": "gust",
       "name": "Bellows Gust",
+      "name_es": "Soplo del Fuelle",
       "cost": 1,
       "type": "attack",
       "rarity": "starter",
@@ -113,11 +123,13 @@ export const cardsBundle = {
         }
       ],
       "flavor": "One long breath across the coals.",
+      "flavor_es": "Un aliento largo sobre las brasas.",
       "hero": "bellows"
     },
     {
       "id": "fan_flames",
       "name": "Fan the Flames",
+      "name_es": "Abanica las Llamas",
       "cost": 0,
       "type": "skill",
       "rarity": "starter",
@@ -132,11 +144,13 @@ export const cardsBundle = {
         }
       ],
       "flavor": "Work the leather and the fire leans in.",
+      "flavor_es": "Trabaja el cuero y el fuego se acerca.",
       "hero": "bellows"
     },
     {
       "id": "anger",
       "name": "Spark",
+      "name_es": "Chispa",
       "cost": 0,
       "type": "attack",
       "rarity": "common",
@@ -147,11 +161,13 @@ export const cardsBundle = {
           "amount": 5
         }
       ],
-      "flavor": "A small heat, spent at once."
+      "flavor": "A small heat, spent at once.",
+      "flavor_es": "Un calor pequeño, gastado de inmediato."
     },
     {
       "id": "cleave",
       "name": "Arc Cut",
+      "name_es": "Tajo en Arco",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -163,11 +179,13 @@ export const cardsBundle = {
           "target": "all_enemies"
         }
       ],
-      "flavor": "One swing, every face in the fire."
+      "flavor": "One swing, every face in the fire.",
+      "flavor_es": "Un solo giro, todas las caras al fuego."
     },
     {
       "id": "clothesline",
       "name": "Collar Check",
+      "name_es": "Carga al Cuello",
       "cost": 2,
       "type": "attack",
       "rarity": "common",
@@ -184,11 +202,13 @@ export const cardsBundle = {
           "to": "enemy"
         }
       ],
-      "flavor": "The jaw meets the haft."
+      "flavor": "The jaw meets the haft.",
+      "flavor_es": "La mandíbula encuentra el mango."
     },
     {
       "id": "headbutt",
       "name": "Brow Strike",
+      "name_es": "Golpe de Frente",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -199,11 +219,13 @@ export const cardsBundle = {
           "amount": 9
         }
       ],
-      "flavor": "The helm does the talking."
+      "flavor": "The helm does the talking.",
+      "flavor_es": "Quien habla aquí es el yelmo."
     },
     {
       "id": "ironwave",
       "name": "Slag Surge",
+      "name_es": "Marea de Escoria",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -218,11 +240,13 @@ export const cardsBundle = {
           "amount": 5
         }
       ],
-      "flavor": "A wall of cooling metal, then the follow-through."
+      "flavor": "A wall of cooling metal, then the follow-through.",
+      "flavor_es": "Un muro de metal que enfría, y luego el empuje."
     },
     {
       "id": "pommel",
       "name": "Haft Jab",
+      "name_es": "Golpe de Culata",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -237,11 +261,13 @@ export const cardsBundle = {
           "amount": 1
         }
       ],
-      "flavor": "The blunt end still counts."
+      "flavor": "The blunt end still counts.",
+      "flavor_es": "El extremo romo también cuenta."
     },
     {
       "id": "sword_boomerang",
       "name": "Returning Brand",
+      "name_es": "Fierro que Vuelve",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -253,11 +279,13 @@ export const cardsBundle = {
           "target": "all_enemies"
         }
       ],
-      "flavor": "Heat you threw comes back."
+      "flavor": "Heat you threw comes back.",
+      "flavor_es": "El calor que lanzaste regresa."
     },
     {
       "id": "thunderclap",
       "name": "Forgeclap",
+      "name_es": "Estallido de Forja",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -275,11 +303,13 @@ export const cardsBundle = {
           "to": "enemy"
         }
       ],
-      "flavor": "The whole shop flinches."
+      "flavor": "The whole shop flinches.",
+      "flavor_es": "Toda la herrería se estremece."
     },
     {
       "id": "twin_strike",
       "name": "Twin Hammers",
+      "name_es": "Martillos Gemelos",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -294,11 +324,13 @@ export const cardsBundle = {
           "amount": 5
         }
       ],
-      "flavor": "Left, then right, before the glow fades."
+      "flavor": "Left, then right, before the glow fades.",
+      "flavor_es": "Izquierda, luego derecha, antes de que se apague el resplandor."
     },
     {
       "id": "wild_strike",
       "name": "Untempered",
+      "name_es": "Sin Templar",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -309,11 +341,13 @@ export const cardsBundle = {
           "amount": 12
         }
       ],
-      "flavor": "No form. All weight."
+      "flavor": "No form. All weight.",
+      "flavor_es": "Sin forma. Todo peso."
     },
     {
       "id": "flex",
       "name": "Bellows",
+      "name_es": "Fuelle",
       "cost": 0,
       "type": "skill",
       "rarity": "common",
@@ -326,11 +360,13 @@ export const cardsBundle = {
           "to": "self"
         }
       ],
-      "flavor": "Work the lungs of the forge."
+      "flavor": "Work the lungs of the forge.",
+      "flavor_es": "Trabaja los pulmones de la forja."
     },
     {
       "id": "shrug",
       "name": "Cast Aside",
+      "name_es": "A Un Lado",
       "cost": 1,
       "type": "skill",
       "rarity": "common",
@@ -345,11 +381,13 @@ export const cardsBundle = {
           "amount": 1
         }
       ],
-      "flavor": "The blow slides off the pauldron."
+      "flavor": "The blow slides off the pauldron.",
+      "flavor_es": "El golpe resbala en la hombrera."
     },
     {
       "id": "true_grit",
       "name": "True Temper",
+      "name_es": "Temple Verdadero",
       "cost": 1,
       "type": "skill",
       "rarity": "common",
@@ -360,11 +398,13 @@ export const cardsBundle = {
           "amount": 7
         }
       ],
-      "flavor": "Hold the heat. Do not flinch."
+      "flavor": "Hold the heat. Do not flinch.",
+      "flavor_es": "Sostén el calor. No parpadees."
     },
     {
       "id": "warcry",
       "name": "Kiln Cry",
+      "name_es": "Grito del Horno",
       "cost": 0,
       "type": "skill",
       "rarity": "common",
@@ -379,11 +419,13 @@ export const cardsBundle = {
           "amount": 1
         }
       ],
-      "flavor": "The furnace answers."
+      "flavor": "The furnace answers.",
+      "flavor_es": "El horno responde."
     },
     {
       "id": "armaments",
       "name": "Fit the Plate",
+      "name_es": "Coloca la Placa",
       "cost": 1,
       "type": "skill",
       "rarity": "common",
@@ -394,11 +436,13 @@ export const cardsBundle = {
           "amount": 5
         }
       ],
-      "flavor": "Strap on what the climb still owes you."
+      "flavor": "Strap on what the climb still owes you.",
+      "flavor_es": "Átate lo que el ascenso aún te debe."
     },
     {
       "id": "havoc",
       "name": "Vent",
+      "name_es": "Respiradero",
       "cost": 1,
       "type": "skill",
       "rarity": "common",
@@ -413,11 +457,13 @@ export const cardsBundle = {
           "amount": 1
         }
       ],
-      "flavor": "Open the flue. The room fills with work."
+      "flavor": "Open the flue. The room fills with work.",
+      "flavor_es": "Abre la chimenea. La sala se llena de trabajo."
     },
     {
       "id": "battle_trance",
       "name": "Heat Trance",
+      "name_es": "Trance de Calor",
       "cost": 0,
       "type": "skill",
       "rarity": "uncommon",
@@ -428,11 +474,13 @@ export const cardsBundle = {
           "amount": 3
         }
       ],
-      "flavor": "The world narrows to the next swing."
+      "flavor": "The world narrows to the next swing.",
+      "flavor_es": "El mundo se reduce al siguiente golpe."
     },
     {
       "id": "bloodletting",
       "name": "Vein Tap",
+      "name_es": "Vena Abierta",
       "cost": 0,
       "type": "skill",
       "rarity": "uncommon",
@@ -443,11 +491,13 @@ export const cardsBundle = {
           "handler": "bloodletting"
         }
       ],
-      "flavor": "Pay in blood. Take the breath back."
+      "flavor": "Pay in blood. Take the breath back.",
+      "flavor_es": "Paga en sangre. Recupera el aliento."
     },
     {
       "id": "carnage",
       "name": "Sunder",
+      "name_es": "Quebranto",
       "cost": 2,
       "type": "attack",
       "rarity": "uncommon",
@@ -458,11 +508,13 @@ export const cardsBundle = {
           "amount": 20
         }
       ],
-      "flavor": "Too much hammer for one body."
+      "flavor": "Too much hammer for one body.",
+      "flavor_es": "Demasiado martillo para un solo cuerpo."
     },
     {
       "id": "combust",
       "name": "Banked Coal",
+      "name_es": "Carbón Guardado",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -473,11 +525,13 @@ export const cardsBundle = {
           "handler": "combust"
         }
       ],
-      "flavor": "Leave a coal in the grate. It works while you do."
+      "flavor": "Leave a coal in the grate. It works while you do.",
+      "flavor_es": "Deja un carbón en la rejilla. Trabaja mientras tú trabajas."
     },
     {
       "id": "dark_embrace",
       "name": "Ash Embrace",
+      "name_es": "Abrazo de Ceniza",
       "cost": 2,
       "type": "power",
       "rarity": "uncommon",
@@ -488,11 +542,13 @@ export const cardsBundle = {
           "handler": "dark_embrace"
         }
       ],
-      "flavor": "What burns away still warms the hands."
+      "flavor": "What burns away still warms the hands.",
+      "flavor_es": "Lo que se quema todavía calienta las manos."
     },
     {
       "id": "dropkick",
       "name": "Heel Drop",
+      "name_es": "Golpe de Talón",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -507,11 +563,13 @@ export const cardsBundle = {
           "amount": 1
         }
       ],
-      "flavor": "The boot comes down where the hammer cannot."
+      "flavor": "The boot comes down where the hammer cannot.",
+      "flavor_es": "La bota cae donde el martillo no llega."
     },
     {
       "id": "entrench",
       "name": "Brace",
+      "name_es": "Apoyo Firme",
       "cost": 2,
       "type": "skill",
       "rarity": "uncommon",
@@ -522,11 +580,13 @@ export const cardsBundle = {
           "handler": "entrench"
         }
       ],
-      "flavor": "Set your feet in the clinker."
+      "flavor": "Set your feet in the clinker.",
+      "flavor_es": "Planta los pies en la escoria."
     },
     {
       "id": "feel_no_pain",
       "name": "Cinder Skin",
+      "name_es": "Piel de Ascuas",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -537,11 +597,13 @@ export const cardsBundle = {
           "handler": "feel_no_pain"
         }
       ],
-      "flavor": "The burn stops meaning anything."
+      "flavor": "The burn stops meaning anything.",
+      "flavor_es": "La quemadura deja de significar algo."
     },
     {
       "id": "flame_barrier",
       "name": "Flame Ward",
+      "name_es": "Velo de Fuego",
       "cost": 2,
       "type": "skill",
       "rarity": "uncommon",
@@ -552,11 +614,13 @@ export const cardsBundle = {
           "amount": 12
         }
       ],
-      "flavor": "A curtain of fire that bites back."
+      "flavor": "A curtain of fire that bites back.",
+      "flavor_es": "Una cortina de fuego que muerde de vuelta."
     },
     {
       "id": "ghostly_armor",
       "name": "Cinder Shroud",
+      "name_es": "Sudario de Ascuas",
       "cost": 1,
       "type": "skill",
       "rarity": "uncommon",
@@ -567,11 +631,13 @@ export const cardsBundle = {
           "amount": 10
         }
       ],
-      "flavor": "Ash remembers the shape of armor."
+      "flavor": "Ash remembers the shape of armor.",
+      "flavor_es": "La ceniza recuerda la forma de la armadura."
     },
     {
       "id": "hemokinesis",
       "name": "Blood Hammer",
+      "name_es": "Martillo de Sangre",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -582,11 +648,13 @@ export const cardsBundle = {
           "handler": "hemokinesis"
         }
       ],
-      "flavor": "The swing costs a little of you."
+      "flavor": "The swing costs a little of you.",
+      "flavor_es": "El golpe cuesta un poco de ti."
     },
     {
       "id": "inflame",
       "name": "Stoke",
+      "name_es": "Avivar",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -599,11 +667,13 @@ export const cardsBundle = {
           "to": "self"
         }
       ],
-      "flavor": "Feed the fire in the arm."
+      "flavor": "Feed the fire in the arm.",
+      "flavor_es": "Alimenta el fuego del brazo."
     },
     {
       "id": "metallicize",
       "name": "Scale Up",
+      "name_es": "Metalizado",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -616,11 +686,13 @@ export const cardsBundle = {
           "to": "self"
         }
       ],
-      "flavor": "Plates knit between blows."
+      "flavor": "Plates knit between blows.",
+      "flavor_es": "Las placas se tejen entre golpes."
     },
     {
       "id": "pummel",
       "name": "Hail of Blows",
+      "name_es": "Lluvia de Golpes",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -646,11 +718,13 @@ export const cardsBundle = {
           "verb": "exhaust"
         }
       ],
-      "flavor": "Four short strikes, then nothing left."
+      "flavor": "Four short strikes, then nothing left.",
+      "flavor_es": "Cuatro golpes cortos, y nada queda."
     },
     {
       "id": "rampage",
       "name": "Climbing Heat",
+      "name_es": "Calor Ascendente",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -661,11 +735,13 @@ export const cardsBundle = {
           "handler": "rampage"
         }
       ],
-      "flavor": "Each swing teaches the next."
+      "flavor": "Each swing teaches the next.",
+      "flavor_es": "Cada golpe enseña al siguiente."
     },
     {
       "id": "rupture",
       "name": "Split Seam",
+      "name_es": "Costura Abierta",
       "cost": 1,
       "type": "power",
       "rarity": "uncommon",
@@ -676,11 +752,13 @@ export const cardsBundle = {
           "handler": "rupture"
         }
       ],
-      "flavor": "When you bleed, the hammer gets heavier."
+      "flavor": "When you bleed, the hammer gets heavier.",
+      "flavor_es": "Cuando sangras, el martillo pesa más."
     },
     {
       "id": "shockwave",
       "name": "Heat Wash",
+      "name_es": "Ola de Calor",
       "cost": 2,
       "type": "skill",
       "rarity": "uncommon",
@@ -699,11 +777,13 @@ export const cardsBundle = {
           "to": "enemy"
         }
       ],
-      "flavor": "A wave that leaves them open and weak."
+      "flavor": "A wave that leaves them open and weak.",
+      "flavor_es": "Una ola que los deja abiertos y débiles."
     },
     {
       "id": "uppercut",
       "name": "Rising Blow",
+      "name_es": "Gancho Ascendente",
       "cost": 2,
       "type": "attack",
       "rarity": "uncommon",
@@ -726,11 +806,13 @@ export const cardsBundle = {
           "to": "enemy"
         }
       ],
-      "flavor": "Up from the floor of the furnace."
+      "flavor": "Up from the floor of the furnace.",
+      "flavor_es": "Desde el suelo del horno hacia arriba."
     },
     {
       "id": "bludgeon",
       "name": "Maul",
+      "name_es": "Maza",
       "cost": 3,
       "type": "attack",
       "rarity": "rare",
@@ -741,11 +823,13 @@ export const cardsBundle = {
           "amount": 32
         }
       ],
-      "flavor": "One stroke. The argument ends."
+      "flavor": "One stroke. The argument ends.",
+      "flavor_es": "Un solo golpe. El argumento termina."
     },
     {
       "id": "impervious",
       "name": "Unbroken",
+      "name_es": "Inquebrantable",
       "cost": 2,
       "type": "skill",
       "rarity": "rare",
@@ -759,11 +843,13 @@ export const cardsBundle = {
           "verb": "exhaust"
         }
       ],
-      "flavor": "Nothing gets through. Then the plate is spent."
+      "flavor": "Nothing gets through. Then the plate is spent.",
+      "flavor_es": "Nada pasa. Luego la placa se agota."
     },
     {
       "id": "limit_break",
       "name": "Overtemper",
+      "name_es": "Sobretemple",
       "cost": 1,
       "type": "skill",
       "rarity": "rare",
@@ -774,11 +860,13 @@ export const cardsBundle = {
           "handler": "limit_break"
         }
       ],
-      "flavor": "Past the point the metal was meant to hold."
+      "flavor": "Past the point the metal was meant to hold.",
+      "flavor_es": "Más allá del punto que el metal debía soportar."
     },
     {
       "id": "offering",
       "name": "Blood Tithe",
+      "name_es": "Diezmo de Sangre",
       "cost": 0,
       "type": "skill",
       "rarity": "rare",
@@ -789,11 +877,13 @@ export const cardsBundle = {
           "handler": "offering"
         }
       ],
-      "flavor": "Feed the kiln. It pays you back in breath and cards."
+      "flavor": "Feed the kiln. It pays you back in breath and cards.",
+      "flavor_es": "Alimenta el horno. Te paga en aliento y en cartas."
     },
     {
       "id": "reaper",
       "name": "Ash Harvest",
+      "name_es": "Cosecha de Ceniza",
       "cost": 2,
       "type": "attack",
       "rarity": "rare",
@@ -804,11 +894,13 @@ export const cardsBundle = {
           "handler": "reaper"
         }
       ],
-      "flavor": "What you cut comes back as heat in the chest."
+      "flavor": "What you cut comes back as heat in the chest.",
+      "flavor_es": "Lo que cortas vuelve como calor en el pecho."
     },
     {
       "id": "cinder_flick",
       "name": "Cinder Flick",
+      "name_es": "Destello de Ascuas",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -820,11 +912,13 @@ export const cardsBundle = {
           "hits": 3
         }
       ],
-      "flavor": "Three sparks before the iron knows it has been hit."
+      "flavor": "Three sparks before the iron knows it has been hit.",
+      "flavor_es": "Tres chispas antes de que el hierro sepa que lo golpearon."
     },
     {
       "id": "heavy_swing",
       "name": "Heavy Swing",
+      "name_es": "Golpe Pesado",
       "cost": 2,
       "type": "attack",
       "rarity": "common",
@@ -835,11 +929,13 @@ export const cardsBundle = {
           "amount": 14
         }
       ],
-      "flavor": "Both hands. All shoulder. No apology."
+      "flavor": "Both hands. All shoulder. No apology.",
+      "flavor_es": "Las dos manos. Todo el hombro. Sin disculpas."
     },
     {
       "id": "kindled_blade",
       "name": "Kindled Blade",
+      "name_es": "Filo Encendido",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -853,11 +949,13 @@ export const cardsBundle = {
           "verb": "retain"
         }
       ],
-      "flavor": "It never quite leaves your grip."
+      "flavor": "It never quite leaves your grip.",
+      "flavor_es": "Nunca del todo sale de tu puño."
     },
     {
       "id": "slag_shrapnel",
       "name": "Slag Shrapnel",
+      "name_es": "Metralla de Escoria",
       "cost": 1,
       "type": "attack",
       "rarity": "common",
@@ -869,11 +967,13 @@ export const cardsBundle = {
           "hits": 4
         }
       ],
-      "flavor": "The wheel throws sparks; you throw worse."
+      "flavor": "The wheel throws sparks; you throw worse.",
+      "flavor_es": "La rueda lanza chispas; tú lanzas algo peor."
     },
     {
       "id": "scrap_shield",
       "name": "Scrap Shield",
+      "name_es": "Escudo de Retazos",
       "cost": 0,
       "type": "skill",
       "rarity": "common",
@@ -887,11 +987,13 @@ export const cardsBundle = {
           "verb": "exhaust"
         }
       ],
-      "flavor": "Off-cuts hold a blow. Once."
+      "flavor": "Off-cuts hold a blow. Once.",
+      "flavor_es": "Los recortes aguantan un golpe. Una vez."
     },
     {
       "id": "bellows_work",
       "name": "Bellows Work",
+      "name_es": "Labor del Fuelle",
       "cost": 1,
       "type": "power",
       "rarity": "common",
@@ -904,11 +1006,13 @@ export const cardsBundle = {
           "to": "self"
         }
       ],
-      "flavor": "A steady draw makes steady hands."
+      "flavor": "A steady draw makes steady hands.",
+      "flavor_es": "Un tiro parejo hace manos firmes."
     },
     {
       "id": "forge_stance",
       "name": "Forge Stance",
+      "name_es": "Postura de Forja",
       "cost": 1,
       "type": "skill",
       "rarity": "uncommon",
@@ -921,11 +1025,13 @@ export const cardsBundle = {
           "to": "self"
         }
       ],
-      "flavor": "Feet like anvils. Hands like water."
+      "flavor": "Feet like anvils. Hands like water.",
+      "flavor_es": "Pies como yunques. Manos como agua."
     },
     {
       "id": "ember_ward",
       "name": "Ember Ward",
+      "name_es": "Resguardo de Ascuas",
       "cost": 2,
       "type": "skill",
       "rarity": "uncommon",
@@ -939,11 +1045,13 @@ export const cardsBundle = {
           "verb": "retain"
         }
       ],
-      "flavor": "Hold the glow. It holds you."
+      "flavor": "Hold the glow. It holds you.",
+      "flavor_es": "Sostén el resplandor. Te sostiene."
     },
     {
       "id": "tallow_rub",
       "name": "Tallow Rub",
+      "name_es": "Unte de Sebo",
       "cost": 1,
       "type": "skill",
       "rarity": "uncommon",
@@ -957,11 +1065,13 @@ export const cardsBundle = {
           "verb": "exhaust"
         }
       ],
-      "flavor": "Old smoke, new skin."
+      "flavor": "Old smoke, new skin.",
+      "flavor_es": "Humo viejo, piel nueva."
     },
     {
       "id": "forge_rhythm",
       "name": "Forge Rhythm",
+      "name_es": "Ritmo de Forja",
       "cost": 1,
       "type": "skill",
       "rarity": "uncommon",
@@ -976,11 +1086,13 @@ export const cardsBundle = {
           "amount": 1
         }
       ],
-      "flavor": "Strike, turn, strike — the beat does the work."
+      "flavor": "Strike, turn, strike — the beat does the work.",
+      "flavor_es": "Golpea, gira, golpea: el compás hace el trabajo."
     },
     {
       "id": "slag_wall",
       "name": "Slag Wall",
+      "name_es": "Muro de Escoria",
       "cost": 2,
       "type": "skill",
       "rarity": "uncommon",
@@ -991,11 +1103,13 @@ export const cardsBundle = {
           "amount": 16
         }
       ],
-      "flavor": "Pour it cool and stand behind it."
+      "flavor": "Pour it cool and stand behind it.",
+      "flavor_es": "Viértelo frío y ponte detrás."
     },
     {
       "id": "cinder_storm",
       "name": "Cinder Storm",
+      "name_es": "Tormenta de Ascuas",
       "cost": 2,
       "type": "attack",
       "rarity": "uncommon",
@@ -1008,11 +1122,13 @@ export const cardsBundle = {
           "target": "all_enemies"
         }
       ],
-      "flavor": "The draft turns and everyone is downwind."
+      "flavor": "The draft turns and everyone is downwind.",
+      "flavor_es": "La corriente gira y todos quedan a sotavento."
     },
     {
       "id": "anvil_rain",
       "name": "Anvil Rain",
+      "name_es": "Lluvia de Yunces",
       "cost": 2,
       "type": "attack",
       "rarity": "uncommon",
@@ -1024,11 +1140,13 @@ export const cardsBundle = {
           "hits": 3
         }
       ],
-      "flavor": "What goes up quenched comes down angry."
+      "flavor": "What goes up quenched comes down angry.",
+      "flavor_es": "Lo que sube enfriado baja con rabia."
     },
     {
       "id": "pressure_spike",
       "name": "Pressure Spike",
+      "name_es": "Pico de Presión",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -1043,11 +1161,13 @@ export const cardsBundle = {
           "amount": 1
         }
       ],
-      "flavor": "Vent the chamber through the target."
+      "flavor": "Vent the chamber through the target.",
+      "flavor_es": "Libera la cámara a través del objetivo."
     },
     {
       "id": "weight_of_iron",
       "name": "Weight of Iron",
+      "name_es": "Peso del Hierro",
       "cost": 2,
       "type": "attack",
       "rarity": "uncommon",
@@ -1064,11 +1184,13 @@ export const cardsBundle = {
           "to": "enemy"
         }
       ],
-      "flavor": "Heavy things argue best."
+      "flavor": "Heavy things argue best.",
+      "flavor_es": "Las cosas pesadas argumentan mejor."
     },
     {
       "id": "tempered_strike",
       "name": "Tempered Strike",
+      "name_es": "Golpe Templado",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -1083,11 +1205,13 @@ export const cardsBundle = {
           "amount": 6
         }
       ],
-      "flavor": "Quenched at the edge, hard at the face."
+      "flavor": "Quenched at the edge, hard at the face.",
+      "flavor_es": "Enfriado en el filo, duro en la cara."
     },
     {
       "id": "seam_finder",
       "name": "Seam Finder",
+      "name_es": "Busca Costuras",
       "cost": 1,
       "type": "attack",
       "rarity": "uncommon",
@@ -1105,11 +1229,13 @@ export const cardsBundle = {
           "to": "enemy"
         }
       ],
-      "flavor": "Every casting has one. Find it."
+      "flavor": "Every casting has one. Find it.",
+      "flavor_es": "Cada pieza fundida tiene una. Encuéntrala."
     },
     {
       "id": "furnace_heart",
       "name": "Furnace Heart",
+      "name_es": "Corazón de Horno",
       "cost": 2,
       "type": "power",
       "rarity": "uncommon",
@@ -1122,11 +1248,13 @@ export const cardsBundle = {
           "to": "self"
         }
       ],
-      "flavor": "It does not beat. It roars."
+      "flavor": "It does not beat. It roars.",
+      "flavor_es": "No late. Ruge."
     },
     {
       "id": "kiln_wrath",
       "name": "Kiln Wrath",
+      "name_es": "Ira del Horno",
       "cost": 3,
       "type": "attack",
       "rarity": "rare",
@@ -1138,11 +1266,13 @@ export const cardsBundle = {
           "hits": 3
         }
       ],
-      "flavor": "The whole kiln, delivered at once."
+      "flavor": "The whole kiln, delivered at once.",
+      "flavor_es": "El horno entero, entregado de una vez."
     },
     {
       "id": "great_pyre",
       "name": "Great Pyre",
+      "name_es": "Gran Pira",
       "cost": 2,
       "type": "attack",
       "rarity": "rare",
@@ -1156,11 +1286,13 @@ export const cardsBundle = {
           "verb": "exhaust"
         }
       ],
-      "flavor": "Build it tall. Walk away."
+      "flavor": "Build it tall. Walk away.",
+      "flavor_es": "Álzala alta. Aléjate caminando."
     },
     {
       "id": "ember_tide",
       "name": "Ember Tide",
+      "name_es": "Marea de Ascuas",
       "cost": 2,
       "type": "attack",
       "rarity": "rare",
@@ -1173,11 +1305,13 @@ export const cardsBundle = {
           "target": "all_enemies"
         }
       ],
-      "flavor": "Open every grate at once."
+      "flavor": "Open every grate at once.",
+      "flavor_es": "Abre todas las rejillas a la vez."
     },
     {
       "id": "pyre_feast",
       "name": "Pyre Feast",
+      "name_es": "Banquete de Pira",
       "cost": 2,
       "type": "attack",
       "rarity": "rare",
@@ -1193,11 +1327,13 @@ export const cardsBundle = {
           "amount": 5
         }
       ],
-      "flavor": "The fire eats. You eat first."
+      "flavor": "The fire eats. You eat first.",
+      "flavor_es": "El fuego come. Tú comes primero."
     },
     {
       "id": "blaze_bellows",
       "name": "Blaze Bellows",
+      "name_es": "Fuelle de Llamas",
       "cost": 1,
       "type": "skill",
       "rarity": "rare",
@@ -1211,11 +1347,13 @@ export const cardsBundle = {
           "verb": "exhaust"
         }
       ],
-      "flavor": "One great heave and the room is white."
+      "flavor": "One great heave and the room is white.",
+      "flavor_es": "Un gran empujón y la sala queda en blanco."
     },
     {
       "id": "rekindle",
       "name": "Rekindle",
+      "name_es": "Reavivar",
       "cost": 2,
       "type": "skill",
       "rarity": "rare",
@@ -1233,11 +1371,13 @@ export const cardsBundle = {
           "verb": "exhaust"
         }
       ],
-      "flavor": "Bank the coals. Breathe. Begin again."
+      "flavor": "Bank the coals. Breathe. Begin again.",
+      "flavor_es": "Guarda las brasas. Respira. Empieza otra vez."
     },
     {
       "id": "hearth_stand",
       "name": "Hearth Stand",
+      "name_es": "Última Hoguera",
       "cost": 3,
       "type": "skill",
       "rarity": "rare",
@@ -1251,11 +1391,13 @@ export const cardsBundle = {
           "verb": "retain"
         }
       ],
-      "flavor": "The last stand is taken at the hearth."
+      "flavor": "The last stand is taken at the hearth.",
+      "flavor_es": "La última resistencia se hace en el hogar."
     },
     {
       "id": "forge_flood",
       "name": "Forge Flood",
+      "name_es": "Inundación de Forja",
       "cost": 2,
       "type": "skill",
       "rarity": "rare",
@@ -1270,7 +1412,8 @@ export const cardsBundle = {
           "amount": 1
         }
       ],
-      "flavor": "Open the sluice. Let the work pour."
+      "flavor": "Open the sluice. Let the work pour.",
+      "flavor_es": "Abre la compuerta. Deja que el trabajo se vierta."
     }
   ],
   "statuses": {

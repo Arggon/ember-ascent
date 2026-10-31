@@ -11,11 +11,31 @@ import { pickAt } from '../rng.js';
 export const QUEST_COUNT = 3;
 
 export const QUESTS = Object.freeze({
-  hunter: { name: 'Elite Hunter', goal: 1, text: 'Win a fight against an elite.', reward: { maxHp: 8 }, rewardText: '+8 max HP' },
-  smith: { name: "Smith's Rhythm", goal: 30, text: 'Play 30 cards.', reward: { heal: 12 }, rewardText: 'Heal 12' },
-  blade: { name: 'Bladework', goal: 120, text: 'Deal 120 damage.', reward: { maxHp: 6 }, rewardText: '+6 max HP' },
-  wall: { name: 'Ironwall', goal: 60, text: 'Gain 60 Block.', reward: { maxHp: 6 }, rewardText: '+6 max HP' },
-  pilgrim: { name: 'Pilgrim', goal: 2, text: 'Reach 2 campfires.', reward: { heal: 15 }, rewardText: 'Heal 15' },
+  hunter: {
+    name: 'Elite Hunter', name_es: 'Cazador de Élites',
+    goal: 1, text: 'Win a fight against an elite.', text_es: 'Gana un combate contra un élite.',
+    reward: { maxHp: 8 }, rewardText: '+8 max HP', rewardText_es: '+8 de HP máximo',
+  },
+  smith: {
+    name: "Smith's Rhythm", name_es: 'Ritmo del Herrero',
+    goal: 30, text: 'Play 30 cards.', text_es: 'Juega 30 cartas.',
+    reward: { heal: 12 }, rewardText: 'Heal 12', rewardText_es: 'Cura 12',
+  },
+  blade: {
+    name: 'Bladework', name_es: 'Labores de Filo',
+    goal: 120, text: 'Deal 120 damage.', text_es: 'Inflige 120 de daño.',
+    reward: { maxHp: 6 }, rewardText: '+6 max HP', rewardText_es: '+6 de HP máximo',
+  },
+  wall: {
+    name: 'Ironwall', name_es: 'Muro de Hierro',
+    goal: 60, text: 'Gain 60 Block.', text_es: 'Gana 60 de Bloqueo.',
+    reward: { maxHp: 6 }, rewardText: '+6 max HP', rewardText_es: '+6 de HP máximo',
+  },
+  pilgrim: {
+    name: 'Pilgrim', name_es: 'Peregrino',
+    goal: 2, text: 'Reach 2 campfires.', text_es: 'Alcanza 2 hogueras.',
+    reward: { heal: 15 }, rewardText: 'Heal 15', rewardText_es: 'Cura 15',
+  },
 });
 /** Stable order, part of the format (the seeded roll indexes into it). */
 export const QUEST_IDS = Object.freeze(['hunter', 'smith', 'blade', 'wall', 'pilgrim']);

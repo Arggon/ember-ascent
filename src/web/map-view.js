@@ -174,14 +174,14 @@ function toggleMapPin(id) {
 
 function mapNode(n) {
   const short = n.type.replace('combat_', '');
-  // I18N-1: the node words are chrome, resolved per paint in the current language. The
-  // warden's NAME is a proper noun in every language ("Slag Warden", "Cinder Foreman");
-  // the words around it localize. Computed BEFORE the node so the aria-label and the
-  // visible word cannot disagree.
+  // I18N-1: the node words are chrome, resolved per paint in the current language.
+  // I18N-2: the warden words localize too ("El Guardián de Escoria" / "El Capataz de
+  // Ascuas" — the enemies table's own twins). Computed BEFORE the node so the
+  // aria-label and the visible word cannot disagree.
   const word = t(`map.node.${short}`);
   const sub = t(`map.node.${short}.sub`);
   const words = short === 'boss' && (snap.act ?? 1) >= 2
-    ? ['Cinder Foreman', t('map.bossSub')]
+    ? [(t('map.bossAct2') || 'Cinder Foreman'), t('map.bossSub')]
     : [(word || (NODE_WORDS[short] || [n.label])[0]), (sub || (NODE_WORDS[short] || ['', ''])[1] || '')];
   const cls = `node t-${short}` + (n.available ? ' available' : '') + (n.current ? ' current' : '');
   // The travel TOOLTIP interpolates the LOCALIZED node label (map.label.<type>), never

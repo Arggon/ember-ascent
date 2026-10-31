@@ -7,7 +7,7 @@
 import { snap } from './runtime.js';
 import { el } from './dom.js';
 import { glyphBox } from './glyphs.js';
-import { ledgerBlock, ledgerMath, lastRecord, lastUnlock, recognitionText, savedOk, unlockBlock } from './run-history.js';
+import { ledgerBlock, ledgerMath, lastRecord, lastUnlock, localizedMark, recognitionText, savedOk, unlockBlock } from './run-history.js';
 import { newGame } from './actions.js';
 import { page } from './page-frame.js';
 import { t } from './i18n.js';
@@ -71,9 +71,12 @@ export function endView() {
     wrap.append(el('p', { cls: 'section-title', text: t('end.marks') }));
     const list = el('ul', { cls: 'marks' });
     for (const mark of marks) {
+      // I18N-2: the mark's words are the catalog's own twins, localized at paint time;
+      // the persisted record keeps its English name/condition.
+      const words = localizedMark(mark);
       list.append(el('li', { cls: 'mark-item' },
-        el('span', { cls: 'mark-name', text: mark.name }),
-        el('span', { cls: 'mark-cond', text: mark.condition }),
+        el('span', { cls: 'mark-name', text: words.name }),
+        el('span', { cls: 'mark-cond', text: words.condition }),
       ));
     }
     wrap.append(list);

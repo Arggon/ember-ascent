@@ -21,7 +21,7 @@ import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
 import { POTION_SLOTS, potionDef } from './rules/potions.js';
-import { eventDef, offerEventChoices, temperOfferOpen } from './rules/events.js';
+import { eventDef, offerEventChoices, renderEventLines, temperOfferOpen } from './rules/events.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
 // of the abbreviations that describe.js explains.
@@ -326,7 +326,8 @@ function beltBody(state) {
 // Pile renderings tolerate an unknown id the way rewardBody does: the raw id stands in
 // for the name instead of a throw (defOrNull above).
 const pileNames = (pile) => (pile.length === 0 ? '-' : pile.map((c) => defOrNull(c)?.name ?? cardIdOf(c)).join(', '));
-const pileCardNames = (pile) => (pile ?? []).map((c) => defOrNull(c)?.name ?? cardIdOf(c));
+// I18N-2: the snapshot's pile viewer takes the language; the compact dump's pileNames above does not.
+const pileCardNames = (pile, lang = 'en') => (pile ?? []).map((c) => fieldFor(defOrNull(c), 'name', lang) || cardIdOf(c));
 
 function rewardBody(state) {
   // S7: the BOSS reward — the warden's relic offers replace the cards (StS
@@ -449,7 +450,9 @@ function eventBody(state) {
     lines.push('RESOLVED');
     // Array.isArray, not `?? []`: a torn resolved beat (lines = 42, or a string) is
     // validateSave-accepted and used to throw straight out of observe() (S6.1 review P2).
-    const beat = Array.isArray(ev.resolved?.lines) ? ev.resolved.lines : [];
+    // I18N-2: the stored beat is structured slugs now; the dump renders their ENGLISH
+    // column (byte-identical to the pre-I18N-2 baked sentences) — the agent contract.
+    const beat = renderEventLines(ev.resolved?.lines, 'en', CARD_DEFS ?? defaultContent().cards);
     beat.forEach((l) => lines.push(` ${l}`));
     lines.push(` v0 continue (HP ${state.player.hp}/${state.player.maxHp}, purse ${state.player.gold ?? 0})`);
     return lines;
@@ -605,10 +608,15 @@ function statusPairs(statuses, lang = 'en') {
 }
 
 /** The hero's relic name and switched-off text, for relic-off boon text. */
-function heroRelic(state) {
+function heroRelic(state, lang = 'en') {
+  const es = lang === 'es';
+  const ch = defaultContent().characters.get(state.character);
+  const def = RELICS[relicId(state)];
   return {
-    name: defaultContent().characters.get(state.character)?.relicName ?? 'relic',
-    offText: RELICS[relicId(state)]?.offText ?? 'stops working',
+    name: (es ? ch?.relicName_es : null) || ch?.relicName || 'relic',
+    name_es: ch?.relicName_es,
+    offText: (es ? def?.offText_es : null) || def?.offText || 'stops working',
+    offText_es: def?.offText_es,
   };
 }
 
@@ -719,7 +727,9 @@ function snapshotEnemies(state, lang = 'en') {
       return {
         index: e.index,
         id: e.id,
-        name: def.name,
+        // I18N-2: the display twin renders in the snapshot's language; the state's own
+        // `name` (stateName) stays English — the hash never moves for a language choice.
+        name: fieldFor(def, 'name', lang),
         hp: e.hp,
         maxHp: e.maxHp,
         block: e.block,
@@ -846,11 +856,16 @@ function snapshotRest(state, legal, lang = 'en') {
 }
 
 /** The kindling section of a snapshot, or null when no boon is being chosen. */
-function snapshotKindling(state) {
+function snapshotKindling(state, lang = 'en') {
   if (state.phase !== 'kindling') return null;
   return {
     boons: state.kindling.offers.map((id, i) => ({
-      id, name: BOONS[id].name, text: boonText(id, heroRelic(state)), label: BOONS[id].label, actionId: `k${i + 1}`,
+      id,
+      // I18N-2: the boon's display twin; `label` stays the compact agent-facing token.
+      name: fieldFor(BOONS[id], 'name', lang),
+      text: boonText(id, heroRelic(state, lang), lang),
+      label: BOONS[id].label,
+      actionId: `k${i + 1}`,
     })),
   };
 }
@@ -1056,8 +1071,14 @@ function snapshotEvent(state, legal, lang = 'en') {
     // Array.isArray, not a spread default: a torn beat (lines = 42, or a string) is
     // validateSave-accepted and `[...(lines ?? [])]` threw straight out of snapshot()
     // (S6.1 review P2) — the same guard the dump applies to the same field.
+    // I18N-2: the beat renders in the snapshot's language from its structured slugs
+    // (rules/events.js renderEventLines); a legacy save's baked English sentence
+    // strings pass through verbatim — the honest degrade, documented in PLAYING.md.
     resolved: ev?.resolved
-      ? { choice: ev.resolved.choice, lines: Array.isArray(ev.resolved?.lines) ? ev.resolved.lines : [] }
+      ? {
+          choice: ev.resolved.choice,
+          lines: renderEventLines(ev.resolved?.lines, lang, CARD_DEFS ?? defaultContent().cards),
+        }
       : null,
     continueId: legal.find((a) => a.kind === 'event_continue')?.id ?? null,
   };
@@ -1084,6 +1105,11 @@ const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
  */
 function snapshotDeck(state, lang = 'en') {
   const rows = new Map();
+  // The English face name per row key: the sheet's SORT key stays language-independent
+  // (cost, then English name, then id, then temper) while the row's `name` renders in
+  // the snapshot's language — an es sheet and an en one read the same rows in the same
+  // order, worded differently.
+  const enNames = new Map();
   for (const inst of state.deck ?? []) {
     // Tolerant on purpose (rewardBody's policy — the text dump's tolerant lookup, shared
     // as defOrNull above): a deck id the content no longer knows — a stale save after a
@@ -1095,6 +1121,7 @@ function snapshotDeck(state, lang = 'en') {
     // is skipped. Its neutral cost (0) is a sort key, not a claim.
     const def = defOrNull(inst.cardId);
     if (!def) {
+      enNames.set(`${inst.cardId}|`, inst.cardId);
       const key = `${inst.cardId}|`;
       const row = rows.get(key);
       if (row) { row.count += 1; continue; }
@@ -1114,6 +1141,7 @@ function snapshotDeck(state, lang = 'en') {
     }
     const { temper } = temperedView(state, inst, def);
     const key = `${inst.cardId}|${temper ?? ''}`;
+    enNames.set(key, def.name);
     const row = rows.get(key);
     if (row) { row.count += 1; continue; }
     rows.set(key, {
@@ -1129,8 +1157,14 @@ function snapshotDeck(state, lang = 'en') {
       count: 1,
     });
   }
-  return [...rows.values()].sort((a, b) =>
-    (a.cost - b.cost) || byStr(a.name, b.name) || byStr(a.cardId, b.cardId) || byStr(a.temper ?? '', b.temper ?? ''));
+  return [...rows.values()]
+    .map((row) => ({ row, sortName: enNames.get(`${row.cardId}|${row.temper ?? ''}`) ?? row.name }))
+    .sort((a, b) =>
+      (a.row.cost - b.row.cost)
+      || byStr(a.sortName, b.sortName)
+      || byStr(a.row.cardId, b.row.cardId)
+      || byStr(a.row.temper ?? '', b.row.temper ?? ''))
+    .map(({ row }) => row);
 }
 
 /** Rarity tiers in codex order; anything unknown sorts last, so a new tier cannot crash the sheet. */
@@ -1158,8 +1192,16 @@ const RARITY_TIER = { common: 0, uncommon: 1, rare: 2 };
 export function cardPool(opts = {}) {
   const lang = langOf(opts);
   const content = defaultContent();
+  // Sort on the DEFINITIONS (whose `name` is the English face name) BEFORE the rows
+  // are worded: the row order is language-independent, so an es surface and an en one
+  // show the same list order while each renders its own names.
   return draftPoolFrom(content)
     .map((id) => content.cards.get(id))
+    .sort((a, b) =>
+      ((RARITY_TIER[a.rarity] ?? 9) - (RARITY_TIER[b.rarity] ?? 9))
+      || (a.cost - b.cost)
+      || byStr(a.name, b.name)
+      || byStr(a.id, b.id))
     .map((def) => ({
       cardId: def.id,
       rarity: def.rarity,
@@ -1171,12 +1213,7 @@ export function cardPool(opts = {}) {
       // `description` the sentence a human reads.
       summary: effectSummary(def),
       description: describeCard(def, {}, lang),
-    }))
-    .sort((a, b) =>
-      ((RARITY_TIER[a.rarity] ?? 9) - (RARITY_TIER[b.rarity] ?? 9))
-      || (a.cost - b.cost)
-      || byStr(a.name, b.name)
-      || byStr(a.cardId, b.cardId));
+    }));
 }
 
 /**
@@ -1220,13 +1257,16 @@ export function snapshot(state, opts = {}) {
     // after the transition — derived kernel-side (rules/encounters.js currentBiome),
     // because state.biome stays the STARTING biome (the log header's meaning).
     biome: currentBiome(state),
-    biomeName: BIOMES[currentBiome(state)].name,
+    // I18N-2: the biome's display twin renders with the snapshot's language.
+    biomeName: fieldFor(BIOMES[currentBiome(state)], 'name', lang),
     // S9: the START paths — every biome but the act-2 one (rules/encounters.js
     // startBiomeIds). The kindling picker renders these; the full table (including the
     // Deeps) stays in the public BIOMES export.
-    biomes: startBiomeIds().map((id) => ({ id, name: BIOMES[id].name })),
-    characterName: defaultContent().characters.get(state.character)?.name ?? state.character,
-    relicName: defaultContent().characters.get(state.character)?.relicName ?? '',
+    biomes: startBiomeIds().map((id) => ({ id, name: fieldFor(BIOMES[id], 'name', lang) })),
+    // I18N-2: the hero's display name. Ashwright is a proper noun and carries no twin
+    // (it renders identically in either language); the Bellows Keeper's title localizes.
+    characterName: fieldFor(defaultContent().characters.get(state.character), 'name', lang) || state.character,
+    relicName: fieldFor(defaultContent().characters.get(state.character), 'relicName', lang),
     difficulty: state.difficulty,
     seed: state.seed,
     player: {
@@ -1254,9 +1294,11 @@ export function snapshot(state, opts = {}) {
       discard: state.combat?.discard?.length ?? 0,
       exhaust: state.combat?.exhaust?.length ?? 0,
       // Names only, for the pile viewer. Counts above stay the compact facts.
-      drawCards: pileCardNames(state.combat?.draw),
-      discardCards: pileCardNames(state.combat?.discard),
-      exhaustCards: pileCardNames(state.combat?.exhaust),
+      // I18N-2: the viewer's names render in the snapshot's language; the compact
+      // dump's pile line (pileNames) stays English — the agent-facing contract.
+      drawCards: pileCardNames(state.combat?.draw, lang),
+      discardCards: pileCardNames(state.combat?.discard, lang),
+      exhaustCards: pileCardNames(state.combat?.exhaust, lang),
     },
     // S1 master-deck viewer: the whole run deck, aggregated and sorted (snapshotDeck
     // above). `deckCount` is the fact the HUD badge shows; the rows carry the rest.
@@ -1287,13 +1329,21 @@ export function snapshot(state, opts = {}) {
     map: snapshotMap(state, legal),
     reward: snapshotReward(state, legal, lang),
     rest: snapshotRest(state, legal, lang),
-    kindling: snapshotKindling(state),
+    kindling: snapshotKindling(state, lang),
     shop: snapshotShop(state, legal, lang),
     // S6 event: null outside the phase; the wayside story, its choice table, and the
     // resolved beat inside it.
     event: snapshotEvent(state, legal, lang),
     quests: state.quests
-      ? state.quests.map((q) => ({ id: q.id, name: QUESTS[q.id].name, text: QUESTS[q.id].text, goal: QUESTS[q.id].goal, progress: q.progress, done: q.done, rewardText: QUESTS[q.id].rewardText }))
+      ? state.quests.map((q) => ({
+          id: q.id,
+          name: fieldFor(QUESTS[q.id], 'name', lang),
+          text: fieldFor(QUESTS[q.id], 'text', lang),
+          goal: QUESTS[q.id].goal,
+          progress: q.progress,
+          done: q.done,
+          rewardText: fieldFor(QUESTS[q.id], 'rewardText', lang),
+        }))
       : null,
     // S7: the summary gains the relic count — what the run carried to its end. S9:
     // beside them, the act the run ended in (the climb's last chapter, for the end

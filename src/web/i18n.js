@@ -227,15 +227,17 @@ const STRINGS = {
   'map.node.elite.sub': { en: 'card reward', es: 'recompensa de carta' },
   'map.node.rest': { en: 'Campfire', es: 'Hoguera' },
   'map.node.rest.sub': { en: 'heal', es: 'recupera' },
-  // The warden's name is a proper noun in every language; only its sub-word localizes.
-  'map.node.boss': { en: 'Slag Warden', es: 'Slag Warden' },
+  // I18N-2: the warden words localize like every other name — the enemies table's own
+  // twins ("El Guardián de Escoria", "El Capataz de Ascuas") are the source of truth.
+  'map.node.boss': { en: 'Slag Warden', es: 'El Guardián de Escoria' },
   'map.node.boss.sub': { en: 'final fight', es: 'combate final' },
+  'map.bossAct2': { en: 'Cinder Foreman', es: 'El Capataz de Ascuas' },
   'map.node.shop': { en: 'Shop', es: 'Tienda' },
   'map.node.shop.sub': { en: 'buy · remove', es: 'compra · quita' },
   'map.node.event': { en: 'Wayside', es: 'El Camino' },
   'map.node.event.sub': { en: 'a choice', es: 'una elección' },
   'map.chapter.1': { en: 'I — The Path', es: 'I — El Sendero' },
-  'map.chapter.2': { en: 'II — The Kiln Deeps', es: 'II — las Hondonadas del Horno' },
+  'map.chapter.2': { en: 'II — The Kiln Deeps', es: 'II — Las Hondonadas del Horno' },
 
   /* ---- reward / warden --------------------------------------------------------- */
   'reward.relic.head': { en: 'Victory — claim the warden\u2019s relic', es: 'Victoria — reclama la reliquia del guardián' },
@@ -316,6 +318,10 @@ const STRINGS = {
   'kindling.note': { en: 'Take one. Each gift has a price.', es: 'Toma uno. Cada regalo tiene un precio.' },
   // Keyed by the HERO ID (actions.js HEROES), not the display name — the picker builds
   // the key as `hero.${h.id}.blurb`, so an id/key mismatch renders an empty node.
+  // I18N-2: the pick-screen names. Ashwright is a proper noun (renders identically);
+  // the Bellows Keeper's title localizes, article-less per the genderless-hero ruling.
+  'hero.ironclad.name': { en: 'Ashwright', es: 'Ashwright' },
+  'hero.bellows.name': { en: 'Bellows Keeper', es: 'Custodio del Fuelle' },
   'hero.ironclad.blurb': { en: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.', es: '60 HP. Martillo y yunque. Corazón Encendido: recupera 6 tras cada combate.' },
   'hero.bellows.blurb': { en: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.', es: '54 HP. Soplo del Fuelle golpea a todos los enemigos; Abanica las Llamas aviva la Energía. Farol Cian: +1 de Energía en el primer turno de cada combate.' },
   'page.kindling': { en: '0 — The Kindling', es: '0 — El Rescoldo' },
@@ -398,9 +404,11 @@ const STRINGS = {
   'map.label.boss': { en: 'boss', es: 'jefe' },
 
   /* ---- relic unlock thresholds (run-history.js relicThresholdLine) ------- */
-  'relicThreshold.crossed': { en: '{n} lifetime {plural} crossed the {marks} mark{marksPlural}.', es: '{n} {plural} de por vida cruzaron {marksClause} {marks}.' },
+  'relicThreshold.crossed': { en: '{n} lifetime {plural} crossed the {marks} mark{marksPlural}.', es: '{n} {plural} de por vida {verb} {marksClause} {marks}.' },
   'relicThreshold.plain': { en: '{n} lifetime {plural} on the ledger.', es: '{n} {plural} de por vida en el libro de cuentas.' },
   'relicThreshold.marksClause': { en: 'the', es: 'la marca de' },
+  'relicThreshold.verb': { en: 'crossed', es: 'cruzaron' },
+  'relicThreshold.verb1': { en: 'crossed', es: 'cruzó' },
   'relicThreshold.marksClausePlural': { en: 'the', es: 'las marcas de' },
 };
 

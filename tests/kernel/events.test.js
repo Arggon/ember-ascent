@@ -191,7 +191,10 @@ test('Sleeping Forge — stoke pays HP through the loseHp path and appends a poo
   assert.equal(left.rngDraws - idlePre.rngDraws, 0, 'the leave consumed nothing');
   assert.equal(left.deck.length, idle.deck.length);
   assert.equal(left.player.hp, idle.player.hp);
-  assert.deepEqual(left.event.resolved.lines, ['- Nothing happens.']);
+  // I18N-2: the beat is stored as structured slugs; the English rendering (snapshot
+  // default) is byte-identical to the pre-sweep baked sentence.
+  assert.deepEqual(left.event.resolved.lines, [{ slug: 'nothing' }]);
+  assert.deepEqual(snapshot(left).event.resolved.lines, ['- Nothing happens.']);
 });
 
 test('Sleeping Forge — the ember costs exactly 30 and grants a Rare; a poor purse gets no id and forcing it is the R6 rejection', () => {
@@ -225,7 +228,8 @@ test('Ash Peddler — the bottle costs 40 and lands a table potion; a full belt 
   let s = step(s0, 'v1').state;
   assert.equal(s.player.gold, 99 - POTION_PRICE);
   assert.equal(s.potions.length, 1, 'the bottle joined the belt');
-  assert.ok(s.event.resolved.lines.some((l) => l.includes('bottle')), 'the beat names the bottle');
+  // I18N-2: the beat is slugs in state; the rendered beat names the bottle (English).
+  assert.ok(snapshot(s).event.resolved.lines.some((l) => l.includes('bottle')), 'the beat names the bottle');
   assert.equal(s.rngDraws - pre.rngDraws, 1, 'the bottle consumed exactly one draw');
   const out = step(pre, 'v1');
   assert.deepEqual(out.events.map((e) => e.t), ['gold_spent', 'potion_drop']);
@@ -310,8 +314,9 @@ test('Collapsed Shaft — climb pays 60 for 12 HP through the fixed paths; the t
   const whole = eventOf('collapsed_shaft', { player: { gold: 50, hp: 60 } });
   const wholeOut = step(whole, 'v2');
   assert.deepEqual(wholeOut.events.map((e) => e.t), ['gold_spent'], 'no heal event at full health');
-  assert.ok(!wholeOut.state.event.resolved.lines.some((l) => l.includes('(+0')), 'the beat never prints +0');
-  assert.match(wholeOut.state.event.resolved.lines.join(' '), /already whole/);
+  const wholeBeat = snapshot(wholeOut.state).event.resolved.lines;
+  assert.ok(!wholeBeat.some((l) => l.includes('(+0')), 'the beat never prints +0');
+  assert.match(wholeBeat.join(' '), /already whole/);
   // The torch is a price like any other: a broke player gets no id.
   const broke = eventOf('collapsed_shaft', { player: { gold: TORCH_PRICE - 1 } });
   assert.ok(!actions(broke).some((a) => a.slug === 'torch'));
@@ -321,7 +326,8 @@ test('Collapsed Shaft — climb pays 60 for 12 HP through the fixed paths; the t
   const preIdle = { ...idle };
   const past = step(idle, 'v3').state;
   assert.equal(past.rngDraws - preIdle.rngDraws, 0);
-  assert.deepEqual(past.event.resolved.lines, ['- Nothing happens.']);
+  assert.deepEqual(past.event.resolved.lines, [{ slug: 'nothing' }]);
+  assert.deepEqual(snapshot(past).event.resolved.lines, ['- Nothing happens.']);
 });
 
 test('Wandering Smith — the temper choice reuses the rest site\u2019s offer builder as a committed modal', () => {
@@ -377,8 +383,9 @@ test('Wandering Smith — stories heal like a rest site; every card already temp
   const whole = eventOf('wandering_smith', { player: { hp: 60 } });
   const wholeOut = step(whole, 'v2');
   assert.deepEqual(wholeOut.events.map((e) => e.t), [], 'no heal event at full health');
-  assert.ok(!wholeOut.state.event.resolved.lines.some((l) => l.includes('(+0')), 'the beat never prints +0');
-  assert.match(wholeOut.state.event.resolved.lines.join(' '), /already whole/);
+  const wholeBeat = snapshot(wholeOut.state).event.resolved.lines;
+  assert.ok(!wholeBeat.some((l) => l.includes('(+0')), 'the beat never prints +0');
+  assert.match(wholeBeat.join(' '), /already whole/);
 
   // An all-tempered deck: the modal would be empty, so the choice is never offered.
   const base = newRun({ seed: 2, tempers: true });

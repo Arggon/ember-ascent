@@ -23,6 +23,8 @@ const TARGETS = ['enemy', 'all', 'self', 'none', 'random_enemy'];
 // carry name_es without flavor_es (or the reverse) and renders MIXED by design — each
 // field falls back to its own English twin, per the honest-fallback rule.
 const OPTIONAL_ES_FIELDS = ['name_es', 'flavor_es'];
+// I18N-2: the same twin rule for the character table (display name + starter relic name).
+const OPTIONAL_CHARACTER_ES_FIELDS = ['name_es', 'relicName_es'];
 
 /**
  * Parse and validate content.
@@ -84,6 +86,12 @@ export function loadContent(input = cardsBundle) {
   for (const [id, ch] of Object.entries(raw.characters)) {
     for (const cardId of ch.startingDeck) {
       if (!cards.has(cardId)) problems.push(`character "${id}": starting deck references unknown card "${cardId}"`);
+    }
+    for (const field of OPTIONAL_CHARACTER_ES_FIELDS) {
+      const v = ch[field];
+      if (v !== undefined && (typeof v !== 'string' || v.length === 0)) {
+        problems.push(`character "${id}": "${field}" must be a non-empty string when present`);
+      }
     }
     characters.set(id, Object.freeze({ ...ch, id }));
   }
