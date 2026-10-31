@@ -675,3 +675,14 @@ Process rules (standing):
   narration's es verb agrees with its subject (1 victoria ... cruzo). Contract
   re-verified mid-toggle (state byte-identical). Solo review next (I18N-2 + the leak
   fixes), then the 0.4.1 release rebuild.
+- 2026-10-30 — I18N-2 re-review VERDICT: REQUEST_CHANGES — and its P1 was the
+  ORCHESTRATOR'S OWN: the verb-agreement fix keyed the es verb on the mark-row count
+  (always 1) instead of the sentence subject (winsAfter), so 4 of 5 milestones read a
+  singular verb over a plural subject — the re-review reproduced it through the real
+  keys. Fixed in 33d8a4a (keyed on winsAfter === 1; the es narration composed at every
+  milestone: 1 cruzó / 3,7,10,15 cruzaron). Also: the METAL glossary row references the
+  swept name (Metalizado); the dead unlockPersistentLine deleted; the 3->2 worked-shape
+  noted as the general shape (3->1 is the format's only contraction); "A un Lado" title
+  case, with cards.bundle.js regenerated through the repo's own generator (the drift
+  test caught the direct edit). Gates: 428/427/1 node, 23/23 browser, gate OK, art OK.
+  Light re-verification of the verbatim fixes, then the 0.4.1 release rebuild.
