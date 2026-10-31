@@ -659,3 +659,11 @@ Process rules (standing):
   the second HUD row like the other overflow chips rather than clipping, and es itself
   adds ~+30px more through the wider Spanish labels. Solo review next; I18N-2 (card
   names/flavors, enemy names, kindling/quests, the resolved-lines format decision) queued.
+- 2026-10-30 — I18N-1.1 committed 04ae4fb; re-review VERDICT: APPROVE (the P1 verified
+  closed — the two-layer wiring test covers future heroes, the layers complementary;
+  every fix landed with evidence; two informational P3s documented: the
+  relicThreshold.crossed hole-parity exception needs a one-line comment, and the
+  wiring test's regex is shape-coupled with the e2e count as backstop — both
+  recorded). I18N-1 CLOSED. I18N-2 (the content sweep: 70 card names_es/flavor_es,
+  enemy names, kindling/quests, the article ruling carried: genderless "Ashwright ha
+  caído." unless the user rules otherwise) dispatched; release rebuild after.
