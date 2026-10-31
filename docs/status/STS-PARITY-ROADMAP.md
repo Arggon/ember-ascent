@@ -646,3 +646,13 @@ Process rules (standing):
   no-decision rows); an unreproducible route-length figure (seed 18 144->74) was quoted
   from a dev artifact. Release rebuilt at round close. **UX-6 CLOSED — the entire
   quality list is delivered and shipped.**
+- 2026-10-31 — I18N-1 committed aacf7ac after QA PASS 8/8 (the toggle + persistence +
+  <html lang>; Spanish combat/artifacts/events/shop/end verified from live DOM quotes;
+  the contract proven at the strongest level — a mid-run toggle leaves the engine hash
+  AND save() byte-identical; the fallback sweep: 0 key-shaped strings; layout matrix
+  byte-identical). Dev summary: SLOW_FACTOR-era pacing untouched; the describe engine
+  bilingual per verb; _es twins for relics/potions/tempers/events (es-419); 265-key web
+  dictionary + toggle; content.js optional es-field validation. Flagged to backlog: the
+  390x844 HUD overflow is PRE-EXISTING in both languages (buttons unreachable at phone
+  width; es amplifies +30px). Solo review next; I18N-2 (card names/flavors, enemy names,
+  kindling/quests, the resolved-lines format decision) queued.
