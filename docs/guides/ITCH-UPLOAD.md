@@ -14,6 +14,14 @@ Work top to bottom. Checked boxes are things already done and verified in this r
 ## Before you start — the one upload file
 
 - [x] **`release.zip`** exists in this workspace root. That is the artifact.
+- [x] **SHIPPED 2026-10-30 as 0.4.0**: `butler push release.zip
+      arggondev/ember-ascent:html --userversion 0.4.0` -> build `#2257168` on the
+      `html` channel. Zip SHA-256
+      `cc4561fe3b3b82f8a84ff87d50dfeb5312009888ea21b76778efbbd7d217cb12`
+      — 93 entries, **3,092,725 bytes**. Content: the full StS-parity roadmap — two
+      acts (The Kiln Deeps), gold/shop/potions/events/relics with meta-unlocks, 70
+      cards, weaving paths, sequenced enemy turns, half-speed cinematic pacing, the
+      deck viewer and card codex. Superseded by nothing — this is the live build.
 - [x] Zip SHA-256 `64964d19442c4a7e37fb55bbc747c2eb8394468f8e407211779a026a97f5fc03`
       — 87 entries, **2,483,583 bytes**. Rebuilt 2026-10-24 at `daba4b4` (the refactored
       module layout plus the melee-approach animation and the ended-screen fix) and
