@@ -9,6 +9,7 @@ import { consumeClick } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
 import { glyphBox } from './glyphs.js';
+import { t } from './i18n.js';
 
 export function rewardView() {
   const wrap = el('div');
@@ -31,11 +32,11 @@ export function rewardView() {
   // re-derived here. null goldGained (a legacy save's reward predates the field) hides the
   // chip instead of printing "+0" for a grant the engine never computed.
   const head = el('div', { cls: 'reward-head' + (arriving.reward ? ' reveal' : '') });
-  head.append(el('span', { text: boss ? 'Victory — claim the warden\u2019s relic' : isBoss ? 'Victory — the warden offers nothing' : 'Victory — choose a card' }));
+  head.append(el('span', { text: boss ? t('reward.relic.head') : isBoss ? t('reward.bossEmpty.head') : t('reward.card.head') }));
   if (snap.reward.goldGained != null) {
-    head.append(el('span', { cls: 'reward-gold', attrs: { title: `Spoils of the fight — purse: ${snap.reward.purse} gold` } },
+    head.append(el('span', { cls: 'reward-gold', attrs: { title: t('reward.gold.title', { n: snap.reward.purse }) } },
       glyphBox('coin', 'coin-glyph'),
-      el('span', { text: `+${snap.reward.goldGained} gold` }),
+      el('span', { text: t('reward.gold', { n: snap.reward.goldGained }) }),
     ));
   }
   // S7: an elite's GUARANTEED drop, named beside the gold exactly like it. The row is the
@@ -43,7 +44,7 @@ export function rewardView() {
   // the tooltip is the relic's own kernel sentence.
   const gained = snap.reward.relicGained;
   if (gained) {
-    head.append(el('span', { cls: 'reward-relic', attrs: { title: `${gained.name} — ${gained.text || 'unknown relic'}` } },
+    head.append(el('span', { cls: 'reward-relic', attrs: { title: t('reward.relic.title', { name: gained.name, text: gained.text || t('relics.unknown') }) } },
       glyphBox('relic', 'coin-glyph'),
       el('span', { text: gained.name }),
     ));
@@ -73,23 +74,21 @@ export function rewardView() {
     const vaultSealed = Array.isArray(snap.relicPool) && !snap.relicPool.some((id) => knownHeld.has(id));
     if (!boss) {
       wrap.append(el('div', { cls: 'boon-list' + (arriving.reward ? ' reveal' : '') },
-        el('p', { cls: 'boon-name', text: vaultSealed
-          ? 'The warden\u2019s vault is sealed to you this climb.'
-          : 'You hold everything the warden\u2019s vault can give.' }),
-        keywordText(el('p', { cls: 'boon-text' }), 'New relics enter the vault as your lifetime climbs win.'),
+        el('p', { cls: 'boon-name', text: vaultSealed ? t('reward.vault.sealed') : t('reward.vault.empty') }),
+        keywordText(el('p', { cls: 'boon-text' }), t('reward.vault.note')),
       ));
       const controls = el('div', { cls: 'controls' });
       if (snap.reward.canSkip) {
         controls.append(el('button', {
           cls: 'btn secondary',
-          text: 'Walk away',
-          attrs: { type: 'button', title: 'Leave the vault — the climb goes on' },
+          text: t('reward.walkAway'),
+          attrs: { type: 'button', title: t('reward.walkAway.vaultTitle') },
           on: { click: () => act(snap.reward.skipId) },
         }));
       }
-      controls.append(el('span', { cls: 'hint', text: 'Win climbs to fill the warden\u2019s vault' }));
+      controls.append(el('span', { cls: 'hint', text: t('reward.vault.hint') }));
       wrap.append(controls);
-      return page('reward', 'III — The Warden\u2019s Relic', 'star', 'panel', [wrap]);
+      return page('reward', t('page.reward.relic'), 'star', 'panel', [wrap]);
     }
     // The warden's offers, one boon-style button each (the kindling boon list is the
     // precedent: name, then the kernel's own sentence). Every button's id is the
@@ -103,13 +102,13 @@ export function rewardView() {
         attrs: {
           type: 'button',
           ...(o.actionId ? { 'data-action': o.actionId } : {}),
-          'aria-label': `${o.name}: ${o.text || 'unknown relic'}`,
-          title: o.actionId ? `Take ${o.name}` : 'This relic cannot be taken',
+          'aria-label': `${o.name}: ${o.text || t('relics.unknown')}`,
+          title: o.actionId ? t('reward.take', { name: o.name }) : t('reward.cannotTake'),
         },
         ...(o.actionId ? { on: { click: (ev) => { consumeClick(ev); act(o.actionId); } } } : {}),
       },
       el('span', { cls: 'boon-name', text: o.name }),
-      keywordText(el('span', { cls: 'boon-text' }), o.text || 'An unknown relic — its id is not in this build\u2019s table.'),
+      keywordText(el('span', { cls: 'boon-text' }), o.text || t('reward.unknownRelic')),
       ));
     }
     wrap.append(list);
@@ -117,17 +116,17 @@ export function rewardView() {
     if (snap.reward.canSkip) {
       controls.append(el('button', {
         cls: 'btn secondary',
-        text: 'Walk away',
+        text: t('reward.walkAway'),
         // True in every shape the run can be in: a one-act (legacy) run ends here, a
         // two-act climb goes on. Saying which would be a rule the kernel owns — the
         // button only refuses the relic.
-        attrs: { type: 'button', title: 'Leave the relic where it lies' },
+        attrs: { type: 'button', title: t('reward.walkAway.title') },
         on: { click: () => act(snap.reward.skipId) },
       }));
     }
-    controls.append(el('span', { cls: 'hint', text: 'Take one relic — it stays with you for the rest of the climb' }));
+    controls.append(el('span', { cls: 'hint', text: t('reward.relic.hint') }));
     wrap.append(controls);
-    return page('reward', 'III — The Warden\u2019s Relic', 'star', 'panel', [wrap]);
+    return page('reward', t('page.reward.relic'), 'star', 'panel', [wrap]);
   }
 
   const row = el('div', { cls: 'hand' + (arriving.reward ? ' reveal-cards' : '') });
@@ -145,12 +144,12 @@ export function rewardView() {
   if (snap.reward.canSkip) {
     controls.append(el('button', {
       cls: 'btn secondary',
-      text: `Skip  (HP ${snap.player.hp}/${snap.player.maxHp})`,
+      text: t('reward.skip', { hp: snap.player.hp, max: snap.player.maxHp }),
       attrs: { type: 'button' },
       on: { click: () => act(snap.reward.skipId) },
     }));
   }
-  controls.append(el('span', { cls: 'hint', text: 'Click a card to add it to your deck' }));
+  controls.append(el('span', { cls: 'hint', text: t('reward.card.hint') }));
   wrap.append(controls);
-  return page('reward', 'III — The Spoils', 'star', 'panel', [wrap]);
+  return page('reward', t('page.reward.spoils'), 'star', 'panel', [wrap]);
 }

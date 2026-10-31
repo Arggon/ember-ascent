@@ -17,6 +17,10 @@ import { cardsBundle } from './content/cards.bundle.js';
 const REQUIRED_CARD_FIELDS = ['id', 'name', 'cost', 'type', 'rarity', 'target', 'effects'];
 const CARD_TYPES = ['attack', 'skill', 'power', 'status', 'curse'];
 const TARGETS = ['enemy', 'all', 'self', 'none', 'random_enemy'];
+// I18N-1: the OPTIONAL Spanish twins. Absent is the normal case (the I18N-2 content
+// sweep fills them in); present they must be a non-empty string, so a typo can never
+// ship as an empty tile or a broken fallback.
+const OPTIONAL_ES_FIELDS = ['name_es', 'flavor_es'];
 
 /**
  * Parse and validate content.
@@ -64,6 +68,12 @@ export function loadContent(input = cardsBundle) {
         problems.push(`card "${card.id}": custom handler "${e.handler}" has no rules/effects implementation`);
       }
       if (e.verb === 'custom' && !e.handler) problems.push(`card "${card.id}": custom effect needs a handler`);
+    }
+    for (const field of OPTIONAL_ES_FIELDS) {
+      const v = card[field];
+      if (v !== undefined && (typeof v !== 'string' || v.length === 0)) {
+        problems.push(`card "${card.id}": "${field}" must be a non-empty string when present`);
+      }
     }
     if (!problems.some((p) => p.startsWith(`card "${card.id}"`))) cards.set(card.id, Object.freeze({ ...card }));
   }

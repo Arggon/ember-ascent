@@ -39,19 +39,16 @@ import { dyingCard, efxBox, freshStatusKeys, heroEfx, hitClass } from './floats.
 import { aimed, cancelTargeting, clickCard, consumeClick, enemyLabel, pendingCard, pendingSlot, pickTarget, setAimed } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
+import { t } from './i18n.js';
 
 /**
- * UX-5: the input gate's reader-facing sentences, one per busy reason. `tile` names the
- * wait inside a locked card's aria-label; `aria` does the same for the End Turn button.
- * The gate is the surface refusing to ASK the kernel while an animation is landing —
- * every reason is a presentation lifetime (runtime.busyReason), never a rule.
+ * UX-5: the input gate's reader-facing sentences, one per busy reason, keyed into the
+ * i18n table (I18N-1). `tile` names the wait inside a locked card's aria-label; `aria`
+ * does the same for the End Turn button. The gate is the surface refusing to ASK the
+ * kernel while an animation is landing — every reason is a presentation lifetime
+ * (runtime.busyReason), never a rule.
  */
-const BUSY_TEXT = {
-  play: { tile: 'the last card is landing', aria: 'the last card lands' },
-  'enemy-turn': { tile: 'the enemies are acting', aria: 'the enemies act' },
-  deal: { tile: 'the hand is arriving', aria: 'the hand arrives' },
-  hold: { tile: 'the stroke is landing', aria: 'the stroke lands' },
-};
+const busyText = (reason, which) => t(`busy.${reason}.${which}`) || t(`busy.fight.${which === 'tile' ? 'animatingTile' : 'animating'}`);
 
 export function heroPose() {  // Precedence: getting hit outranks the card's own movement — a hero who just lost HP
   // flinches, even while playing an attack (and HP-cost cards like bloodletting always
@@ -96,7 +93,7 @@ export function heroFigure() {
   const isBellows = snap.character === 'bellows';
   const node = el('div', {
     cls: 'hero' + (ratio <= 0.35 ? ' is-low' : '') + (isBellows ? ' is-bellows' : ''),
-    attrs: { role: 'group', 'aria-label': `${snap.characterName || 'Ashwright'}, ${p.hp} of ${p.maxHp} HP, block ${p.block}` },
+    attrs: { role: 'group', 'aria-label': t('combat.hero.aria', { name: snap.characterName || 'Ashwright', hp: p.hp, max: p.maxHp, block: p.block }) },
   });
   const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
   // The stage tree is rebuilt on every paint, which would restart the keyframe from 0%
@@ -190,14 +187,14 @@ function pileButton(which) {
   const isDraw = which === 'draw';
   const count = snap.piles[which] ?? 0;
   const names = (isDraw ? snap.piles.drawCards : snap.piles.discardCards) || [];
-  const label = isDraw ? 'Draw' : 'Discard';
-  const extra = !isDraw && snap.piles.exhaust > 0 ? `, exhaust ${snap.piles.exhaust}` : '';
+  const label = isDraw ? t('combat.pile.draw') : t('combat.pile.discard');
+  const extra = !isDraw && snap.piles.exhaust > 0 ? t('combat.pile.exhaustExtra', { n: snap.piles.exhaust }) : '';
   return el('button', {
     cls: isDraw ? 'pile pile-draw' : 'pile pile-discard',
     attrs: {
       type: 'button',
-      title: names.length ? `${label}: ${names.join(', ')}` : `${label} pile empty`,
-      'aria-label': `${label} pile, ${count} cards${extra}`,
+      title: names.length ? t('combat.pile.named', { label, names: names.join(', ') }) : t('combat.pile.empty', { label }),
+      'aria-label': t('combat.pile.aria', { label, n: count, extra }),
     },
     on: {
       click: (ev) => {
@@ -217,7 +214,7 @@ function energyOrb() {
   const max = snap.energyPerTurn;
   return el('div', {
     cls: 'energy-orb' + (n === 0 ? ' is-empty' : ''),
-    attrs: { title: `Energy ${n} of ${max}`, 'aria-label': `Energy ${n} of ${max}` },
+    attrs: { title: t('combat.energy.title', { n, max }), 'aria-label': t('combat.energy.title', { n, max }) },
   },
     el('b', { cls: 'orb-num', text: String(n) }),
     el('span', { cls: 'orb-cap', text: `/${max}` }),
@@ -225,7 +222,7 @@ function energyOrb() {
 }
 
 function speedDock() {
-  const dock = el('div', { cls: 'speed-dock', attrs: { role: 'group', 'aria-label': 'Animation speed' } });
+  const dock = el('div', { cls: 'speed-dock', attrs: { role: 'group', 'aria-label': t('combat.speed.aria') } });
   const add = (speed, text, title) => dock.append(el('button', {
     cls: 'btn ghost speed-btn' + (animSpeed === speed ? ' is-on' : ''),
     text,
@@ -240,21 +237,21 @@ function speedDock() {
       },
     },
   }));
-  add(1, '1×', 'Animation speed 1×');
-  add(2, '2×', 'Animation speed 2×');
-  add(0, '»', 'Skip animation');
+  add(1, '1×', t('combat.speed.1'));
+  add(2, '2×', t('combat.speed.2'));
+  add(0, '»', t('combat.speed.skip'));
   return dock;
 }
 
 function pileModal(which) {
   const names = (which === 'draw' ? snap.piles.drawCards : snap.piles.discardCards) || [];
-  const title = which === 'draw' ? 'Draw pile' : 'Discard pile';
+  const title = which === 'draw' ? t('combat.pile.drawTitle') : t('combat.pile.discardTitle');
   const back = el('div', { cls: 'pile-back', attrs: { role: 'dialog', 'aria-label': title } });
   back.addEventListener('click', (ev) => {
     if (ev.target === back) { setPileOpen(null); repaint(); }
   });
   const sheet = el('div', { cls: 'pile-sheet' }, el('h2', { text: `${title} (${names.length})` }));
-  if (names.length === 0) sheet.append(el('p', { text: 'Empty.' }));
+  if (names.length === 0) sheet.append(el('p', { text: t('combat.pile.emptySheet') }));
   else {
     const list = el('ul', { cls: 'pile-list' });
     for (const name of names) list.append(el('li', { text: name }));
@@ -262,11 +259,11 @@ function pileModal(which) {
   }
   if (which === 'discard' && snap.piles.exhaust > 0) {
     const exh = snap.piles.exhaustCards || [];
-    sheet.append(el('p', { cls: 'pile-exh', text: `Exhausted (${snap.piles.exhaust}): ${exh.join(', ') || '—'}` }));
+    sheet.append(el('p', { cls: 'pile-exh', text: t('combat.pile.exhausted', { n: snap.piles.exhaust, names: exh.join(', ') || '—' }) }));
   }
   sheet.append(el('button', {
     cls: 'btn secondary',
-    text: 'Close',
+    text: t('combat.close'),
     attrs: { type: 'button' },
     on: { click: (ev) => { consumeClick(ev); setPileOpen(null); repaint(); } },
   }));
@@ -278,10 +275,10 @@ function combatControls(targeting, busy) {
   const hit = pendingCard();
   const controls = el('div', { cls: 'controls' });
   if (targeting && hit) {
-    controls.append(el('span', { cls: 'target-banner', text: `${hit.name} — choose an enemy target` }));
+    controls.append(el('span', { cls: 'target-banner', text: t('combat.targetBanner', { name: hit.name }) }));
     controls.append(el('button', {
       cls: 'btn secondary cancel-target',
-      text: 'Cancel  (Esc)',
+      text: t('combat.cancel'),
       attrs: { type: 'button' },
       on: { click: () => cancelTargeting() },
     }));
@@ -294,13 +291,13 @@ function combatControls(targeting, busy) {
     // saw a rejected action: this is the surface refusing to ask.
     const btn = el('button', {
       cls: 'btn' + (busy ? ' is-locked' : ''),
-      text: 'End Turn  (e)',
+      text: t('combat.endTurn'),
       attrs: {
         type: 'button',
         ...(busy ? {
           'aria-disabled': 'true',
-          'aria-label': `End Turn — locked while ${BUSY_TEXT[busy] ? BUSY_TEXT[busy].aria : 'the fight animates'}`,
-          title: `Waiting: ${BUSY_TEXT[busy] ? BUSY_TEXT[busy].tile : 'the fight is animating'}`,
+          'aria-label': t('combat.endTurn.locked', { why: busyText(busy, 'aria') }),
+          title: t('combat.endTurn.waiting', { why: busyText(busy, 'tile') }),
         } : {}),
       },
       on: busy ? {} : { click: () => act(endTurn && endTurn.id) },
@@ -368,11 +365,9 @@ export function combatView() {
   dock.append(combatControls(targeting, busy));
   wrap.append(dock);
 
-  wrap.append(el('p', { cls: 'hint', text: targeting
-    ? 'Click a highlighted enemy, or press 1–9 · Esc or click empty space to cancel'
-    : 'Click a card to play it · a card that needs a target asks you to pick one' }));
+  wrap.append(el('p', { cls: 'hint', text: targeting ? t('combat.hint.targeting') : t('combat.hint') }));
   if (pileOpen === 'draw' || pileOpen === 'discard') wrap.append(pileModal(pileOpen));
-  return page('combat', 'II — The Fight', 'blade', '', [wrap]);
+  return page('combat', t('combat.chapter'), 'blade', '', [wrap]);
 }
 
 /**
@@ -518,12 +513,10 @@ export function cardTile(card, opts = {}) {
   // renderer. The compact shorthand stays visible but secondary and labelled, so a
   // reader who meets "A6" in the CLI can still connect the two.
   const desc = card.description || card.summary;
-  const awaiting = isPending ? ' Choosing a target: click a highlighted enemy, or press Escape to cancel.' : '';
-  // The locked wait is named in the tile's own sentence (the BUSY_TEXT table), so a
+  const awaiting = isPending ? t('combat.choosing') : '';
+  // The locked wait is named in the tile's own sentence (the i18n busy keys), so a
   // screen reader hears why the playable card is not taking input right now.
-  const lockedNote = locked !== null
-    ? ` Waiting: ${BUSY_TEXT[locked] ? BUSY_TEXT[locked].tile : 'the fight is animating'}.`
-    : '';
+  const lockedNote = locked !== null ? t('combat.waiting', { why: busyText(locked, 'tile') }) : '';
   const tile = el('button', {
     cls: `card type-${card.type}` + (disabled ? ' disabled is-unplayable' : ''),
     attrs: {
@@ -535,7 +528,7 @@ export function cardTile(card, opts = {}) {
       // The inert reason belongs to the CARD'S CONTEXT: a hand tile lacks Energy, a
       // shop shelf (S4) lacks gold. `disabledNote` lets a caller state the real reason
       // instead of the Energy default.
-      'aria-label': `${card.name}. Costs ${card.cost} Energy. ${desc}${lockedNote || (disabled ? ` ${card.disabledNote ?? 'Not playable: not enough Energy.'}` : '')}${awaiting}`,
+      'aria-label': `${card.name}. ${t('card.costs', { n: card.cost })} ${desc}${lockedNote || (disabled ? ` ${card.disabledNote ?? t('card.notPlayable')}` : '')}${awaiting}`,
       // UX-2 (review P3): the rules row is line-clamped at several tiers, and the
       // clamped tail was reachable only through the aria-label — invisible to a
       // sighted hover. The native title carries the FULL sentence, which makes the
@@ -548,7 +541,7 @@ export function cardTile(card, opts = {}) {
   if (disabled) tile.disabled = true;
 
   // Cost gem: a faceted stone, not a plain circle.
-  const gem = el('span', { cls: 'cost-gem', attrs: { title: 'Energy cost' } },
+  const gem = el('span', { cls: 'cost-gem', attrs: { title: t('deck.cost') } },
     el('span', { cls: 'gem-core', text: String(card.cost) }),
   );
   tile.append(gem);
@@ -592,8 +585,8 @@ export function cardTile(card, opts = {}) {
   // keep, not playing one, so the shorthand is noise there.
   if (card.showSummary !== false) {
     const foot = el('span', { cls: 'cfoot' });
-    foot.append(el('span', { cls: 'csum', text: card.summary, attrs: { title: 'Compact form used by the agent-facing command line' } }));
-    if (disabled) foot.append(el('span', { cls: 'cwhy', text: card.disabledWhy ?? 'needs more Energy' }));
+    foot.append(el('span', { cls: 'csum', text: card.summary, attrs: { title: t('combat.compact.title') } }));
+    if (disabled) foot.append(el('span', { cls: 'cwhy', text: card.disabledWhy ?? t('card.needsEnergy') }));
     if (stamp) foot.append(stamp);
     tile.append(foot);
   } else if (stamp) {
@@ -607,10 +600,10 @@ export function cardTile(card, opts = {}) {
     cls: 'card-wrap' + (disabled ? ' is-disabled' : '') + (inactive ? ' is-inactive' : '') + (isPending ? ' is-pending' : ''),
     attrs: opts.index ? { style: `--i:${opts.index - 1}` } : {},
   },
-    el('span', { cls: 'hand-index', text: String(opts.index), attrs: { title: `Keyboard shortcut: ${opts.index}` } }),
+    el('span', { cls: 'hand-index', text: String(opts.index), attrs: { title: t('combat.keyHint', { n: opts.index }) } }),
     // The in-card cue that this card is the one waiting for a target. A shape and a word,
     // not a colour: `⇱` reads as "aim" at a glance and survives a monochrome screen.
-    isPending ? el('span', { cls: 'awaiting-badge', text: '⇱ pick a target', attrs: { 'aria-hidden': 'true' } }) : null,
+    isPending ? el('span', { cls: 'awaiting-badge', text: t('combat.pickTarget'), attrs: { 'aria-hidden': 'true' } }) : null,
     tile,
   );
   return wrap;

@@ -110,9 +110,11 @@ export function view(session, opts) {
   return observe(session.state, opts);
 }
 
-/** Structured, DOM-free view of the state (kernel-owned); a renderer draws this. */
-export function snapshotOf(session) {
-  return snapshot(session.state);
+/** Structured, DOM-free view of the state (kernel-owned); a renderer draws this.
+ *  `opts` rides through to the kernel snapshot — I18N-1's `{ lang }` presentation
+ *  choice; omitted/empty is the default English snapshot every existing caller gets. */
+export function snapshotOf(session, opts = {}) {
+  return snapshot(session.state, opts);
 }
 
 /**

@@ -16,6 +16,8 @@ import { cancelTargeting } from './targeting.js';
 import { POTION_GLYPH, TEMPER_GLYPH, glyphBox } from './glyphs.js';
 import { cardPool } from '../kernel/index.js';
 import { inDeckCounts } from './deck-counts.js';
+import { currentLang, t } from './i18n.js';
+import { switchLang } from './actions.js';
 
 /* ------------------------------------------------------------------------- HUD */
 
@@ -27,7 +29,7 @@ export function renderHud() {
     el('span', {
       cls: 'hud-char',
       text: snap.characterName || capitalize(snap.character),
-      attrs: { title: snap.relicName ? `${snap.characterName} — relic: ${snap.relicName}` : '' },
+      attrs: { title: snap.relicName ? t('hud.char.title', { name: snap.characterName, relic: snap.relicName }) : '' },
     }),
   );
 
@@ -35,18 +37,18 @@ export function renderHud() {
   // as one text node inside a chip with a 44px min-width is what wrapped the HUD into
   // two-line blocks on a phone ("HP" over "60/60"). The glyph carries the label, the title
   // carries the full sentence for hover and screen readers, and the value can never wrap.
-  hudEl.append(stat('hp', '♥', `${p.hp}/${p.maxHp}`, flash.hp, `HP ${p.hp} of ${p.maxHp}`));
+  hudEl.append(stat('hp', '♥', `${p.hp}/${p.maxHp}`, flash.hp, t('hud.hp.title', { hp: p.hp, max: p.maxHp })));
   hudEl.append(stat('energy', '⚡', `${p.energy}/${snap.energyPerTurn}`, flash.energy,
-    `Energy ${p.energy} of ${snap.energyPerTurn}`));
-  hudEl.append(stat('block', '⛨', String(p.block), flash.block, `Block ${p.block}`));
+    t('hud.energy.title', { n: p.energy, max: snap.energyPerTurn })));
+  hudEl.append(stat('block', '⛨', String(p.block), flash.block, t('hud.block.title', { n: p.block })));
   // S3 gold economy: the purse is a READOUT, not a control — no button, no flash, just the
   // kernel's own `snap.player.gold` (the same value the CLI dump's GOLD header shows), so
   // the browser can never disagree with the engine about how rich you are.
   const purse = p.gold ?? 0;
-  hudEl.append(stat('gold', '◉', String(purse), false, `Gold ${purse}`));
+  hudEl.append(stat('gold', '◉', String(purse), false, t('hud.gold.title', { n: purse })));
   hudEl.append(renderBelt());
   hudEl.append(renderRelics());
-  hudEl.append(el('span', { cls: 'hud-step', text: `step ${snap.stepIndex}` }));
+  hudEl.append(el('span', { cls: 'hud-step', text: t('hud.step', { n: snap.stepIndex }) }));
 
   // A status that just landed on the PLAYER gets the same by-kind treatment as an enemy's.
   const freshSelf = freshStatusKeys([...(p.statuses || []), ...(p.powers || [])]);
@@ -69,11 +71,11 @@ export function renderHud() {
   const deckTotal = snap.deckCount ?? (snap.deckCards || []).reduce((n, c) => n + c.count, 0);
   hudEl.append(el('button', {
     cls: 'btn ghost',
-    text: `Deck (${deckTotal})`,
+    text: t('hud.deck', { n: deckTotal }),
     attrs: {
       type: 'button',
-      title: 'Your whole deck, duplicates counted — keyboard: d',
-      'aria-label': `Deck: ${deckTotal} cards`,
+      title: t('hud.deck.title'),
+      'aria-label': t('hud.deck.aria', { n: deckTotal }),
     },
     on: { click: () => toggleDeck(true) },
   }));
@@ -84,26 +86,40 @@ export function renderHud() {
   const codexTotal = runCodexRows().length;
   hudEl.append(el('button', {
     cls: 'btn ghost',
-    text: 'Cards',
+    text: t('hud.cards'),
     attrs: {
       type: 'button',
-      title: 'Every card the rewards can offer this run — keyboard: k',
-      'aria-label': `Card codex: ${codexTotal} cards`,
+      title: t('hud.cards.title'),
+      'aria-label': t('hud.cards.aria', { n: codexTotal }),
     },
     on: { click: () => toggleCodex(true) },
   }));
   hudEl.append(el('button', {
     cls: 'btn ghost',
-    text: 'Help',
+    text: t('hud.help'),
     // No keyboard binding opens Help (the old "keyboard: ?" title named a key that was
     // never wired — POLISH round nit); Escape is how the OPEN sheet closes (app.js).
-    attrs: { type: 'button', title: 'How to play, and what every abbreviation means (Escape closes it)' },
+    attrs: { type: 'button', title: t('hud.help.title') },
     on: { click: () => toggleHelp(true) },
+  }));
+  // I18N-1: the language toggle. The label names the CURRENT language (EN/ES); the
+  // aria-label is bilingual by design ("Language / Idioma") so a screen reader finds it
+  // in either language. switchLang() re-snapshots the CURRENT run with the new lang and
+  // repaints — the same run re-narrated, its state untouched.
+  hudEl.append(el('button', {
+    cls: 'btn ghost lang-toggle',
+    text: t('lang.toggle'),
+    attrs: {
+      type: 'button',
+      title: t('lang.toggle.title'),
+      'aria-label': t('lang.toggle.aria'),
+    },
+    on: { click: () => switchLang() },
   }));
   hudEl.append(el('button', {
     cls: 'btn ghost',
-    text: 'New Run',
-    attrs: { type: 'button', title: `New run (seed ${snap.seed}) — keyboard: n` },
+    text: t('hud.newRun'),
+    attrs: { type: 'button', title: t('hud.newRun.title', { n: snap.seed }) },
     on: { click: () => newGame() },
   }));
 }
@@ -121,15 +137,15 @@ export function renderHud() {
 function renderRelics() {
   const rows = snap.relics ?? [];
   const tip = rows.length === 0
-    ? 'Relics: none held yet — elites always drop one, and the warden offers three.'
-    : rows.map((r) => `${r.name} — ${r.text || 'unknown relic'}${r.known ? '' : ' (unknown relic id in this save)'}`).join('\n');
+    ? t('relics.none')
+    : rows.map((r) => `${r.name} — ${r.text || t('relics.unknown')}${r.known ? '' : t('relics.unknownId')}`).join('\n');
   return el('span', {
     cls: 'relics' + (rows.length === 0 ? ' none' : ''),
     attrs: {
       title: tip,
       // The announced form carries the same list the tooltip shows, so a screen reader
       // hears exactly what a sighted reader hovers.
-      'aria-label': `Relics: ${rows.length} held${rows.length > 0 ? `: ${rows.map((r) => r.name).join(', ')}` : ''}`,
+      'aria-label': t('relics.aria', { n: rows.length, names: rows.map((r) => r.name).join(', ') }),
     },
   },
   glyphBox('relic', 'relic-glyph'),
@@ -152,24 +168,27 @@ function renderRelics() {
 function renderBelt() {
   const rows = snap.belt ?? [];
   const slots = snap.beltSlots ?? 3;
-  const belt = el('span', { cls: 'belt', attrs: { role: 'group', 'aria-label': `Potion belt: ${rows.length} of ${slots}` } });
+  const belt = el('span', { cls: 'belt', attrs: { role: 'group', 'aria-label': t('belt.aria', { n: rows.length, m: slots }) } });
   for (let i = 0; i < slots; i += 1) {
     const row = rows[i] ?? null;
     if (!row) {
       belt.append(el('span', {
         cls: 'belt-slot empty',
-        attrs: { title: `Potion slot ${i + 1}: empty`, 'aria-label': `Potion slot ${i + 1}: empty` },
+        attrs: {
+          title: t('belt.slot.empty', { n: i + 1 }),
+          'aria-label': t('belt.slot.empty', { n: i + 1 }),
+        },
       }, glyphBox('flask', 'belt-glyph')));
       continue;
     }
-    const tip = `${row.name} — ${row.text || 'unknown potion'}${row.known ? '' : ' (unknown potion id in this save)'}`;
+    const tip = `${row.name} — ${row.text || t('belt.unknown')}${row.known ? '' : t('belt.unknownId')}`;
     if (snap.phase === 'combat') {
       belt.append(el('button', {
         cls: 'belt-slot filled',
         attrs: {
           type: 'button',
-          title: `${tip} — click for quaff / discard`,
-          'aria-label': `Potion slot ${i + 1}: ${row.name}. Open quaff or discard.`,
+          title: `${tip}${t('belt.click')}`,
+          'aria-label': t('belt.slot.aria', { n: i + 1, name: row.name }),
           'aria-haspopup': 'dialog',
           'aria-expanded': String(beltOpenSlot === row.slot),
         },
@@ -181,7 +200,7 @@ function renderBelt() {
     } else {
       belt.append(el('span', {
         cls: 'belt-slot filled inert',
-        attrs: { title: `${tip} — quaff and discard work in combat only`, 'aria-label': `Potion slot ${i + 1}: ${row.name}` },
+        attrs: { title: `${tip}${t('belt.combatOnly')}`, 'aria-label': `Potion slot ${i + 1}: ${row.name}` },
       },
         glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
         el('span', { cls: 'belt-name', text: row.name }),
@@ -223,7 +242,7 @@ export function setBeltOpenSlot(slot) {
  */
 export function beltPanel() {
   const row = (snap.belt ?? []).find((r) => r.slot === beltOpenSlot);
-  const back = el('div', { cls: 'modal-back', attrs: { role: 'dialog', 'aria-label': 'Potion' } });
+  const back = el('div', { cls: 'modal-back', attrs: { role: 'dialog', 'aria-label': t('belt.panel.aria') } });
   back.addEventListener('click', (ev) => { if (ev.target === back) toggleBelt(null); });
   // A missing row (a stale slot index after a repaint raced the click) renders as the
   // bare backdrop and NOTHING else: this function runs mid-render, so calling
@@ -233,10 +252,10 @@ export function beltPanel() {
   // it through the normal path, and an empty backdrop covers the stage meanwhile.
   if (!row) return back;
 
-  const panel = el('div', { cls: 'modal belt-modal', attrs: { role: 'dialog', 'aria-label': `${row.name}: quaff or discard` } });
+  const panel = el('div', { cls: 'modal belt-modal', attrs: { role: 'dialog', 'aria-label': t('belt.panel.title', { name: row.name }) } });
   const scroll = el('div', { cls: 'modal-scroll' });
   scroll.append(el('h2', { text: row.name }));
-  scroll.append(el('p', { cls: 'belt-desc', text: row.text || 'An unknown potion — its id is not in this build\'s table. Discard it to free the slot.' }));
+  scroll.append(el('p', { cls: 'belt-desc', text: row.text || t('belt.panel.unknownText') }));
 
   const choices = el('div', { cls: 'belt-choices' });
   for (const id of row.quaffIds) {
@@ -246,12 +265,14 @@ export function beltPanel() {
     const enemy = k ? snap.enemies[Number(k[1]) - 1] : null;
     choices.append(el('button', {
       cls: 'btn belt-act quaff',
-      text: enemy ? `Quaff — ${enemy.name} (${enemy.hp}/${enemy.maxHp})` : 'Quaff',
+      text: enemy ? t('belt.quaff.aimed', { enemy: enemy.name, hp: enemy.hp, max: enemy.maxHp }) : t('belt.quaff'),
       attrs: {
         type: 'button',
         'data-action': id,
-        title: enemy ? `Aim at the ${ordinal(Number(k[1]))} living enemy` : row.text,
-        'aria-label': enemy ? `Quaff ${row.name}, aimed at ${enemy.name}, ${enemy.hp} of ${enemy.maxHp} HP` : `Quaff ${row.name}. ${row.text}`,
+        title: enemy ? t('belt.quaff.aimedTitle', { n: Number(k[1]) }) : row.text,
+        'aria-label': enemy
+          ? t('belt.quaff.ariaAimed', { name: row.name, enemy: enemy.name, hp: enemy.hp, max: enemy.maxHp })
+          : t('belt.quaff.aria', { name: row.name, text: row.text }),
       },
       on: { click: (ev) => { ev.__dlbHandled = true; act(id); toggleBelt(null); } },
     }));
@@ -259,27 +280,27 @@ export function beltPanel() {
   if (row.discardId) {
     choices.append(el('button', {
       cls: 'btn secondary belt-act discard',
-      text: 'Discard',
+      text: t('belt.discard'),
       attrs: {
         type: 'button',
         'data-action': row.discardId,
-        title: 'Throw it away — the slot frees, nothing else changes',
-        'aria-label': `Discard ${row.name}. The slot frees; nothing else changes.`,
+        title: t('belt.discard.title'),
+        'aria-label': t('belt.discard.aria', { name: row.name }),
       },
       on: { click: (ev) => { ev.__dlbHandled = true; act(row.discardId); toggleBelt(null); } },
     }));
   }
   scroll.append(choices);
   if (snap.phase !== 'combat') {
-    scroll.append(el('p', { cls: 'hint', text: 'Quaff and discard work in combat only.' }));
+    scroll.append(el('p', { cls: 'hint', text: t('belt.combatOnlyNote') }));
   }
 
   panel.append(scroll);
   panel.append(el('div', { cls: 'modal-foot' },
     el('button', {
       cls: 'btn secondary',
-      text: 'Close  (Esc)',
-      attrs: { type: 'button', title: 'Keep the potion (keyboard: Escape)' },
+      text: t('belt.close'),
+      attrs: { type: 'button', title: t('belt.close.title') },
       on: { click: () => toggleBelt(null) },
     }),
   ));
@@ -287,9 +308,9 @@ export function beltPanel() {
   return back;
 }
 
-/** 1st/2nd/3rd… for the aim tooltip — presentation wording, not a rule. */
+/** 1st/2nd/3rd… for the aim tooltip — presentation wording, localized like the rest. */
 function ordinal(n) {
-  return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n] ?? 'th'}`;
+  return t('ord', { n });
 }
 
 /* ----------------------------------------------------------------- HELP / GLOSSARY */
@@ -324,11 +345,11 @@ export function helpPanel() {
   const back = el('div', { cls: 'modal-back' });
   back.addEventListener('click', (ev) => { if (ev.target === back) toggleHelp(false); });
 
-  const panel = el('div', { cls: 'modal', attrs: { role: 'dialog', 'aria-label': 'How to play' } });
+  const panel = el('div', { cls: 'modal', attrs: { role: 'dialog', 'aria-label': t('help.title') } });
   // Everything that can be long lives in the scroller: the panel scrolls INSIDE the
   // viewport instead of growing past it.
   const scroll = el('div', { cls: 'modal-scroll' });
-  scroll.append(el('h2', { text: 'How to play' }));
+  scroll.append(el('h2', { text: t('help.title') }));
 
   for (const topic of snap.help || []) {
     scroll.append(el('div', { cls: 'help-topic' },
@@ -340,16 +361,16 @@ export function helpPanel() {
   // How targeting works is the SURFACE's behaviour, not a game rule, so this line lives
   // here rather than in the kernel's help topics: the engine has no opinion about clicks.
   scroll.append(el('div', { cls: 'help-topic' },
-    el('div', { cls: 'ht-title', text: 'Aiming at one enemy' }),
-    el('div', { cls: 'ht-body', text: 'When more than one enemy is alive, clicking a card that needs a target does not play it yet — the card lifts and every enemy that can be hit is highlighted and numbered. Click a highlighted enemy, or press its number, to hit that one; the enemy\'s telegraphed intent is shown beside it while you decide, so you can spend the hit on the one that hurts most. Press Escape, press 0, click the card again, or click empty space to put the card back and play something else. With a single enemy alive a card still plays in one click, and cards that say ALL or SELF never ask.' }),
+    el('div', { cls: 'ht-title', text: t('help.aim.title') }),
+    el('div', { cls: 'ht-body', text: t('help.aim.body') }),
   ));
 
-  scroll.append(el('h2', { cls: 'mt', text: 'What the shorthand means' }));
-  scroll.append(el('p', { cls: 'hint', text: 'Cards always describe themselves in words. These compact codes appear in the corner of a card, in the enemy\'s intent, and in the command-line version of the game.' }));
+  scroll.append(el('h2', { cls: 'mt', text: t('help.shorthand.title') }));
+  scroll.append(el('p', { cls: 'hint', text: t('help.shorthand.hint') }));
 
   // Grouped, so the vocabulary a player meets on every card is separated from the codes
   // that only ever appear on one card. The kernel supplies the grouping.
-  const sections = snap.glossarySections || [{ key: 'A', title: 'Codes', blurb: '' }];
+  const sections = snap.glossarySections || [{ key: 'A', title: t('codex.other'), blurb: '' }];
   for (const section of sections) {
     const rows = (snap.glossary || []).filter((r) => (r.group || 'A') === section.key);
     if (rows.length === 0) continue;
@@ -370,7 +391,7 @@ export function helpPanel() {
   panel.append(el('div', { cls: 'modal-foot' },
     el('button', {
       cls: 'btn',
-      text: 'Got it',
+      text: t('help.gotIt'),
       attrs: { type: 'button' },
       on: { click: () => { try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch {} toggleHelp(false); } },
     }),
@@ -378,8 +399,8 @@ export function helpPanel() {
     // and never belonged one tap from End Turn. The `n` hotkey still starts a new run.
     el('button', {
       cls: 'btn secondary',
-      text: 'New Run',
-      attrs: { type: 'button', title: 'Discard this run and start a new one (keyboard: n)' },
+      text: t('hud.newRun'),
+      attrs: { type: 'button', title: t('help.newRun.title') },
       on: { click: () => newGame() },
     }),
   ));
@@ -413,12 +434,12 @@ export function deckPanel() {
   const back = el('div', { cls: 'modal-back' });
   back.addEventListener('click', (ev) => { if (ev.target === back) toggleDeck(false); });
 
-  const panel = el('div', { cls: 'modal deck-modal', attrs: { role: 'dialog', 'aria-label': `Deck: ${count} cards` } });
+  const panel = el('div', { cls: 'modal deck-modal', attrs: { role: 'dialog', 'aria-label': t('deck.title', { n: count }) } });
   const scroll = el('div', { cls: 'modal-scroll' });
-  scroll.append(el('h2', { text: `Deck (${count})` }));
+  scroll.append(el('h2', { text: t('deck.heading', { n: count }) }));
 
   if (rows.length === 0) {
-    scroll.append(el('p', { cls: 'hint', text: 'The deck is empty.' }));
+    scroll.append(el('p', { cls: 'hint', text: t('deck.empty') }));
   } else {
     const list = el('div', { cls: 'deck-rows' });
     for (const c of rows) list.append(deckRow(c));
@@ -429,8 +450,8 @@ export function deckPanel() {
   panel.append(el('div', { cls: 'modal-foot' },
     el('button', {
       cls: 'btn secondary',
-      text: 'Close  (Esc)',
-      attrs: { type: 'button', title: 'Back to the run (keyboard: Escape)' },
+      text: t('belt.close'),
+      attrs: { type: 'button', title: t('deck.close.title') },
       on: { click: () => toggleDeck(false) },
     }),
   ));
@@ -449,7 +470,7 @@ function deckRow(c) {
     cls: 'deck-row' + (c.tempered ? ` tempered temper-${c.temper}` : ''),
     attrs: c.tempered ? { title: c.temperText || c.temperName } : {},
   });
-  row.append(el('span', { cls: 'deck-cost', attrs: { title: 'Energy cost' }, text: String(c.cost) }));
+  row.append(el('span', { cls: 'deck-cost', attrs: { title: t('deck.cost') }, text: String(c.cost) }));
   row.append(el('span', { cls: 'deck-type', text: c.typeLabel }));
   row.append(el('span', { cls: 'deck-name', text: c.name }));
   if (c.tempered) {
@@ -461,7 +482,7 @@ function deckRow(c) {
     ));
   }
   if (c.count > 1) {
-    row.append(el('span', { cls: 'deck-count', text: `×${c.count}`, attrs: { title: `${c.count} copies in the deck` } }));
+    row.append(el('span', { cls: 'deck-count', text: `×${c.count}`, attrs: { title: t('deck.copies', { n: c.count }) } }));
   }
   return row;
 }
@@ -469,18 +490,25 @@ function deckRow(c) {
 /* ---------------------------------------------------------------- CARD CODEX (S2) */
 
 /**
- * The kernel's full-set LOOKUP TABLE, computed ONCE at load: describe-layer rows for every
- * card the shipped content could ever offer (`cardPool()`), sorted by rarity tier, then
- * cost, then face name, then card id. NOT the run's offerable pool by itself — a narrowed
- * unlock profile makes the truth shorter. The per-run filter is `runCodexRows()` below.
+ * The kernel's full-set LOOKUP TABLE, one row per card the shipped content could ever
+ * offer, describe-layer enriched. It was computed once at load; I18N-1 makes the rows
+ * language-dependent (`cardPool({ lang })`), so the table is cached PER LANGUAGE and
+ * re-derived the first time a paint asks in a language it has not seen — a language
+ * switch repaints in the new language without paying for the other one again.
  */
-const CODEX_POOL = cardPool();
+const codexCache = {};
+function codexPool() {
+  const lang = currentLang();
+  if (!codexCache[lang]) codexCache[lang] = cardPool({ lang });
+  return codexCache[lang];
+}
 
-/** The rarity groups in the order a new player should meet them; a group with no rows is skipped. */
+/** The rarity groups in the order a new player should meet them; a group with no rows is
+ *  skipped. Labels are keys, resolved per paint — the words follow the language. */
 const RARITY_GROUPS = [
-  { key: 'common', label: 'Common' },
-  { key: 'uncommon', label: 'Uncommon' },
-  { key: 'rare', label: 'Rare' },
+  { key: 'common', labelKey: 'codex.common' },
+  { key: 'uncommon', labelKey: 'codex.uncommon' },
+  { key: 'rare', labelKey: 'codex.rare' },
 ];
 const RARITY_GROUP_KEYS = new Set(RARITY_GROUPS.map((g) => g.key));
 
@@ -496,9 +524,9 @@ const RARITY_GROUP_KEYS = new Set(RARITY_GROUPS.map((g) => g.key));
  */
 function runCodexRows() {
   const ids = snap.draftPool;
-  if (!Array.isArray(ids)) return CODEX_POOL;
+  if (!Array.isArray(ids)) return codexPool();
   const offerable = new Set(ids);
-  return CODEX_POOL.filter((c) => offerable.has(c.cardId));
+  return codexPool().filter((c) => offerable.has(c.cardId));
 }
 
 export let codexOpen = false;
@@ -525,19 +553,19 @@ export function codexPanel() {
   const back = el('div', { cls: 'modal-back' });
   back.addEventListener('click', (ev) => { if (ev.target === back) toggleCodex(false); });
 
-  const panel = el('div', { cls: 'modal codex-modal', attrs: { role: 'dialog', 'aria-label': `Card codex: ${rows.length} cards` } });
+  const panel = el('div', { cls: 'modal codex-modal', attrs: { role: 'dialog', 'aria-label': t('hud.cards.aria', { n: rows.length }) } });
   const scroll = el('div', { cls: 'modal-scroll' });
-  scroll.append(el('h2', { text: `Cards (${rows.length})` }));
-  scroll.append(el('p', { cls: 'hint', text: 'Every card a combat reward can add to your deck this run. Pick with the fight ahead in mind.' }));
+  scroll.append(el('h2', { text: t('codex.title', { n: rows.length }) }));
+  scroll.append(el('p', { cls: 'hint', text: t('codex.hint') }));
 
   // The three rarity tiers, then a catch-all so the header total can never count a row no
   // group renders: a rarity the tiers above do not name still shows, under "Other".
-  for (const group of [...RARITY_GROUPS, { key: null, label: 'Other' }]) {
+  for (const group of [...RARITY_GROUPS, { key: null, labelKey: 'codex.other' }]) {
     const groupRows = group.key === null
       ? rows.filter((c) => !RARITY_GROUP_KEYS.has(c.rarity))
       : rows.filter((c) => c.rarity === group.key);
     if (groupRows.length === 0) continue;
-    scroll.append(el('h3', { cls: 'codex-group-head', text: `${group.label} (${groupRows.length})` }));
+    scroll.append(el('h3', { cls: 'codex-group-head', text: `${t(group.labelKey)} (${groupRows.length})` }));
     const list = el('div', { cls: 'codex-rows' });
     for (const c of groupRows) list.append(codexRow(c, tally.get(c.cardId) ?? 0));
     scroll.append(list);
@@ -547,8 +575,8 @@ export function codexPanel() {
   panel.append(el('div', { cls: 'modal-foot' },
     el('button', {
       cls: 'btn secondary',
-      text: 'Close  (Esc)',
-      attrs: { type: 'button', title: 'Back to the run (keyboard: Escape)' },
+      text: t('belt.close'),
+      attrs: { type: 'button', title: t('deck.close.title') },
       on: { click: () => toggleCodex(false) },
     }),
   ));
@@ -564,15 +592,15 @@ export function codexPanel() {
 function codexRow(c, inDeck) {
   const row = el('div', { cls: 'codex-row', attrs: { 'data-rarity': c.rarity } });
   const line = el('div', { cls: 'codex-line' });
-  line.append(el('span', { cls: 'codex-cost', attrs: { title: 'Energy cost' }, text: String(c.cost) }));
+  line.append(el('span', { cls: 'codex-cost', attrs: { title: t('deck.cost') }, text: String(c.cost) }));
   line.append(el('span', { cls: 'codex-type', text: c.typeLabel }));
   line.append(el('span', { cls: 'codex-name', text: c.name }));
-  line.append(el('span', { cls: 'codex-rarity', text: c.rarity, attrs: { title: `Rarity: ${c.rarity}` } }));
+  line.append(el('span', { cls: 'codex-rarity', text: c.rarity, attrs: { title: t('codex.rarity', { r: c.rarity }) } }));
   if (inDeck > 0) {
     line.append(el('span', {
       cls: 'codex-indeck',
-      text: `in deck ×${inDeck}`,
-      attrs: { title: `${inDeck} ${inDeck === 1 ? 'copy' : 'copies'} in your deck` },
+      text: t('codex.indeck', { n: inDeck }),
+      attrs: { title: t(inDeck === 1 ? 'codex.indeck.title' : 'codex.indeck.titlePlural', { n: inDeck }) },
     }));
   }
   row.append(line);

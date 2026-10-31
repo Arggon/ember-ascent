@@ -47,6 +47,7 @@ import {
 } from './runtime.js';
 import { el, placeAt } from './dom.js';
 import { fxAdd } from './fx-add.js';
+import { t } from './i18n.js';
 import { SIG_FX } from './fx-signatures.js';
 import { strikeFloatNode } from './floats.js';
 
@@ -79,7 +80,7 @@ export function sceneBeat(from, to) {
     if (quiet) return;
     if ((to === 'kindling' || to === 'map') && !(snap.map && snap.map.floor > 0)) {
       fxAdd(el('div', { cls: 'fx-act-card', attrs: { 'aria-hidden': 'true' } },
-        el('span', { cls: 'fx-act-num', text: 'Act I' }),
+        el('span', { cls: 'fx-act-num', text: t('fx.act.one') }),
         el('span', { cls: 'fx-act-name', text: snap.biomeName ?? BIOMES[DEFAULT_BIOME].name }),
         el('span', { cls: 'fx-act-rule' })), animMs(2300));
     }

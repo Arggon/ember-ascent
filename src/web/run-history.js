@@ -42,6 +42,7 @@ import {
 
 import { el } from './dom.js';
 import { ctl, runEvents } from './runtime.js';
+import { currentLang, t } from './i18n.js';
 
 /* -------------------------------------------------------------------- RUN HISTORY */
 //
@@ -179,18 +180,23 @@ export function recognitionText(math) {
   const c = math.counts ?? {};
   const floor = c.floors ?? 0;
   const kills = c.kills ?? 0;
-  return `This run ended on floor ${floor}. You climbed ${floor} ${floor === 1 ? 'floor' : 'floors'} `
-    + `and killed ${kills} ${kills === 1 ? 'enemy' : 'enemies'}. `
-    + 'Killing an elite (+10) or the boss (+50) is where the larger totals come from.';
+  return t('ledger.recognition', {
+    floor,
+    floorPlural: floor === 1 ? t('end.floors.one') : t('end.floors', { n: floor }),
+    kills: kills === 1 ? t('end.enemies.one') : t('end.enemies', { n: kills }),
+  });
 }
 
 /**
  * The score ledger. A REAL list, so every contributing line is individually reachable
  * (AC-7.1) rather than being one text block whose arithmetic must be re-derived by hand.
+ * The line LABELS come from the kernel's frozen SCORE_TABLE (English until I18N-2 sweeps
+ * the record layer); the math words ("yes"/"no") and the Total are this file's own and
+ * localize here.
  * @param {ReturnType<typeof ledgerMath>} math
  */
 export function ledgerBlock(math) {
-  const block = el('div', { cls: 'run-ledger', attrs: { role: 'list', 'aria-label': 'Score ledger' } });
+  const block = el('div', { cls: 'run-ledger', attrs: { role: 'list', 'aria-label': t('ledger.aria') } });
   for (const line of math.lines) {
     block.append(el('div', { cls: 'ledger-line', attrs: { role: 'listitem' } },
       el('span', { cls: 'ledger-label', text: line.label }),
@@ -200,7 +206,7 @@ export function ledgerBlock(math) {
   }
   block.append(el('div', { cls: 'ledger-rule', attrs: { 'aria-hidden': 'true' } }));
   block.append(el('div', { cls: 'ledger-total' + (math.earned ? ' is-earned' : ''), attrs: { role: 'listitem' } },
-    el('span', { cls: 'ledger-total-label', text: 'Total' }),
+    el('span', { cls: 'ledger-total-label', text: t('ledger.total') }),
     el('span', { cls: 'ledger-total-value', text: String(math.total) }),
   ));
   return block;
@@ -210,19 +216,26 @@ export function ledgerBlock(math) {
  *  CROSSED is half of what has to be stated, not just "unlocked!"). */
 export function unlockThresholdLine(entry, info) {
   const at = entry?.at ?? null;
-  if (at && typeof at.score === 'number') return `Score ${info.scoreTotalAfter} crossed the ${at.score}-point mark.`;
-  if (at && typeof at.runs === 'number') return `Run ${info.runCountAfter} crossed the ${at.runs}-run mark.`;
-  return `Condition met: ${entry?.condition ?? 'a threshold'}.`;
+  if (at && typeof at.score === 'number') return t('unlock.threshold.score', { score: info.scoreTotalAfter, mark: at.score });
+  if (at && typeof at.runs === 'number') return t('unlock.threshold.runs', { runs: info.runCountAfter, mark: at.runs });
+  return t('unlock.threshold.condition', { condition: entry?.condition ?? 'a threshold' });
 }
 
 /** The relic milestone an unlock was met by, as a sentence — the AC-9.2 rule in its
- *  S10 register: the WINS mark crossed, never just "unlocked!". */
+ *  S10 register: the WINS mark crossed, never just "unlocked!". Composed here (rather
+ *  than one template) because the marks list inflects in both languages. */
 export function relicThresholdLine(ids, winsAfter) {
   const rows = (RELIC_UNLOCK_TABLE ?? []).filter((row) => row.ids.some((id) => ids.includes(id)));
-  const marks = rows.map((row) => `${row.at} ${row.at === 1 ? 'win' : 'wins'}`);
-  return marks.length > 0
-    ? `${winsAfter} lifetime ${winsAfter === 1 ? 'win' : 'wins'} crossed the ${marks.join(' and ')} mark${marks.length === 1 ? '' : 's'}.`
-    : `${winsAfter} lifetime ${winsAfter === 1 ? 'win' : 'wins'} on the ledger.`;
+  const winWord = (n) => (n === 1 ? t('unlock.win.one') : t('unlock.win'));
+  const marks = rows.map((row) => `${row.at} ${winWord(row.at)}`);
+  if (marks.length > 0) {
+    if (currentLang() === 'es') {
+      return `${winsAfter} ${winWord(winsAfter)} de por vida cruzaron ${marks.length === 1 ? 'la marca de' : 'las marcas de'} ${marks.join(' y ')}.`;
+    }
+    return `${winsAfter} lifetime ${winWord(winsAfter)} crossed the ${marks.join(' and ')} mark${marks.length === 1 ? '' : 's'}.`;
+  }
+  if (currentLang() === 'es') return `${winsAfter} ${winWord(winsAfter)} de por vida en el libro de cuentas.`;
+  return `${winsAfter} lifetime ${winWord(winsAfter)} on the ledger.`;
 }
 
 /** The post-run narration block: threshold crossed, option opened, pool size, limitation. */
@@ -230,10 +243,12 @@ export function unlockBlock(info) {
   const block = el('div', { cls: 'unlock-block' });
   for (const unlocked of info.newly) {
     const entry = (UNLOCK_CATALOG ?? []).find((e) => e.id === unlocked.id) ?? null;
-    block.append(el('p', { cls: 'unlock-head', text: `UNLOCKED — ${unlocked.name}` }));
+    block.append(el('p', { cls: 'unlock-head', text: t('unlock.head', { name: unlocked.name }) }));
     block.append(el('p', { cls: 'unlock-that', text: unlockThresholdLine(entry, info) }));
     // The kernel's own narration sentence: what the option now IS. Never "you are
     // stronger" — an unlock adds an OPTION, and the framing may not imply the game eased.
+    // The narration text is frozen kernel content — English until I18N-2 sweeps the
+    // record layer (an honest fallback, like the card names).
     block.append(el('p', { cls: 'unlock-line', text: unlocked.narration }));
   }
   // S10 RELICS: the same narration, relic-shaped. A win that crossed a milestone names
@@ -244,21 +259,20 @@ export function unlockBlock(info) {
   const relics = info.relics ?? null;
   if (relics && relics.newly.length > 0) {
     const names = relics.newly.map((id) => relicDef(id)?.name ?? id);
-    block.append(el('p', { cls: 'unlock-head', text: 'UNLOCKED — relics for the climbs ahead' }));
-    block.append(el('p', { cls: 'unlock-line', text: `Your climbs unlocked: ${names.join(', ')}.` }));
+    block.append(el('p', { cls: 'unlock-head', text: t('unlock.relics.head') }));
+    block.append(el('p', { cls: 'unlock-line', text: t('unlock.relics.line', { names: names.join(', ') }) }));
     block.append(el('p', { cls: 'unlock-that', text: relicThresholdLine(relics.newly, relics.winsAfter) }));
   }
   const inPlay = info.cardsAfter;
   if (typeof inPlay === 'number') {
-    block.append(el('p', { cls: 'unlock-pool', text: `Cards in play: ${inPlay} of ${SHIPPED_CARDS}.` }));
+    block.append(el('p', { cls: 'unlock-pool', text: t('unlock.pool.cards', { n: inPlay, m: SHIPPED_CARDS }) }));
   }
   if (relics && typeof relics.countAfter === 'number') {
-    block.append(el('p', { cls: 'unlock-pool', text: `Relics in play: ${relics.countAfter} of ${RELIC_TOTAL}.` }));
+    block.append(el('p', { cls: 'unlock-pool', text: t('unlock.pool.relics', { n: relics.countAfter, m: RELIC_TOTAL }) }));
   }
   // The limitation, stated plainly ONCE, in the kernel's frozen-content terms: the pool is
   // re-ordered and gated, it is never enlarged.
-  block.append(el('p', { cls: 'unlock-limit', text: `The card pool is the same ${SHIPPED_CARDS} cards. `
-    + 'Unlocking changes which of them you are offered — it does not add cards.' }));
+  block.append(el('p', { cls: 'unlock-limit', text: t('unlock.limit', { n: SHIPPED_CARDS }) }));
   return block;
 }
 

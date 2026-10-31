@@ -49,6 +49,7 @@ import { backdropMarkup } from './stage-art.js';
 import { dyingRow } from './floats.js';
 import { endTargeting, pendingCard, pendingSlot } from './targeting.js';
 import { renderHud, helpPanel, helpOpen, HELP_SEEN_KEY, deckPanel, deckOpen, codexPanel, codexOpen, beltOpenSlot, beltPanel, setBeltOpenSlot } from './hud.js';
+import { t } from './i18n.js';
 import { heroFigure, combatView } from './combat-view.js';
 import { mapView } from './map-view.js';
 import { rewardView } from './reward-view.js';
@@ -228,7 +229,7 @@ export function render() {
     // The hold stage must sit in the SAME page wrapper combatView uses (`page-combat`
     // sizes and positions the fight), or the hero lands outside the frame and the
     // backdrop loses its lighting — a near-black stage instead of the fight it ended.
-    stageEl.replaceChildren(page('combat', 'II — The Fight', 'blade', '', [holdWrap]));
+    stageEl.replaceChildren(page('combat', t('combat.chapter'), 'blade', '', [holdWrap]));
     // How long the stage holds. The collapse ghost reads for the PACED collapse
     // (`animMs(COLLAPSE_MS)`, the stylesheet's own paced `juice-shatter`); a killing
     // stroke with a SIGNATURE needs longer, because its impact beat fires at ~70% of

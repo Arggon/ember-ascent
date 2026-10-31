@@ -11,6 +11,7 @@ import { el, keywordText, sceneIllus } from './dom.js';
 import { heroMarkup } from './stage-art.js';
 import { HEROES, act, switchHero, switchPath } from './actions.js';
 import { page } from './page-frame.js';
+import { t } from './i18n.js';
 
 /* ------------------------------------------------------------------ KINDLING */
 
@@ -36,7 +37,7 @@ export function kindlingView() {
     const at = Math.max(0, HEROES.findIndex((h) => h.id === current));
     const heroes = el('div', {
       cls: 'hero-select',
-      attrs: { role: 'radiogroup', 'aria-label': 'Choose your hero' },
+      attrs: { role: 'radiogroup', 'aria-label': t('kindling.heroes.aria') },
       on: {
         keydown: (ev) => {
           const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
@@ -52,14 +53,15 @@ export function kindlingView() {
     });
     for (const h of HEROES) {
       const on = current === h.id;
+      const blurb = t(`hero.${h.id}.blurb`);
       heroes.append(el('button', {
         cls: `hero-pick${on ? ' on' : ''} hp-${h.id}`,
-        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1', title: h.blurb },
+        attrs: { type: 'button', role: 'radio', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1', title: blurb },
         on: { click: () => switchHero(h.id) },
       },
       heroFace(h.id),
       el('span', { cls: 'hp-name', text: h.name }),
-      el('span', { cls: 'hp-blurb', text: h.blurb })));
+      el('span', { cls: 'hp-blurb', text: blurb })));
     }
     wrap.append(heroes);
     // Radio group like the hero picker (WAI-ARIA APG): one tab stop (the checked path),
@@ -69,7 +71,7 @@ export function kindlingView() {
     const atBiome = Math.max(0, biomes.findIndex((b) => b.id === curBiome));
     const paths = el('div', {
       cls: 'biome-select',
-      attrs: { role: 'radiogroup', 'aria-label': 'Choose the path' },
+      attrs: { role: 'radiogroup', 'aria-label': t('kindling.paths.aria') },
       on: {
         keydown: (ev) => {
           const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
@@ -83,7 +85,7 @@ export function kindlingView() {
         },
       },
     });
-    paths.append(el('span', { cls: 'bs-label', text: 'Path' }));
+    paths.append(el('span', { cls: 'bs-label', text: t('kindling.path') }));
     for (const b of biomes) {
       const on = curBiome === b.id;
       paths.append(el('button', {
@@ -94,8 +96,8 @@ export function kindlingView() {
     }
     wrap.append(paths);
   }
-  wrap.append(el('div', { cls: 'big-title kindling-head', text: 'The forge offers a kindling' }));
-  wrap.append(el('p', { cls: 'kindling-note', text: 'Take one. Each gift has a price.' }));
+  wrap.append(el('div', { cls: 'big-title kindling-head', text: t('kindling.head') }));
+  wrap.append(el('p', { cls: 'kindling-note', text: t('kindling.note') }));
   const list = el('div', { cls: 'boon-list' });
   for (const b of snap.kindling.boons) {
     list.append(el('button', {
@@ -106,5 +108,5 @@ export function kindlingView() {
     keywordText(el('span', { cls: 'boon-text' }), b.text)));
   }
   wrap.append(list);
-  return page('kindling', '0 — The Kindling', 'flame', 'panel', [wrap]);
+  return page('kindling', t('page.kindling'), 'flame', 'panel', [wrap]);
 }

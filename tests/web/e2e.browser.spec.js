@@ -2312,3 +2312,73 @@ test('a torn relic pool seals the warden\u2019s vault honestly (UX-2 fallback)',
   }
   assert.ok(sealed, 'the walk reached the warden and read the sealed vault');
 });
+
+/* ---------------------------------------------------------------- I18N-1: language */
+
+test('language: the toggle flips the combat UI and the card sentences to Spanish and back, persists across a reload, and never disturbs the run', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t);
+  await bootToMap(page);
+  await travelToFight(page);
+  await waitIdle(page);
+
+  // DEFAULT: English chrome, English card sentences, <html lang="en">.
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+  const endBtn = page.locator('.controls button', { hasText: 'End Turn' });
+  assert.equal(await endBtn.count(), 1, 'the English End Turn button is present');
+  assert.equal((await page.locator('.pile-draw .pile-name').textContent()).trim(), 'Draw');
+  const enDesc = await page.locator('.card .cdesc').first().textContent();
+  assert.match(enDesc, /^(Deal|Gain|Draw|Discard|Restore|Exhaust|Retain|Lose|Apply|Double|Special)/,
+    'an English kernel sentence shows before the switch');
+  const before = await readState(page);
+  assert.equal(before.phase, 'combat');
+
+  // THE SWITCH. The control is found by its bilingual aria-label, which reads the same
+  // in both languages, so a Spanish-only screen reader still finds it.
+  const toggle = page.locator('#hud button.lang-toggle');
+  assert.equal(await toggle.getAttribute('aria-label'), 'Language / Idioma');
+  await toggle.click();
+  await waitIdle(page);
+
+  // Spanish chrome: <html lang>, the toggle's own label, End Turn, the piles, the hint.
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'es', '<html lang> follows the switch');
+  assert.equal((await page.locator('#hud button.lang-toggle').textContent()).trim(), 'ES');
+  assert.equal((await page.locator('.controls button', { hasText: 'Terminar turno' }).count()), 1, 'End Turn renders Spanish');
+  assert.equal((await page.locator('.pile-draw .pile-name').textContent()).trim(), 'Robo');
+  assert.equal((await page.locator('.pile-discard .pile-name').textContent()).trim(), 'Descarte');
+  assert.match(await page.locator('p.hint').last().textContent(), /Haz clic en una carta para jugarla/,
+    'the combat hint renders Spanish');
+
+  // Spanish card sentences, re-derived kernel-side from the same effect data.
+  const esDesc = await page.locator('.card .cdesc').first().textContent();
+  assert.match(esDesc, /^(Infliges|Ganas|Robas|Descartas|Restauras|Agotas|Retienes|Pierdes|Aplicas|Duplicas|Gana)/,
+    'a Spanish kernel sentence shows after the switch');
+  assert.doesNotMatch(esDesc, /^(Deal|Gain|Draw|Discard|Restore|Exhaust|Retain|Apply) /,
+    'the English sentence is gone from the tile');
+
+  // THE RUN IS UNTOUCHED: same phase, same turn, same living enemies — only the words changed.
+  const afterSwitch = await readState(page);
+  assert.equal(afterSwitch.phase, 'combat');
+  assert.equal(afterSwitch.turn, before.turn);
+  assert.deepEqual(
+    afterSwitch.enemies.map((e) => ({ index: e.index, hp: e.hp })),
+    before.enemies.map((e) => ({ index: e.index, hp: e.hp })),
+  );
+
+  // PERSISTENCE: the choice lives in localStorage (dlb.lang), so a reload boots Spanish
+  // (a fresh run — the browser surface never resumes a mid-run fight; that is the
+  // pre-existing boot contract, not this slice's).
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForSelector('#hud', { timeout: 5000 });
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'es', 'the reload boots Spanish');
+  assert.equal((await page.locator('#hud button.lang-toggle').textContent()).trim(), 'ES');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'es');
+
+  // BACK TO ENGLISH: one click restores the English chrome on the fresh run.
+  await page.locator('#hud button.lang-toggle').click();
+  await waitIdle(page);
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+  assert.equal((await page.locator('#hud button.lang-toggle').textContent()).trim(), 'EN');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en');
+});

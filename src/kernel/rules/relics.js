@@ -106,85 +106,103 @@ export const ELITE_COMMON_BAND = 70;
  * shows verbatim — both live HERE, kernel-side, so no surface re-derives words.
  * `offText` completes "Your <relic> ..." for the Iron Skin boon and is only meaningful on
  * a relic a hero can start with.
+ *
+ * I18N-1: `name_es`/`text_es` (and `offText_es` on a startable relic) are the Spanish
+ * twins of the player-facing fields, read by snapshot({lang:'es'}) through the bilingual
+ * field lookup (observe.js fieldFor) with the English field as the honest fallback.
+ * `summary` — the compact CLI code — stays English-only by contract, like the dump.
  */
 export const RELICS = Object.freeze({
   // --- the two starting relics (B4) -------------------------------------------------
   burning_blood: {
-    tier: 'common', name: 'Kindled Heart',
+    tier: 'common', name: 'Kindled Heart', name_es: 'Corazón Encendido',
     summary: `HP+${RELIC_HEAL}/fight`, text: `After each combat, restore ${RELIC_HEAL} HP.`,
-    offText: 'no longer heals after fights',
+    text_es: `Después de cada combate, recuperas ${RELIC_HEAL} HP.`,
+    offText: 'no longer heals after fights', offText_es: 'ya no recupera HP después de los combates',
     healAfterFight: RELIC_HEAL,
   },
   cyan_lantern: {
-    tier: 'common', name: 'Cyan Lantern',
+    tier: 'common', name: 'Cyan Lantern', name_es: 'Farol Cian',
     summary: `E+${LANTERN_ENERGY} turn 1`, text: `On the first turn of each combat, gain ${LANTERN_ENERGY} Energy.`,
-    offText: 'no longer gives Energy on the first turn of each fight',
+    text_es: `En el primer turno de cada combate, ganas ${LANTERN_ENERGY} de Energía.`,
+    offText: 'no longer gives Energy on the first turn of each fight', offText_es: 'ya no da Energía en el primer turno de cada combate',
     firstTurnEnergy: LANTERN_ENERGY,
   },
   // --- common drops -----------------------------------------------------------------
   forge_iron: {
-    tier: 'common', name: 'Forge Iron',
+    tier: 'common', name: 'Forge Iron', name_es: 'Hierro de Forja',
     summary: `B${FORGE_IRON_BLOCK} turn 1`, text: `At the start of each combat, gain ${FORGE_IRON_BLOCK} Block.`,
+    text_es: `Al inicio de cada combate, ganas ${FORGE_IRON_BLOCK} de Bloqueo.`,
     combatStartBlock: FORGE_IRON_BLOCK,
   },
   whetted_edge: {
-    tier: 'common', name: 'Whetted Edge',
+    tier: 'common', name: 'Whetted Edge', name_es: 'Filo Afilado',
     summary: `PWR+${WHETTED_EDGE_STRENGTH} turn 1`, text: `At the start of each combat, gain ${WHETTED_EDGE_STRENGTH} Strength.`,
+    text_es: `Al inicio de cada combate, ganas ${WHETTED_EDGE_STRENGTH} de Fuerza.`,
     combatStartStrength: WHETTED_EDGE_STRENGTH,
   },
   hearth_ash: {
-    tier: 'common', name: 'Hearth Ash',
+    tier: 'common', name: 'Hearth Ash', name_es: 'Ceniza del Hogar',
     summary: `rest HP+${HEARTH_HEAL}`, text: `When you rest, heal ${HEARTH_HEAL} additional HP.`,
+    text_es: `Cuando descansas, recuperas ${HEARTH_HEAL} HP adicionales.`,
     restHealBonus: HEARTH_HEAL,
   },
   // --- uncommon drops ---------------------------------------------------------------
   ember_heart: {
-    tier: 'uncommon', name: 'Ember Heart',
+    tier: 'uncommon', name: 'Ember Heart', name_es: 'Corazón de Ascuas',
     summary: `MAXHP+${EMBER_HEART_HP}`, text: `When you acquire it, gain ${EMBER_HEART_HP} max HP (and heal that much).`,
+    text_es: `Cuando la adquieres, ganas ${EMBER_HEART_HP} de HP máximo (y recuperas esa cantidad).`,
     maxHpBonus: EMBER_HEART_HP,
   },
   gold_vein: {
-    tier: 'uncommon', name: 'Gold Vein',
+    tier: 'uncommon', name: 'Gold Vein', name_es: 'Veta de Oro',
     summary: `GOLD+${GOLD_VEIN_GAIN}/fight`, text: `After each combat, gain ${GOLD_VEIN_GAIN} gold.`,
+    text_es: `Después de cada combate, ganas ${GOLD_VEIN_GAIN} de oro.`,
     goldAfterFight: GOLD_VEIN_GAIN,
   },
   flask_grip: {
-    tier: 'uncommon', name: 'Flask Grip',
+    tier: 'uncommon', name: 'Flask Grip', name_es: 'Asidero de Frasco',
     summary: `B${FLASK_GRIP_BLOCK}/quaff`, text: `Whenever you quaff a potion, gain ${FLASK_GRIP_BLOCK} Block.`,
+    text_es: `Cada vez que bebes una poción, ganas ${FLASK_GRIP_BLOCK} de Bloqueo.`,
     quaffBlock: FLASK_GRIP_BLOCK,
   },
   // --- rare drops (the boss offers these FIRST; UX-1's down-tier fills a short offer
   // --- from uncommons, then commons) --------------------------------------------------
   deep_well: {
-    tier: 'rare', name: 'Deep Well',
+    tier: 'rare', name: 'Deep Well', name_es: 'Pozo Profundo',
     summary: `D+${DEEP_WELL_DRAW} turn 1`, text: `Draw ${DEEP_WELL_DRAW} additional card on the first turn of each combat.`,
+    text_es: `Robas ${DEEP_WELL_DRAW} ${DEEP_WELL_DRAW === 1 ? 'carta adicional' : 'cartas adicionales'} en el primer turno de cada combate.`,
     firstTurnDraw: DEEP_WELL_DRAW,
   },
   ash_crown: {
-    tier: 'rare', name: 'Ash Crown',
+    tier: 'rare', name: 'Ash Crown', name_es: 'Corona de Ceniza',
     summary: `HP+${ASH_CROWN_HEAL}/fight rest+${HEARTH_HEAL}`,
     text: `After each combat, restore ${ASH_CROWN_HEAL} HP. When you rest, heal ${HEARTH_HEAL} additional HP.`,
+    text_es: `Después de cada combate, recuperas ${ASH_CROWN_HEAL} HP. Cuando descansas, recuperas ${HEARTH_HEAL} HP adicionales.`,
     healAfterFight: ASH_CROWN_HEAL, restHealBonus: HEARTH_HEAL,
   },
   slag_crown: {
-    tier: 'rare', name: 'Slag Crown',
+    tier: 'rare', name: 'Slag Crown', name_es: 'Corona de Escoria',
     summary: `E+1 turn 1 PWR+${SLAG_CROWN_STRENGTH}`,
     text: `On the first turn of each combat, gain ${LANTERN_ENERGY} Energy and ${SLAG_CROWN_STRENGTH} Strength.`,
+    text_es: `En el primer turno de cada combate, ganas ${LANTERN_ENERGY} de Energía y ${SLAG_CROWN_STRENGTH} de Fuerza.`,
     firstTurnEnergy: LANTERN_ENERGY, combatStartStrength: SLAG_CROWN_STRENGTH,
   },
   // S9: two more rares so the ACT-2 warden's offer is a real three-choice — the rare
   // pool must outlive act 1's pick (5 rares, one taken per boss, two bosses). Both
   // compose existing hooks; no new mechanics, no new draws.
   cinder_ward: {
-    tier: 'rare', name: 'Cinder Ward',
+    tier: 'rare', name: 'Cinder Ward', name_es: 'Guardia de Ascuas',
     summary: `B${CINDER_WARD_BLOCK} turn 1`,
     text: `At the start of each combat, gain ${CINDER_WARD_BLOCK} Block.`,
+    text_es: `Al inicio de cada combate, ganas ${CINDER_WARD_BLOCK} de Bloqueo.`,
     combatStartBlock: CINDER_WARD_BLOCK,
   },
   ash_ledger: {
-    tier: 'rare', name: 'Ash Ledger',
+    tier: 'rare', name: 'Ash Ledger', name_es: 'Libro de Ceniza',
     summary: `GOLD+${ASH_LEDGER_GAIN}/fight`,
     text: `After each combat, gain ${ASH_LEDGER_GAIN} gold.`,
+    text_es: `Después de cada combate, ganas ${ASH_LEDGER_GAIN} de oro.`,
     goldAfterFight: ASH_LEDGER_GAIN,
   },
 });
