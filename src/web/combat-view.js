@@ -7,7 +7,7 @@
 // hold through incidental repaints. The hero's movement is chosen by WHICH card was
 // played (hero-moves.js), never only by its type.
 
-import { BIOMES, DEFAULT_BIOME } from '../kernel/index.js';
+import { BIOMES, DEFAULT_BIOME, describeTile, loadContent } from '../kernel/index.js';
 import {
   HERO_POSE_MS,
   SPEED_KEY,
@@ -39,7 +39,7 @@ import { dyingCard, efxBox, freshStatusKeys, heroEfx, hitClass } from './floats.
 import { aimed, cancelTargeting, clickCard, consumeClick, enemyLabel, pendingCard, pendingSlot, pickTarget, setAimed } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
-import { t } from './i18n.js';
+import { currentLang, t } from './i18n.js';
 
 /**
  * UX-5: the input gate's reader-facing sentences, one per busy reason, keyed into the
@@ -488,13 +488,19 @@ function enemyCard(e, position) {
  * effect, then the compact CLI code. Auto height means a 3-line effect grows the tile
  * rather than clipping it.
  * @param {any} card the snapshot's card view
- * @param {{index?: number, onClick?: Function, actionId?: string, locked?: string|null}} [opts]
+ * @param {{index?: number, onClick?: Function, actionId?: string, locked?: string|null,
+ *          readOnly?: boolean}} [opts]
  *        `index` draws the keyboard digit badge (hand only); `onClick` overrides the default
  *        hand-play action (reward tiles need it, because taking a card is a different verb);
  *        `locked` is the UX-5 busy reason — the tile wears the disabled shape even though
- *        the kernel would take it, because the previous animation is still landing
+ *        the kernel would take it, because the previous animation is still landing;
+ *        `readOnly` (UX-8) renders the tile as a FACT, not a control: a labelled div, no
+ *        disabled/unplayable shape, no click — the codex gallery, the deck sheet and an
+ *        inert removal instance share it. The full-tile markup is the hand's own, so the
+ *        three read-only surfaces can never drift from the game's card face.
  */
 export function cardTile(card, opts = {}) {
+  const readOnly = Boolean(opts.readOnly);
   const isPending = pendingSlot !== null && card.slot === pendingSlot;
   // While one card is waiting for a target the OTHER cards cannot be played by accident:
   // clicking them cancels the step instead. They read as inert but stay focusable, so a
@@ -502,7 +508,10 @@ export function cardTile(card, opts = {}) {
   // UX-5: a busy hand is disabled the SAME way — the unplayable visual, aria-disabled,
   // and the native disabled flag — with the honest wait named instead of the Energy one.
   const locked = opts.locked ?? null;
-  const disabled = !card.playable || locked !== null;
+  // UX-8: a read-only tile is never the disabled/unplayable shape — it is not a card the
+  // hand refused, it is a card nobody asked to play. Full colour, no aria-disabled, and
+  // no click handler at all (a div, so no focus stop announces a control that does nothing).
+  const disabled = !readOnly && (!card.playable || locked !== null);
   // A tile is clicked for two different reasons: playing it from the hand, or taking it from
   // a reward. `opts.onClick` supplies the second. Before this existed every tile called
   // `clickCard(slot)`, which only searches `snap.hand` — so a reward tile (slot `s1`)
@@ -517,14 +526,16 @@ export function cardTile(card, opts = {}) {
   // The locked wait is named in the tile's own sentence (the i18n busy keys), so a
   // screen reader hears why the playable card is not taking input right now.
   const lockedNote = locked !== null ? t('combat.waiting', { why: busyText(locked, 'tile') }) : '';
-  const tile = el('button', {
+  const tile = el(readOnly ? 'div' : 'button', {
     cls: `card type-${card.type}` + (disabled ? ' disabled is-unplayable' : ''),
     attrs: {
-      type: 'button',
+      // A readout is a group (the enemy cards' own resting role): labelled, but never
+      // announced as a button that would do nothing.
+      ...(readOnly ? { role: 'group' } : { type: 'button' }),
       // `data-slot` is how focus returns to the right card after a cancel.
       'data-slot': card.slot,
       ...(opts.actionId ? { 'data-action': opts.actionId } : {}),
-      'aria-disabled': String(disabled),
+      ...(readOnly ? {} : { 'aria-disabled': String(disabled) }),
       // The inert reason belongs to the CARD'S CONTEXT: a hand tile lacks Energy, a
       // shop shelf (S4) lacks gold. `disabledNote` lets a caller state the real reason
       // instead of the Energy default.
@@ -536,9 +547,9 @@ export function cardTile(card, opts = {}) {
       title: desc,
       ...(isPending ? { 'aria-pressed': 'true' } : {}),
     },
-    on: disabled && !opts.onClick ? {} : { click: onClick },
+    on: readOnly ? {} : (disabled && !opts.onClick ? {} : { click: onClick }),
   });
-  if (disabled) tile.disabled = true;
+  if (!readOnly && disabled) tile.disabled = true;
 
   // Cost gem: a faceted stone, not a plain circle.
   const gem = el('span', { cls: 'cost-gem', attrs: { title: t('deck.cost') } },
@@ -607,4 +618,59 @@ export function cardTile(card, opts = {}) {
     tile,
   );
   return wrap;
+}
+
+/* ------------------------------------------------- UX-8: the gallery fact layer */
+//
+// The codex gallery, the deck sheet and the shop's removal pick render cardTile, whose
+// hand/reward callers receive their describe-layer sentences pre-computed in the snapshot.
+// The read-only surfaces are NOT snapshot fields (the kernel publishes the deck as
+// name/cost/type/temper rows; descriptions live behind the describe layer), so this
+// helper feeds the tile the two facts the snapshot rows lack. Everything here is the
+// kernel's own wording through the ONE public entry point — the surface never derives a
+// number or a sentence of its own.
+
+/** The FULL shipped table's definitions, loaded once: the 65 draft-pool cards plus the
+ *  five hero-only starters, which snapshot.deckCards and the shop's deckInstances can
+ *  both hold but cardPool() (rewards only) does not list. */
+let GALLERY_DEFS = null;
+function galleryDefs() {
+  if (!GALLERY_DEFS) GALLERY_DEFS = loadContent().cards;
+  return GALLERY_DEFS;
+}
+
+const GALLERY_FACTS = {};
+
+/**
+ * The describe-layer facts one content card needs for a read-only tile: its sentence,
+ * its flavor line, and its type word — computed in the CURRENT language and cached per
+ * language, so a language switch re-derives exactly once like the codex pool cache.
+ * The kernel's own `describeTile` is the fact bundle (it feeds the hand tiles' fields:
+ * the name, the cost, the SHORT type word, the describe sentence), so every word here is
+ * kernel wording; only the flavor line is read off the def beside it. An id the content
+ * no longer knows (a torn save's placeholder row) degrades to empty strings; the tile
+ * then shows the raw id name it already carries and no rules text.
+ * @param {string} cardId
+ * @returns {{description: string, flavor: string, type: string, typeLabel: string}}
+ */
+export function cardDescribe(cardId) {
+  const lang = currentLang();
+  let per = GALLERY_FACTS[lang];
+  if (!per) per = GALLERY_FACTS[lang] = new Map();
+  const hit = per.get(cardId);
+  if (hit) return hit;
+  const def = galleryDefs().get(cardId) || null;
+  const fact = def
+    ? (() => {
+        const tile = describeTile(def, {}, 0, lang);
+        return {
+          description: tile.description || '',
+          flavor: (lang === 'es' ? (def.flavor_es ?? def.flavor) : def.flavor) || '',
+          type: tile.type,
+          typeLabel: tile.typeLabel,
+        };
+      })()
+    : { description: '', flavor: '', type: 'unknown', typeLabel: 'unknown' };
+  per.set(cardId, fact);
+  return fact;
 }

@@ -9,19 +9,21 @@
 //   5. Maul's signature (stage shake + ember shockwave) fires through the REAL
 //      targeting path (card click → numbered targets → enemy click), the regression
 //      for the delayed-fx fix (bfa7bf7) and its coexistence with the hit-stop queue
-//   6. the S1 master-deck sheet lists the starting deck from the map AND from combat
-//      (read-only: no tempered badge at run start, duplicates counted, Esc/Close both
-//      dismiss it and the run underneath is untouched)
-//   7. the S2 card codex groups the whole draft pool by rarity with counts, shows a known
-//      card's describe-layer sentence, wears the "in deck" chip on an injected copy, and
+//   6. the S1 master-deck sheet shows the starting deck from the map AND from combat
+//      as the game's card tiles, ONE PER COPY (UX-8: the tile count is the count,
+//      read-only divs — no tempered badge at run start, Esc/Close both dismiss it and
+//      the run underneath is untouched; a tempered injected pair wears its stamp)
+//   7. the S2 card codex groups the whole draft pool by rarity with counts as a card-TILE
+//      GALLERY (UX-8: full faces with their woodcut art), shows a known card's
+//      describe-layer sentence, wears the "in deck" chip on an injected copy, and
 //      Escape dismisses it without moving the run
 //   8. the S3 gold economy: a victory pays the purse (the reward head's "+N gold" chip
 //      and the HUD readout agree on the same kernel value) and the next victory adds to
 //      it; the run summary names the final purse
 //   9. the S4 shop: the vendor is a labelled map node with five priced shelves and the
 //      purse in view; a click buys a card (the deck sheet agrees mid-shop), the removal
-//      service is a modal pick of deck instances, unaffordable shelves are inert, and
-//      leaving is final
+//      service is the deck as card TILES and the tile itself is the pick (UX-8),
+//      unaffordable shelves are inert, and leaving is final
 //  10. the S5 potions: three empty belt slots at boot; a won fight drops a potion into
 //      the belt (seed 1: fight 2, Ember Draught); in the next combat the chip opens the
 //      quaff/discard popover, quaffing consumes the slot and lands the effect on the
@@ -289,8 +291,9 @@ test('deck: the master-deck sheet shows the starting deck from the map, and agai
   await bootToMap(page);
 
   // MAP PHASE. The control names the count (the kernel's own deckCount), the sheet is a
-  // labelled dialog, and the rows are the starting deck aggregated: Hammerfall ×5,
-  // Quench ×4, Anvil Blow ×1 — nothing tempered at run start.
+  // labelled dialog, and the gallery is the starting deck ONE TILE PER COPY (UX-8, the
+  // StS reading): Hammerfall ×5, Quench ×4, Anvil Blow ×1 render as 10 tiles — the tile
+  // count IS the deck count — and nothing is tempered at run start.
   const btn = page.locator('#hud button[aria-label^="Deck:"]');
   assert.equal(await btn.getAttribute('aria-label'), 'Deck: 10 cards', 'the control must announce the deck size');
   assert.equal((await btn.textContent()).trim(), 'Deck (10)');
@@ -299,18 +302,27 @@ test('deck: the master-deck sheet shows the starting deck from the map, and agai
   const sheet = page.locator('.modal.deck-modal');
   assert.equal(await sheet.getAttribute('aria-label'), 'Deck: 10 cards', 'the sheet must be a labelled dialog');
   assert.equal(await sheet.locator('h2').textContent(), 'Deck (10)', 'the sheet title carries the count');
-  const rows = sheet.locator('.deck-row');
-  assert.equal(await rows.count(), 3, 'the 10-card starting deck must aggregate to 3 rows');
-  const hammer = rows.filter({ hasText: 'Hammerfall' });
-  assert.equal(await hammer.count(), 1, 'exactly one Hammerfall row (duplicates counted, not repeated)');
-  assert.equal(await hammer.locator('.deck-count').textContent(), '×5', 'the five starter strikes read as one ×5 row');
-  assert.equal(await rows.filter({ hasText: 'Quench' }).locator('.deck-count').textContent(), '×4');
-  assert.equal(await rows.filter({ hasText: 'Anvil Blow' }).count(), 1);
+  const tiles = sheet.locator('.deck-grid .card');
+  assert.equal(await tiles.count(), 10, 'the 10-card starting deck renders 10 tiles, one per copy');
+  const hammer = tiles.filter({ hasText: 'Hammerfall' });
+  assert.equal(await hammer.count(), 5, 'the five starter strikes read as five Hammerfall tiles');
+  assert.equal(await tiles.filter({ hasText: 'Quench' }).count(), 4);
+  assert.equal(await tiles.filter({ hasText: 'Anvil Blow' }).count(), 1);
   assert.equal(await sheet.locator('.ctemper').count(), 0, 'nothing in the starting deck may wear a temper stamp');
+  // Each tile is the game's card face: the kernel's describe sentence in the rules row
+  // (and in the label), the cost gem, and the woodcut illustration of the card id.
+  const firstHammer = hammer.first();
+  assert.equal(await firstHammer.locator('.cname').textContent(), 'Hammerfall');
+  assert.equal(await firstHammer.locator('.gem-core').textContent(), '1');
+  assert.match(await firstHammer.locator('.cdesc').textContent(), /Deal 6 damage/);
+  assert.match(await firstHammer.getAttribute('aria-label'), /Costs 1 Energy/);
+  assert.equal(await firstHammer.locator('.c-illus svg').count(), 1, 'a deck tile carries the card art');
+  assert.equal(await firstHammer.getAttribute('role'), 'group', 'a read-only tile is a labelled fact, not a button');
   // Deterministic order: cost then name — Hammerfall and Quench share cost 1, so the
-  // cheaper pair leads and the cost-2 Anvil Blow closes the list.
-  const names = await rows.locator('.deck-name').allTextContents();
-  assert.deepEqual(names, ['Hammerfall', 'Quench', 'Anvil Blow']);
+  // cheaper pair leads and the cost-2 Anvil Blow closes the gallery (copies cluster).
+  const names = await tiles.locator('.cname').allTextContents();
+  assert.deepEqual(names.slice(0, 6), ['Hammerfall', 'Hammerfall', 'Hammerfall', 'Hammerfall', 'Hammerfall', 'Quench']);
+  assert.equal(names[9], 'Anvil Blow');
 
   // Escape closes it (keyboard affordance); the map is exactly where it was.
   await page.keyboard.press('Escape');
@@ -321,7 +333,7 @@ test('deck: the master-deck sheet shows the starting deck from the map, and agai
   await travelToFight(page);
   await openDeck(page);
   const combatSheet = page.locator('.modal.deck-modal');
-  assert.equal(await combatSheet.locator('.deck-row').count(), 3, 'the deck is unchanged in combat');
+  assert.equal(await combatSheet.locator('.deck-grid .card').count(), 10, 'the deck is unchanged in combat');
   assert.equal(await combatSheet.locator('.ctemper').count(), 0);
   // The Close button is the mouse affordance out.
   await combatSheet.getByRole('button', { name: /Close/ }).click();
@@ -329,7 +341,7 @@ test('deck: the master-deck sheet shows the starting deck from the map, and agai
   assert.equal(await readState(page).then((s) => s.phase), 'combat', 'the fight must still be running after closing');
 });
 
-test('deck: tempered copies injected through the save lever wear their own stamped row', { timeout: 120000 }, async (t) => {
+test('deck: tempered copies injected through the save lever wear their own stamped tiles', { timeout: 120000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   const page = await freshPage(t);
   await bootToMap(page);
@@ -348,10 +360,13 @@ test('deck: tempered copies injected through the save lever wear their own stamp
   await travelToFight(page);
   await openDeck(page);
 
-  const hot = page.locator('.modal.deck-modal .deck-row.tempered');
-  assert.equal(await hot.count(), 1, 'the tempered pair must aggregate into ONE row of its own');
-  assert.equal(await hot.locator('.ctemper .t-name').textContent(), 'Red-hot', 'the row must wear the temper stamp');
-  assert.equal(await hot.locator('.deck-count').textContent(), '×2', 'the injected pair reads as one ×2 row');
+  const hot = page.locator('.modal.deck-modal .deck-grid .card.tempered');
+  assert.equal(await hot.count(), 2, 'the tempered pair reads as two tiles of its own (one per copy)');
+  const stamp = hot.first().locator('.ctemper .t-name');
+  assert.equal(await stamp.textContent(), 'Red-hot', 'each tempered tile wears the temper stamp');
+  assert.equal(await hot.nth(1).locator('.ctemper .t-name').textContent(), 'Red-hot');
+  // The tile's hover sentence carries the kernel's own temper sentence beside the base one.
+  assert.match(await hot.first().getAttribute('title'), /Red-hot: \+50% damage/);
 });
 
 /** The S2 card codex, opened from the HUD's Cards control. */
@@ -401,19 +416,26 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
   assert.equal(await sheet.locator('h2').textContent(), 'Cards (20)', 'the sheet title carries the pool size');
   const heads = await sheet.locator('.codex-group-head').allTextContents();
   assert.deepEqual(heads, ['Common (16)', 'Uncommon (4)'], 'the fresh groups with their counts — and no rare group, honestly absent');
-  assert.equal(await sheet.locator('.codex-row').count(), 20, 'every pool card is one row');
+  const tiles = sheet.locator('.codex-grid .card');
+  assert.equal(await tiles.count(), 20, 'every pool card is one full card tile');
 
-  // Spot-check one known row: Slag Surge (cardId ironwave), cost 1, its describe-layer
-  // sentence verbatim — and the full-table card Maul stays ABSENT from a fresh sheet
-  // (the codex shows what the run can be offered, never the whole shipped table).
-  const surge = sheet.locator('.codex-row', { hasText: 'Slag Surge' });
-  assert.equal(await surge.count(), 1, 'Slag Surge renders exactly one row');
-  assert.equal(await surge.locator('.codex-name').textContent(), 'Slag Surge');
-  assert.equal(await surge.locator('.codex-cost').textContent(), '1');
-  assert.equal(await surge.locator('.codex-desc').textContent(), 'Gain 5 Block. Deal 5 damage to the enemy.');
-  assert.equal(await sheet.locator('.codex-row', { hasText: 'Maul' }).count(), 0, 'a locked card is not on the sheet');
+  // Spot-check one known tile: Slag Surge (cardId ironwave) — the game's card face, with
+  // its cost gem, its woodcut illustration and its describe-layer sentence verbatim —
+  // while the full-table card Maul stays ABSENT from a fresh sheet (the codex shows what
+  // the run can be offered, never the whole shipped table).
+  const surge = tiles.filter({ hasText: 'Slag Surge' });
+  assert.equal(await surge.count(), 1, 'Slag Surge renders exactly one tile');
+  assert.equal(await surge.locator('.cname').textContent(), 'Slag Surge');
+  assert.equal(await surge.locator('.gem-core').textContent(), '1');
+  assert.equal(await surge.locator('.cdesc').textContent(), 'Gain 5 Block. Deal 5 damage to the enemy.');
+  assert.equal(await surge.locator('.c-illus svg').count(), 1, 'the tile renders the card art');
+  assert.equal(await surge.getAttribute('role'), 'group', 'a codex tile is a labelled fact, not a button');
+  assert.match(await surge.getAttribute('aria-label'), /Costs 1 Energy/);
+  assert.match(await surge.getAttribute('aria-label'), /Rarity: Common/);
+  assert.match(await surge.getAttribute('title'), /Common/);
+  assert.equal(await tiles.filter({ hasText: 'Maul' }).count(), 0, 'a locked card is not on the sheet');
 
-  // The injected copy wears the brass chip; nothing else in this deck is a pool card.
+  // The injected copy wears the brass corner chip; nothing else in this deck is a pool card.
   assert.equal(await surge.locator('.codex-indeck').textContent(), 'in deck ×1');
   assert.equal(await sheet.locator('.codex-indeck').count(), 1, 'exactly one owned copy to chip');
 
@@ -430,6 +452,66 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
   await page.keyboard.press('Escape');
   await page.waitForSelector('.modal.codex-modal', { state: 'detached', timeout: 3000 });
   assert.equal(await readState(page).then((s) => s.phase), 'combat', 'closing the codex must not move the run');
+});
+
+// ---------------------------------------------------------------------------
+// UX-8: the three read-only surfaces render the GAME'S card tiles. The codex is a card
+// gallery — every pool card one full tile with its woodcut illustration, gem, type head
+// and describe sentence — and the deck sheet is one tile per copy. The shop's removal
+// pick is the deck as tiles with the tile itself the pick; that flow is driven end-to-end
+// by the vendor walk above (a real click on a removal tile takes the instance out).
+// Fitting is the shared modal shell's own contract: the scroller scrolls, the sheet never
+// outgrows the viewport — verified here at a phone size against the 20-tile gallery.
+// ---------------------------------------------------------------------------
+test('UX-8: the codex gallery renders card tiles with art, and the deck sheet one tile per copy', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t);
+  await bootToMap(page);
+
+  // The codex gallery. The fresh pool is 20 cards; 14 of them have a drawn woodcut
+  // today (the six Bellows-family cards ship through the designed no-art fallback —
+  // the head stays, only the drawing is absent), so 14 tiles carry an illustration.
+  await openCodex(page);
+  const sheet = page.locator('.modal.codex-modal');
+  const tiles = sheet.locator('.codex-grid .card');
+  assert.equal(await tiles.count(), 20, 'the gallery shows one tile per offerable card');
+  assert.equal(await sheet.locator('.codex-grid .card .c-illus svg').count(), 14,
+    'the drawn cards render their woodcut inside the tile head');
+
+  // Phone fit: the sheet never outgrows a 390x844 viewport, and the gallery scrolls
+  // inside the shared modal scroller instead of clipping.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await sleep(200);
+  const sheetBox = await sheet.boundingBox();
+  assert.ok(sheetBox && sheetBox.height <= 844, `the codex sheet must fit a phone viewport, got ${sheetBox && sheetBox.height}`);
+  const scrolls = await sheet.locator('.modal-scroll').evaluate((n) => ({ sh: n.scrollHeight, ch: n.clientHeight }));
+  assert.ok(scrolls.sh > scrolls.ch, `a 20-tile gallery must scroll (scrollHeight ${scrolls.sh} > clientHeight ${scrolls.ch})`);
+  await page.locator('.modal.codex-modal').getByRole('button', { name: /Close/ }).click();
+  await page.waitForSelector('.modal.codex-modal', { state: 'detached', timeout: 3000 });
+
+  // The deck sheet: exactly 7 cards render exactly 7 tiles, duplicates as separate
+  // faces, each with its art. (The lever recipe: load, then a real action repaints.)
+  const res = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.deck = [
+      { uid: 'u-0', cardId: 'strike' }, { uid: 'u-1', cardId: 'strike' },
+      { uid: 'u-2', cardId: 'defend' }, { uid: 'u-3', cardId: 'defend' }, { uid: 'u-4', cardId: 'defend' },
+      { uid: 'u-5', cardId: 'bash' }, { uid: 'u-6', cardId: 'ironwave' },
+    ];
+    return ctl.load(save);
+  });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+  await travelToFight(page);
+  await openDeck(page);
+  const deckSheet = page.locator('.modal.deck-modal');
+  const deckTiles = deckSheet.locator('.deck-grid .card');
+  assert.equal(await deckTiles.count(), 7, 'a 7-card deck shows 7 tiles');
+  assert.equal(await deckTiles.filter({ hasText: 'Hammerfall' }).count(), 2, 'duplicates render as separate tiles');
+  assert.equal(await deckSheet.locator('.deck-grid .card .c-illus svg').count(), 7,
+    'every deck tile carries its card art');
+  await deckSheet.getByRole('button', { name: /Close/ }).click();
+  await page.waitForSelector('.modal.deck-modal', { state: 'detached', timeout: 3000 });
 });
 
 test('combat: a basic attack deals its printed damage without targeting', { timeout: 60000 }, async (t) => {
@@ -1446,15 +1528,19 @@ test('shop: the vendor sells a card, removes one, and closes for good', { timeou
   await page.keyboard.press('Escape');
   await sleep(200);
 
-  // The removal service: pay, pick one instance out of the modal list, land back.
+  // The removal service: pay, pick one card tile out of the deck gallery, land back.
   const rem = page.locator('button[data-action="x"]');
   assert.equal(await rem.count(), 1, 'the service is a button while the purse covers it');
   await rem.click();
-  await page.waitForSelector('.remove-list', { timeout: 3000 });
+  await page.waitForSelector('.remove-grid', { timeout: 3000 });
   const deckNow = await page.evaluate(() => window.__dlb.snapshot().deckCount);
-  const choices = page.locator('.remove-list .boon');
-  assert.equal(await choices.count(), deckNow, 'one choice per deck instance');
-  await choices.first().click();
+  const choices = page.locator('.remove-grid .card');
+  assert.equal(await choices.count(), deckNow, 'one card tile per deck instance');
+  // The tile IS the pick: it carries the instance's action id and the removal sentence.
+  const pickTile = choices.first();
+  assert.ok(await pickTile.getAttribute('data-action'), 'a removal tile carries its action id');
+  assert.match(await pickTile.getAttribute('aria-label'), /Remove /);
+  await pickTile.click();
   await sleep(400);
   assert.equal(await page.evaluate(() => window.__dlb.snapshot().deckCount), deckNow - 1,
     'the picked instance left the deck');
