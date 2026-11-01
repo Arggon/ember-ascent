@@ -151,9 +151,9 @@ export const NODE_WORDS = {
 };
 
 /**
- * Pick a silhouette, boss/elite framing and a rim tint from the enemy's NAME. The
- * snapshot carries the name; nothing here reads a rule or a stat.
- * @param {string} name
+ * Pick a silhouette, boss/elite framing and a rim tint from the enemy's encounter ID. The
+ * snapshot carries the id; nothing here reads a rule or a stat.
+ * @param {string} id the kernel's stable encounter id (e.g. `cinder_foreman`)
  * @returns {{art: string, boss: boolean, elite: boolean, hue: number}}
  */
 export function enemyLook(id) {
@@ -164,8 +164,17 @@ export function enemyLook(id) {
     acid_slime: { art: 'e-slime', hue: 3 },
     gremlin_nob: { art: 'e-brute', elite: true, hue: 2 },
     the_guardian: { art: 'e-sentinel', boss: true, hue: 1 },
+    // UX-9 D2: the Cinder Mines roster. The `boss`/`elite` flags are what drive the framing
+    // (border + boss name font); the sprites resolve by `e.id` in stage-art.js, so no glyph
+    // class is invented here for the unused `art` field.
+    slag_crawler: { hue: 3 },
+    ash_wraith: { hue: 0 },
+    ash_wraith_elite: { elite: true, hue: 4 },
+    cinder_foreman: { boss: true, hue: 2 },
   };
   const hit = table[id];
-  if (hit) return { art: hit.art, boss: Boolean(hit.boss), elite: Boolean(hit.elite), hue: hit.hue };
+  if (hit) {
+    return { art: hit.art || 'e-rune', boss: Boolean(hit.boss), elite: Boolean(hit.elite), hue: hit.hue };
+  }
   return { art: 'e-rune', boss: false, elite: false, hue: 0 };
 }

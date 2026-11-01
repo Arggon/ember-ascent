@@ -133,6 +133,17 @@ export function setStrikeSeq(seq) { strikeSeq = seq; }
  */
 export const STRIKE_SEQ = { beat: 500, slam: 640, impactAt: 0.46, floatMs: 950 };
 /**
+ * UX-9b: the BEAT slot for a non-attack step of the same turn (guard / power / hex), at the
+ * same pre-factor base as STRIKE_SEQ. The attack path keeps its own three figures
+ * untouched; this is one extra number, not a second timing system: the plan's tail is the
+ * non-attack steps in kernel order, one slot each, played AFTER the last slam (so a
+ * `thrash` A7 B5 reads as strike then guard). 560ms is the spec's §4.2 `power` beat — the
+ * middle of guard 480 / power 560 / hex 640 — because 9c's per-kind pose durations are the
+ * refinement, and a plan that already carries the kind can be re-slotted there without
+ * touching the event grouping again. `animMs` paces it exactly like every other beat.
+ */
+export const TURN_STEP = { ms: 560 };
+/**
  * Where THIS enemy sits in the playing sequence, or null. `delay` is what its .fig's
  * animation-delay should be RIGHT NOW: positive (waiting for its turn — `fill: both`
  * holds the 0% frame) or negative (resuming mid-flight after an incidental repaint),
@@ -333,6 +344,15 @@ export function clearFxTimers() {
  */
 export let lastPlayerStatuses = [];
 export function setLastPlayerStatuses(keys) { lastPlayerStatuses = keys; }
+/**
+ * The enemy statuses the PREVIOUS paint saw, keyed by each enemy's stable `index`. UX-9 D3:
+ * an enemy chip's juice-in must compare against THAT enemy's own previous keys — comparing
+ * against the player's list made an enemy chip animate whenever the player gained a status.
+ * A Map, not an array: `index` is stable identity that survives a death and a shift up the
+ * row, which is the same reason `hitClass` and `prevEnemies` key on it.
+ */
+export let lastEnemyStatuses = new Map();
+export function setLastEnemyStatuses(map) { lastEnemyStatuses = map; }
 /** Polite live region. The targeting state is never conveyed by colour alone: every
  *  step that changes what the player can do is also announced as text. */
 export const liveEl = document.getElementById('live');
@@ -425,10 +445,13 @@ export function setPhaseArriving(phase) { phaseArriving = phase; }
  * `travelTo` is a node id rather than a flag, because the map beat needs to know which
  * node to draw the step toward.
  *
- * @returns {{victory: boolean, defeat: boolean, reward: boolean, rest: boolean, boss: boolean, travelTo: string|null}}
+ * `bossName` is the acting boss's already-localized display name, carried with the boss beat
+ * so the welcome banner can announce the boss that actually walked in rather than a literal.
+ *
+ * @returns {{victory: boolean, defeat: boolean, reward: boolean, rest: boolean, boss: boolean, bossName: string|null, travelTo: string|null}}
  */
 export function noArrival() {
-  return { victory: false, defeat: false, reward: false, rest: false, boss: false, travelTo: null };
+  return { victory: false, defeat: false, reward: false, rest: false, boss: false, bossName: null, travelTo: null };
 }
 
 /** The one phase beat a paint may play. Reset at the top of every paint. */

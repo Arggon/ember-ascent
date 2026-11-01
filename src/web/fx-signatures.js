@@ -1031,3 +1031,332 @@ export const SIG_FX = {
   tithe: fxTithe,
   selfseam: fxSelfseam,
 };
+
+
+/* ============================ UX-9c: THE ENEMY'S OWN PRESENTATIONS ============================
+ * The per-card table above answers "what does this CARD look like on the hero's side". This
+ * table answers the other half: what does THIS ENEMY look like when it acts. Same shape, same
+ * five handles, same rule — one function per presentation, keyed by the enemy's roster id, and
+ * a knob that plays nothing is simply absent. dispatchFx() iterates the entry for the acting
+ * enemy's id on the matching beat (spec §5).
+ *
+ * Keys are `src/kernel/rules/encounters.js` ids; knobs are the beat kinds the roster really
+ * produces (`attack` = enemy_attack, `guard` = enemy_block, `power`/`hex` = enemy_status).
+ * The Cantor's rite and the Foreman's survey are SCRIPTED moves, so those two also read the
+ * move id off the beat (`b.move`, from the intent label) and key on it.
+ *
+ * Every node is decoration: aria-hidden, no text, transform/opacity/filter only, and placed by
+ * MEASURING the live enemy card + hero at fire time (the row re-lays out on every paint).
+ * `stageShake` reuses the hero side's one stage-shake class instead of adding a second shake.
+ */
+
+/** A multi-hit move's own printed label (A5x3, A4x2) is the only hit count on the beat. */
+function multi(b) {
+  return /x\d/.test(String(b && b.move ? b.move : ''));
+}
+
+/** The enemy card this beat belongs to, in viewport coordinates. */
+function foeLane(b) {
+  if (!stageEl || !stageEl.querySelector) return null;
+  const card = Number.isInteger(b.enemy)
+    ? stageEl.querySelector(`.enemy[data-target-index="${b.enemy + 1}"]`)
+    : null;
+  if (!card) return null;
+  const r = card.getBoundingClientRect();
+  if (r.width === 0 && r.height === 0) return null;
+  return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height * 0.5), w: r.width, h: r.height };
+}
+
+/** The hero, in viewport coordinates — where every strike's impact reads. */
+function markLane() {
+  if (!stageEl || !stageEl.querySelector) return null;
+  const hero = stageEl.querySelector('.fight .hero');
+  if (!hero) return null;
+  const r = hero.getBoundingClientRect();
+  if (r.width === 0 && r.height === 0) return null;
+  return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height * 0.55), w: r.width, h: r.height };
+}
+
+/** Put one decoration on the layer, at the hero (default) or the acting foe. */
+function put(cls, ms, kids = [], at = null, dx = 0, dy = 0) {
+  const node = el('div', { cls, attrs: { 'aria-hidden': 'true' } }, ...kids);
+  const p = at;
+  if (p) placeAt(node, p, dx, dy);
+  fxAdd(node, ms);
+  return node;
+}
+
+/** One 240ms stage shake — the same class the hero's signature uses, never a second one. */
+function stageShake(fire, gen, at) {
+  fire(() => {
+    if (stageEl && stageEl.classList) stageEl.classList.add('stage-shake');
+    later(() => {
+      if (gen === animGen && stageEl && stageEl.classList) stageEl.classList.remove('stage-shake');
+    }, animMs(450) || 450);
+  }, at);
+}
+
+/* ---- 5.1 Cinder Maw: winds back too far, then snaps; the shell plate lands mid-bite. ---- */
+export function fxMawBite(fire, lane, b, sigMs, gen) {
+  const impact = animMs(Math.round((sigMs || 640) * 0.46)) || 1;
+  const foe = foeLane(b);
+  const mark = markLane();
+  fire(() => { if (mark) put('fx-maw-bite', animMs(340) || 340, [], mark, -46, -34); }, impact);
+  // The plate falls from the JAW's side and lands a beat EARLY — mid-bite, not after it.
+  fire(() => { if (foe) put('fx-maw-plate', animMs(260) || 260, [], foe, 14, 6); },
+    Math.max(1, impact - (animMs(90) || 90)));
+}
+export function fxMawInhale(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-maw-inhale', animMs(560) || 560, [], foe); }, animMs(40) || 1);
+}
+
+/* ---- 5.2 Ash Cantor: never touches the hero. Rite column rises; ash cone falls. ---- */
+export function fxRiteColumn(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-rite-col', animMs(560) || 560, [el('span', { cls: 'fx-rite-glyph' })], foe, 0, 10); },
+    animMs(60) || 1);
+}
+export function fxAshCone(fire, lane, b, sigMs, gen) {
+  const mark = markLane();
+  fire(() => { if (mark) put('fx-ash-cone', animMs(640) || 640, [el('span', { cls: 'fx-ash-cone-body' })], mark, -70, -110); },
+    animMs(Math.round((sigMs || 640) * 0.2)) || 1);
+}
+
+/* ---- 5.3 Kiln Mite: a 460ms dart with one twitch; grow TIGHTENS (≤1.04), never enlarges. ---- */
+export function fxMiteDart(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  const mark = markLane();
+  fire(() => {
+    if (!foe || !mark) return;
+    const node = put('fx-mite-dart', animMs(460) || 460, [], foe);
+    // The dart's own distance, written as a custom property: the keyframe translates by it.
+    if (node.style && node.style.setProperty) {
+      node.style.setProperty('--dart-x', `${Math.round(mark.x - foe.x)}px`);
+      node.style.setProperty('--dart-y', `${Math.round(mark.y - foe.y)}px`);
+    }
+  }, animMs(30) || 1);
+}
+
+export function fxMiteTighten(fire, lane, b, sigMs) {
+  // GROW = TIGHTEN. The mite never gets bigger (hard cap 1.04 in the keyframe); the inner
+  // glow is the tell, so this reads as winding up rather than inflating.
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-mite-tighten', animMs(560) || 560, [el('span', { cls: 'fx-mite-glow' })], foe); },
+    animMs(40) || 1);
+}
+
+/* ---- 5.4 Slag Ooze: compress, then lunge; the acid arc drips to the hero's FEET. ---- */
+export function fxOozeCompress(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-ooze-compress', animMs(300) || 300, [], foe); }, animMs(10) || 1);
+}
+export function fxOozeLunge(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-ooze-lunge', animMs(340) || 340, [], foe); }, animMs(300) || 1);
+}
+export function fxAcidArc(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  const mark = markLane();
+  fire(() => {
+    if (!foe || !mark) return;
+    const arc = put('fx-acid-arc', animMs(640) || 640, [el('span', { cls: 'fx-acid-drip' })], foe);
+    if (arc.style && arc.style.setProperty) {
+      arc.style.setProperty('--arc-x', `${Math.round(mark.x - foe.x)}px`);
+      arc.style.setProperty('--arc-y', `${Math.round(mark.y - foe.y + 34)}px`);
+    }
+  }, animMs(40) || 1);
+}
+
+/* ---- 5.5 Cinder Brute: 900ms charge + stage shake; seams glow; enraged holds. ---- */
+export function fxBruteCharge(fire, lane, b, sigMs, gen) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-brute-charge', animMs(900) || 900, [], foe); }, animMs(10) || 1);
+  stageShake(fire, gen, animMs(760) || 1);
+}
+export function fxBruteSeams(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-brute-seams', animMs(720) || 720, [], foe); }, animMs(60) || 1);
+}
+export function fxVulnRing(fire, lane, b, sigMs) {
+  const mark = markLane();
+  fire(() => { if (mark) put('fx-vuln-ring', animMs(480) || 480, [], mark); }, animMs(Math.round((sigMs || 640) * 0.46)) || 1);
+}
+
+/* ---- 5.6 Slag Warden: defence IS the flourish — three-plate wall, triple pockets. ---- */
+export function fxWardenWall(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => {
+    if (!foe) return;
+    put('fx-warden-wall', animMs(620) || 620, [
+      el('span', { cls: 'fx-warden-plate' }),
+      el('span', { cls: 'fx-warden-plate fx-warden-plate-2' }),
+      el('span', { cls: 'fx-warden-plate fx-warden-plate-3' }),
+    ], foe, 0, -6);
+  }, animMs(40) || 1);
+}
+export function fxWardenPiston(fire, lane, b, sigMs, gen) {
+  const foe = foeLane(b);
+  const mark = markLane();
+  fire(() => { if (foe) put('fx-warden-piston', animMs(520) || 520, [], foe); }, animMs(10) || 1);
+  fire(() => { if (mark) put('fx-pocket', animMs(280) || 280, [], mark, -20, -20); },
+    animMs(Math.round((sigMs || 640) * 0.46)) || 1);
+}
+export function fxWardenPockets(fire, lane, b, sigMs) {
+  const mark = markLane();
+  if (!mark) return;
+  const impact = animMs(Math.round((sigMs || 640) * 0.46)) || 1;
+  const beat = animMs(360) || 360;
+  for (let n = 0; n < 3; n++) {
+    fire(() => put('fx-pocket', animMs(260) || 260, [], mark, -26 + n * 4, -26), impact + beat * n);
+  }
+}
+export function fxSteamWash(fire, lane, b, sigMs) {
+  const mark = markLane();
+  fire(() => { if (mark) put('fx-steam', animMs(640) || 640, [el('span', { cls: 'fx-steam-body' })], mark, -90, -50); },
+    animMs(40) || 1);
+}
+
+/* ---- 5.7 Slag Crawler: hex shell draw on harden; two mirrored claw darts. ---- */
+export function fxCrawlerHex(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-crawler-hex', animMs(480) || 480, [el('span', { cls: 'fx-hex-outline' })], foe); },
+    animMs(20) || 1);
+}
+export function fxCrawlerClaws(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  const mark = markLane();
+  fire(() => {
+    if (!foe || !mark) return;
+    for (const [side, cls] of [[-1, 'fx-claw-l'], [1, 'fx-claw-r']]) {
+      const claw = put(cls, animMs(340) || 340, [], foe);
+      if (claw.style && claw.style.setProperty) {
+        claw.style.setProperty('--claw-x', `${Math.round(mark.x - foe.x)}px`);
+        claw.style.setProperty('--claw-y', `${Math.round(mark.y - foe.y)}px`);
+        claw.style.setProperty('--claw-tilt', `${side * 9}deg`);
+      }
+    }
+  }, animMs(30) || 1);
+}
+export function fxCrawlerRam(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-crawler-ram', animMs(520) || 520, [], foe); }, animMs(10) || 1);
+}
+
+/* ---- 5.8 Ash Wraith: ZERO travel — thins, crosses as a streak, thickens at the hero. ---- */
+export function fxWraithThin(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-wraith-thin', animMs(480) || 480, [], foe); }, animMs(10) || 1);
+}
+export function fxWailRings(fire, lane, b, sigMs) {
+  const mark = markLane();
+  fire(() => {
+    if (!mark) return;
+    put('fx-wail-ring', animMs(480) || 480, [], mark);
+    put('fx-wail-ring fx-wail-ring-2', animMs(480) || 480, [], mark, 0, 0);
+  }, animMs(40) || 1);
+}
+export function fxWraithStreak(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  const mark = markLane();
+  fire(() => {
+    if (!foe || !mark) return;
+    const streak = put('fx-wraith-streak', animMs(460) || 460, [], foe);
+    if (streak.style && streak.style.setProperty) {
+      streak.style.setProperty('--streak-x', `${Math.round(mark.x - foe.x)}px`);
+      streak.style.setProperty('--streak-y', `${Math.round(mark.y - foe.y)}px`);
+    }
+  }, animMs(20) || 1);
+}
+export function fxWraithDrift(fire, lane, b, sigMs) {
+  const foe = foeLane(b);
+  fire(() => { if (foe) put('fx-wraith-drift', animMs(560) || 560, [], foe); }, animMs(20) || 1);
+}
+
+/* ---- 5.9 Ash Matriarch: the Wraith's phase language, AREA instead of distance. ---- */
+export function fxMatriarchVeil(fire, lane, b, sigMs) {
+  const mark = markLane();
+  if (!mark) return;
+  fire(() => {
+    put('fx-matriarch-veil', animMs(640) || 640, [el('span', { cls: 'fx-veil-body' })], mark, -110, -70);
+  }, animMs(Math.round((sigMs || 640) * 0.16)) || 1);
+}
+
+/* ---- 5.10 Cinder Foreman: the survey circle marks the ground, THEN the ceiling drops. ---- */
+export function fxSurveyCircle(fire, lane, b, sigMs) {
+  const mark = markLane();
+  fire(() => { if (mark) put('fx-survey-circle', animMs(480) || 480, [], mark, -24, 8); }, animMs(10) || 1);
+}
+export function fxCeilingSlab(fire, lane, b, sigMs, gen) {
+  const mark = markLane();
+  // After the survey's draw + one beat: the hold is the beat itself, not a second clock.
+  const at = animMs(480) + (animMs(320) || 320);
+  fire(() => {
+    if (!mark) return;
+    put('fx-ceiling-slab', animMs(360) || 360, [], mark, -56, -230);
+    put('fx-ceiling-dust', animMs(260) || 260, [], mark, -44, 6);
+  }, at);
+  stageShake(fire, gen, at + (animMs(220) || 220));
+}
+
+/**
+ * UX-9c: the per-enemy presentation table (spec §5). Keyed by roster id; each entry's knobs
+ * are the beat kinds that enemy really produces. A knob that plays nothing is absent — the
+ * generic §4 beat from UX-9b is the fallback for every type and every missing knob.
+ */
+export const ENEMY_SIG_FX = {
+  // 5.1: overshoot windup then snap; the plate lands mid-bite. Bellow inhales instead of biting.
+  jaw_worm: { attack: fxMawBite, power: fxMawInhale },
+  // 5.2 scripted: the rite column (incantation PWR3), then the ash cone that falls across the
+  // stage INSTEAD of a lunge (dark_strike A6). She never touches the hero.
+  cultist: { power: fxRiteColumn, attack: fxAshCone },
+  // 5.3: 460ms dart with the 85% twitch; grow tightens, never enlarges.
+  red_louse: { attack: fxMiteDart, power: fxMiteTighten },
+  // 5.4: compress then lunge (tackle A10); the acid arc drips to the hero's feet (lick WK1).
+  acid_slime: {
+    attack: (fire, lane, b, sigMs) => { fxOozeCompress(fire, lane, b, sigMs); fxOozeLunge(fire, lane, b, sigMs); },
+    hex: fxAcidArc,
+  },
+  // 5.5: 900ms charge + stage shake (rush A14); skull_bash's vulnerable half is its `hex` beat
+  // (short charge + ring); enrage glows the seams and holds `is-enraged` at paint time.
+  gremlin_nob: {
+    attack: fxBruteCharge,
+    hex: fxVulnRing,
+    power: fxBruteSeams,
+  },
+  // 5.6: defense is the flourish. Three-plate wall on B20; heavy piston on A32; the A5x3 label
+  // (multi-hit, `xN`) gets the triple-pocket impact; vent_steam is a steam wash, no travel.
+  the_guardian: {
+    guard: fxWardenWall,
+    attack: (fire, lane, b, sigMs, gen) => {
+      if (multi(b)) fxWardenPockets(fire, lane, b, sigMs);
+      else fxWardenPiston(fire, lane, b, sigMs, gen);
+    },
+    hex: fxSteamWash,
+  },
+  // 5.7: hex shell draw on harden; the A4x2 label gets two mirrored claw darts; ram pushes low.
+  slag_crawler: {
+    guard: fxCrawlerHex,
+    attack: (fire, lane, b, sigMs) => {
+      if (multi(b)) fxCrawlerClaws(fire, lane, b, sigMs);
+      else fxCrawlerRam(fire, lane, b, sigMs);
+    },
+  },
+  // 5.8: zero travel. Wail thins in place and rings at the hero; drain crosses as a streak;
+  // drift bobs and never moves horizontally (its block half is the shared guard shimmer).
+  ash_wraith: {
+    hex: (fire, lane, b, sigMs) => { fxWraithThin(fire, lane, b, sigMs); fxWailRings(fire, lane, b, sigMs); },
+    attack: fxWraithStreak,
+    power: fxWraithDrift,
+  },
+  // 5.9: the Wraith's phases with AREA instead of distance — the veil sweeps the hero row
+  // while she holds full opacity; hex/power/guard reuse the wraith phases.
+  ash_wraith_elite: {
+    attack: fxMatriarchVeil,
+    hex: (fire, lane, b, sigMs) => { fxWraithThin(fire, lane, b, sigMs); fxWailRings(fire, lane, b, sigMs); },
+    power: fxWraithDrift,
+    guard: fxWraithDrift,
+  },
+  // 5.10 scripted: survey marks the ground, THEN the ceiling slab drops on the same beat.
+  cinder_foreman: { attack: (fire, lane, b, sigMs, gen) => { fxSurveyCircle(fire, lane, b, sigMs); fxCeilingSlab(fire, lane, b, sigMs, gen); } },
+};
