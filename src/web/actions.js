@@ -180,14 +180,23 @@ export function act(actionId, targetK = null) {
       for (const ev of (Array.isArray(res.events) ? res.events : [])) {
         if (!ev) continue;
         if (ev.t === 'player_status') {
-          // UX-9c: the debuff that lands on the HERO is the acting enemy's own move half, but
-          // the event carries no attacker index (spec §4.1). It rides the flat list with
-          // `enemy: null` (so the float still places at the hero) and is attributed to the
-          // LAST enemy that spoke — which is the one whose move emitted it.
+          // UX-9: the debuff that lands on the HERO is the acting enemy's own move half.
+          // The kernel now stamps `enemy: i` on it (act.js debuff runner), the same index
+          // its sibling runners use, so the hex is attributed to the enemy that actually
+          // spoke — a debuff-only turn no longer falls back to `lastOwner: null`, which
+          // left the Wraith's opening wail with no signature and no pose. The FALLBACK
+          // stays for any event that arrives without an index: then the last enemy that
+          // spoke is still the one whose move emitted it. The step keeps `enemy: null`
+          // (the float places at the HERO via `to: 'player'`), so nothing downstream
+          // changes: fx.js/beatPose read step.owner/ownerId.
+          const ownerIdx = Number.isInteger(ev.enemy) ? ev.enemy : lastOwner;
+          const ownerFoe = ownerIdx == null
+            ? null
+            : before.enemies.find((e) => e.index === ownerIdx);
           beats.push({
             enemy: null,
-            owner: lastOwner,
-            ownerId: lastOwnerId,
+            owner: ownerIdx,
+            ownerId: ownerFoe ? ownerFoe.id : lastOwnerId,
             move: lastMove,
             kind: 'status',
             to: 'player',
@@ -282,8 +291,15 @@ export function act(actionId, targetK = null) {
     // guard step is skipped here, and only a gain the event stream never named (a kernel
     // path that moves block silently) still falls through to this float. The PLAYER's side
     // is untouched — `gainedBlock` above keeps its one hero float, byte-identical.
+    // UX-9: the dedupe only applies when the BEAT is going to play. fx.js breaks out of the
+    // enemy-turn tail loop at `animSpeed === 0` (it paints the named floats statically
+    // instead), and efxBox renders no guard beat either — so under fast mode or reduced
+    // motion the guard step never becomes visible and suppressing the diff would drop the
+    // `+N` entirely. Gate on the same condition the beats path runs under: the snapshot-diff
+    // float is then the only carrier, which is exactly what it is for.
+    const beatsPlay = !reducedMotion && animSpeed !== 0;
     const guardedIdx = new Set(
-      (turnBeats ?? []).filter((s) => s.kind === 'block').map((s) => s.enemy),
+      beatsPlay ? (turnBeats ?? []).filter((s) => s.kind === 'block').map((s) => s.enemy) : [],
     );
     for (const e of after.enemies) {
       const was = beforeByIdx.get(e.index);

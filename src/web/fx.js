@@ -262,7 +262,15 @@ export function dispatchFx() {
           const foe = byFoe.get(a.enemy);
           const table = sigFor(foe && foe.id);
           if (!table || !table.attack) return;
-          table.attack(fire, null, { enemy: a.enemy, id: foe.id, move: foe.move, hits: a.hits }, plan.slamMs, gen);
+          // UX-9: the same per-attacker offset the named float above uses. The table's own
+          // clock already measures from the slam start (its impact knob is sigMs * impactAt,
+          // i.e. plan.impactMs relative to a zero-delay fire), so the ONLY thing to add is
+          // this attacker's beat — plan.beatMs * i. Attacker 0 is then byte-identical to
+          // before, and attacker 2's flourish lands on its own slam instead of one beat
+          // early, where it overlapped attacker 1's impact.
+          const offset = plan.beatMs * i;
+          const staggered = (cb, ms) => fire(cb, (ms || 0) + offset);
+          table.attack(staggered, null, { enemy: a.enemy, id: foe.id, move: foe.move, hits: a.hits }, plan.slamMs, gen);
         });
         plan.tail.forEach((s, i) => {
           fire(() => {

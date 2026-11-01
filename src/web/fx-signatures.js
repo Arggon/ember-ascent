@@ -1050,9 +1050,19 @@ export const SIG_FX = {
  * `stageShake` reuses the hero side's one stage-shake class instead of adding a second shake.
  */
 
-/** A multi-hit move's own printed label (A5x3, A4x2) is the only hit count on the beat. */
-function multi(b) {
-  return /x\d/.test(String(b && b.move ? b.move : ''));
+/**
+ * A multi-hit move's own printed label (A5x3, A4x2) is the only hit count on the beat.
+ *
+ * UX-9: this returns the COUNT, not a yes/no — the pocket and claw flourishes used to be
+ * hardcoded to 3 and 2, which drew a triple-pocket for a single slam and a double claw for
+ * a single rake. Clamped 1..4 (no shipped label exceeds x3) so a malformed label cannot
+ * spawn an unbounded loop; a label without `xN` is one hit.
+ */
+function multiCount(b) {
+  const m = /x(\d)/.exec(String(b && b.move ? b.move : ''));
+  if (!m) return 1;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? Math.min(4, Math.max(1, n)) : 1;
 }
 
 /** The enemy card this beat belongs to, in viewport coordinates. */
@@ -1202,13 +1212,15 @@ export function fxWardenPiston(fire, lane, b, sigMs, gen) {
   fire(() => { if (mark) put('fx-pocket', animMs(280) || 280, [], mark, -20, -20); },
     animMs(Math.round((sigMs || 640) * 0.46)) || 1);
 }
-export function fxWardenPockets(fire, lane, b, sigMs) {
+export function fxWardenPockets(fire, lane, b, sigMs, count) {
   const mark = markLane();
   if (!mark) return;
   const impact = animMs(Math.round((sigMs || 640) * 0.46)) || 1;
   const beat = animMs(360) || 360;
-  for (let n = 0; n < 3; n++) {
-    fire(() => put('fx-pocket', animMs(260) || 260, [], mark, -26 + n * 4, -26), impact + beat * n);
+  // UX-9: one pocket per hit the label actually prints (x3 -> 3, x1 -> 1), not a fixed 3.
+  const n = Math.min(4, Math.max(1, count || 1));
+  for (let k = 0; k < n; k++) {
+    fire(() => put('fx-pocket', animMs(260) || 260, [], mark, -26 + k * 4, -26), impact + beat * k);
   }
 }
 export function fxSteamWash(fire, lane, b, sigMs) {
@@ -1223,20 +1235,23 @@ export function fxCrawlerHex(fire, lane, b, sigMs) {
   fire(() => { if (foe) put('fx-crawler-hex', animMs(480) || 480, [el('span', { cls: 'fx-hex-outline' })], foe); },
     animMs(20) || 1);
 }
-export function fxCrawlerClaws(fire, lane, b, sigMs) {
+export function fxCrawlerClaws(fire, lane, b, sigMs, count) {
   const foe = foeLane(b);
   const mark = markLane();
-  fire(() => {
-    if (!foe || !mark) return;
-    for (const [side, cls] of [[-1, 'fx-claw-l'], [1, 'fx-claw-r']]) {
-      const claw = put(cls, animMs(340) || 340, [], foe);
-      if (claw.style && claw.style.setProperty) {
-        claw.style.setProperty('--claw-x', `${Math.round(mark.x - foe.x)}px`);
-        claw.style.setProperty('--claw-y', `${Math.round(mark.y - foe.y)}px`);
-        claw.style.setProperty('--claw-tilt', `${side * 9}deg`);
+  const hits = Math.min(4, Math.max(1, count || 1));
+  for (let k = 0; k < hits; k++) {
+    fire(() => {
+      if (!foe || !mark) return;
+      for (const [side, cls] of [[-1, 'fx-claw-l'], [1, 'fx-claw-r']]) {
+        const claw = put(cls, animMs(340) || 340, [], foe);
+        if (claw.style && claw.style.setProperty) {
+          claw.style.setProperty('--claw-x', `${Math.round(mark.x - foe.x)}px`);
+          claw.style.setProperty('--claw-y', `${Math.round(mark.y - foe.y)}px`);
+          claw.style.setProperty('--claw-tilt', `${side * 9}deg`);
+        }
       }
-    }
-  }, animMs(30) || 1);
+    }, (animMs(30) || 1) + k * (animMs(180) || 1));
+  }
 }
 export function fxCrawlerRam(fire, lane, b, sigMs) {
   const foe = foeLane(b);
@@ -1325,20 +1340,24 @@ export const ENEMY_SIG_FX = {
     power: fxBruteSeams,
   },
   // 5.6: defense is the flourish. Three-plate wall on B20; heavy piston on A32; the A5x3 label
-  // (multi-hit, `xN`) gets the triple-pocket impact; vent_steam is a steam wash, no travel.
+  // (multi-hit, `xN`) gets one pocket impact PER printed hit (UX-9: the count comes off the
+  // label, it used to be a hardcoded 3); vent_steam is a steam wash, no travel.
   the_guardian: {
     guard: fxWardenWall,
     attack: (fire, lane, b, sigMs, gen) => {
-      if (multi(b)) fxWardenPockets(fire, lane, b, sigMs);
+      const hits = multiCount(b);
+      if (hits > 1) fxWardenPockets(fire, lane, b, sigMs, hits);
       else fxWardenPiston(fire, lane, b, sigMs, gen);
     },
     hex: fxSteamWash,
   },
-  // 5.7: hex shell draw on harden; the A4x2 label gets two mirrored claw darts; ram pushes low.
+  // 5.7: hex shell draw on harden; the A4x2 label gets one mirrored claw PAIR per printed hit
+  // (UX-9: count off the label, not a hardcoded 2); ram pushes low.
   slag_crawler: {
     guard: fxCrawlerHex,
     attack: (fire, lane, b, sigMs) => {
-      if (multi(b)) fxCrawlerClaws(fire, lane, b, sigMs);
+      const hits = multiCount(b);
+      if (hits > 1) fxCrawlerClaws(fire, lane, b, sigMs, hits);
       else fxCrawlerRam(fire, lane, b, sigMs);
     },
   },

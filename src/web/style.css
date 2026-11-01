@@ -7757,11 +7757,13 @@ button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
 
 /* ====================================================== UX-9c: per-type enemy presentations ==
    The CSS half of spec §5. Every node below is decoration on #fx-layer: aria-hidden, no text,
-   and animated through transform / opacity / filter ONLY. Nothing here declares width, height,
-   margin, top or left — the layer position comes from the JS placeAt() (the same convention
-   every fx node uses), and a node's box is grown by padding + border, so no page box can move
-   and the visual matrix stays row-for-row identical. Reduced motion needs nothing added: the
-   whole layer is display:none in that block and dispatchFx() returns before scheduling.
+   and animated through transform / opacity / filter ONLY. No rule here declares width or
+   height: a node's box is grown by padding + border, so no page box can move and the visual
+   matrix stays row-for-row identical. Two rules DO set `left: 50%` + `bottom` (.fx-acid-drip,
+   .fx-warden-plate) — that is not a layout box, it offsets absolute decoration off the layer's
+   flow, exactly like the JS placeAt() convention every other fx node uses. Reduced motion
+   needs nothing added: the whole layer is display:none in that block and dispatchFx()
+   returns before scheduling.
 
    The `epose-*` family is the per-(enemy, beat kind) POSE, painted on the enemy CARD for the
    step's duration. It is deliberately NOT `pose-*`: that namespace is the renderer's global

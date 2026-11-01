@@ -326,17 +326,26 @@ const MOVE_RUNNERS = {
     return { state: next, events };
   },
 
-  /** debuff: apply Vulnerable and Weak to the player. */
+  /**
+   * debuff: apply Vulnerable and Weak to the player.
+   *
+   * UX-9: both events carry `enemy: i` — the acting enemy's index, exactly as the attack,
+   * block and buff runners stamp their own events. The hex lands on the HERO, but it is
+   * still THAT enemy's move, and the presentation layer needs to know which one spoke: a
+   * Wraith's opening wail must play its signature, and on a multi-foe turn a hex cannot be
+   * attributed by "whoever spoke last" (on a debuff-only turn nobody did). The field is
+   * event payload only — it is not state, so no replay hash depends on it.
+   */
   debuff(state, i, move) {
     let next = state;
     const events = [];
     if (move.vulnerable) {
       next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, vulnerable: (next.player.statuses?.vulnerable ?? 0) + move.vulnerable } } };
-      events.push({ t: 'player_status', status: 'vulnerable', stacks: move.vulnerable });
+      events.push({ t: 'player_status', enemy: i, status: 'vulnerable', stacks: move.vulnerable });
     }
     if (move.weak) {
       next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, weak: (next.player.statuses?.weak ?? 0) + move.weak } } };
-      events.push({ t: 'player_status', status: 'weak', stacks: move.weak });
+      events.push({ t: 'player_status', enemy: i, status: 'weak', stacks: move.weak });
     }
     return { state: next, events };
   },
