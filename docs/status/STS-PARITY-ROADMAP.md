@@ -714,3 +714,25 @@ Process rules (standing):
   in scope (the hardcoded 'SLAG WARDEN' boss banner, enemyLook() knowing 6/10 ids, the
   enemy chip juice keyed to the player's statuses), zero new strings. Solo review of
   both commits next; then UX-9 dev; release rebuild after the batch.
+- 2026-11-01 — Solo review VERDICTS: 8083336 APPROVE; 84e0dd9 REQUEST_CHANGES (one P1).
+  The P1, fixed in 551fc8e: the deck sheet derived the visible sentence from the base
+  card, so a Red-hot Hammerfall read "Deal 6" under its own stamp while the hand's tile
+  said 9 — snapshotDeck now publishes the tempered describeCard(def, instance) and the
+  sheet renders the row's own sentence; reading the finding to its root found the same
+  derivation on the shop's removal tiles (a third surface), closed the same way; the
+  tile data-slot key grew the copy index so focus returns to the copy it came from.
+  The reviewer's P2 on potions: ember_draught folded player Strength/Weak through the
+  shared verb — StS rules the printed number IS the number — fixed in 551fc8e via a
+  potion-only resolver (the card vocabulary stays closed, ADR-3); the old pin read the
+  reuse the other way and is re-pinned both directions with the rationale on record.
+  The reviewer's P2 on compound moves (jaw_worm.thrash "A7 B5", gremlin_nob.skull_bash
+  "A6 VULN2" resolve their attack half alone) is documented in the runner as the queued
+  next kernel slice — the kernel already emits enemy_block/enemy_status. P3s fixed: the
+  false enemy-side floor claim in playerStrike's comment, the read-only deck tile's
+  hover lift, the deckTile stale comment, the QA evidence's hunk count (21 lines -> 3
+  hunks). Gates after the fixes: npm test 440/439/1 todo, browser 24/24, gate OK,
+  visual matrix row-for-row identical to the documented baseline. UX-7 CLOSED; UX-8
+  CLOSED. Queued follow-ups on record: the intent-number tooltip breakdown ("9 = 7 + 2
+  Strength", the user's measurement was display ambiguity, not a bug) and the
+  compound-move kernel slice. UX-9 (per-enemy-type action FX, spec at
+  docs/specs/UX-9-enemy-action-fx-spec.md) dispatched to dev; release rebuild after.
