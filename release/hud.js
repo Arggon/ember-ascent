@@ -13,7 +13,8 @@ import { capitalize, el } from './dom.js';
 import { freshStatusKeys } from './floats.js';
 import { act, newGame } from './actions.js';
 import { cancelTargeting } from './targeting.js';
-import { POTION_GLYPH, TEMPER_GLYPH, glyphBox } from './glyphs.js';
+import { POTION_GLYPH, glyphBox } from './glyphs.js';
+import { cardDescribe, cardTile } from './combat-view.js';
 import { cardPool } from './src/kernel/index.js';
 import { inDeckCounts } from './deck-counts.js';
 import { currentLang, t } from './i18n.js';
@@ -419,14 +420,18 @@ export function toggleDeck(open) {
 }
 
 /**
- * The master-deck sheet (S1): every card the run owns, read-only. Every row is a fact the
+ * The master-deck sheet (S1), UX-8: every card the run owns, read-only, rendered as the
+ * GAME'S card tiles — one tile per COPY (a 4× Quench deck shows 4 Quench tiles; the count
+ * is the tile count, the way Slay the Spire's deck view reads). Every row is a fact the
  * kernel's snapshot already published (`snap.deckCards`, aggregated and sorted THERE), so
- * this viewer can never show a card the run does not own, a cost the engine does not
- * charge or a temper the rules do not resolve. The shell is the help sheet's own —
- * `.modal-back` > `.modal` > `.modal-scroll` + `.modal-foot` — so the page keeps ONE
- * modal system: the backdrop click and the Close button dismiss it exactly like Help,
- * and Escape closes either (app.js's sheet guards; the S1.1-era note that Help had no
- * Escape predates the keyguard round).
+ * this gallery can never show a card the run does not own, a cost the engine does not
+ * charge or a temper the rules do not resolve; the tile count IS the kernel's own
+ * deckCount. The rows lack the describe layer, so `cardDescribe` (combat-view's gallery
+ * fact layer, kernel wording) supplies each tile's sentence and flavor line. The shell is
+ * the help sheet's own — `.modal-back` > `.modal` > `.modal-scroll` + `.modal-foot` — so
+ * the page keeps ONE modal system: the backdrop click and the Close button dismiss it
+ * exactly like Help, and Escape closes either (app.js's sheet guards; the S1.1-era note
+ * that Help had no Escape predates the keyguard round).
  */
 export function deckPanel() {
   const rows = snap.deckCards || [];
@@ -441,9 +446,11 @@ export function deckPanel() {
   if (rows.length === 0) {
     scroll.append(el('p', { cls: 'hint', text: t('deck.empty') }));
   } else {
-    const list = el('div', { cls: 'deck-rows' });
-    for (const c of rows) list.append(deckRow(c));
-    scroll.append(list);
+    const grid = el('div', { cls: 'deck-grid' });
+    for (const c of rows) {
+      for (let copy = 0; copy < (c.count ?? 1); copy += 1) grid.append(deckTile(c));
+    }
+    scroll.append(grid);
   }
 
   panel.append(scroll);
@@ -460,31 +467,38 @@ export function deckPanel() {
 }
 
 /**
- * One deck row: cost, type word, face name, the temper stamp when the copy is tempered,
- * and ×N when the deck holds duplicates. Same stamp the hand tiles wear (`.ctemper`,
- * re-styled for rows in the deck section of style.css), so a tempered card is recognised
- * the same way everywhere.
+ * One deck TILE: the full card face — art, cost gem, type head, name, flavor, effect
+ * sentence — read-only (`cardTile`'s readOnly shape: a labelled div, never the hand's
+ * disabled affordance). A tempered copy wears the tile's own trim and forged stamp
+ * (`.ctemper`, the hand's very mark): the visible sentence is the ROW's own — the
+ * kernel's tempered describe sentence from snapshotDeck — so the sheet can never
+ * disagree with the hand about one card, and the stamp's tooltip carries the kernel's
+ * own temper sentence on top.
  */
-function deckRow(c) {
-  const row = el('div', {
-    cls: 'deck-row' + (c.tempered ? ` tempered temper-${c.temper}` : ''),
-    attrs: c.tempered ? { title: c.temperText || c.temperName } : {},
-  });
-  row.append(el('span', { cls: 'deck-cost', attrs: { title: t('deck.cost') }, text: String(c.cost) }));
-  row.append(el('span', { cls: 'deck-type', text: c.typeLabel }));
-  row.append(el('span', { cls: 'deck-name', text: c.name }));
+function deckTile(c) {
+  const tile = cardTile({
+    slot: `${c.cardId}|${c.temper ?? ''}|${c.copy ?? 0}`,
+    cardId: c.cardId,
+    name: c.name,
+    flavor: c.flavor,
+    cost: c.cost,
+    type: c.type,
+    typeLabel: c.typeLabel,
+    description: c.description || c.name,
+    playable: false,
+    showSummary: false,
+    temper: c.temper,
+    temperName: c.temperName,
+    temperText: c.temperText,
+  }, { readOnly: true });
   if (c.tempered) {
-    row.append(el('span', { cls: 'ctemper' },
-      glyphBox(TEMPER_GLYPH[c.temper] || 'rune', 't-mark'),
-      // The name alone: the kernel always publishes one for a tempered row, and any
-      // fallback here would re-derive a describe-layer string on the web.
-      el('span', { cls: 't-name', text: c.temperName }),
-    ));
+    // The full effect in one sentence on hover and for readers: the row's own (tempered)
+    // rules sentence plus the kernel's temper sentence, both published verbatim.
+    const full = `${c.description} ${c.temperText}`.trim();
+    tile.setAttribute('title', full);
+    tile.setAttribute('aria-label', `${tile.getAttribute('aria-label')} ${c.temperText}`.trim());
   }
-  if (c.count > 1) {
-    row.append(el('span', { cls: 'deck-count', text: `×${c.count}`, attrs: { title: t('deck.copies', { n: c.count }) } }));
-  }
-  return row;
+  return tile;
 }
 
 /* ---------------------------------------------------------------- CARD CODEX (S2) */
@@ -537,12 +551,15 @@ export function toggleCodex(open) {
 }
 
 /**
- * The card codex sheet (S2): every card THIS run's combat rewards can add to the deck,
- * grouped by rarity with group counts, read-only. The rows are the kernel's `cardPool()`
- * lookup filtered to the run's own `snap.draftPool` (so a narrowed profile shows only
- * what can really be offered), every cell is a describe-layer fact, and the "in deck"
- * chip is a sum of the kernel's own `deckCards` counts — the sheet can never show a card
- * the reward deck cannot offer, or a copy the run does not hold. The shell is the deck
+ * The card codex sheet (S2), UX-8: every card THIS run's combat rewards can add to the
+ * deck, grouped by rarity with group counts, read-only — rendered as the GAME'S card
+ * tiles in a scrolling gallery (a card library, not a table). The rows are the kernel's
+ * `cardPool()` lookup filtered to the run's own `snap.draftPool` (so a narrowed profile
+ * shows only what can really be offered), every tile is a describe-layer fact, and the
+ * brass "in deck ×N" chip rides the tile's corner as a sum of the kernel's own
+ * `deckCards` counts — the gallery can never show a card the reward deck cannot offer,
+ * or a copy the run does not hold. Tiles are `cardTile`'s readOnly shape: full art and
+ * cost gem, never the hand's disabled affordance, no click. The shell is the deck
  * sheet's own — `.modal-back` > `.modal` > `.modal-scroll` + `.modal-foot` — so the page
  * keeps ONE modal system: backdrop click, Escape and Close all dismiss it, exactly like
  * Help and Deck.
@@ -558,7 +575,7 @@ export function codexPanel() {
   scroll.append(el('h2', { text: t('codex.title', { n: rows.length }) }));
   scroll.append(el('p', { cls: 'hint', text: t('codex.hint') }));
 
-  // The three rarity tiers, then a catch-all so the header total can never count a row no
+  // The three rarity tiers, then a catch-all so the header total can never count a tile no
   // group renders: a rarity the tiers above do not name still shows, under "Other".
   for (const group of [...RARITY_GROUPS, { key: null, labelKey: 'codex.other' }]) {
     const groupRows = group.key === null
@@ -566,9 +583,9 @@ export function codexPanel() {
       : rows.filter((c) => c.rarity === group.key);
     if (groupRows.length === 0) continue;
     scroll.append(el('h3', { cls: 'codex-group-head', text: `${t(group.labelKey)} (${groupRows.length})` }));
-    const list = el('div', { cls: 'codex-rows' });
-    for (const c of groupRows) list.append(codexRow(c, tally.get(c.cardId) ?? 0));
-    scroll.append(list);
+    const grid = el('div', { cls: 'codex-grid' });
+    for (const c of groupRows) grid.append(codexTile(c, tally.get(c.cardId) ?? 0));
+    scroll.append(grid);
   }
 
   panel.append(scroll);
@@ -585,27 +602,40 @@ export function codexPanel() {
 }
 
 /**
- * One codex row: cost, type word, face name, rarity tag, the card's own describe-layer
- * sentence, and — only when the deck holds at least one copy — the brass "in deck ×N"
- * chip. Zero copies render no chip: absence is the fact, and 65 zero chips would bury it.
+ * One codex TILE: the full card face — cost gem, type head, art, name, flavor, the
+ * card's own describe-layer sentence — read-only. The rarity word rides the tile's
+ * label and title (the group header is the visual cue, and the tile hue is the type's,
+ * so rarity keeps a spoken home deep in a long group), and — only when the deck holds
+ * at least one copy — the brass "in deck ×N" chip is pinned to the tile's corner, the
+ * price badge's own slot. Zero copies render no chip: absence is the fact, and 65 zero
+ * chips would bury it.
  */
-function codexRow(c, inDeck) {
-  const row = el('div', { cls: 'codex-row', attrs: { 'data-rarity': c.rarity } });
-  const line = el('div', { cls: 'codex-line' });
-  line.append(el('span', { cls: 'codex-cost', attrs: { title: t('deck.cost') }, text: String(c.cost) }));
-  line.append(el('span', { cls: 'codex-type', text: c.typeLabel }));
-  line.append(el('span', { cls: 'codex-name', text: c.name }));
-  line.append(el('span', { cls: 'codex-rarity', text: t(`codex.${c.rarity}`) || c.rarity, attrs: { title: t('codex.rarity', { r: c.rarity }) } }));
+function codexTile(c, inDeck) {
+  const fact = cardDescribe(c.cardId);
+  const rarity = t(`codex.${c.rarity}`) || c.rarity;
+  const tile = cardTile({
+    slot: c.cardId,
+    cardId: c.cardId,
+    name: c.name,
+    flavor: fact.flavor,
+    cost: c.cost,
+    type: c.type,
+    typeLabel: c.typeLabel,
+    description: c.description,
+    playable: false,
+    showSummary: false,
+  }, { readOnly: true });
+  const labelled = `${tile.getAttribute('aria-label')} (${t('codex.rarity', { r: rarity })})`;
+  tile.setAttribute('aria-label', labelled);
+  tile.setAttribute('title', `${c.description} (${rarity})`);
   if (inDeck > 0) {
-    line.append(el('span', {
+    tile.append(el('span', {
       cls: 'codex-indeck',
       text: t('codex.indeck', { n: inDeck }),
       attrs: { title: t(inDeck === 1 ? 'codex.indeck.title' : 'codex.indeck.titlePlural', { n: inDeck }) },
     }));
   }
-  row.append(line);
-  row.append(el('div', { cls: 'codex-desc', text: c.description }));
-  return row;
+  return tile;
 }
 
 function stat(kind, glyph, text, isFlash, title) {

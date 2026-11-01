@@ -4,7 +4,7 @@
 // the same purity contract as the closed vocabulary: (state, ctx, params) -> {state, events},
 // no Date, no Math.random, no I/O, no input mutation. Importing this module registers
 // every handler exactly once; the architecture gate checks the purity of all of them.
-import { registerEffect, damageEnemy, addStatus, addPower, loseHp } from '../vocabulary.js';
+import { registerEffect, damageEnemy, playerStrike, addStatus, addPower, loseHp } from '../vocabulary.js';
 import { drawIntoHand } from '../draw.js';
 
 /** Bloodletting: pay 3 HP, gain 2 energy. */
@@ -21,8 +21,7 @@ registerEffect('hemokinesis', (state, ctx, _params) => {
   if (!target || target.dead) {
     return { state: { ...state, player }, events: [{ t: 'self_damage', amount: 2 }] };
   }
-  const strength = player.statuses?.strength ?? 0;
-  const out = damageEnemy(target, 15 + strength);
+  const out = damageEnemy(target, playerStrike(15, player));
   return {
     state: {
       ...state,
@@ -35,12 +34,11 @@ registerEffect('hemokinesis', (state, ctx, _params) => {
 
 /** Reaper: deal 4 damage to ALL enemies, heal HP equal to unblocked damage dealt. */
 registerEffect('reaper', (state, ctx, _params) => {
-  const strength = state.player.statuses?.strength ?? 0;
   let healed = 0;
   const events = [];
   const enemies = state.combat.enemies.map((e, i) => {
     if (e.dead) return e;
-    const out = damageEnemy(e, 4 + strength);
+    const out = damageEnemy(e, playerStrike(4, state.player));
     healed += out.dealt;
     events.push({ t: 'damage', source: 'player', target: i, raw: out.raw, dealt: out.dealt, blocked: out.blocked, hp: out.enemy.hp });
     return out.enemy;
@@ -118,10 +116,10 @@ registerEffect('rampage', (state, ctx, _params) => {
   const idx = ctx.targetEnemyIndex ?? 0;
   const target = state.combat.enemies[idx];
   const bonus = ctx.card?.perPlay ?? 0;
-  const amount = 8 + bonus + (state.player.statuses?.strength ?? 0);
+  const amount = 8 + bonus;
   if (!target || target.dead) return { state, events: [] };
 
-  const out = damageEnemy(target, amount);
+  const out = damageEnemy(target, playerStrike(amount, state.player));
   // The played card has already left `hand` by the time this handler runs, so the
   // deck — which holds every card instance for the run — is what proves presence.
   // Omitting it silently disabled the persistent growth this card exists for.

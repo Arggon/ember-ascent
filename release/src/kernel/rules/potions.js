@@ -43,7 +43,7 @@
 //
 // Pure: no Date, no Math.random, no I/O; the only entropy is (seed, drawIndex).
 import { intAt } from '../rng.js';
-import { VOCABULARY, DEBUFFS } from './vocabulary.js';
+import { VOCABULARY, DEBUFFS, damageEnemy } from './vocabulary.js';
 
 /** Belt capacity (StS parity: 3). A 4th potion is impossible — suppressed at the drop. */
 export const POTION_SLOTS = 3;
@@ -98,7 +98,7 @@ export const POTION_DEBUFFS = DEBUFFS;
  * than widening the card vocabulary (ADR-3's set stays closed for cards).
  */
 export const POTION_EFFECTS = Object.freeze({
-  ember_draught: Object.freeze([{ verb: 'damage', amount: 20 }]),
+  ember_draught: Object.freeze([{ verb: 'potion_damage', amount: 20 }]),
   stone_skin: Object.freeze([{ verb: 'block', amount: 12 }]),
   ash_salts: Object.freeze([{ verb: 'potion_heal', percent: 20 }]),
   bellows_fuel: Object.freeze([{ verb: 'energy', amount: 2 }]),
@@ -111,6 +111,26 @@ export const POTION_EFFECTS = Object.freeze({
  *  through quaffEffects below, never from card content (the `custom` verb cannot name
  *  them, so the card vocabulary stays closed). */
 const POTION_VERBS = {
+  /** potion_damage — deal `amount` to the aimed enemy: the printed number IS the
+   *  number, both sides of damageEnemy still apply (block absorbs, Vulnerable
+   *  amplifies), but the hero's statuses do NOT fold in — a potion is not an attack,
+   *  so Strength never adds and Weak never multiplies it. This is the StS ruling
+   *  (Fire Potion hits for its printed 20 through block and Vulnerable, at full
+   *  value under Weak). It is also the honest reading of the potion's own text:
+   *  "Deal 20 damage" promises no modifier. Kept here rather than widening the
+   *  card vocabulary — ADR-3's set stays closed for cards (see the header). */
+  potion_damage(state, params) {
+    const idx = state.ctx?.targetEnemyIndex ?? 0;
+    const enemies = state.combat.enemies;
+    const target = enemies[idx];
+    if (!target || target.dead) return { state, events: [] };
+    const out = damageEnemy(target, params.amount);
+    return {
+      state: { ...state, combat: { ...state.combat, enemies: enemies.map((e, i) => (i === idx ? out.enemy : e)) } },
+      events: [{ t: 'damage', source: 'potion', target: idx, raw: out.raw, dealt: out.dealt, blocked: out.blocked, hp: out.enemy.hp }],
+    };
+  },
+
   /** potion_heal — restore `percent`% of the player's MAX HP, floored to an integer,
    *  capped at the max: the same clamp every other heal reads (`resolveVictory`,
    *  reaper). The source names the potion so the event trail says what healed. */
@@ -143,6 +163,8 @@ const POTION_VERBS = {
  * Resolve one potion's effect list against a combat state. The aimed convention is
  * playCard's own: `targetEnemyIndex` is the 0-based LIVING-enemy position the caller
  * resolved from the action id's 1-based k, and the shared verbs treat it identically.
+ * The potion-only `potion_damage` resolver reads the aim through `state.ctx`, so
+ * `quaffEffects` plants it on the state copy it hands the verb.
  * @param {any} state
  * @param {string} potionId a KNOWN potion id (every caller guards on potionDef first)
  * @param {number} targetEnemyIndex 0-based living-enemy position (unused by self potions)
@@ -150,7 +172,7 @@ const POTION_VERBS = {
  */
 export function quaffEffects(state, potionId, targetEnemyIndex) {
   const ctx = { rng: null, card: null, source: 'potion', target: null, targetEnemyIndex };
-  let next = state;
+  let next = { ...state, ctx: { targetEnemyIndex } };
   const events = [];
   for (const effect of POTION_EFFECTS[potionId] ?? []) {
     const fn = POTION_VERBS[effect.verb];
@@ -158,7 +180,7 @@ export function quaffEffects(state, potionId, targetEnemyIndex) {
     next = out.state;
     events.push(...out.events);
   }
-  return { state: next, events };
+  return { state: { ...next, ctx: state.ctx ?? null }, events };
 }
 
 /**

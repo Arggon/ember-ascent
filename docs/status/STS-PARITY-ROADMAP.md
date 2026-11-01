@@ -752,3 +752,10 @@ Process rules (standing):
   fixed (honest CSS comment; multiCount() parses xN). Gates after: 440/439/0/1, gate OK,
   surface-art OK, browser 24/24, matrix unchanged. Light re-verification next, then the
   release rebuild.
+- 2026-11-01 — UX-9 re-review VERDICT: APPROVE — UX-9 CLOSED. The P1 verified by re-running
+  the reviewer's own scripted-wail probe (player_status now carries enemy: i — actor, not
+  last-speaker; sigFor resolves the hex knob); the stagger math, the fast-mode guard, the
+  CSS comment and multiCount() all verified. Residuals to backlog: one cheap kernel pin on
+  the debuff player_status shape (currently held only by the review's hand-written probe),
+  and a future-roster note on fx.js reading sigFor at fire-schedule time. Release rebuild
+  next.

@@ -7,7 +7,7 @@
 // hold through incidental repaints. The hero's movement is chosen by WHICH card was
 // played (hero-moves.js), never only by its type.
 
-import { BIOMES, DEFAULT_BIOME } from './src/kernel/index.js';
+import { BIOMES, DEFAULT_BIOME, describeTile, loadContent } from './src/kernel/index.js';
 import {
   HERO_POSE_MS,
   SPEED_KEY,
@@ -28,6 +28,7 @@ import {
   setHeroMoveHold,
   skipAnim,
   snap,
+  strikeSeq,
   strikeSlot,
 } from './runtime.js';
 import { el, keywordText } from './dom.js';
@@ -35,11 +36,11 @@ import { TEMPER_GLYPH, TYPE_GLYPH, enemyLook, glyphBox } from './glyphs.js';
 import { heroMove, isMeleeMove, signatureFor } from './hero-moves.js';
 import { backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, attackTier, intentGlyph } from './stage-art.js';
 import { cardArtMarkup } from './card-art.js';
-import { dyingCard, efxBox, freshStatusKeys, heroEfx, hitClass } from './floats.js';
+import { dyingCard, efxBox, freshEnemyStatusKeys, heroEfx, hitClass } from './floats.js';
 import { aimed, cancelTargeting, clickCard, consumeClick, enemyLabel, pendingCard, pendingSlot, pickTarget, setAimed } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
-import { t } from './i18n.js';
+import { currentLang, t } from './i18n.js';
 
 /**
  * UX-5: the input gate's reader-facing sentences, one per busy reason, keyed into the
@@ -143,6 +144,66 @@ export function heroFigure() {
   if (p.block > 0) node.append(el('div', { cls: 'eblock', text: `⛨ ${p.block}` }));
   node.append(heroEfx());
   return node;
+}
+
+/**
+ * UX-9c: the per-(enemy, beat kind) POSE class (spec §4.2's table, per-type refinements
+ * from §5). The `epose-` prefix is deliberate: `pose-*` is the renderer's global pose
+ * contract that check-surface-art.mjs gates against POSE_VALUES, and these are the enemy
+ * CHIP's beat poses, not hero movements. Each value is the pose name only — the paint site
+ * adds the prefix, which is also what keeps the checker's class scan honest.
+ *
+ * `null` means "no beat pose": the card falls through to the old enemyPose() precedence
+ * (strike clock, hurt, low, windup, idle), so a type with no entry reads exactly as before.
+ */
+const ENEMY_POSES = {
+  // §5.1 — the overshoot windup is the POSE; the snap is the shared slam.
+  jaw_worm: { attack: 'maw-wind', power: 'maw-inhale' },
+  // §5.2 — she never advances: the rite and the cone are columns, not dashes.
+  cultist: { power: 'cantor-rite', attack: 'cantor-cast' },
+  // §5.3 — a 460ms dart; grow TIGHTENS.
+  red_louse: { attack: 'mite-dart', power: 'mite-tighten' },
+  // §5.4 — compress then lunge; the arc is a drip from a body that stays put.
+  acid_slime: { attack: 'ooze-lunge', hex: 'ooze-drip' },
+  // §5.5 — long charge, then the enraged seam glow holds.
+  gremlin_nob: { attack: 'brute-charge', hex: 'brute-bash', power: 'brute-enrage' },
+  // §5.6 — the wall is the guard pose; the piston is the heavy slam.
+  the_guardian: { guard: 'warden-wall', attack: 'warden-piston', hex: 'warden-steam' },
+  // §5.7 — hex shell hardens; claws dart; ram pushes low.
+  slag_crawler: { guard: 'crawler-hex', attack: 'crawler-dart' },
+  // §5.8 — zero travel, ever: thin / streak / bob.
+  ash_wraith: { hex: 'wraith-thin', attack: 'wraith-streak', power: 'wraith-drift' },
+  // §5.9 — the same phases, held as an AREA: the hero row dims, she does not.
+  ash_wraith_elite: { attack: 'matriarch-veil', hex: 'wraith-thin', power: 'wraith-drift', guard: 'wraith-drift' },
+  // §5.10 — the survey marks the ground; the drop is the slam.
+  cinder_foreman: { attack: 'foreman-survey' },
+};
+
+/**
+ * The beat kind the playing plan says THIS enemy is on, or null.
+ *
+ * `strikeSeq.tail` is the turn's non-attack steps in kernel order, one TURN_STEP slot each,
+ * starting where the last slam ended. A single attacker's beats are therefore positional:
+ * its step i plays in tail slot i. The pose the card wears is the kind of the step whose
+ * slot the clock is currently in — computed from the same `start`/`stepMs` the CSS delays
+ * use, so a repaint mid-beat re-derives the same answer instead of restarting anything.
+ * Only the FIRST attacker is served positionally: with several foes the tail's slots are
+ * not their individual beats, and a wrong pose is worse than the generic one, so a
+ * multi-enemy turn keeps the shared §4 behaviour.
+ */
+function beatPose(e) {
+  const plan = strikeSeq;
+  if (!plan || !Array.isArray(plan.tail) || plan.tail.length === 0) return null;
+  if (plan.attacks && plan.attacks.length > 1) return null;
+  const table = ENEMY_POSES[e.id];
+  if (!table) return null;
+  const elapsed = Date.now() - plan.start;
+  const i = Math.floor((elapsed - plan.tailAt) / Math.max(1, plan.stepMs));
+  if (i < 0 || i >= plan.tail.length) return null;
+  const step = plan.tail[i];
+  if (step.enemy !== e.index && step.owner !== e.index) return null;
+  const kind = step.kind === 'block' ? 'guard' : step.kind === 'status' ? (step.to === 'player' ? 'hex' : 'power') : 'attack';
+  return table[kind] ?? null;
 }
 
 function enemyPose(e) {
@@ -387,7 +448,24 @@ function enemyCard(e, position) {
   // per id per run, so an incidental repaint reproduces no arrival class and nothing
   // replays. A boss gets its own, heavier beat: the fight announces itself.
   const entering = enteringIds.has(e.id);
+  // UX-9c: the beat pose (spec §4.2) — one `epose-*` class for the step the plan is on,
+  // reduced motion never paints one (the plan is not armed there either, but the guard is
+  // explicit: no transition-bearing class is added on that path, AC-11).
+  // A strike is on the shared `pose-slam` body clock (the checker's pose contract), so its
+  // per-type body language rides this same `epose-*` class — the type's `attack` pose takes
+  // the slot when it has one. The tail's non-attack steps own the slot otherwise.
+  const striking = strikeSlot(e.index) !== null
+    || Boolean(bursts.find((x) => x.kind === 'enemy-turn' && x.attacks.some((a) => a.enemy === e.index)));
+  const beat = reducedMotion ? null
+    : (ENEMY_POSES[e.id] && ENEMY_POSES[e.id].attack && striking ? ENEMY_POSES[e.id].attack : beatPose(e));
+  // §5.5: the enrage persists while its Strength stands. Paint-time and reduced-motion
+  // gated — the seams are already a transition-bearing class, and the Strength chip states
+  // the same fact statically (AC-11).
+  const enraged = !reducedMotion && e.id === 'gremlin_nob'
+    && (e.statuses || []).some((x) => x.key === 'strength');
   const cls = 'enemy' + ` eh-${look.hue}` + (look.boss ? ' e-boss' : '') + (look.elite ? ' e-elite' : '')
+    + (beat ? ` epose-${beat}` : '')
+    + (enraged ? ' is-enraged' : '')
     + hitClass(e.index)
     + (entering ? (look.boss ? ' arriving boss-enter' : ' arriving') : '')
     // `targeting` marks a legal candidate; `aimed` marks the ONE the player has actually
@@ -466,7 +544,9 @@ function enemyCard(e, position) {
     bb.querySelector('i').style.width = `${Math.min(100, Math.round((e.block / Math.max(1, e.maxHp)) * 100))}%`;
     card.append(bb);
   }
-  const fresh = freshStatusKeys(e.statuses);
+  // UX-9 D3: the chip juices off THIS enemy's own previous status keys (per-index), not
+  // off the player's list, which made an enemy chip animate whenever the player gained one.
+  const fresh = freshEnemyStatusKeys(e.index, e.statuses);
   const statuses = e.statuses.map((s) => el('span', {
     cls: `pill ${s.key}` + (fresh.has(s.key) ? ' juice-in' : ''),
     text: s.text || `${s.label} ${s.stacks}`,
@@ -488,13 +568,19 @@ function enemyCard(e, position) {
  * effect, then the compact CLI code. Auto height means a 3-line effect grows the tile
  * rather than clipping it.
  * @param {any} card the snapshot's card view
- * @param {{index?: number, onClick?: Function, actionId?: string, locked?: string|null}} [opts]
+ * @param {{index?: number, onClick?: Function, actionId?: string, locked?: string|null,
+ *          readOnly?: boolean}} [opts]
  *        `index` draws the keyboard digit badge (hand only); `onClick` overrides the default
  *        hand-play action (reward tiles need it, because taking a card is a different verb);
  *        `locked` is the UX-5 busy reason — the tile wears the disabled shape even though
- *        the kernel would take it, because the previous animation is still landing
+ *        the kernel would take it, because the previous animation is still landing;
+ *        `readOnly` (UX-8) renders the tile as a FACT, not a control: a labelled div, no
+ *        disabled/unplayable shape, no click — the codex gallery, the deck sheet and an
+ *        inert removal instance share it. The full-tile markup is the hand's own, so the
+ *        three read-only surfaces can never drift from the game's card face.
  */
 export function cardTile(card, opts = {}) {
+  const readOnly = Boolean(opts.readOnly);
   const isPending = pendingSlot !== null && card.slot === pendingSlot;
   // While one card is waiting for a target the OTHER cards cannot be played by accident:
   // clicking them cancels the step instead. They read as inert but stay focusable, so a
@@ -502,7 +588,10 @@ export function cardTile(card, opts = {}) {
   // UX-5: a busy hand is disabled the SAME way — the unplayable visual, aria-disabled,
   // and the native disabled flag — with the honest wait named instead of the Energy one.
   const locked = opts.locked ?? null;
-  const disabled = !card.playable || locked !== null;
+  // UX-8: a read-only tile is never the disabled/unplayable shape — it is not a card the
+  // hand refused, it is a card nobody asked to play. Full colour, no aria-disabled, and
+  // no click handler at all (a div, so no focus stop announces a control that does nothing).
+  const disabled = !readOnly && (!card.playable || locked !== null);
   // A tile is clicked for two different reasons: playing it from the hand, or taking it from
   // a reward. `opts.onClick` supplies the second. Before this existed every tile called
   // `clickCard(slot)`, which only searches `snap.hand` — so a reward tile (slot `s1`)
@@ -517,14 +606,16 @@ export function cardTile(card, opts = {}) {
   // The locked wait is named in the tile's own sentence (the i18n busy keys), so a
   // screen reader hears why the playable card is not taking input right now.
   const lockedNote = locked !== null ? t('combat.waiting', { why: busyText(locked, 'tile') }) : '';
-  const tile = el('button', {
+  const tile = el(readOnly ? 'div' : 'button', {
     cls: `card type-${card.type}` + (disabled ? ' disabled is-unplayable' : ''),
     attrs: {
-      type: 'button',
+      // A readout is a group (the enemy cards' own resting role): labelled, but never
+      // announced as a button that would do nothing.
+      ...(readOnly ? { role: 'group' } : { type: 'button' }),
       // `data-slot` is how focus returns to the right card after a cancel.
       'data-slot': card.slot,
       ...(opts.actionId ? { 'data-action': opts.actionId } : {}),
-      'aria-disabled': String(disabled),
+      ...(readOnly ? {} : { 'aria-disabled': String(disabled) }),
       // The inert reason belongs to the CARD'S CONTEXT: a hand tile lacks Energy, a
       // shop shelf (S4) lacks gold. `disabledNote` lets a caller state the real reason
       // instead of the Energy default.
@@ -536,9 +627,9 @@ export function cardTile(card, opts = {}) {
       title: desc,
       ...(isPending ? { 'aria-pressed': 'true' } : {}),
     },
-    on: disabled && !opts.onClick ? {} : { click: onClick },
+    on: readOnly ? {} : (disabled && !opts.onClick ? {} : { click: onClick }),
   });
-  if (disabled) tile.disabled = true;
+  if (!readOnly && disabled) tile.disabled = true;
 
   // Cost gem: a faceted stone, not a plain circle.
   const gem = el('span', { cls: 'cost-gem', attrs: { title: t('deck.cost') } },
@@ -607,4 +698,59 @@ export function cardTile(card, opts = {}) {
     tile,
   );
   return wrap;
+}
+
+/* ------------------------------------------------- UX-8: the gallery fact layer */
+//
+// The codex gallery, the deck sheet and the shop's removal pick render cardTile, whose
+// hand/reward callers receive their describe-layer sentences pre-computed in the snapshot.
+// The read-only surfaces are NOT snapshot fields (the kernel publishes the deck as
+// name/cost/type/temper rows; descriptions live behind the describe layer), so this
+// helper feeds the tile the two facts the snapshot rows lack. Everything here is the
+// kernel's own wording through the ONE public entry point — the surface never derives a
+// number or a sentence of its own.
+
+/** The FULL shipped table's definitions, loaded once: the 65 draft-pool cards plus the
+ *  five hero-only starters, which snapshot.deckCards and the shop's deckInstances can
+ *  both hold but cardPool() (rewards only) does not list. */
+let GALLERY_DEFS = null;
+function galleryDefs() {
+  if (!GALLERY_DEFS) GALLERY_DEFS = loadContent().cards;
+  return GALLERY_DEFS;
+}
+
+const GALLERY_FACTS = {};
+
+/**
+ * The describe-layer facts one content card needs for a read-only tile: its sentence,
+ * its flavor line, and its type word — computed in the CURRENT language and cached per
+ * language, so a language switch re-derives exactly once like the codex pool cache.
+ * The kernel's own `describeTile` is the fact bundle (it feeds the hand tiles' fields:
+ * the name, the cost, the SHORT type word, the describe sentence), so every word here is
+ * kernel wording; only the flavor line is read off the def beside it. An id the content
+ * no longer knows (a torn save's placeholder row) degrades to empty strings; the tile
+ * then shows the raw id name it already carries and no rules text.
+ * @param {string} cardId
+ * @returns {{description: string, flavor: string, type: string, typeLabel: string}}
+ */
+export function cardDescribe(cardId) {
+  const lang = currentLang();
+  let per = GALLERY_FACTS[lang];
+  if (!per) per = GALLERY_FACTS[lang] = new Map();
+  const hit = per.get(cardId);
+  if (hit) return hit;
+  const def = galleryDefs().get(cardId) || null;
+  const fact = def
+    ? (() => {
+        const tile = describeTile(def, {}, 0, lang);
+        return {
+          description: tile.description || '',
+          flavor: (lang === 'es' ? (def.flavor_es ?? def.flavor) : def.flavor) || '',
+          type: tile.type,
+          typeLabel: tile.typeLabel,
+        };
+      })()
+    : { description: '', flavor: '', type: 'unknown', typeLabel: 'unknown' };
+  per.set(cardId, fact);
+  return fact;
 }

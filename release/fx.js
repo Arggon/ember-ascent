@@ -24,6 +24,7 @@ import {
 } from './hero-moves.js';
 import {
   STRIKE_SEQ,
+  TURN_STEP,
   HERO_POSE_MS,
   animMs,
   animSpeed,
@@ -48,8 +49,8 @@ import {
 import { el, placeAt } from './dom.js';
 import { fxAdd } from './fx-add.js';
 import { t } from './i18n.js';
-import { SIG_FX } from './fx-signatures.js';
-import { strikeFloatNode } from './floats.js';
+import { ENEMY_SIG_FX, SIG_FX } from './fx-signatures.js';
+import { guardFloatNode, statusFloatNode, strikeFloatNode } from './floats.js';
 
 /**
  * One line of words on the screen layer at the moment of arrival: the boss walks in, the
@@ -205,9 +206,13 @@ export function dispatchFx() {
   // (a boss walking in, a run ending) rather than a value that changed, and `arriving` is
   // already reset by the next paint. Consumed HERE, once, so nothing replays.
   const welcome = arriving.boss;
+  // The boss's name is consumed with the beat (UX-9 D1), for the same reason: `arriving` is
+  // replaced by the next paint, so reading it here is the one chance this play has.
+  const welcomeName = arriving.bossName || '';
   const won = arriving.victory;
   const lost = arriving.defeat;
   arriving.boss = false;
+  arriving.bossName = null;
 
   for (const b of list) {
     switch (b.kind) {
@@ -226,6 +231,10 @@ export function dispatchFx() {
         if (animSpeed === 0) break;
         const plan = strikeSeq;
         if (!plan) break;
+        // UX-9c: the per-type presentations. `plan.plans` is the same turn grouped per
+        // attacker (actions.js), so each strike beat knows its roster id and the moved
+        // label; a type with no entry simply plays the generic beats below.
+        const byFoe = new Map((plan.plans ?? []).map((p) => [p.enemy, p]));
         plan.attacks.forEach((a, i) => {
           // Each attacker's named float lands where its dash arrives (the slam's impact
           // keyframe), measured over the hero at fire time — a repaint between beats
@@ -239,12 +248,77 @@ export function dispatchFx() {
             fxAdd(node, animMs(STRIKE_SEQ.floatMs) || STRIKE_SEQ.floatMs);
           }, plan.beatMs * i + plan.impactMs);
         });
+        // UX-9b: the NON-ATTACK beats, on the SAME clock. `plan.tail` is the turn's guard /
+        // power / hex steps in kernel order (armd in act()); they play one TURN_STEP slot
+        // each, starting where the last slam ended — so a compound move reads strike THEN
+        // guard, and a turn with no attack at all plays entirely here. The input gate holds
+        // for the whole plan (busyReason reads strikeSeq, not the attack count), which is
+        // what keeps a block/buff/debuff turn from being raced by a player click.
+        // The per-type table, iterated one knob at a time exactly like the hero's SIG_FX loop
+        // above — one entry per ROSTER ID, one knob per beat kind. A knob that does not exist
+        // for this type, or does not exist at all, leaves the generic beat as the fallback.
+        const sigFor = (id) => (id ? ENEMY_SIG_FX[id] : null);
+        plan.attacks.forEach((a, i) => {
+          const foe = byFoe.get(a.enemy);
+          const table = sigFor(foe && foe.id);
+          if (!table || !table.attack) return;
+          // UX-9: the same per-attacker offset the named float above uses. The table's own
+          // clock already measures from the slam start (its impact knob is sigMs * impactAt,
+          // i.e. plan.impactMs relative to a zero-delay fire), so the ONLY thing to add is
+          // this attacker's beat — plan.beatMs * i. Attacker 0 is then byte-identical to
+          // before, and attacker 2's flourish lands on its own slam instead of one beat
+          // early, where it overlapped attacker 1's impact.
+          const offset = plan.beatMs * i;
+          const staggered = (cb, ms) => fire(cb, (ms || 0) + offset);
+          table.attack(staggered, null, { enemy: a.enemy, id: foe.id, move: foe.move, hits: a.hits }, plan.slamMs, gen);
+        });
+        plan.tail.forEach((s, i) => {
+          fire(() => {
+            const at = s.enemy != null && s.to !== 'player' ? throwLane(s) : null;
+            const node = s.kind === 'block' ? guardFloatNode(s) : statusFloatNode(s);
+            node.className += ' fx-beat-float';
+            if (at) placeAt(node, at, 0, 0);
+            else if (s.to === 'player') {
+              const l = heroLane();
+              if (l) placeAt(node, l, 0, 0);
+            }
+            fxAdd(node, animMs(STRIKE_SEQ.floatMs) || STRIKE_SEQ.floatMs);
+            // The decoration that makes the beat read as an ACTION rather than a number
+            // appearing: a shield arc for guard, a pulse for a status landing. Same lane as
+            // the float above, so the two are one event. The two tests are hoisted OUT of
+            // the class value on purpose: the surface-art checker reads every quoted span
+            // in a class position as a class name, so `s.to === 'player'` inline would be
+            // reported as an emitted (and unstyled) `.player`.
+            const isBlock = s.kind === 'block';
+            const isHex = s.kind === 'status' && s.to === 'player';
+            // UX-9c: the SAME beat kind selects the type's own knob. `ownerId` is the acting
+            // enemy (a `player_status` step carries no index of its own, see actions.js).
+            const board = sigFor(s.ownerId);
+            const knob = isBlock ? 'guard' : (isHex ? 'hex' : 'power');
+            if (board && board[knob]) {
+              board[knob](fire, null, { enemy: s.owner, id: s.ownerId, move: s.move, hits: 1 }, plan.stepMs, gen);
+            }
+            const beat = el('div', {
+              cls: `fx-beat ${isBlock ? 'fx-beat-guard' : 'fx-beat-status'}${isHex ? ' is-hex' : ''}`,
+              attrs: { 'aria-hidden': 'true' },
+            });
+            if (at) placeAt(beat, at, 0, 0);
+            else {
+              const l = heroLane();
+              if (l) placeAt(beat, l, 0, 0);
+            }
+            fxAdd(beat, animMs(TURN_STEP.ms) || TURN_STEP.ms);
+          }, plan.tailAt + plan.stepMs * i);
+        });
         // The screen pulse, re-timed to the sequence: ONE pulse when the last attack
         // lands, so the turn's cumulative weight reads without strobing the screen per
         // hit. (The aggregate "You take N" toast keeps the net fact for everyone else.)
         if (b.playerLost > 0) {
+          // A turn with no slam (block/buff/hex only) cannot lose HP, so the fallback to
+          // the tail's start is a guard against a future event pairing, not a live path.
           const last = plan.attacks.length - 1;
-          fire(() => fxAdd(el('div', { cls: 'fx-vignette' }), animMs(620)), plan.beatMs * last + plan.impactMs);
+          const at = plan.attacks.length > 0 ? plan.beatMs * last + plan.impactMs : plan.tailAt;
+          fire(() => fxAdd(el('div', { cls: 'fx-vignette' }), animMs(620)), at);
         }
         break;
       }
@@ -325,9 +399,12 @@ export function dispatchFx() {
     }
   }
   // The boss arrives as a BEAT, not a bigger fade: a red wash, a heavier and slower
-  // title card, plus a ring that expands out of the enemy row.
+  // title card, plus a ring that expands out of the enemy row. The card's word is the
+  // acting boss's own name, carried on the beat by the renderer (UX-9 D1) — the snapshot
+  // name is already localized, so Slag Warden and the Cinder Foreman each announce
+  // themselves in EN and ES with no literal here.
   if (welcome) {
-    fxBanner('SLAG WARDEN', 'boss', '', animMs(1350));
+    fxBanner(welcomeName, 'boss', '', animMs(1350));
     fxAdd(el('div', { cls: 'fx-boss-ring' }), animMs(1100));
   }
   // The run's last two moments, each with its own weight: a bright hold for the win, a

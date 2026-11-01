@@ -61,6 +61,28 @@ export function registeredEffects() {
 const clamp = (v, max) => Math.max(0, Math.min(v, max));
 
 /**
+ * One hit of a PLAYER attack: Strength added, then Weak applied (×3/4, floored) — the
+ * exact mirror of the enemy's own strikeDamage (rules/act.js), so both sides of a fight
+ * resolve attack damage by the same add-then-multiply order. The floor at 0 keeps a
+ * Weakened 1-damage hit from going negative — player-side only by convention: the
+ * enemy's strikeDamage stops at `Math.max(0, dmg - 2)` and never floors its multiplier.
+ *
+ * WHY A HELPER: the fold used to live only inside the `damage` verb, and the exotic
+ * handlers (hemokinesis, reaper, rampage) re-derived their Strength line by hand — the
+ * player's Weak was never applied anywhere, so the status text's promise ("your attacks
+ * deal 25% less damage") was a lie whenever an enemy debuffed the hero. One helper, one
+ * order, every player attack through it.
+ * @param {number} base the move's printed damage (before statuses)
+ * @param {any} player the attacking player (status carrier)
+ * @returns {number} damage per hit, statuses folded
+ */
+export function playerStrike(base, player) {
+  let dmg = base + (player.statuses?.strength ?? 0);
+  if ((player.statuses?.weak ?? 0) > 0) dmg = Math.floor(dmg * 3 / 4);
+  return Math.max(0, dmg);
+}
+
+/**
  * Deal damage to one enemy: block absorbs first, then Vulnerable amplifies by 50%.
  * @param {any} enemy
  * @param {number} amount pre-modifier damage
@@ -124,10 +146,12 @@ export function addPower(state, power, stacks) {
 
 /** @type {Record<string, (state: any, ctx: EffectCtx, params: any) => EffectResult>} */
 export const VOCABULARY = {
-  /** damage — deal `amount` (plus Strength) to the target, `hits` times. */
+  /** damage — deal `amount` (plus Strength, then Weak-reduced) to the target, `hits` times.
+   *  THE ATTACK FOLD, deliberately shared: every card attack resolves through
+   *  playerStrike, and potions deliberately do NOT (potion_damage, rules/potions.js —
+   *  a potion is not an attack; its printed number is the number). */
   damage(state, ctx, params) {
-    const strength = state.player.statuses?.strength ?? 0;
-    const perHit = Math.max(0, params.amount + strength);
+    const perHit = playerStrike(params.amount, state.player);
     const hits = params.hits ?? 1;
 
     if (params.target === 'all_enemies') {

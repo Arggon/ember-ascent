@@ -9,8 +9,8 @@
 // choices, labelled copy n/m in the deck order the kernel's `x<n>` ids address.
 
 import { snap } from './runtime.js';
-import { el, keywordText, sceneIllus } from './dom.js';
-import { cardTile } from './combat-view.js';
+import { el, sceneIllus } from './dom.js';
+import { cardDescribe, cardTile } from './combat-view.js';
 import { consumeClick } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
@@ -37,27 +37,17 @@ export function shopView() {
 
   if (shop.removing) {
     wrap.append(el('p', { cls: 'shop-note', text: t('shop.removalNote') }));
-    const list = el('div', { cls: 'boon-list remove-list' });
+    // UX-8: the deck's cards as the GAME'S card tiles — one tile per deck instance, art
+    // and full description, the copy census carried in the tile's label and tooltip (the
+    // copies are interchangeable; their tiles look alike on purpose, exactly the deck
+    // sheet's one-tile-per-copy reading). The tile IS the pick: a click removes it, the
+    // same actionId the old text rows carried. An instance without a pick id (a torn
+    // step) renders read-only rather than promising a click the kernel would reject.
+    const grid = el('div', { cls: 'remove-grid' });
     for (const d of shop.deckInstances) {
-      const copyTag = d.copies > 1 ? t('shop.copy', { a: d.copy, b: d.copies }) : '';
-      list.append(el('button', {
-        cls: `boon remove-offer${d.temper ? ` temper-${d.temper}` : ''}`,
-        attrs: {
-          type: 'button',
-          'data-action': d.actionId,
-          'aria-label': t('shop.remove.aria', {
-            name: d.name,
-            copy: copyTag,
-            temper: d.temperName ? `, ${d.temperName}` : '',
-          }),
-        },
-        on: { click: () => act(d.actionId) },
-      },
-      el('span', { cls: 'boon-name', text: `${d.name}${copyTag}` }),
-      keywordText(el('span', { cls: 'boon-text' }), d.temperName ? t('shop.tempered', { name: d.temperName }) : t('shop.costsEnergy', { n: d.cost })),
-      ));
+      grid.append(removalTile(d));
     }
-    wrap.append(list);
+    wrap.append(grid);
     return page('shop', t('page.shop'), 'coin', 'panel', [wrap]);
   }
 
@@ -126,4 +116,52 @@ export function shopView() {
   }));
   wrap.append(controls);
   return page('shop', t('page.shop'), 'coin', 'panel', [wrap]);
+}
+
+/**
+ * One removal TILE (UX-8): the deck instance as the full card face — art, cost gem, type
+ * head, name, the describe layer's own sentence — and the tile itself IS the pick (the
+ * same `actionId` the old text rows carried). `cardDescribe` supplies the facts the
+ * kernel's `deckInstances` rows do not publish (description, flavor, type word), so the
+ * tile's sentence is the kernel's own wording in the current language. The copy census
+ * ("copy 2/5") rides the label and tooltip, not the face: the copies are interchangeable,
+ * so their tiles look alike on purpose — the deck sheet's one-tile-per-copy reading. A
+ * tempered instance wears the tile's own trim and stamp, which is exactly how it reads in
+ * the hand; the stamp's tooltip stays empty because `deckInstances` publishes no temper
+ * sentence (the deck sheet's rows do — that surface carries it).
+ * @param {any} d one `snap.shop.deckInstances` row
+ * @returns {HTMLElement}
+ */
+function removalTile(d) {
+  const fact = cardDescribe(d.cardId);
+  const copyTag = d.copies > 1 ? t('shop.copy', { a: d.copy, b: d.copies }) : '';
+  const pickable = Boolean(d.actionId);
+  const tile = cardTile({
+    slot: d.actionId ?? `deck${d.index}`,
+    cardId: d.cardId,
+    name: d.name,
+    flavor: fact.flavor,
+    cost: d.cost,
+    type: fact.type,
+    typeLabel: fact.typeLabel,
+    // The row's own tempered sentence when the kernel publishes one (deckInstances
+    // does); cardDescribe stays the fallback for a caller that predates the field.
+    description: d.description || fact.description || d.name,
+    // A pick is not a hand play: the tile is clickable through its own action id, and it
+    // must never wear the hand's "not enough Energy" affordance for a service already
+    // paid for. `playable: true` keeps the full-colour face; the pick verb lives in the
+    // label below.
+    playable: true,
+    showSummary: false,
+    temper: d.temper,
+    temperName: d.temperName,
+    temperText: d.temperText ?? '',
+  }, pickable
+    ? { actionId: d.actionId, onClick: (ev) => { consumeClick(ev); act(d.actionId); } }
+    : { readOnly: true });
+  const temper = d.temperName ? `, ${d.temperName}` : '';
+  const base = t('shop.remove.aria', { name: d.name, copy: copyTag, temper });
+  tile.setAttribute('aria-label', `${base} ${fact.description}`.trim());
+  tile.setAttribute('title', `${fact.description}${copyTag}${temper}`.trim() || d.name);
+  return tile;
 }

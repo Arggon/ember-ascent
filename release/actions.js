@@ -18,6 +18,7 @@ import {
 import { createController } from './src/surface/gui/controller.js';
 import {
   STRIKE_SEQ,
+  TURN_STEP,
   clearFxTimers,
   clearHitstop,
   flash,
@@ -40,6 +41,7 @@ import {
   setHeroMoveHold,
   setInputLock,
   setLastPlayerStatuses,
+  setLastEnemyStatuses,
   setLastTravel,
   setPaintedPhase,
   setPhaseArriving,
@@ -64,6 +66,17 @@ import { enemyLook } from './glyphs.js';
 import { currentProfile, recordRun, resetRunOutcome } from './run-history.js';
 import { dispatchFx, playInputSpan } from './fx.js';
 import { currentLang, setLang, t } from './i18n.js';
+
+/**
+ * UX-9b: which statuses land on the HERO rather than on the enemy the event names (spec
+ * §4.1's hex/power mapping). The kernel's `enemy_status` event today only ever carries an
+ * enemy's own Strength, so this set is empty in practice; it is the rule the pipeline
+ * states, kept here so a future self-debuff stacks on the right body without the grouping
+ * changing again. A debuff move afflicts the player through the kernel's `debuff` runner,
+ * whose `player_status` events carry NO attacker index — those are read as their own
+ * beats below (that is what keeps a wail/grief turn from being silent).
+ */
+const PLAYER_AFFLICTING = new Set(['weak', 'vulnerable']);
 
 /** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it.
  *  The NAMES are proper nouns in every language. The blurbs are NOT carried here: the
@@ -128,7 +141,7 @@ export function act(actionId, targetK = null) {
      */
 
     // UX-2: the enemy turn, SEQUENCED AND NAMED. The turn flip is the one moment the
-    // kernel resolves several attacks in one step, so the snapshot diff can only say
+    // kernel resolves several attackers in one step, so the snapshot diff can only say
     // "the hero lost N in total" — the per-attacker facts live in the kernel's OWN
     // event stream for this step (`enemy_attack` carries the attacker's index, what it
     // dealt and what the hero's block ate, per hit, in resolution order). They are read
@@ -136,24 +149,119 @@ export function act(actionId, targetK = null) {
     // regrouped for presentation, never re-derived. The result is ONE burst the
     // dispatcher plays as a sequence — enemy 1 winds up and strikes (its named float
     // lands on the hero), THEN enemy 2 — instead of every foe slamming at once.
+    //
+    // UX-9b GENERALIZED THE GROUPING (spec §4.1). It used to read `enemy_attack` alone, so
+    // a turn of guards, buffs or debuffs produced no plan at all — no pose, no float, no
+    // gate, the turn just arrived silently. The stream carries three enemy-indexed kinds,
+    // and each is a BEAT: `enemy_attack` → strike, `enemy_block {enemy, amount}` → guard,
+    // `enemy_status {enemy, status, stacks}` → the enemy's own status gain. A turn with any
+    // of them now produces ONE plan, even with zero attacks. A debuff move afflicts the
+    // HERO and its `player_status` event carries no attacker index (spec §4.1 notes this);
+    // that step rides the flat beat list with `enemy: null` and lands on the hero, which is
+    // what keeps a wail/grief turn from being silent too.
+    //
+    // `plans` groups the beats per attacker, in kernel resolution order (what 9c paints
+    // poses from); `beats` is the same steps flat in that same order (spec §4.1's list).
+    // `attacks` keeps the exact shape and accumulation order the strike sequence already
+    // consumes, so the shipped attack path is untouched.
+    let turnPlans = null;
+    let turnBeats = null;
     let turnStrikes = null;
     if (before.phase === 'combat' && after.turn !== before.turn) {
       const attacks = [];
+      const plans = new Map();
+      const beats = [];
+      // UX-9c: the acting enemy, as the flat beat list walks the stream. A debuff move emits
+      // only `player_status` (no attacker index), so the step is attributed to the last
+      // enemy that spoke — see the branch below.
+      let lastOwner = null;
+      let lastOwnerId = null;
+      let lastMove = null;
       for (const ev of (Array.isArray(res.events) ? res.events : [])) {
-        if (!ev || ev.t !== 'enemy_attack') continue;
-        let a = attacks.find((x) => x.enemy === ev.enemy);
-        if (!a) {
-          const foe = before.enemies.find((e) => e.index === ev.enemy);
-          a = { enemy: ev.enemy, name: foe ? foe.name : t('toast.enemyFallback'), dealt: 0, blocked: 0, hits: 0 };
-          attacks.push(a);
+        if (!ev) continue;
+        if (ev.t === 'player_status') {
+          // UX-9: the debuff that lands on the HERO is the acting enemy's own move half.
+          // The kernel now stamps `enemy: i` on it (act.js debuff runner), the same index
+          // its sibling runners use, so the hex is attributed to the enemy that actually
+          // spoke — a debuff-only turn no longer falls back to `lastOwner: null`, which
+          // left the Wraith's opening wail with no signature and no pose. The FALLBACK
+          // stays for any event that arrives without an index: then the last enemy that
+          // spoke is still the one whose move emitted it. The step keeps `enemy: null`
+          // (the float places at the HERO via `to: 'player'`), so nothing downstream
+          // changes: fx.js/beatPose read step.owner/ownerId.
+          const ownerIdx = Number.isInteger(ev.enemy) ? ev.enemy : lastOwner;
+          const ownerFoe = ownerIdx == null
+            ? null
+            : before.enemies.find((e) => e.index === ownerIdx);
+          beats.push({
+            enemy: null,
+            owner: ownerIdx,
+            ownerId: ownerFoe ? ownerFoe.id : lastOwnerId,
+            move: lastMove,
+            kind: 'status',
+            to: 'player',
+            status: ev.status,
+            stacks: ev.stacks ?? 0,
+          });
+          continue;
         }
-        a.dealt += ev.dealt ?? 0;
-        a.blocked += ev.blocked ?? 0;
-        a.hits += 1;
+        const kind = ev.t === 'enemy_attack' ? 'attack'
+          : ev.t === 'enemy_block' ? 'block'
+            : ev.t === 'enemy_status' ? 'status'
+              : null;
+        if (kind === null || !Number.isInteger(ev.enemy)) continue;
+        let plan = plans.get(ev.enemy);
+        if (!plan) {
+          const foe = before.enemies.find((e) => e.index === ev.enemy);
+          // UX-9c: the step carries the enemy's ROSTER ID and the move's own printed label.
+          // The presentation table (fx-signatures ENEMY_SIG_FX) is keyed by id, so a beat must
+          // know which type is acting; the label is the only hit count the wire carries
+          // (`A5x3`, `A4x2`), which is what tells a triple-pocket from a single slam. Both
+          // come from the BEFORE snapshot — the acting enemy is still on it, dead or not.
+          plan = {
+            enemy: ev.enemy,
+            name: foe ? foe.name : t('toast.enemyFallback'),
+            id: foe ? foe.id : null,
+            move: foe && foe.intent ? foe.intent.label : null,
+            steps: [],
+          };
+          plans.set(ev.enemy, plan);
+        }
+        if (kind === 'attack') {
+          let a = attacks.find((x) => x.enemy === ev.enemy);
+          if (!a) {
+            a = { enemy: ev.enemy, name: plan.name, dealt: 0, blocked: 0, hits: 0 };
+            attacks.push(a);
+          }
+          a.dealt += ev.dealt ?? 0;
+          a.blocked += ev.blocked ?? 0;
+          a.hits += 1;
+        }
+        lastOwner = ev.enemy;
+        lastOwnerId = plan.id;
+        lastMove = plan.move;
+        // The step's TARGET is the event's own: a status the kernel words as
+        // player-afflicting lands on the hero even though the event carries an enemy
+        // index (spec §4.1's hex mapping); everything else lands on that enemy.
+        const to = kind === 'status' && PLAYER_AFFLICTING.has(ev.status) ? 'player' : 'enemy';
+        // UX-9c: `id` / `move` ride every step (see the plan note above) so the per-type
+        // presentation can key on the roster id and read the move's own label.
+        const who = { id: plan.id, move: plan.move };
+        const step = kind === 'attack'
+          ? { enemy: ev.enemy, ...who, kind, to, dealt: ev.dealt ?? 0, blocked: ev.blocked ?? 0, hits: 1 }
+          : kind === 'block'
+            ? { enemy: ev.enemy, ...who, kind, to, amount: Math.max(0, ev.amount ?? 0) }
+            : { enemy: ev.enemy, ...who, kind, to, status: ev.status, stacks: ev.stacks ?? 0 };
+        plan.steps.push(step);
+        beats.push(step);
       }
-      if (attacks.length > 0) turnStrikes = attacks;
+      if (beats.length > 0) {
+        turnPlans = [...plans.values()];
+        turnBeats = beats;
+        turnStrikes = attacks.length > 0 ? attacks : null;
+      }
     }
-    if (turnStrikes) fx.push({ kind: 'enemy-turn', attacks: turnStrikes, playerLost });
+    if (turnPlans) fx.push({ kind: 'enemy-turn', attacks: turnStrikes ?? [], plans: turnPlans, beats: turnBeats, playerLost });
     // The player hurt flinch: the HP delta drives the pose (and the HP-bar flash). The
     // NUMBER is carried per attacker by the sequenced floats instead — on a sequenced
     // turn the aggregate floater is marked silent so the hero flinches once without
@@ -177,9 +285,25 @@ export function act(actionId, targetK = null) {
       fx.push({ kind: 'float', enemy: e.index, amount: dealt, tone: 'dmg', tier, defeated: e.hp <= 0 });
       if (was.block > 0) fx.push({ kind: 'block-eat', enemy: e.index });
     }
+    // UX-9b: an enemy's block gain now has its OWN beat in the sequenced turn
+    // (`enemy_block` -> guard step, played by fx.js on the turn clock), so the diff must not
+    // print the same `+N` a second time. The beats path wins: an enemy already covered by a
+    // guard step is skipped here, and only a gain the event stream never named (a kernel
+    // path that moves block silently) still falls through to this float. The PLAYER's side
+    // is untouched — `gainedBlock` above keeps its one hero float, byte-identical.
+    // UX-9: the dedupe only applies when the BEAT is going to play. fx.js breaks out of the
+    // enemy-turn tail loop at `animSpeed === 0` (it paints the named floats statically
+    // instead), and efxBox renders no guard beat either — so under fast mode or reduced
+    // motion the guard step never becomes visible and suppressing the diff would drop the
+    // `+N` entirely. Gate on the same condition the beats path runs under: the snapshot-diff
+    // float is then the only carrier, which is exactly what it is for.
+    const beatsPlay = !reducedMotion && animSpeed !== 0;
+    const guardedIdx = new Set(
+      beatsPlay ? (turnBeats ?? []).filter((s) => s.kind === 'block').map((s) => s.enemy) : [],
+    );
     for (const e of after.enemies) {
       const was = beforeByIdx.get(e.index);
-      if (was && e.block > was.block && e.hp === was.hp) {
+      if (was && e.block > was.block && e.hp === was.hp && !guardedIdx.has(e.index)) {
         fx.push({ kind: 'float', enemy: e.index, amount: e.block - was.block, tone: 'block', tier: 1 });
       }
     }
@@ -348,13 +472,28 @@ export function act(actionId, targetK = null) {
   if (seqBurst && !reducedMotion && animSpeed !== 0) {
     const beatMs = animMs(STRIKE_SEQ.beat);
     const slamMs = animMs(STRIKE_SEQ.slam);
+    // UX-9b: the non-attack beats (guard / power / hex) ride the SAME plan as a tail after
+    // the last slam, one TURN_STEP slot each in kernel order — so a compound move reads as
+    // strike THEN guard, and a turn with no attack at all still has a clock to present on.
+    // The tail starts where the last slam ENDS (not at the next beat: with one attacker the
+    // next beat would fall inside its own slam); a turn with no slam starts it at 0, which
+    // is the block-only / buff-only / debuff-only turn. An attack-only turn has an empty
+    // tail, so totalMs stays byte-identical to the pre-9b figure.
+    const tail = (seqBurst.beats ?? []).filter((s) => s.kind !== 'attack');
+    const stepMs = animMs(TURN_STEP.ms);
+    const strikeMs = seqBurst.attacks.length > 0 ? beatMs * (seqBurst.attacks.length - 1) + slamMs : 0;
+    const tailAt = strikeMs;
     const plan = {
       attacks: seqBurst.attacks,
+      plans: seqBurst.plans ?? [],
+      tail,
+      stepMs,
+      tailAt,
       beatMs,
       slamMs,
       impactMs: Math.round(slamMs * STRIKE_SEQ.impactAt),
       start: Date.now(),
-      totalMs: beatMs * (seqBurst.attacks.length - 1) + slamMs,
+      totalMs: Math.max(strikeMs, tail.length > 0 ? tailAt + stepMs * tail.length : 0),
     };
     setStrikeSeq(plan);
     // The plan's retirement is deliberately NOT generation-guarded: a newer action
@@ -452,6 +591,7 @@ export function newGame(seed = null, opts = {}) {
   setInputLock(null);
   setDyingThisPaint([]);
   setLastPlayerStatuses([]);
+  setLastEnemyStatuses(new Map());
   setPaintedPhase(null);
   setQuietIntro(opts.quiet === true);
   // A new run must animate its own entrance and its own victory/defeat, so every one-shot

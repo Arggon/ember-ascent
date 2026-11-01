@@ -591,8 +591,17 @@ export function observeActions(state) {
   return lines.join('\n');
 }
 
-/** Status labels for the structured snapshot (same abbreviations as the text dump). */
-function statusPairs(statuses, lang = 'en') {
+/**
+ * Status labels for the structured snapshot (same abbreviations as the text dump).
+ * `side` picks whose fact the words state: the hero's Strength says "your attacks deal
+ * N more damage", an ENEMY's says "its attacks deal N more damage" — the same counters
+ * mean different things per side, and a chip that borrowed the player's wording on an
+ * enemy told the reader the buff was theirs.
+ * @param {any} statuses
+ * @param {string} [lang]
+ * @param {'player'|'enemy'} [side]
+ */
+function statusPairs(statuses, lang = 'en', side = 'player') {
   return Object.entries(statuses ?? {})
     .filter(([, v]) => (v ?? 0) > 0)
     .map(([key, stacks]) => ({
@@ -602,8 +611,8 @@ function statusPairs(statuses, lang = 'en') {
       label: `${STATUS_ABBREV[key] ?? key.toUpperCase()}${stacks}`,
       // The same fact in words, for a reader meeting it for the first time. Derived
       // here, in the kernel, so no surface can invent its own wording.
-      text: `${describeStatus(key, stacks, 'player', lang).replace(/\.$/, '')}`,
-      explain: describeStatus(key, stacks, 'player', lang),
+      text: `${describeStatus(key, stacks, side, lang).replace(/\.$/, '')}`,
+      explain: describeStatus(key, stacks, side, lang),
     }));
 }
 
@@ -733,7 +742,7 @@ function snapshotEnemies(state, lang = 'en') {
         hp: e.hp,
         maxHp: e.maxHp,
         block: e.block,
-        statuses: statusPairs(e.statuses, lang),
+        statuses: statusPairs(e.statuses, lang, 'enemy'),
         intent: {
           label: intentLabel(e),
           kind: move.kind,
@@ -953,6 +962,7 @@ function snapshotShop(state, legal, lang = 'en') {
   const deckInstances = (state.deck ?? []).map((inst, i) => {
     const def = defOrNull(inst.cardId);
     const temper = state.tempers?.[inst.uid] ?? null;
+    const { def: temperedDef } = def ? temperedView(state, inst, def) : { def: null };
     const key = `${inst.cardId}|${temper ?? ''}`;
     const copy = (seen.get(key) ?? 0) + 1;
     seen.set(key, copy);
@@ -965,6 +975,9 @@ function snapshotShop(state, legal, lang = 'en') {
       cost: def?.cost ?? 0,
       temper,
       temperName: temper ? fieldFor(TEMPERS[temper], 'name', lang) || temper : '',
+      // The TEMPERED describe sentence, the deck sheet's own new rule: the removal
+      // modal's tile must not print the base number under a temper stamp either.
+      description: def ? describeCard(temperedDef, inst, lang) : '',
       copy,
       copies: census.get(key) ?? 1,
     };
@@ -1139,7 +1152,7 @@ function snapshotDeck(state, lang = 'en') {
       });
       continue;
     }
-    const { temper } = temperedView(state, inst, def);
+    const { def: temperedDef, temper } = temperedView(state, inst, def);
     const key = `${inst.cardId}|${temper ?? ''}`;
     enNames.set(key, def.name);
     const row = rows.get(key);
@@ -1154,6 +1167,11 @@ function snapshotDeck(state, lang = 'en') {
       temper,
       temperName: temper ? fieldFor(TEMPERS[temper], 'name', lang) : '',
       temperText: temper ? fieldFor(TEMPERS[temper], 'text', lang) : '',
+      // The TEMPERED describe sentence, same rule the hand tile follows (B2): a Red-hot
+      // Hammerfall says "Deal 9 damage" here too, so the deck sheet can never disagree
+      // with the hand about one card. The hand adds its HP-cost rider on top; the deck
+      // sheet's row carries the plain sentence (the stamp's tooltip has the temper's).
+      description: def ? describeCard(temperedDef, inst, lang) : '',
       count: 1,
     });
   }

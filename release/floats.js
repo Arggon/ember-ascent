@@ -7,7 +7,7 @@
 // drift apart. Under reduced motion the numbers and ghosts are simply absent — their
 // facts stay on the HP bars.
 
-import { animMs, animSpeed, bursts, flash, lastPlayerStatuses, reducedMotion } from './runtime.js';
+import { animMs, animSpeed, bursts, flash, lastEnemyStatuses, lastPlayerStatuses, reducedMotion } from './runtime.js';
 import { el } from './dom.js';
 import { HERO_THROWS, THROW_MS, heroMove, signatureFor } from './hero-moves.js';
 import { enemyMarkup } from './stage-art.js';
@@ -66,6 +66,39 @@ export function strikeFloatNode(a, hold = '') {
   span.append(el('b', { text: glyph }));
   span.append(el('b', { text: absorbedByBlock ? t('fx.absorbed') : `−${a.dealt}` }));
   if (a.hits > 1 && !absorbedByBlock) span.append(el('b', { cls: 'efloat-hits', text: `${a.hits}×` }));
+  return span;
+}
+
+/**
+ * UX-9b: the GUARD beat's float — the block the enemy just gained, on that enemy. It is the
+ * same readable figure the existing block-gain float prints (`+N` with the ⛨ glyph), built
+ * from the kernel's own `enemy_block` amount rather than from a snapshot delta, so a guard
+ * beat reads on the beat instead of arriving with the next paint's diff. No words: the
+ * glyph is the noun, the number is the fact.
+ * @param {{amount: number}} s one block step of a turn plan
+ * @param {string} [hold] extra class for the queued/static mechanism (`floatHold()`)
+ */
+export function guardFloatNode(s, hold = '') {
+  const span = el('span', { cls: 'efloat' });
+  span.className = `efloat efloat-g${s.amount >= 8 ? 2 : 1} efloat-block${hold}`;
+  span.append(el('b', { text: '⛨' }), el('b', { text: `+${s.amount}` }));
+  return span;
+}
+
+/**
+ * UX-9b: the STATUS beat's float — the stacks a turn just applied, on the body they landed
+ * on. Decoration only: the glyph and the kernel's own stack count, no invented wording, and
+ * the status chip on that body already carries its name and explanation (combat-view). The
+ * `-`/`+` sign states the direction (an enemy self-buff adds, a hex on the hero takes), and
+ * the class carries the direction for the stylesheet.
+ * @param {{status: string, stacks: number, to: 'player'|'enemy'}} s one status step
+ * @param {string} [hold] extra class for the queued/static mechanism (`floatHold()`)
+ */
+export function statusFloatNode(s, hold = '') {
+  const span = el('span', { cls: 'efloat' });
+  const up = s.to !== 'player';
+  span.className = `efloat efloat-g1 efloat-status ${up ? 'is-up' : 'is-down'}${hold}`;
+  span.append(el('b', { text: up ? '▲' : '▼' }), el('b', { text: `${up ? '+' : '−'}${s.stacks}` }));
   return span;
 }
 
@@ -141,6 +174,22 @@ export function heroEfx() {
  */
 export function freshStatusKeys(list) {
   const prev = new Set((lastPlayerStatuses || []));
+  return new Set((list || []).map((s) => s.key).filter((k) => !prev.has(k)));
+}
+
+/**
+ * The enemy variant of `freshStatusKeys` (UX-9 D3): which of THIS enemy's status keys were
+ * not on the same enemy at the previous paint, read from the per-index map the renderer
+ * publishes. Keyed by `index` rather than by position, so an enemy that shifted up the row
+ * after a death is still diffed against itself and does not re-juice its whole chip row.
+ * The player path above is untouched and keeps its own list.
+ *
+ * @param {number} index the enemy's stable snapshot index
+ * @param {Array<{key: string}>} list its statuses on the paint being built
+ * @returns {Set<string>} the keys that just landed
+ */
+export function freshEnemyStatusKeys(index, list) {
+  const prev = new Set((lastEnemyStatuses instanceof Map ? lastEnemyStatuses.get(index) : null) || []);
   return new Set((list || []).map((s) => s.key).filter((k) => !prev.has(k)));
 }
 

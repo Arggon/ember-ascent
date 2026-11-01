@@ -33,6 +33,7 @@ import {
   setInputLock,
   setBursts,
   setLastPlayerStatuses,
+  setLastEnemyStatuses,
   setLastTravel,
   setPaintedPhase,
   setPhaseArriving,
@@ -132,6 +133,11 @@ export function render() {
   const statusKeysNow = [...(snap.player.statuses || []).map((s) => s.key),
     ...(snap.player.powers || []).map((p) => p.key),
     ...(snap.enemies || []).flatMap((e) => (e.statuses || []).map((s) => s.key))];
+  // UX-9 D3: the same "before" snapshot, but per enemy and keyed by stable `index`, so an
+  // enemy chip can be diffed against THAT enemy's own previous keys. Built before any child
+  // of this paint reads it, exactly like the player list above.
+  const enemyStatusKeysNow = new Map((snap.enemies || []).map((e) =>
+    [e.index, (e.statuses || []).map((s) => s.key)]));
 
   renderHud();
   stageEl.replaceChildren();
@@ -173,8 +179,13 @@ export function render() {
     }
   }
   // The boss's arrival is NAMED on screen as well as animated, so the fact ("the boss is
-  // here") is readable with no motion at all.
-  if (bossWelcomed.length > 0) arriving.boss = true;
+  // here") is readable with no motion at all. The name rides along on the beat (UX-9 D1): it
+  // is the snapshot's own enemy name, already localized by the kernel, so the banner needs
+  // no string of its own and announces whichever boss actually walked in.
+  if (bossWelcomed.length > 0) {
+    arriving.boss = true;
+    arriving.bossName = bossWelcomed[0];
+  }
 
   /* The end of a run: a VICTORY or DEFEAT that arrives on the same action as a death holds
    * the collapse on screen before the summary replaces it, so "the enemy dies, THEN the
@@ -255,6 +266,7 @@ export function render() {
     // gets its entrance animation when the beat ends. The ended panel paints plain.
     if (snap.phase !== 'reward') setPaintedPhase(snap.phase);
     setLastPlayerStatuses(statusKeysNow);
+    setLastEnemyStatuses(enemyStatusKeysNow);
     if (dealPending || dyingThisPaint.length > 0 || travelPending) {
       laterPaint(() => { setDealPending(false); setDyingThisPaint([]); }, 0);
     }
@@ -319,6 +331,7 @@ export function render() {
      for is which enemy has just left the row. It decides how a departure is shown and can
      change neither what is legal nor what an outcome is. */
   setLastPlayerStatuses(statusKeysNow);
+  setLastEnemyStatuses(enemyStatusKeysNow);
   setLastTravel(travelPending);
   setPrevEnemies((snap.enemies || []).map((e) => ({ index: e.index, id: e.id, name: e.name })));
   if (dealPending || dyingThisPaint.length > 0 || travelPending) {

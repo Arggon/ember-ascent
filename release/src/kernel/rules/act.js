@@ -152,9 +152,24 @@ const currentMove = (enemy) => {
   return def.moves[enemy.moveIndex] ?? def.moves[0];
 };
 
-/** One hit of an attack move: Strength added, Weak applied. */
-const strikeDamage = (enemy, move) => {
-  let dmg = move.damage + (enemy.statuses?.strength ?? 0);
+/**
+ * One hit of an attack move: Strength added, Weak applied (×3/4, floored) — the exact
+ * mirror of the player's playerStrike (rules/vocabulary.js), so both sides of a fight
+ * resolve attack damage by the same add-then-multiply order.
+ *
+ * `pendingStrength` is the buff the move itself is about to apply (a "gain N Strength,
+ * then strike" move): the intent must ANNOUNCE the post-buff number and the strike must
+ * LAND it — StS rules the buff applies before the strike in the same move sequence. The
+ * runner applies the buff to the enemy's statuses FIRST and calls this without the
+ * pending argument (the landed stacks are already in `enemy.statuses`), so the folded
+ * number has exactly one source and Weak multiplies the full post-buff base.
+ * @param {any} enemy
+ * @param {any} move
+ * @param {number} [pendingStrength] strength this move will add before striking
+ * @returns {number} damage per hit
+ */
+const strikeDamage = (enemy, move, pendingStrength = 0) => {
+  let dmg = move.damage + (enemy.statuses?.strength ?? 0) + pendingStrength;
   if ((enemy.statuses?.weak ?? 0) > 0) dmg = Math.floor(dmg * 3 / 4);
   return dmg;
 };
@@ -164,11 +179,16 @@ export function intentLabel(enemy) {
   return currentMove(enemy).label;
 }
 
-/** Damage the enemy's current intent will deal to the player, before player block. */
+/**
+ * Damage the enemy's current intent will deal to the player, before player block. A move
+ * that buffs itself before striking (`move.strength` on an attack) announces the POST-buff
+ * number — the same number the strike will land (the runner applies the buff, then reads
+ * the updated statuses through strikeDamage, so announce and resolve can never disagree).
+ */
 export function intentDamage(enemy) {
   const move = currentMove(enemy);
   if (move.kind !== 'attack') return 0;
-  return strikeDamage(enemy, move) * (move.hits ?? 1);
+  return strikeDamage(enemy, move, move.strength ?? 0) * (move.hits ?? 1);
 }
 
 /**
@@ -239,12 +259,29 @@ const patchEnemyAt = (state, i, fn) => patchEnemies(state, (e, j) => (j === i ? 
  * runner owns its events; the loop only sequences them.
  */
 const MOVE_RUNNERS = {
-  /** attack: hit the player `hits` times for Strength-added, Weak-reduced damage. */
+  /**
+   * attack: hit the player `hits` times for Strength-added, Weak-reduced damage. A move
+   * that ALSO carries `strength` buffs itself FIRST (its `enemy_status` event leads, the
+   * printed order is the event order) and the strike then reads the UPDATED statuses —
+   * the "gain N Strength, then attack" move lands the buffed number on that same strike
+   * (StS ruling), and intentDamage's pending fold announces exactly this number.
+   *
+   * KNOWN GAP, ON RECORD (solo review of 8083336): the runner reads `move.strength` only
+   * — a compound move printing Block or a debuff (jaw_worm.thrash "A7 B5",
+   * gremlin_nob.skull_bash "A6 VULN2") still resolves its attack half alone; the
+   * printed B/VULN words are promises the runner does not keep. The kernel already
+   * emits `enemy_block {enemy, amount}` and `enemy_status`; wiring them into this runner
+   * is the queued next kernel slice.
+   */
   attack(state, i, move) {
-    const enemy = state.combat.enemies[i];
-    const dmg = strikeDamage(enemy, move);
     const events = [];
     let next = state;
+    if (move.strength) {
+      next = patchEnemyAt(next, i, (e) => ({ ...e, statuses: { ...e.statuses, strength: (e.statuses.strength ?? 0) + move.strength } }));
+      events.push({ t: 'enemy_status', enemy: i, status: 'strength', stacks: move.strength });
+    }
+    const enemy = next.combat.enemies[i];
+    const dmg = strikeDamage(enemy, move);
     const hits = move.hits ?? 1;
     for (let h = 0; h < hits; h += 1) {
       const out = damagePlayer(next.player, dmg);
@@ -255,9 +292,16 @@ const MOVE_RUNNERS = {
     return { state: next, events };
   },
 
-  /** block: gain the printed Block. */
+  /**
+   * block: gain the printed Block, plus the enemy's own Dexterity — the exact fold the
+   * player's `block` verb applies (rules/vocabulary.js), so the status text's promise
+   * ("Block it gains is N higher") holds for both sides of a fight. No shipped enemy can
+   * gain Dexterity yet, so this changes nothing observable today; it is here so a future
+   * biome that grants it cannot silently skip the fold.
+   */
   block(state, i, move) {
-    const amount = move.block ?? 0;
+    const enemy = state.combat.enemies[i];
+    const amount = Math.max(0, (move.block ?? 0) + (enemy.statuses?.dexterity ?? 0));
     return {
       state: patchEnemyAt(state, i, (e) => ({ ...e, block: e.block + amount })),
       events: [{ t: 'enemy_block', enemy: i, amount }],
@@ -273,23 +317,35 @@ const MOVE_RUNNERS = {
       events.push({ t: 'enemy_status', enemy: i, status: 'strength', stacks: move.strength });
     }
     if (move.block) {
-      next = patchEnemyAt(next, i, (e) => ({ ...e, block: e.block + move.block }));
-      events.push({ t: 'enemy_block', enemy: i, amount: move.block });
+      // Same Dexterity fold the block runner applies — a buff move's Block is a block grant.
+      const enemy = next.combat.enemies[i];
+      const amount = Math.max(0, move.block + (enemy.statuses?.dexterity ?? 0));
+      next = patchEnemyAt(next, i, (e) => ({ ...e, block: e.block + amount }));
+      events.push({ t: 'enemy_block', enemy: i, amount });
     }
     return { state: next, events };
   },
 
-  /** debuff: apply Vulnerable and Weak to the player. */
+  /**
+   * debuff: apply Vulnerable and Weak to the player.
+   *
+   * UX-9: both events carry `enemy: i` — the acting enemy's index, exactly as the attack,
+   * block and buff runners stamp their own events. The hex lands on the HERO, but it is
+   * still THAT enemy's move, and the presentation layer needs to know which one spoke: a
+   * Wraith's opening wail must play its signature, and on a multi-foe turn a hex cannot be
+   * attributed by "whoever spoke last" (on a debuff-only turn nobody did). The field is
+   * event payload only — it is not state, so no replay hash depends on it.
+   */
   debuff(state, i, move) {
     let next = state;
     const events = [];
     if (move.vulnerable) {
       next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, vulnerable: (next.player.statuses?.vulnerable ?? 0) + move.vulnerable } } };
-      events.push({ t: 'player_status', status: 'vulnerable', stacks: move.vulnerable });
+      events.push({ t: 'player_status', enemy: i, status: 'vulnerable', stacks: move.vulnerable });
     }
     if (move.weak) {
       next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, weak: (next.player.statuses?.weak ?? 0) + move.weak } } };
-      events.push({ t: 'player_status', status: 'weak', stacks: move.weak });
+      events.push({ t: 'player_status', enemy: i, status: 'weak', stacks: move.weak });
     }
     return { state: next, events };
   },
