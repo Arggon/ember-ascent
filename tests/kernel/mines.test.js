@@ -72,4 +72,8 @@ test('a mines run plays, the header carries the biome, and replay matches the go
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:a8ea90a4789f097b1ef353111e4115d9f49be5bc0f4f1e968ec12b0d33377832';
+// Recomputed for UX-7 (attack-damage status folding): the mines roster carries Weak
+// moves (the Ash Wraith's wail, the Matriarch's grief), and a weakened hero's attacks
+// now resolve for 25% less — the drive diverges from the old hash at the first
+// weakened swing. Pure state math, no RNG change (same draw count, same 160-step drive).
+const GOLDEN = 'sha256:6c6a554cffc9149c0e643c81c34f149275ab4f4a52651aedc8972e387edb6190';

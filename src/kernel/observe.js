@@ -591,8 +591,17 @@ export function observeActions(state) {
   return lines.join('\n');
 }
 
-/** Status labels for the structured snapshot (same abbreviations as the text dump). */
-function statusPairs(statuses, lang = 'en') {
+/**
+ * Status labels for the structured snapshot (same abbreviations as the text dump).
+ * `side` picks whose fact the words state: the hero's Strength says "your attacks deal
+ * N more damage", an ENEMY's says "its attacks deal N more damage" — the same counters
+ * mean different things per side, and a chip that borrowed the player's wording on an
+ * enemy told the reader the buff was theirs.
+ * @param {any} statuses
+ * @param {string} [lang]
+ * @param {'player'|'enemy'} [side]
+ */
+function statusPairs(statuses, lang = 'en', side = 'player') {
   return Object.entries(statuses ?? {})
     .filter(([, v]) => (v ?? 0) > 0)
     .map(([key, stacks]) => ({
@@ -602,8 +611,8 @@ function statusPairs(statuses, lang = 'en') {
       label: `${STATUS_ABBREV[key] ?? key.toUpperCase()}${stacks}`,
       // The same fact in words, for a reader meeting it for the first time. Derived
       // here, in the kernel, so no surface can invent its own wording.
-      text: `${describeStatus(key, stacks, 'player', lang).replace(/\.$/, '')}`,
-      explain: describeStatus(key, stacks, 'player', lang),
+      text: `${describeStatus(key, stacks, side, lang).replace(/\.$/, '')}`,
+      explain: describeStatus(key, stacks, side, lang),
     }));
 }
 
@@ -733,7 +742,7 @@ function snapshotEnemies(state, lang = 'en') {
         hp: e.hp,
         maxHp: e.maxHp,
         block: e.block,
-        statuses: statusPairs(e.statuses, lang),
+        statuses: statusPairs(e.statuses, lang, 'enemy'),
         intent: {
           label: intentLabel(e),
           kind: move.kind,

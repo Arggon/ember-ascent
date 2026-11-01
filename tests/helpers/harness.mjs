@@ -45,7 +45,10 @@ export function makeEnemy(def, over = {}) {
     statuses: { ...(over.statuses ?? {}) },
     moveIndex: over.moveIndex ?? 0,
     moveHistory: [],
-    intentStep: 0,
+    // Scripted enemies pick their move as script[min(intentStep, len-1)] — starting at 1
+    // means "the opening move has already been chosen" (what a real fight's second turn
+    // looks like), so a test that ends the turn sees the NEXT script step.
+    intentStep: over.intentStep ?? 0,
     dead: over.dead ?? false,
   };
 }
