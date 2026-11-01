@@ -736,3 +736,19 @@ Process rules (standing):
   Strength", the user's measurement was display ambiguity, not a bug) and the
   compound-move kernel slice. UX-9 (per-enemy-type action FX, spec at
   docs/specs/UX-9-enemy-action-fx-spec.md) dispatched to dev; release rebuild after.
+- 2026-11-01 — UX-9 committed d40debd after QA PASS on executed gates (statics 440/439/0/1
+  + gate + surface-art; browser 24/24; visual matrix row-for-row identical to the
+  documented baseline — no layout box grew). Spec: docs/specs/UX-9-enemy-action-fx-spec.md
+  (10 enemy types, the web layer read only enemy_attack before). Dev notes:
+  docs/status/2026-11-01-ux9-dev-notes.md. QA: docs/status/2026-11-01-ux9-qa.md — AC map
+  7 verified / 4 static-only / 1 unverified (AC-12 per-type captures declared NOT DONE;
+  the module-graph test caught a missing strikeSeq import mid-slice, fixed). Solo review
+  VERDICT: REQUEST_CHANGES — the P1 executed a scripted wail and proved every hex knob
+  unreachable (the debuff runner never said which enemy spoke; five of ten types lost
+  their signature). Fixed in 6560cd8: the kernel stamps enemy: i on debuff
+  player_status (ZERO golden drift — the event payload is not state), web attribution
+  prefers ev.enemy; the reviewer's P2s fixed (per-attacker FX stagger with a math
+  correction over the brief; fast-mode block numbers restored via a dedupe gate); P3s
+  fixed (honest CSS comment; multiCount() parses xN). Gates after: 440/439/0/1, gate OK,
+  surface-art OK, browser 24/24, matrix unchanged. Light re-verification next, then the
+  release rebuild.
