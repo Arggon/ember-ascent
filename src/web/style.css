@@ -7488,10 +7488,11 @@ html, body {
   width: 172px;
   min-height: 236px;
   /* A fact, not a control: the read-only tile never borrows the hand's pointer. */
+  /* A fact, not a control: the read-only tile never borrows the hand's pointer, and it
+     does not lift on hover either — the lift is the hand's "I can play this" tell. */
   cursor: default;
-  transition: border-color var(--dur) ease, transform var(--dur) ease;
+  transition: border-color var(--dur) ease;
 }
-.deck-grid .card:hover { transform: translateY(-4px); }
 /* The stamp on a gallery tile: the sheet drops the compact-code footer, so the builder
    appends the stamp straight to the plate — where the defensive absolute rule above (a
    footer-less tile "none today") would plant it over the rules text. In the galleries

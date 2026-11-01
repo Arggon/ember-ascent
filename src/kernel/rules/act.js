@@ -265,6 +265,13 @@ const MOVE_RUNNERS = {
    * printed order is the event order) and the strike then reads the UPDATED statuses —
    * the "gain N Strength, then attack" move lands the buffed number on that same strike
    * (StS ruling), and intentDamage's pending fold announces exactly this number.
+   *
+   * KNOWN GAP, ON RECORD (solo review of 8083336): the runner reads `move.strength` only
+   * — a compound move printing Block or a debuff (jaw_worm.thrash "A7 B5",
+   * gremlin_nob.skull_bash "A6 VULN2") still resolves its attack half alone; the
+   * printed B/VULN words are promises the runner does not keep. The kernel already
+   * emits `enemy_block {enemy, amount}` and `enemy_status`; wiring them into this runner
+   * is the queued next kernel slice.
    */
   attack(state, i, move) {
     const events = [];

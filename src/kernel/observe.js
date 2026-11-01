@@ -962,6 +962,7 @@ function snapshotShop(state, legal, lang = 'en') {
   const deckInstances = (state.deck ?? []).map((inst, i) => {
     const def = defOrNull(inst.cardId);
     const temper = state.tempers?.[inst.uid] ?? null;
+    const { def: temperedDef } = def ? temperedView(state, inst, def) : { def: null };
     const key = `${inst.cardId}|${temper ?? ''}`;
     const copy = (seen.get(key) ?? 0) + 1;
     seen.set(key, copy);
@@ -974,6 +975,9 @@ function snapshotShop(state, legal, lang = 'en') {
       cost: def?.cost ?? 0,
       temper,
       temperName: temper ? fieldFor(TEMPERS[temper], 'name', lang) || temper : '',
+      // The TEMPERED describe sentence, the deck sheet's own new rule: the removal
+      // modal's tile must not print the base number under a temper stamp either.
+      description: def ? describeCard(temperedDef, inst, lang) : '',
       copy,
       copies: census.get(key) ?? 1,
     };
@@ -1148,7 +1152,7 @@ function snapshotDeck(state, lang = 'en') {
       });
       continue;
     }
-    const { temper } = temperedView(state, inst, def);
+    const { def: temperedDef, temper } = temperedView(state, inst, def);
     const key = `${inst.cardId}|${temper ?? ''}`;
     enNames.set(key, def.name);
     const row = rows.get(key);
@@ -1163,6 +1167,11 @@ function snapshotDeck(state, lang = 'en') {
       temper,
       temperName: temper ? fieldFor(TEMPERS[temper], 'name', lang) : '',
       temperText: temper ? fieldFor(TEMPERS[temper], 'text', lang) : '',
+      // The TEMPERED describe sentence, same rule the hand tile follows (B2): a Red-hot
+      // Hammerfall says "Deal 9 damage" here too, so the deck sheet can never disagree
+      // with the hand about one card. The hand adds its HP-cost rider on top; the deck
+      // sheet's row carries the plain sentence (the stamp's tooltip has the temper's).
+      description: def ? describeCard(temperedDef, inst, lang) : '',
       count: 1,
     });
   }

@@ -144,7 +144,9 @@ function removalTile(d) {
     cost: d.cost,
     type: fact.type,
     typeLabel: fact.typeLabel,
-    description: fact.description || d.name,
+    // The row's own tempered sentence when the kernel publishes one (deckInstances
+    // does); cardDescribe stays the fallback for a caller that predates the field.
+    description: d.description || fact.description || d.name,
     // A pick is not a hand play: the tile is clickable through its own action id, and it
     // must never wear the hand's "not enough Energy" affordance for a service already
     // paid for. `playable: true` keeps the full-colour face; the pick verb lives in the
@@ -153,7 +155,7 @@ function removalTile(d) {
     showSummary: false,
     temper: d.temper,
     temperName: d.temperName,
-    temperText: '',
+    temperText: d.temperText ?? '',
   }, pickable
     ? { actionId: d.actionId, onClick: (ev) => { consumeClick(ev); act(d.actionId); } }
     : { readOnly: true });

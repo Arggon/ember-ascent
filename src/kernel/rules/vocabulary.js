@@ -64,7 +64,8 @@ const clamp = (v, max) => Math.max(0, Math.min(v, max));
  * One hit of a PLAYER attack: Strength added, then Weak applied (×3/4, floored) — the
  * exact mirror of the enemy's own strikeDamage (rules/act.js), so both sides of a fight
  * resolve attack damage by the same add-then-multiply order. The floor at 0 keeps a
- * Weakened 1-damage hit from going negative, same as the enemy side.
+ * Weakened 1-damage hit from going negative — player-side only by convention: the
+ * enemy's strikeDamage stops at `Math.max(0, dmg - 2)` and never floors its multiplier.
  *
  * WHY A HELPER: the fold used to live only inside the `damage` verb, and the exotic
  * handlers (hemokinesis, reaper, rampage) re-derived their Strength line by hand — the
@@ -145,7 +146,10 @@ export function addPower(state, power, stacks) {
 
 /** @type {Record<string, (state: any, ctx: EffectCtx, params: any) => EffectResult>} */
 export const VOCABULARY = {
-  /** damage — deal `amount` (plus Strength, then Weak-reduced) to the target, `hits` times. */
+  /** damage — deal `amount` (plus Strength, then Weak-reduced) to the target, `hits` times.
+   *  THE ATTACK FOLD, deliberately shared: every card attack resolves through
+   *  playerStrike, and potions deliberately do NOT (potion_damage, rules/potions.js —
+   *  a potion is not an attack; its printed number is the number). */
   damage(state, ctx, params) {
     const perHit = playerStrike(params.amount, state.player);
     const hits = params.hits ?? 1;

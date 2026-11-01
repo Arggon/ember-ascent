@@ -11,7 +11,7 @@ import { content, loadDescribe, loadKernel } from '../helpers/harness.mjs';
 import { TEMPERS } from '../../src/kernel/rules/tempers.js';
 
 const K = await loadKernel();
-const { newRun, snapshot } = K;
+const { newRun, snapshot, describeCard } = K;
 const C = await content();
 const { CARD_TYPE_LABEL } = await loadDescribe();
 
@@ -28,6 +28,7 @@ function expectedRow(id, count, temper = null) {
     temper,
     temperName: temper ? TEMPERS[temper].name : '',
     temperText: temper ? TEMPERS[temper].text : '',
+    description: K.describeCard(def),
     count,
   };
 }
@@ -151,4 +152,17 @@ test('counts sum to the deck and the frozen state is left untouched', () => {
   assert.equal(snap.deckCards.reduce((n, r) => n + r.count, 0), snap.deckCount);
   assert.equal(snap.deckCount, state.deck.length);
   assert.equal(JSON.stringify(state.deck), before, 'snapshot() must not mutate the deck');
+});
+
+test('a deck row carries the TEMPERED describe sentence — the sheet can never disagree with the hand', () => {
+  // The solo review of 84e0dd9 caught the deck sheet rendering the BASE sentence on a
+  // tempered copy ("Deal 6 damage" under a Red-hot stamp; the hand's tile said 9). The
+  // row now publishes the same describeCard(def, instance) the hand tile reads.
+  const base = newRun({ seed: 2, tempers: true });
+  const strike = base.deck.find((c) => c.cardId === 'strike');
+  const snap = snapshot({ ...base, tempers: { [strike.uid]: 'redhot' } });
+  const hot = snap.deckCards.find((r) => r.tempered);
+  assert.match(hot.description, /9/, 'the tempered copy prints the tempered number');
+  const plain = snap.deckCards.find((r) => r.cardId === 'strike' && !r.tempered);
+  assert.doesNotMatch(plain.description, /9/, 'the untempered copy keeps the base sentence');
 });

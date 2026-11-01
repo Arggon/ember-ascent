@@ -240,11 +240,17 @@ test('Ember Draught: the damage verb, exactly — 20 raw, Vulnerable amplifies, 
   assert.equal(blocked.state.combat.enemies[0].hp, 28);
   assert.equal(blocked.state.combat.enemies[0].block, 0);
 
-  // Strength is NOT added: potions are not attacks, the verb reads the PLAYER's
-  // strength... it does (the verb is shared) — so pin what the reuse really means:
-  // a Whetstone'd player's Ember Draught hits harder, exactly like a card would.
+  // Player Strength and Weak do NOT fold in: a potion is not an attack (potion_damage,
+  // rules/potions.js — the printed 20 IS the number, StS ruling). The earlier pin here
+  // read the reuse the other way ("a Whetstone'd draught hits harder, like a card"),
+  // but that fold was the same announce/resolve lie UX-7 set out to kill, in its HARMFUL
+  // direction: under Weak the belt promised 20 and landed 15 with no display hint. Both
+  // sides of damageEnemy still apply — Vulnerable amplifies and block absorbs, pinned
+  // above — the hero's own statuses never touch the number.
   const strong = step(beltCombat(['ember_draught'], { statuses: { strength: 3 } }), 'q1');
-  assert.equal(strong.state.combat.enemies[0].hp, 17, 'player Strength flows through the shared verb');
+  assert.equal(strong.state.combat.enemies[0].hp, 20, 'player Strength does not fold into a potion');
+  const weak = step(beltCombat(['ember_draught'], { statuses: { weak: 2 } }), 'q1');
+  assert.equal(weak.state.combat.enemies[0].hp, 20, 'player Weak does not shrink a potion');
 });
 
 test('Ember Draught aims: q1_2 hits the second LIVING enemy, q1 falls to the first', () => {

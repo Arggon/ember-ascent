@@ -470,21 +470,21 @@ export function deckPanel() {
  * One deck TILE: the full card face — art, cost gem, type head, name, flavor, effect
  * sentence — read-only (`cardTile`'s readOnly shape: a labelled div, never the hand's
  * disabled affordance). A tempered copy wears the tile's own trim and forged stamp
- * (`.ctemper`, the hand's very mark): the visible sentence is the card's base one and
- * the stamp's tooltip carries the kernel's own temper sentence, so nothing here derives
- * a tempered number the kernel did not publish on this surface.
+ * (`.ctemper`, the hand's very mark): the visible sentence is the ROW's own — the
+ * kernel's tempered describe sentence from snapshotDeck — so the sheet can never
+ * disagree with the hand about one card, and the stamp's tooltip carries the kernel's
+ * own temper sentence on top.
  */
 function deckTile(c) {
-  const fact = cardDescribe(c.cardId);
   const tile = cardTile({
-    slot: `${c.cardId}|${c.temper ?? ''}`,
+    slot: `${c.cardId}|${c.temper ?? ''}|${c.copy ?? 0}`,
     cardId: c.cardId,
     name: c.name,
-    flavor: fact.flavor,
+    flavor: c.flavor,
     cost: c.cost,
     type: c.type,
     typeLabel: c.typeLabel,
-    description: fact.description || c.name,
+    description: c.description || c.name,
     playable: false,
     showSummary: false,
     temper: c.temper,
@@ -492,9 +492,9 @@ function deckTile(c) {
     temperText: c.temperText,
   }, { readOnly: true });
   if (c.tempered) {
-    // The full effect in one sentence on hover and for readers: the card's own rules
-    // text plus the kernel's own temper sentence, both published verbatim.
-    const full = `${fact.description} ${c.temperText}`.trim();
+    // The full effect in one sentence on hover and for readers: the row's own (tempered)
+    // rules sentence plus the kernel's temper sentence, both published verbatim.
+    const full = `${c.description} ${c.temperText}`.trim();
     tile.setAttribute('title', full);
     tile.setAttribute('aria-label', `${tile.getAttribute('aria-label')} ${c.temperText}`.trim());
   }
