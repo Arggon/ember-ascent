@@ -686,3 +686,31 @@ Process rules (standing):
   case, with cards.bundle.js regenerated through the repo's own generator (the drift
   test caught the direct edit). Gates: 428/427/1 node, 23/23 browser, gate OK, art OK.
   Light re-verification of the verbatim fixes, then the 0.4.1 release rebuild.
+- 2026-11-01 — UX-7 committed 8083336 and UX-8 committed 84e0dd9 after the combined QA
+  PASS (UX-7 3/3, UX-8 4/4): npm test 438 pass / 0 fail / 1 pre-existing todo
+  (tests/history/record.test.js:384 §11.2), browser 24/24 (the `relics:` spec alone is
+  ~148 s of the 662 s wall), gate OK, golden replay BYTE-IDENTICAL out-of-tree (14 lines
+  re-recorded — same names/order, headers identical, only heuristic records moved; the
+  seed-10 win->loss is the player-Weak fold working), visual matrix 23 FAIL / 18 pass
+  byte-identical to the documented baseline — all phone-portrait, single root cause (the
+  layout viewport blows out to ~1.8–2.0× and trips HERO_NAME_MIN_WIDTH=381; real
+  clipping only on the three 360x640@130 rows, spill 4–5 px), reproduced identically on
+  the committed release artifact, so PRE-EXISTING; full evidence in
+  docs/status/2026-11-01-ux78-qa.md. UX-7 = the player's Weak folds into every player
+  attack: playerStrike() mirrors the enemy's strikeDamage (add Strength, then Weak ×3/4
+  floored), a buff-then-strike move lands the post-buff number and the intent announces
+  exactly that, enemy block gains the enemy's own Dexterity, enemy status chips speak
+  the enemy variant en/es, and the hero's Vulnerable amplification of enemy attacks is
+  pinned. The user's "enemy Strength not hitting" measurement resolved as intent
+  AMBIGUITY, not a bug: the announced number already includes the buff (base 7 + 2 = 9);
+  an intent tooltip breakdown ("9 = 7 + 2 Strength") is queued as a UX follow-up.
+  UX-8 = the codex, deck sheet and shop card-removal menu render the combat hand's card
+  tiles — art, name, full description — one tile per copy in the deck, removal clickable,
+  es flows through the same builder. Wording correction on record: the codex shows the
+  run's draftPool (20 tiles on a fresh run; cardPool() is 65) — the "65-tile codex"
+  acceptance phrasing was wrong, not the code. UX-9 (per-enemy-type action animations
+  and FX) specced at docs/specs/UX-9-enemy-action-fx-spec.md: 10 enemy types, the web
+  layer reads only enemy_attack today so block/buff/debuff turns are silent, 3 defects
+  in scope (the hardcoded 'SLAG WARDEN' boss banner, enemyLook() knowing 6/10 ids, the
+  enemy chip juice keyed to the player's statuses), zero new strings. Solo review of
+  both commits next; then UX-9 dev; release rebuild after the batch.
