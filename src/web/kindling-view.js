@@ -11,6 +11,7 @@ import { el, keywordText, sceneIllus } from './dom.js';
 import { heroMarkup } from './stage-art.js';
 import { HEROES, act, switchHero, switchPath } from './actions.js';
 import { page } from './page-frame.js';
+import { glyphBox, BOON_GLYPH } from './glyphs.js';
 import { t } from './i18n.js';
 
 /* ------------------------------------------------------------------ KINDLING */
@@ -107,6 +108,9 @@ export function kindlingView() {
       cls: 'boon', attrs: { type: 'button', 'data-action': b.actionId, 'aria-label': `${b.name}: ${b.text}` },
       on: { click: () => act(b.actionId) },
     },
+    // The boon's own small mark (BOON_GLYPH), decorative — the name and the kernel
+    // sentence carry the meaning. An unknown id degrades to the rune, never an empty box.
+    glyphBox(BOON_GLYPH[b.id] || 'rune', 'boon-glyph'),
     el('span', { cls: 'boon-name', text: b.name }),
     keywordText(el('span', { cls: 'boon-text' }), b.text)));
   }
