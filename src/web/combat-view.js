@@ -7,7 +7,7 @@
 // hold through incidental repaints. The hero's movement is chosen by WHICH card was
 // played (hero-moves.js), never only by its type.
 
-import { BIOMES, DEFAULT_BIOME, describeTile, loadContent } from '../kernel/index.js';
+import { BIOMES, DEFAULT_BIOME, describeTile, intentChips, loadContent } from '../kernel/index.js';
 import {
   HERO_POSE_MS,
   SPEED_KEY,
@@ -142,19 +142,28 @@ export function heroFigure() {
   bar.querySelector('i').style.width = `${Math.max(0, Math.round((p.hp / Math.max(1, p.maxHp)) * 100))}%`;
   node.append(bar);
   if (p.block > 0) node.append(el('div', { cls: 'eblock', text: `⛨ ${p.block}` }));
-  // PARITY: the hero's statuses (Vulnerable, Weak, …) read as pills UNDER her own HP
-  // bar — the same place an enemy's statuses sit on its card — instead of only in the
-  // top HUD bar, where a landing debuff read as faint legend chrome. Powers (run-long
-  // counters: Combust, Rupture, …) STAY on the HUD: they outlive the fight, and this
-  // card exists only in combat. Same pill markup and diff (`freshStatusKeys` diffs
-  // against the PREVIOUS paint, which render.js records before this view is built),
-  // so the by-key colour and the juice-in animation carry over unchanged.
+  // PARITY: the hero's statuses (Vulnerable, Weak, …) read as CHIPS under her own HP
+  // bar — mark + stacks, the card chips' own component — instead of a full sentence per
+  // pill: the user reads an icon and a number, and the sentence is one click away (the
+  // kernel's own explain, through the shared popover) and on the chip's native title.
+  // The hero card is a read-only readout (a div), so the chips are real controls. The
+  // juice-in diff is unchanged (`freshStatusKeys` diffs against the PREVIOUS paint,
+  // which render.js records before this view is built) — the entrance class moves onto
+  // the chip, and the reduced-motion block neutralizes it there like it does the pills.
+  // Powers (run-long counters: Combust, Rupture, …) STAY on the HUD: they outlive the
+  // fight, and this card exists only in combat.
   const freshHero = freshStatusKeys(p.statuses || []);
-  const heroStatuses = (p.statuses || []).map((s) => el('span', {
-    cls: `pill ${s.key}` + (freshHero.has(s.key) ? ' juice-in' : ''),
-    text: s.text || `${s.label} ${s.stacks}`,
-    attrs: { title: s.explain || '' },
-  }));
+  const heroStatuses = (p.statuses || []).map((s) => chipNode(
+    {
+      verb: 'status',
+      status: s.key,
+      num: String(s.stacks ?? 0),
+      label: s.name || s.label || s.key,
+      explain: s.explain || s.text || '',
+    },
+    true,
+    freshHero.has(s.key) ? 'juice-in' : '',
+  ));
   if (heroStatuses.length > 0) node.append(el('div', { cls: 'e-statuses' }, ...heroStatuses));
   node.append(heroEfx());
   return node;
@@ -560,20 +569,44 @@ function enemyCard(e, position) {
   }
   // UX-9 D3: the chip juices off THIS enemy's own previous status keys (per-index), not
   // off the player's list, which made an enemy chip animate whenever the player gained one.
+  // Statuses read as CHIPS now — mark + stacks, no visible sentence (the user's ask):
+  // the kernel's explain is the native title and one click away through the shared
+  // popover. While TARGETING the enemy card is a native <button>, so the chips take the
+  // hand-card path (spans whose click stops propagation — clicking a chip must never
+  // pick the target); the rest state is a read-only readout (a div) and gets real
+  // controls, exactly like the read-only card tiles.
   const fresh = freshEnemyStatusKeys(e.index, e.statuses);
-  const statuses = e.statuses.map((s) => el('span', {
-    cls: `pill ${s.key}` + (fresh.has(s.key) ? ' juice-in' : ''),
-    text: s.text || `${s.label} ${s.stacks}`,
-    attrs: { title: s.explain || '' },
-  }));
+  const statuses = e.statuses.map((s) => chipNode(
+    {
+      verb: 'status',
+      status: s.key,
+      num: String(s.stacks ?? 0),
+      label: s.name || s.label || s.key,
+      explain: s.explain || s.text || '',
+    },
+    !targeting,
+    fresh.has(s.key) ? 'juice-in' : '',
+  ));
   if (statuses.length > 0) card.append(el('div', { cls: 'e-statuses' }, ...statuses));
   card.append(efxBox(e.index));
-  // The sentence stays readable under the figure. The badge above is the scaled glyph.
+  // The intent reads as CHIPS now (attack / block / each applied status), built from the
+  // kernel's own `intentChips` facts — no label parsing, every number the engine's own.
+  // The sentence leaves the VISIBLE row (the user's ask) but stays the row's native
+  // title and aria-label, and is every chip's popover explain: one click says the whole
+  // move. A move shape that yields no chips (an unknown kind) falls back to the old
+  // sentence row — never a guess. Death ghosts (floats.js dyingCard) and the boss-down
+  // hold never render this row, so they are untouched by the swap.
   const plain = e.intent.text || `${e.intent.label}`;
-  card.append(el('div', {
-    cls: `e-intent kind-${kind}`,
-    attrs: { title: plain },
-  }, el('span', { cls: 'ilabel', text: plain })));
+  const ichips = intentChips(e, currentLang());
+  card.append(ichips.length > 0
+    ? el('div', {
+        cls: `e-intent kind-${kind}`,
+        attrs: { role: 'group', title: plain, 'aria-label': plain },
+      }, ...ichips.map((c) => chipNode(c, !targeting)))
+    : el('div', {
+        cls: `e-intent kind-${kind}`,
+        attrs: { title: plain },
+      }, el('span', { cls: 'ilabel', text: plain })));
   return card;
 }
 
@@ -740,17 +773,20 @@ try {
  * browser, so those chips explain through their native title only, and keyboard users
  * reach the same sentence through the tile's aria-label, which always carries it.
  * @param {any} chip a kernel-published chip row
- * @param {boolean} readOnly the tile is a fact, not a control
+ * @param {boolean} readOnly the containing tile is a READ-ONLY READOUT, so the chip
+ *   becomes a real control (role=button, tabbable); inside a native button (a hand tile,
+ *   a targeting-mode enemy card) it stays an inert span — but with tabindex -1, so
+ *   closing the explainer can still hand focus back to the chip it came from
  * @returns {HTMLElement}
  */
-function chipNode(chip, readOnly) {
+function chipNode(chip, readOnly, extraCls = '') {
   const mark = EFFECT_GLYPH[chip.status ?? chip.verb] || 'rune';
   const node = el('span', {
-    cls: 'cfx-chip',
+    cls: 'cfx-chip' + (extraCls ? ` ${extraCls}` : ''),
     attrs: {
       title: chip.explain || '',
       'aria-label': chip.explain || '',
-      ...(readOnly ? { role: 'button', tabindex: '0' } : {}),
+      ...(readOnly ? { role: 'button', tabindex: '0' } : { tabindex: '-1' }),
     },
   },
     glyphBox(mark, 'cfx-mark'),
@@ -911,7 +947,13 @@ export function cardTile(card, opts = {}) {
   // expressible (a `custom` verb) keeps its sentence BESIDE the chips, so nothing its
   // text says is ever lost to the icons. Rows without chips (an old snapshot) fall
   // straight through to the sentence — the old face.
-  const chips = Array.isArray(card.chips) ? card.chips : [];
+  // PARITY-2b: while THIS card waits for a target, its chip row is the AIMED enemy's
+  // own variant (kernel-published `chipsByTarget`, keyed by the same 1-based living slot
+  // `aimed` holds) — the same swap `aimedDesc` performs on the sentence, so a covered
+  // card's hidden fold still shows its amplified number under the crosshair. No variant
+  // for this enemy, or not aiming: the resting face.
+  const chips = (isPending && aimed != null ? (card.chipsByTarget?.[aimed] ?? null) : null)
+    || (Array.isArray(card.chips) ? card.chips : []);
   if (chips.length > 0) tile.append(chipRow(chips, readOnly));
   if (!(chips.length > 0 && card.chipsComplete === true)) {
     tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));

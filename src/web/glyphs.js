@@ -155,6 +155,7 @@ export const INTENT_GLYPH = { attack: 'strike', block: 'shieldWide', buff: 'chev
  *  MARKS — an unknown key falls back to the rune inside glyphBox, never an empty box. */
 export const EFFECT_GLYPH = {
   damage: 'blade',
+  attack: 'blade',
   block: 'shield',
   draw: 'draw',
   discard: 'discard',

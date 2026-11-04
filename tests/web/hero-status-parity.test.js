@@ -1,15 +1,18 @@
-// STATUS PARITY: the player's combat statuses (Vulnerable, Weak, …) read as pills on the
-// HERO'S OWN CARD, under her HP bar — the same place an enemy's statuses sit — and NOT in
-// the top HUD bar, where a landing debuff read as faint legend chrome. Powers (Combust, …)
-// stay up there: they outlive the fight, and the combat card never shows them.
+// STATUS PARITY: the player's combat statuses (Vulnerable, Weak, …) read as CHIPS on the
+// HERO'S OWN CARD, under her HP bar — mark + stacks, the card chips' own component, the
+// kernel's sentence as the title and one popover click away (never printed inline) — the
+// same place an enemy's statuses sit, and NOT in the top HUD bar, where a landing debuff
+// once read as faint legend chrome. Powers (Combust, …) stay up there as pills: they
+// outlive the fight, and the combat card never shows them.
 //
 // WHAT THIS PINS, against the REAL surface code driven by the fake-DOM harness:
 //   * heroFigure() emits a `.e-statuses` row INSIDE `.hero`, after the hp bar and before
-//     the `.efx` strip, holding one `pill <key>` per snapshot status, with the kernel's own
-//     explain sentence as the pill's title (and its own text as the pill's text);
-//   * renderHud() paints NO status pill — a `vulnerable`/`weak` pill reappearing in the top
-//     bar is the regression this file exists to catch — while the powers still paint there
-//     as `pill power`;
+//     the `.efx` strip, holding one `.cfx-chip` per snapshot status with the kernel's own
+//     explain sentence as the chip's title and the live stacks as its number — and NO
+//     visible sentence on the readout (the user's ask);
+//   * renderHud() paints NO status chip/pill — a `vulnerable`/`weak` readout reappearing
+//     in the top bar is the regression this file exists to catch — while the powers still
+//     paint there as `pill power`;
 //   * the `juice-in` diff pins once and is KEY-based: it rides the paint on which a status
 //     key first appears and is gone from every repaint of that same key. Stacks going up do
 //     NOT re-juice (freshStatusKeys compares keys, by design: a stacking status must not
@@ -142,21 +145,30 @@ function heroStatusBox() {
   const hero = heroOf();
   return hero ? hero.querySelector('.e-statuses') : null;
 }
-/** The status pills painted on the hero card, in paint order. */
+/** The status CHIPS painted on the hero card, in paint order. The readout moved from
+ *  sentence pills to mark+stack chips (the card chips' own component) — the sentence is
+ *  the chip's native title and one popover click away, never visible inline. */
 function heroStatusPills() {
   const box = heroStatusBox();
-  return box ? box.kids.filter((k) => k.tag === 'span') : [];
+  return box ? box.kids.filter((k) => k.classList.contains('cfx-chip')) : [];
 }
 /** The pills painted in the top HUD bar (whatever they are). */
 function hudPills() {
   return byId.hud.querySelectorAll('span').filter((s) => s.classList.contains('pill'));
 }
-/** The status key a pill stands for (`pill vulnerable juice-in` -> `vulnerable`). */
-const pillKey = (pill) => pill.className.split(/\s+/).find((c) => c !== 'pill' && c !== 'juice-in');
+/** The status key a chip stands for: its kernel explain (the title) is the snapshot
+ *  row's own, so the match is by explain, not by a class name. */
+function chipKey(chip, snapshotStatuses) {
+  const hit = snapshotStatuses.find((s) => chip.attrs.title === s.explain);
+  return hit ? hit.key : null;
+}
 /** Which keys are wearing the one-paint `juice-in` entrance on this paint. */
-const juiceKeys = (pills) => pills.filter((p) => p.classList.contains('juice-in')).map(pillKey).sort();
+const juiceKeys = (pills, snapshotStatuses) => pills
+  .filter((p) => p.classList.contains('juice-in'))
+  .map((p) => chipKey(p, snapshotStatuses))
+  .sort();
 
-test('the hero card carries the player statuses as pills under her own HP bar', () => {
+test('the hero card carries the player statuses as chips under her own HP bar', () => {
   const { api } = startCombat({ statuses: { vulnerable: 2, weak: 1 } });
   const hero = heroOf();
   assert.ok(hero, 'the hero figure painted');
@@ -170,16 +182,21 @@ test('the hero card carries the player statuses as pills under her own HP bar', 
   assert.ok(order.indexOf('hpbar') < order.indexOf('e-statuses'), 'the status row sits under the hp bar');
   assert.ok(order.indexOf('e-statuses') < order.indexOf('efx'), 'the status row sits above the effects strip');
 
-  const pills = heroStatusPills();
+  const chips = heroStatusPills();
   const snapshotStatuses = api.snapNow().player.statuses;
-  assert.equal(pills.length, snapshotStatuses.length, 'one pill per status on the snapshot');
-  assert.deepEqual(pills.map(pillKey).sort(), ['vulnerable', 'weak'], 'both statuses are on the hero card');
+  assert.equal(chips.length, snapshotStatuses.length, 'one chip per status on the snapshot');
+  assert.deepEqual(chips.map((c) => chipKey(c, snapshotStatuses)).sort(), ['vulnerable', 'weak'],
+    'both statuses are on the hero card');
   for (const s of snapshotStatuses) {
-    const pill = pills.find((p) => pillKey(p) === s.key);
-    assert.ok(pill, `a pill is painted for ${s.key}`);
-    assert.ok(pill.classList.contains('pill'), 'the entry is a pill');
-    assert.equal(pill.attrs.title, s.explain, `the ${s.key} pill explains itself with the kernel's own sentence`);
-    assert.equal(pill.txt, s.text, `the ${s.key} pill reads the kernel's own text`);
+    const chip = chips.find((c) => chipKey(c, snapshotStatuses) === s.key);
+    assert.ok(chip, `a chip is painted for ${s.key}`);
+    assert.ok(chip.classList.contains('cfx-chip'), 'the entry is a chip');
+    assert.equal(chip.attrs.role, 'button', 'the hero card is a readout — its chips are real controls');
+    assert.equal(chip.attrs.title, s.explain, `the ${s.key} chip explains itself with the kernel's own sentence`);
+    assert.ok(chip.querySelector('.cfx-num'), `the ${s.key} chip carries its stack number`);
+    assert.equal(chip.querySelector('.cfx-num').txt, String(s.stacks), `the ${s.key} chip reads the live stacks`);
+    // The user's ask: no visible sentence on the readout — the icon and number only.
+    assert.ok(!chip.textContent.includes(s.text), `the ${s.key} chip does not print the sentence inline`);
   }
 });
 
@@ -208,33 +225,33 @@ test('the top HUD bar shows powers only — a combat status up there is the regr
 
 test('juice-in pins once: it rides the paint a status first appears on, not every repaint', () => {
   const { api, state } = startCombat({ statuses: { weak: 1 } });
+  const keys = () => juiceKeys(heroStatusPills(), api.snapNow().player.statuses);
   // The boot paint is the run's first paint, so Weak is NEW there: it juices.
-  assert.deepEqual(juiceKeys(heroStatusPills()), ['weak'], 'a status landing on the first paint juices');
+  assert.deepEqual(keys(), ['weak'], 'a status landing on the first paint juices');
   // A repaint of the SAME statuses must not re-animate — render() records the painted keys
   // at the end of every paint, which is what makes the diff a one-shot.
   api.render();
-  assert.deepEqual(juiceKeys(heroStatusPills()), [], 'the same statuses on a reprint do not re-juice');
+  assert.deepEqual(keys(), [], 'the same statuses on a reprint do not re-juice');
   // A key that newly LANDS juices; the one already painted does not.
   state.player.statuses = { vulnerable: 2, weak: 1 };
   api.sync();
   api.render();
-  assert.deepEqual(juiceKeys(heroStatusPills()), ['vulnerable'], 'only the arriving key juices');
+  assert.deepEqual(keys(), ['vulnerable'], 'only the arriving key juices');
   // Stacks going up are NOT an arrival: freshStatusKeys diffs keys, so a stacking status
   // does not re-animate on every turn that adds to it.
   state.player.statuses = { vulnerable: 3, weak: 1 };
   api.sync();
   api.render();
-  assert.deepEqual(juiceKeys(heroStatusPills()), [], 'more stacks on a known key do not re-juice');
-  const vuln = heroStatusPills().find((p) => pillKey(p) === 'vulnerable');
-  assert.equal(vuln.txt, api.snapNow().player.statuses.find((s) => s.key === 'vulnerable').text,
-    'the pill still follows the new stack count');
+  assert.deepEqual(keys(), [], 'more stacks on a known key do not re-juice');
+  const vuln = heroStatusPills().find((p) => chipKey(p, api.snapNow().player.statuses) === 'vulnerable');
+  assert.equal(vuln.querySelector('.cfx-num').txt, '3', 'the chip still follows the new stack count');
   // A key that leaves and lands again IS an arrival, so the juice comes back.
   state.player.statuses = { weak: 1 };
   api.sync();
   api.render();
-  assert.deepEqual(juiceKeys(heroStatusPills()), [], 'a status that falls off paints nothing');
+  assert.deepEqual(keys(), [], 'a status that falls off paints nothing');
   state.player.statuses = { vulnerable: 1, weak: 1 };
   api.sync();
   api.render();
-  assert.deepEqual(juiceKeys(heroStatusPills()), ['vulnerable'], 'a status that lands again juices again');
+  assert.deepEqual(keys(), ['vulnerable'], 'a status that lands again juices again');
 });

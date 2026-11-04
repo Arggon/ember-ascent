@@ -252,3 +252,23 @@ test('the number the tile previews is the number the play lands', async () => {
   assert.equal(before[1] - after[1], 9, 'the Vulnerable enemy took the previewed 9');
   assert.equal(before[0] - after[0], 0, 'the healthy neighbour was not touched');
 });
+
+/* ------------------------------------------------- PARITY-2b: the aimed chip swap */
+//
+// On a fully chip-covered card the sentence is hidden, so the fold preview MUST move the
+// chip's number too — the crosshair's whole point. The kernel publishes `chipsByTarget`
+// keyed like the sentence variants; the pending tile swaps the row exactly as it swaps
+// `aimedDesc`.
+
+test('the aimed chip swaps to the amplified number with the sentence', async () => {
+  const api = await startFight();
+  // At rest (two enemies alive, none aimed): the resting printed 6.
+  const chipNum = () => tile('p1')._all().find((n) => n.classList.contains('cfx-num')).txt;
+  assert.equal(chipNum(), '6', 'the resting chip reads the printed 6');
+  tile('p1').dispatch('click');
+  enemyTiles()[1].dispatch('mouseenter');
+  assert.equal(api.aimed, 2);
+  assert.equal(chipNum(), '9', 'the crosshair\u2019s chip says 9 — the fold is visible on a covered card');
+  api.setAimed(1);
+  assert.equal(chipNum(), '6', 'aiming at the healthy neighbour restores the resting chip');
+});

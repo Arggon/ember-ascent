@@ -377,9 +377,16 @@ export function describeVerbChip(verb, statusKey, amount, lang = 'en', side = 'p
 
 /** The word a chip's popover titles itself with, e.g. "Strength" / "Fuerza". */
 const CHIP_LABEL_VERB = {
-  en: { damage: 'Damage', block: 'Block', draw: 'Draw', discard: 'Discard', energy: 'Energy', heal: 'Heal', exhaust: 'Exhaust', retain: 'Retain' },
-  es: { damage: 'Daño', block: 'Bloqueo', draw: 'Robo', discard: 'Descarte', energy: 'Energía', heal: 'Curación', exhaust: 'Agotar', retain: 'Retener' },
+  en: { damage: 'Damage', block: 'Block', draw: 'Draw', discard: 'Discard', energy: 'Energy', heal: 'Heal', exhaust: 'Exhaust', retain: 'Retain', attack: 'Attack' },
+  es: { damage: 'Daño', block: 'Bloqueo', draw: 'Robo', discard: 'Descarte', energy: 'Energía', heal: 'Curación', exhaust: 'Agotar', retain: 'Retener', attack: 'Ataque' },
 };
+
+/** The chip label for one verb in one language — shared by cardChips and by the intent
+ *  chip builder, so an enemy's attack chip and a card's damage chip title alike. */
+export function chipVerbLabel(verb, lang = 'en') {
+  const es = langOf(lang) === 'es';
+  return (es ? CHIP_LABEL_VERB.es : CHIP_LABEL_VERB.en)[verb] ?? String(verb);
+}
 
 /**
  * The chip list of one card definition — one row per effect, in effect order, with the
@@ -391,13 +398,21 @@ const CHIP_LABEL_VERB = {
  * entries read as ONE "2×4" chip, the same fold describeCard applies to its sentence), and
  * `custom` verbs emit NO row — their meaning is bespoke, so the card's own sentence speaks
  * for them (see chipsCover).
+ *
+ * `fold` is the live-combat context (snapshotHand's PARITY numbers): a damage chip's
+ * number goes through the SAME resolvers the sentence fold uses (playerStrike for
+ * Strength/Weak, then vulnerableAmplify when `fold.vuln`), a block chip through
+ * blockGain, and both explain re-worded with the landed number — so a chip can never
+ * promise a number the play will not land. A clean fold leaves every chip byte-identical
+ * to the printed one.
  * @param {any} def card definition from content (cards.json shape)
  * @param {string} [lang] 'en' (default) or 'es'
+ * @param {{strength?: number, weak?: number, dexterity?: number, vuln?: boolean}} [fold]
+ *        live-combat fold numbers, or null for the printed card
  * @returns {Array<object>} one chip per chip-expressible effect
  */
-export function cardChips(def, lang = 'en') {
+export function cardChips(def, lang = 'en', fold = null) {
   if (!def || !Array.isArray(def.effects)) return [];
-  const es = langOf(lang) === 'es';
   // The effect's target scope, resolved the SAME way TEMPLATES resolves its `who` (the
   // effect's own `target` first, the definition's for an unset one), so a chip's words
   // and the dropped sentence can never disagree about who is hit. `custom` effects skip
@@ -422,13 +437,30 @@ export function cardChips(def, lang = 'en') {
       });
     } else if (CHIP_NUMBER[e.verb]) {
       const hits = e.hits ?? 1;
+      // The printed chip number (the compact conventions: +N for gains, N×hits) and the
+      // number the explain words. The PARITY fold — the same math the sentence's rider
+      // runs — moves BOTH only for the verbs a live state can move (damage, block), so
+      // the icon's number and the hidden-or-shown sentence never disagree about what
+      // lands; a clean fold leaves both byte-identical to the printed card.
+      let n = e.amount;
+      let num = CHIP_NUMBER[e.verb](e);
+      if (fold) {
+        if (e.verb === 'damage') {
+          n = playerStrike(e.amount, { statuses: { strength: fold.strength ?? 0, weak: fold.weak ?? 0 } });
+          if (fold.vuln) n = vulnerableAmplify(n);
+          num = hits > 1 ? `${n}×${hits}` : String(n);
+        } else if (e.verb === 'block') {
+          n = blockGain(e.amount, fold.dexterity ?? 0);
+          num = String(n);
+        }
+      }
       out.push({
         verb: e.verb,
         amount: e.amount,
         ...(hits > 1 ? { hits } : {}),
-        num: CHIP_NUMBER[e.verb](e),
-        label: (es ? CHIP_LABEL_VERB.es : CHIP_LABEL_VERB.en)[e.verb] ?? String(e.verb),
-        explain: describeVerbChip(e.verb, null, e.amount, lang, 'player', hits, scopeOf(e)),
+        num,
+        label: chipVerbLabel(e.verb, lang),
+        explain: describeVerbChip(e.verb, null, n, lang, 'player', hits, scopeOf(e)),
       });
     }
     // Unknown verbs fall out silently here — chipsCover below is what reports the gap,

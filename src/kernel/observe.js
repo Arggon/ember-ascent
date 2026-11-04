@@ -33,6 +33,8 @@ import {
   describeStatus,
   cardChips,
   chipsCover,
+  chipVerbLabel,
+  statusName,
   glossary,
   glossarySections,
   helpTopics,
@@ -611,6 +613,9 @@ function statusPairs(statuses, lang = 'en', side = 'player') {
       stacks,
       // Compact form for the CLI and for anyone who has read the glossary.
       label: `${STATUS_ABBREV[key] ?? key.toUpperCase()}${stacks}`,
+      // The human word for the status ("Strength"), for the chip popovers: the compact
+      // `label` is the agent-facing token, never a popover title.
+      name: statusName(key, lang),
       // The same fact in words, for a reader meeting it for the first time. Derived
       // here, in the kernel, so no surface can invent its own wording.
       text: `${describeStatus(key, stacks, side, lang).replace(/\.$/, '')}`,
@@ -720,6 +725,23 @@ function snapshotHand(state, legal, lang = 'en') {
     // multi-enemy field carry it; null when no variant differs from `description`, so a
     // clean field adds zero payload and the renderer falls back to the resting face.
     let descriptionsByTarget = null;
+    // PARITY-2b: the same swap for the CHIP ROW. On a fully chip-covered card the
+    // sentence is hidden, so the folded number would be invisible exactly when aiming —
+    // the crosshair's whole point. Each living enemy gets its chips re-derived through
+    // the fold with ITS OWN Vulnerable (the same resolvers the sentence rider runs), and
+    // a key is published ONLY when that enemy's variant actually differs from the base
+    // row — a clean field adds zero payload, like the sentence variants above.
+    let chipsByTarget = null;
+    if (foldBase && targets.length > 0) {
+      const restingChips = cardChips(def, lang, { ...foldBase, vuln: false });
+      const chipVariants = alive.map((enemy, j) => cardChips(def, lang, { ...foldBase, vuln: (enemy.statuses?.vulnerable ?? 0) > 0 }));
+      chipVariants.forEach((v, j) => {
+        if (JSON.stringify(v) !== JSON.stringify(restingChips)) {
+          chipsByTarget ??= {};
+          chipsByTarget[j + 1] = v;
+        }
+      });
+    }
     if (foldBase && targets.length > 0) {
       const variants = alive.map((enemy, j) => describeCard(def, card, lang, { ...foldBase, vuln: (enemy.statuses?.vulnerable ?? 0) > 0 })
         + (hpCost > 0 ? (lang === 'es' ? ` Pierdes ${hpCost} HP al jugarla.` : ` Lose ${hpCost} HP when played.`) : ''));
@@ -759,13 +781,18 @@ function snapshotHand(state, legal, lang = 'en') {
       // The EFFECT CHIPS (the tile's icon row): one `{verb, status?, amount, num, label,
       // explain}` per effect, worded kernel-side so a tile prints and never derives. Read
       // off the TEMPERED definition, like `summary`/`description` above, so a Red-hot
-      // Hammerfall's chip says 9×1. `chipsComplete` is the tile's licence to drop the
-      // visible sentence: true only when every effect carries a chip (a `custom` verb
-      // keeps the sentence — its meaning is bespoke and no icon claims it) AND the
-      // tempered play carries no HP rider — a "Lose 2 HP when played." tail has no chip
-      // to speak for it, so the sentence STAYS on the face beside the icons.
-      chips: cardChips(def, lang),
+      // Hammerfall's chip says 9×1 — and through the SAME live fold the sentence rides,
+      // so the icon's number is the number the play lands. `chipsComplete` is the tile's
+      // licence to drop the visible sentence: true only when every effect carries a chip
+      // (a `custom` verb keeps the sentence — its meaning is bespoke and no icon claims
+      // it) AND the tempered play carries no HP rider — a "Lose 2 HP when played." tail
+      // has no chip to speak for it, so the sentence STAYS on the face beside the icons.
+      chips: cardChips(def, lang, fold),
       chipsComplete: chipsCover(def) && hpCost === 0,
+      // PARITY-2b per-target chip variants (null when none differs from the base row),
+      // keyed by the 1-based living-enemy slot — the same k `descriptionsByTarget` and
+      // the aim actions use, so the renderer swaps both faces with one lookup.
+      chipsByTarget,
       playable,
       // The engine's own answer to "may this card be aimed?" — so a renderer never has to
       // infer it from the card type (Defend is type 'skill', Bash is 'attack', but the
@@ -801,6 +828,17 @@ function snapshotEnemies(state, lang = 'en') {
           kind: move.kind,
           damage: intentDamage(e),
           hits: move.hits ?? 1,
+          // The STRUCTURED chip facts (feature: enemies speak in chips): what the move
+          // does, as data, so a renderer never parses the label string to build a chip.
+          // `block` when the move guards (an attack-and-block move carries both), and
+          // every status the move applies — debuff stacks onto the player, a buff's
+          // Strength onto itself (`to: 'self'`), the same split the status pills keep.
+          block: move.block ?? null,
+          statuses: [
+            ...(move.vulnerable ? [{ status: 'vulnerable', stacks: move.vulnerable }] : []),
+            ...(move.weak ? [{ status: 'weak', stacks: move.weak }] : []),
+            ...(move.kind === 'buff' && move.strength ? [{ status: 'strength', stacks: move.strength, to: 'self' }] : []),
+          ],
           // The sentence for the SAME intent, from the same rules, so the compact number
           // and the readable line can never disagree. The enemy NAME stays English until
           // I18N-2 sweeps the encounter tables.
@@ -808,6 +846,55 @@ function snapshotEnemies(state, lang = 'en') {
         },
       };
     });
+}
+
+/**
+ * The INTENT CHIP row of one snapshot enemy row (feature: enemies speak in chips): what
+ * the announced move does, as the same chip shape a card face carries — an attack chip,
+ * a block chip when the move guards, and one chip per status the move applies (debuffs
+ * onto the player, a buff's Strength onto itself). Every chip's `explain` is the
+ * intent's OWN describeIntent sentence, so clicking any of them explains the whole move
+ * in kernel wording, and no renderer parses the label string to learn any of it.
+ *
+ * Numbers come from the snapshot's own facts (`intent.damage` is the engine's
+ * intentDamage — Strength already added, Weak already applied; `hits` the move's), so a
+ * chip and the compact badge can never disagree. A move kind the shape does not cover
+ * yields no chips and the renderer falls back to the sentence — never a guess.
+ * @param {any} enemy a snapshot enemy row (its `intent` carries the facts)
+ * @param {string} [lang] 'en' (default) or 'es'
+ * @returns {Array<object>} chips of `{verb, amount?, hits?, status?, num, label, explain}`
+ */
+export function intentChips(enemy, lang = 'en') {
+  const intent = enemy?.intent ?? {};
+  const explain = intent.text || intent.label || '';
+  const out = [];
+  const push = (chip) => out.push({ ...chip, explain });
+  if (intent.kind === 'attack' && typeof intent.damage === 'number' && intent.damage > 0) {
+    const hits = intent.hits ?? 1;
+    // The badge's own convention: the per-hit number × hits (intent.damage is the TOTAL).
+    push({
+      verb: 'attack',
+      amount: intent.damage,
+      ...(hits > 1 ? { hits } : {}),
+      num: hits > 1 ? `${Math.round(intent.damage / hits)}×${hits}` : String(intent.damage),
+      label: chipVerbLabel('attack', lang),
+    });
+  }
+  // Statuses before the block chip, so each move's chip order mirrors its sentence's
+  // clause order: "attack for 7 and block 5", "power up: +3 Strength and gain 6 Block".
+  for (const s of intent.statuses ?? []) {
+    push({
+      verb: 'status',
+      status: s.status,
+      amount: s.stacks,
+      num: `+${s.stacks}`,
+      label: statusName(s.status, lang),
+    });
+  }
+  if ((intent.block ?? 0) > 0) {
+    push({ verb: 'block', amount: intent.block, num: String(intent.block), label: chipVerbLabel('block', lang) });
+  }
+  return out;
 }
 
 /** The map section of a snapshot: every node, with availability decided here. */

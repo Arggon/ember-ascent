@@ -131,3 +131,57 @@ test('the previewed number equals the damage the engine lands', async () => {
   assert.equal(shownVuln, 12);
   assert.equal(amplified.raw, shownVuln, 'Anvil Blow previewed 12 and must land 12');
 });
+
+/* ------------------------------------------------------- PARITY-2b: the chip fold */
+//
+// The CHIP ROW follows the same fold: on a fully chip-covered card the sentence is
+// hidden, so the aimed variant must move the icon's number too — through the SAME
+// resolvers (playerStrike / vulnerableAmplify / blockGain), keyed exactly like
+// descriptionsByTarget, and published ONLY where a variant actually differs.
+
+const hand0 = (state, opts) => K.snapshot(state, opts).hand[0];
+
+test('the resting chip folds the live Strength, and the explain re-words the landed number', async () => {
+  const s = await combatState('strike', { statuses: { strength: 3 } });
+  const chip = hand0(s).chips[0];
+  assert.equal(chip.num, '9', 'the damage chip says the number the play lands, not the print');
+  assert.equal(chip.explain, 'Deal 9 damage.');
+  // The math is the engine's own: 6 + Strength 3 through playerStrike.
+  const hit = await land(s);
+  assert.equal(hit.raw, Number(chip.num), 'the chip previewed the raw the play lands');
+  // A clean state stays byte-identical to the printed card.
+  const clean = hand0(await combatState('strike')).chips[0];
+  assert.equal(clean.num, '6');
+  assert.equal(clean.explain, 'Deal 6 damage.');
+});
+
+test('chipsByTarget: aiming at the Vulnerable enemy swaps the chip to the amplified number', async () => {
+  const s = await combatState('strike', {
+    enemies: [makeEnemy(ENEMIES.jaw_worm), makeEnemy(ENEMIES.jaw_worm, { statuses: { vulnerable: 2 } })],
+  });
+  const row = hand0(s);
+  // Keyed EXACTLY like descriptionsByTarget: the 1-based living slots, the same filter.
+  assert.ok(row.descriptionsByTarget, 'the sentence variants exist for this field');
+  assert.equal(row.chipsByTarget['2'][0].num, '9', 'the Vulnerable enemy\u2019s chip says 9 (6 × 3/2 floored)');
+  assert.equal(row.chipsByTarget['2'][0].explain, 'Deal 9 damage.');
+  // The healthy neighbour gets NO key: its variant is the resting face, byte-identical.
+  assert.equal(row.chipsByTarget['1'], undefined, 'a clean enemy publishes no key');
+  assert.equal(row.chips[0].num, '6', 'the base row keeps the resting 6');
+});
+
+test('chipsByTarget publishes nothing when no enemy is Vulnerable', async () => {
+  const s = await combatState('strike', {
+    enemies: [makeEnemy(ENEMIES.jaw_worm), makeEnemy(ENEMIES.jaw_worm)],
+  });
+  const row = hand0(s);
+  assert.equal(row.chipsByTarget, null, 'a clean field adds zero payload');
+  assert.equal(row.chips[0].num, '6');
+});
+
+test('a block chip folds Dexterity through blockGain', async () => {
+  const s = await combatState('defend', { statuses: { dexterity: 2 } });
+  const chip = hand0(s).chips[0];
+  assert.equal(chip.verb, 'block');
+  assert.equal(chip.num, '7', 'Defend 5 + Dexterity 2 lands 7');
+  assert.equal(chip.explain, 'Gain 7 Block — it soaks damage and is spent at the start of your next turn.');
+});

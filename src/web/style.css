@@ -1913,6 +1913,10 @@ html, body {
 /* Vulnerable = fracture, Weak = droop, Strength/Dexterity = lift. Each is a different
    SHAPE as well as a different colour, so the kind is never carried by colour alone. */
 .pill.juice-in { animation: juice-status-in calc(0.42s * var(--pace, 1)) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
+/* The status CHIPS (the enemy/hero readouts' replacement for sentence pills) ride the
+   same entrance: same clock, generic keyframe — the per-kind shapes stay pill-only, the
+   chip's mark already carries the kind. Neutralized in the reduce block like the pills. */
+.cfx-chip.juice-in { animation: juice-status-in calc(0.42s * var(--pace, 1)) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
 .pill.vulnerable.juice-in { animation-name: juice-fracture; }
 .pill.weak.juice-in { animation-name: juice-droop; }
 .pill.strength.juice-in,
@@ -2208,7 +2212,8 @@ html, body {
   .pill.vulnerable.juice-in,
   .pill.weak.juice-in,
   .pill.strength.juice-in,
-  .pill.dexterity.juice-in { transform: none !important; opacity: 1 !important; }
+  .pill.dexterity.juice-in,
+  .cfx-chip.juice-in { transform: none !important; opacity: 1 !important; }
 
   /* Targeting: keep every cue that CARRIES information (the ring, the chosen crosshair,
      the card badge, the dimmed hand) and drop only the movement. The selected target is
@@ -3507,6 +3512,13 @@ html, body {
 .stage-combat .enemy .hpbar { width: 80%; margin: 2px 0; }
 .stage-combat .enemy .eblock { font-size: 0.72rem; }
 .stage-combat .e-statuses { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+/* The status CHIPS: the same component the card faces carry, on the readouts. The rows
+   are narrower than a card tile and sit on tinted ground, so the chip tightens its pad
+   and darkens its well; the mark and number do the talking, the sentence is the title. */
+.stage-combat .e-statuses .cfx-chip,
+.stage-combat .e-intent .cfx-chip { padding: 0 6px 0 3px; background: rgba(0, 0, 0, 0.34); }
+.stage-combat .e-statuses .cfx-mark,
+.stage-combat .e-intent .cfx-mark { width: 12px; height: 12px; }
 /* PARITY: the hero's own status pills sit under her HP bar, mirroring the enemy card.
    `.page-combat .hero` carries pointer-events:none (the hero lane is click-through),
    so the pill row must re-enable it or the pills' cursor:help + title tooltips die
