@@ -92,7 +92,8 @@ const MARKS = {
   //     `.b` iron body, `.r` rim light, `.g` ember glow, `.gr` ground stroke. One mark per
   //     relic id; the boss offer tiles wear it LARGE (.boon-art) and the elite chip wears
   //     the SAME mark restyled to strokes at chip size (.boon-glyph). The one cool accent
-  //     (`.cb` cold flame) is the Cyan Lantern's — the temper-stamp precedent. Constant
+  //     (`.cb` cold flame) is the Cyan Lantern's — the quenched-temper cold blue
+  //     precedent (the card temper class ships #8fd0f2). Constant
   //     markup, no interpolation; an unknown relic id falls back per RELIC_GLYPH below. ---
   'r-burning_blood': { box: '0 0 100 100', body: '<path class="b" d="M50 84 C22 62 15 40 29 28 C40 19 50 27 50 38 C50 27 60 19 71 28 C85 40 78 62 50 84 Z"/><path class="r" d="M50 84 C22 62 15 40 29 28 C40 19 50 27 50 38"/><path class="r" d="M50 44 L46 52 L53 59 L48 67"/><circle class="g" cx="44" cy="40" r="3.4"/><circle class="g" cx="57" cy="35" r="2.4"/><path class="g" d="M62 80 C65 84.5 66 87.5 64.6 89.8 C63.2 92 59.8 92 58.8 89.8 C57.8 87.5 59.4 84.5 62 80 Z"/><path class="gr" d="M8 95 H92"/>' },
   'r-cyan_lantern': { box: '0 0 100 100', body: '<path class="b" d="M38 14 H62 L58 24 H42 Z"/><path class="b" d="M42 78 H58 V86 H42 Z"/><path class="cb" d="M50 32 C56 40 58.5 46 58.5 52 C58.5 58.5 54.8 62.5 50 62.5 C45.2 62.5 41.5 58.5 41.5 52 C41.5 46 44 40 50 32 Z"/><path class="r" d="M50 5 V14"/><path class="r" d="M42 24 L38.5 64 C38.5 73 43.5 78 50 78 C56.5 78 61.5 73 61.5 64 L58 24"/><path class="r" d="M45 26 L43.5 77 M55 26 L56.5 77 M39 34 H61"/>' },
