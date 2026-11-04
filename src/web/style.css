@@ -7150,20 +7150,18 @@ html, body {
    branch — so this longer form matches exactly the same elements. */
 .card.tempered.temper-redhot .ctemper { box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 0 8px rgba(255, 106, 42, 0.55); }
 .temper-head { margin: 6px 0 0; color: #cbb59e; font-size: 0.85rem; }
-.temper-list .boon { min-height: 64px; }
-.temper-offer.temper-quenched { border-color: #4f7f99; }
-.temper-offer.temper-redhot { border-color: #9a3a1a; }
-.temper-offer.temper-balanced { border-color: #8a7330; }
+/* The forge offers render as the GAME'S tempered card tiles now (temperPickTile — the
+   smith's modal and this forge share it): the per-temper trim and stamp come from the
+   card layer's own .card.temper-* rules above, and the row sizing from .event-cards —
+   so only the short-window fit lives here. */
 @media (max-height: 480px) {
   .rest .rest-calm { display: none; }
   .temper-head { margin: 2px 0 0; font-size: 0.72rem; }
-  /* Short windows: the three offers sit in ONE row, and each keeps its effect AND cost
-     (Red-hot's HP, Balanced's exhaust) in small type instead of hiding them. One row of
-     three is shorter than the two-row wrap of names alone, so nothing is pushed down. */
+  /* Short windows: the three offers sit in ONE row of narrower tiles instead of
+     wrapping — three across still shows every face's chips, and nothing is pushed
+     below the fold. */
   .temper-list { flex-wrap: nowrap; gap: 6px; }
-  .temper-list .boon { flex: 1 1 0; min-width: 0; min-height: 0; padding: 3px 6px; gap: 1px; }
-  .temper-list .boon-text { display: block; font-size: 0.64rem; line-height: 1.2; }
-  .temper-list .boon-name { font-size: 0.66rem; letter-spacing: 0.01em; white-space: nowrap; }
+  .temper-list .card { flex: 1 1 0; width: auto; min-width: 0; min-height: 0; }
 }
 /* Phones in portrait: with forge offers on the screen, the calm line is the one thing that
    can go (the heading already says it) so the last offer is not pushed below the fold. */

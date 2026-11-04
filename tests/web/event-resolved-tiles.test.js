@@ -106,7 +106,7 @@ const { prelude, body, mods: importedModules } = await bundleApp(appUrl, { stubC
 // The view and HUD builders under test, exported from the bundle scope. The boot paint
 // already ran by factory time (app.js), so `snap` holds the booted controller's snapshot.
 let src = body;
-src += '\nreturn { snapNow: () => snap, eventView, renderHud };';
+src += '\nreturn { snapNow: () => snap, eventView, restView, renderHud };';
 
 const ctlMod = await import('../../src/surface/gui/controller.js');
 const factory = new Function('__ctl', '__mods', `
@@ -136,6 +136,24 @@ function bootOn(state) {
   globalThis.localStorage._d[HELP_SEEN_KEY] = '1'; // a RETURNING player: no Help sheet over the stage
   const ctl = ctlMod.createController({ session: { state, submitted: [], events: [] } });
   return factory(ctl, importedModules);
+}
+
+/** A REAL smith modal: a run with tempers opt-in walks into the row-2 wayside until it
+ *  is the smith, then opens the committed modal with the kernel's own offer roll. */
+function smithModalState() {
+  for (let seed = 0; seed < 60; seed += 1) {
+    const base = K.newRun({ seed, tempers: true });
+    const staged = { ...base, floor: 1, mapNodeId: 'r1n0' };
+    const travel = K.actions(staged).find((a) => a.nodeType === 'event');
+    if (!travel) continue;
+    const visit = K.step(staged, travel.id);
+    if (visit.error !== null || visit.state.event?.id !== 'wandering_smith') continue;
+    const open = K.step(visit.state, 'v1'); // the temper choice opens the modal
+    if (open.error === null && open.state.event?.tempering && open.state.event.offers.length >= 2) {
+      return JSON.parse(JSON.stringify(open.state));
+    }
+  }
+  throw new Error('no walk opened the smith\u2019s modal');
 }
 
 /** The event list's <li> rows, in beat order. */
@@ -243,6 +261,65 @@ test('an unknown card id degrades to a raw-id tile, never a crash', () => {
   assert.ok(tile, 'a tile renders even for an id the content no longer knows');
   assert.equal(localFind(tile, '.cname').txt, 'deleted_card', 'the raw id stands in as the name');
   assert.equal(localFind(tile, '.cfx'), null, 'no chips for a card the describe layer cannot read');
+});
+
+test('the smith\u2019s modal renders clickable tempered tiles, and a click commits the pick', () => {
+  const state = smithModalState();
+  const api = bootOn(state);
+  assert.equal(api.snapNow().phase, 'event', 'the crafted state stands at the modal');
+  // The SNAPSHOT's offer rows are the contract (actionId + tempered face), not the raw
+  // stored state — the tiles read what the kernel published.
+  const offers = api.snapNow().event.offers;
+  const view = api.eventView();
+  const list = localFind(view, '.temper-list');
+  assert.ok(list, 'the modal paints its offer row');
+  const tiles = list.kids.filter((k) => k.classList.contains('card'));
+  assert.equal(tiles.length, offers.length, 'one TILE per offer — no text-only button left');
+  for (let i = 0; i < tiles.length; i += 1) {
+    const tile = tiles[i];
+    const offer = offers[i];
+    assert.equal(tile.tag, 'button', 'the pick tile is a real control, not the readout div');
+    assert.equal(tile.attrs['data-action'], offer.actionId, `tile ${i + 1} carries its pick id`);
+    assert.ok(tile.classList.contains('tempered') && tile.classList.contains(`temper-${offer.temper}`),
+      `tile ${i + 1} wears the tempered trim (${offer.temper})`);
+    assert.ok(localFind(tile, '.ctemper'), `tile ${i + 1} wears the forged stamp`);
+    assert.ok(localFind(tile, '.cfx'), `tile ${i + 1} carries a chip row`);
+    assert.match(tile.attrs['aria-label'] ?? '', new RegExp(`Temper ${offer.cardName}`),
+      `tile ${i + 1} keeps the offer aria contract`);
+  }
+  // COMMIT: a real click on the first tile plays its pick — the modal closes into the
+  // resolved beat and the temper lands on the deck instance (the kernel's own record:
+  // the deck sheet gains a tempered row, published by snapshotDeck).
+  const before = api.snapNow();
+  tiles[0]._ls.click[0]({ target: tiles[0] });
+  const after = api.snapNow();
+  assert.ok(after.event?.resolved, 'the click committed: the resolved beat followed');
+  assert.equal(after.event?.tempering, false, 'the modal closed');
+  assert.ok(!(before.deckCards ?? []).some((r) => r.tempered), 'nothing tempered before the pick');
+  assert.ok((after.deckCards ?? []).some((r) => r.tempered), 'the temper landed on a deck instance');
+});
+
+test('the rest site\u2019s forge renders the same clickable tempered tiles', () => {
+  const base = K.newRun({ seed: 3, tempers: true });
+  const forge = { ...JSON.parse(JSON.stringify(base)), phase: 'rest', temperOffers: [
+    { uid: base.deck[0].uid, cardId: 'defend', temper: 'quenched' },
+  ] };
+  const api = bootOn(forge);
+  assert.equal(api.snapNow().phase, 'rest', 'the crafted state stands at the forge');
+  const view = api.restView();
+  const list = localFind(view, '.temper-list');
+  assert.ok(list, 'the forge paints its offer row');
+  const tiles = list.kids.filter((k) => k.classList.contains('card'));
+  assert.equal(tiles.length, 1, 'one tile per offer');
+  const tile = tiles[0];
+  assert.equal(tile.tag, 'button', 'the forge pick is a real control too');
+  assert.equal(tile.attrs['data-action'], 't1', 'the pick id rides the tile');
+  assert.ok(tile.classList.contains('tempered') && tile.classList.contains('temper-quenched'),
+    'the tempered trim is on the forge tile');
+  const chips = localFind(tile, '.cfx').kids.filter((k) => k.classList.contains('cfx-chip'));
+  assert.deepEqual(chips.map((c) => c.querySelector('.cfx-num').txt), ['5', '3'],
+    'the forge tile shows the tempered numbers (both blocks)');
+  assert.match(tile.attrs['aria-label'] ?? '', /^Temper Quench\./, 'the aria contract holds at the forge');
 });
 
 /* ------------------------------------------------------- the HUD: belt and relics */

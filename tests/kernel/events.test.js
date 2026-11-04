@@ -498,6 +498,40 @@ test('the snapshot publishes the beat\u2019s card refs parallel to its lines (th
   assert.deepEqual(qRef.chips.map((c) => c.amount), [5, 3], 'both block chips ride the ref');
   assert.equal(qRef.chipsComplete, true, 'the tempered face is fully chip-covered');
 
+  // The smith's OFFERS publish the same tempered face per pick (the ONE helper,
+  // temperedCardRow): a pick tile shows what the tempered copy will actually play.
+  const smith0 = eventOf('wandering_smith', { tempers: true });
+  const quenchUid = smith0.deck.find((c) => c.cardId === 'defend')?.uid ?? smith0.deck[0].uid;
+  const smithModal = {
+    ...smith0,
+    event: { ...smith0.event, tempering: true, offers: [
+      { uid: quenchUid, cardId: 'defend', temper: 'quenched' },
+      { uid: 'c9_staged', cardId: 'bludgeon', temper: 'balanced' },
+    ] },
+  };
+  const offers = snapshot(smithModal).event.offers;
+  assert.equal(offers.length, 2, 'both picks publish');
+  assert.equal(offers[0].actionId, 't1', 'the pick id rides the offer');
+  assert.deepEqual(offers[0].chips.map((c) => c.amount), [5, 3], 'Quench+Quenched: both block chips');
+  assert.match(offers[0].description, /Gain 5 Block\. Gain 3 Block\./, 'the tempered sentence rides the offer');
+  assert.equal(offers[0].temperName, 'Quenched', 'the temper names itself for the stamp');
+  assert.equal(offers[0].cardName, 'Quench', 'the aria contract\u2019s card word stays published');
+  const maul = offers[1];
+  assert.equal(maul.name, 'Maul', 'the face names the card');
+  const verbs = maul.chips.map((c) => c.verb);
+  assert.ok(verbs.includes('damage'), 'the base face\u2019s damage chip is on the offer');
+  assert.ok(verbs.includes('draw'), 'the Balanced draw chip is on the offer');
+  assert.ok(verbs.includes('exhaust') || /exhaust/i.test(maul.description),
+    'the exhaust fact rides the face (chip or sentence) — never hidden');
+
+  // And the REST SITE's forge list publishes the same row shape from the same helper —
+  // the two surfaces read ONE publisher and cannot disagree.
+  const forge = { ...newRun({ seed: 2, tempers: true }), phase: 'rest', temperOffers: [{ uid: quenchUid, cardId: 'defend', temper: 'quenched' }] };
+  const forgeRow = snapshot(forge).rest.tempers[0];
+  assert.equal(forgeRow.actionId, 't1', 'the forge pick keeps its id');
+  assert.deepEqual(forgeRow.chips.map((c) => c.amount), [5, 3], 'the forge publishes the same tempered face');
+  assert.match(forgeRow.description, /Gain 5 Block\. Gain 3 Block\./);
+
   // Legacy honesty: a baked-sentence beat (a pre-I18N-2 save) publishes null refs and
   // passes its strings through untouched; a temper id the table no longer knows
   // degrades to a bare card ref, never a throw.

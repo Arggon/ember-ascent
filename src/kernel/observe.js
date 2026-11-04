@@ -177,6 +177,47 @@ function defOrNull(cardOrId) {
 }
 
 /**
+ * ONE helper for "the card this temper lands on, as the TEMPERED copy plays": the
+ * synthetic def (rules/tempers.js temperEffects) rendered through the describe layer
+ * into the row shape every tempered tile consumes — the resolved beat's card refs
+ * (beatCards) and BOTH surfaces' temper OFFERS (the smith's event modal and the rest
+ * site's forge list). snapshotDeck's rows derive the same fields through temperedView
+ * (its own pre-existing path over the same synthetic def). Every number and word is
+ * kernel wording
+ * (B2: the tempered copy's own face, never the base card's); the temper's name and
+ * rules sentence ride beside them. Tolerant like defOrNull: an id the content no longer
+ * knows (or a temper the table lost) yields the identity fields WITHOUT a face —
+ * callers degrade to their raw-id shapes, never a throw.
+ * @param {string} cardId
+ * @param {string} temper a TEMPERS key (callers gate on TEMPERS[temper] where it matters)
+ * @param {string} lang
+ * @returns {{cardId: string, temper: string, temperName: string, temperText: string,
+ *            name?: string, cost?: number, type?: string, typeLabel?: string,
+ *            description?: string, chips?: any[], chipsComplete?: boolean}}
+ */
+function temperedCardRow(cardId, temper, lang) {
+  const def = defOrNull(cardId);
+  const row = {
+    cardId,
+    temper,
+    temperName: fieldFor(TEMPERS[temper], 'name', lang) || temper,
+    temperText: fieldFor(TEMPERS[temper], 'text', lang),
+  };
+  if (!def) return row;
+  const temperedDef = { ...def, effects: temperEffects(def.effects, temper) };
+  return {
+    ...row,
+    name: fieldFor(def, 'name', lang),
+    cost: def.cost,
+    type: def.type,
+    typeLabel: typeLabel(def.type, lang),
+    description: describeCard(temperedDef, {}, lang),
+    chips: cardChips(temperedDef, lang),
+    chipsComplete: chipsCover(temperedDef),
+  };
+}
+
+/**
  * B2: the definition a tempered instance actually plays — the same card with the effect
  * list the kernel resolves (rules/tempers.js temperEffects), so every rendering of it
  * (CLI hand line, GUI sentence, compact summary) shows the tempered numbers. An
@@ -1002,8 +1043,13 @@ function snapshotRest(state, legal, lang = 'en') {
     heal: REST_HEAL,
     tempers: (state.temperOffers ?? []).map((o, i) => ({
       // Tolerant like rewardBody (defOrNull): an unknown offer id shows its raw id.
-      actionId: `t${i + 1}`, cardId: o.cardId, cardName: fieldFor(defOrNull(o.cardId), 'name', lang) || o.cardId,
-      temper: o.temper, temperName: fieldFor(TEMPERS[o.temper], 'name', lang) || o.temper, text: fieldFor(TEMPERS[o.temper], 'text', lang),
+      // The TEMPERED FACE rides the offer (temperedCardRow — the same helper the smith's
+      // event modal and the resolved beat's refs publish), so the forge's pick tiles show
+      // the numbers the tempered copy will actually play. Both surfaces read ONE publisher.
+      actionId: `t${i + 1}`,
+      ...temperedCardRow(o.cardId, o.temper, lang),
+      cardName: fieldFor(defOrNull(o.cardId), 'name', lang) || o.cardId,
+      text: fieldFor(TEMPERS[o.temper], 'text', lang),
     })),
   };
 }
@@ -1193,31 +1239,13 @@ function snapshotShop(state, legal, lang = 'en') {
  */
 function beatCards(lines, lang) {
   if (!Array.isArray(lines)) return [];
-  const defs = CARD_DEFS ?? defaultContent().cards;
   return lines.map((line) => {
     if (!line || typeof line !== 'object' || typeof line.cardId !== 'string') return null;
     const temper = typeof line.temper === 'string' && TEMPERS[line.temper] ? line.temper : null;
-    if (!temper) return { cardId: line.cardId };
-    const plain = defs.get(line.cardId) ?? null;
-    const temperedDef = plain ? { ...plain, effects: temperEffects(plain.effects, temper) } : null;
-    return {
-      cardId: line.cardId,
-      temper,
-      temperName: fieldFor(TEMPERS[temper], 'name', lang) || temper,
-      temperText: fieldFor(TEMPERS[temper], 'text', lang),
-      // The tempered face, the deck sheet's own row fields (snapshotDeck): when the
-      // content no longer knows the card, no face rides and the tile degrades to the
-      // describe layer's raw-id shape.
-      ...(temperedDef ? {
-        name: fieldFor(plain, 'name', lang),
-        cost: plain.cost,
-        type: plain.type,
-        typeLabel: typeLabel(plain.type, lang),
-        description: describeCard(temperedDef, {}, lang),
-        chips: cardChips(temperedDef, lang),
-        chipsComplete: chipsCover(temperedDef),
-      } : {}),
-    };
+    // The tempered face is the ONE helper's row (temperedCardRow above) — the same
+    // shape the smith's offers and the rest site's forge list publish, so the resolved
+    // tile can never disagree with the offer tile it came from.
+    return temper ? temperedCardRow(line.cardId, temper, lang) : { cardId: line.cardId };
   });
 }
 
@@ -1260,14 +1288,17 @@ function snapshotEvent(state, legal, lang = 'en') {
     // same number actions() enumerates — and a refused element emits no row at all:
     // the view renders only picks the kernel actually offers (S4.1/S5 ruling).
     offers: (Array.isArray(ev?.offers) ? ev.offers : [])
-      .map((o, i) => (temperOfferOpen(o, state) ? {
+      .map((o, i) => (temperOfferOpen(o, state) ? ({
         actionId: temperPicks.get(i) ?? null,
-        cardId: o.cardId,
+        // The TEMPERED FACE rides the offer (temperedCardRow — the same helper the
+        // resolved beat's refs and the rest site's forge list use): the pick tile shows
+        // the numbers the tempered copy will actually play, never the base card's.
+        ...temperedCardRow(o.cardId, o.temper, lang),
+        // The pre-face fields keep their names: `cardName` is the aria contract's card
+        // word, `text` the temper's own sentence ("Quenched: also gain 3 Block.").
         cardName: fieldFor(defOrNull(o.cardId), 'name', lang) || o.cardId,
-        temper: o.temper,
-        temperName: fieldFor(TEMPERS[o.temper], 'name', lang) || o.temper,
         text: fieldFor(TEMPERS[o.temper], 'text', lang),
-      } : null))
+      }) : null))
       .filter(Boolean),
     choices: evald.map((c) => ({
       index: c.index,

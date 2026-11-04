@@ -242,9 +242,10 @@ test('the real module graph survives a full run and paints the restart menu', as
       const cont = buttons().find((n) => n.attrs['data-action'] === 'v0');
       if (cont) click(cont);
       else {
-        // The smith's temper modal renders `.boon.temper-offer` picks instead of
-        // event choices — the pick is committed, so take the first one.
-        const temper = stageNodes().find((n) => n._cls.split(/\s+/).includes('temper-offer') && n.attrs['data-action']);
+        // The smith's temper modal renders its picks as the game's tempered card
+        // tiles (a click commits) instead of event choices — take the first one.
+        const temper = stageNodes().find((n) => n._cls.split(/\s+/).includes('card')
+          && (n.attrs['data-action'] ?? '').startsWith('t'));
         if (temper) { click(temper); }
         else {
           const choices = stageNodes().filter((n) => n._cls.split(/\s+/).includes('event-choice') && n.attrs['data-action']);

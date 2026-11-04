@@ -2113,7 +2113,7 @@ test('relics: no HUD chip, the held count climbs on an elite drop, and the warde
       // UX-6: the smith's TEMPER choice (now reachable on funneled lanes) opens the
       // committed modal instead of a result — pick an offer, then continue.
       await page.locator('.event-choices .boon:not([disabled])').first().click();
-      const modal = page.locator('.boon-list.temper-list .temper-offer');
+      const modal = page.locator('.temper-list .card[data-action]');
       if (await modal.count()) { await modal.first().click(); await sleep(500); }
       await page.waitForSelector('.event-result, button[data-action="v0"]', { timeout: 5000 });
       const cont = page.locator('button[data-action="v0"]').first();
@@ -2283,7 +2283,7 @@ test('a fresh profile: the vault offers down-tier commons and the first win unlo
       // the smith's TEMPER — that opens the committed modal instead of a result:
       // pick an offer, then continue.
       await page.locator('.event-choices .boon:not([disabled])').first().click();
-      const modal = page.locator('.boon-list.temper-list .temper-offer');
+      const modal = page.locator('.temper-list .card[data-action]');
       if (await modal.count()) { await modal.first().click(); await sleep(500); }
       await page.waitForSelector('.event-result, button[data-action="v0"]', { timeout: 5000 });
       const cont = page.locator('button[data-action="v0"]').first();
