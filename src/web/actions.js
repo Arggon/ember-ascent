@@ -405,7 +405,9 @@ export function act(actionId, targetK = null) {
   // Each departure becomes a `death` burst, which the next paint draws as an inert ghost
   // card that collapses. The ghost is positioned by ENEMY ROW ORDER (`side-*`), never by a
   // measured coordinate.
-  for (const d of dying) fx.push({ kind: 'death', enemy: d.index, name: d.name, side: d.side, boss: d.boss });
+  // `id` rides along too: the ghost card's art is keyed by it (`dyingCard` -> `enemyMarkup`),
+  // and without it every death ghost fell back to the jaw-worm sprite (SPRITES.jaw_worm).
+  for (const d of dying) fx.push({ kind: 'death', enemy: d.index, id: d.id, name: d.name, side: d.side, boss: d.boss });
 
   /* ------------------------------------------------------------- PHASE ARRIVALS ------
    * The end-of-run beat. `ended` is reached the instant the last enemy (or the player) is
