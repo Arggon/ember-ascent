@@ -41,6 +41,7 @@ import { makePolicy } from '../../src/surface/policies.js';
 import { EVENT_ROSTER, eventDef, offerEventChoices, rollEventAt, EMBER_PRICE, POTION_PRICE, SELL_GAIN, SHAFT_GOLD, SHAFT_HP, TORCH_PRICE, TORCH_HEAL, FORGE_HP, STORIES_HEAL, EVENT_DECK_FLOOR } from '../../src/kernel/rules/events.js';
 import { EVENT_NODES, NODE_TYPES } from '../../src/kernel/rules/map.js';
 import { POTION_SLOTS } from '../../src/kernel/rules/potions.js';
+import { TEMPERS } from '../../src/kernel/rules/tempers.js';
 
 const K = await loadKernel();
 const { newRun, step, actions, observe, snapshot, hash, validateSave } = K;
@@ -433,6 +434,82 @@ test('the resolved beat renders in the snapshot with the kernel\u2019s own lines
     assert.ok(typeof c.effect === 'string' && c.effect.length > 0, `${c.slug} previews its effect`);
   }
   assert.equal(fresh.choices.find((c) => c.slug === 'torch').reason, `needs ${TORCH_PRICE} gold`);
+});
+
+test('the snapshot publishes the beat\u2019s card refs parallel to its lines (the event screen\u2019s tiles)', () => {
+  // A CRAFTED beat pins the parallel-array contract exactly: a toll line publishes
+  // null, a card_joined line publishes the cardId its stored line carries, and the
+  // rendered lines stay BYTE-IDENTICAL to the pre-cards wording (the dump/agent
+  // contract — tests/budget.test.js territory).
+  const s0 = eventOf('sleeping_forge');
+  const staged = {
+    ...s0,
+    event: {
+      ...s0.event,
+      resolved: {
+        choice: 1,
+        lines: [
+          { slug: 'toll', who: { en: 'forge', es: 'La forja' }, n: 8 },
+          { slug: 'card_joined', cardId: 'strike' },
+        ],
+      },
+    },
+  };
+  const beat = snapshot(staged).event.resolved;
+  assert.deepEqual(beat.lines, [
+    '- The forge took its due: 8 HP.',
+    '- The coals give up a card: Hammerfall joins your deck.',
+  ], 'the sentences render byte-identical to the pre-cards wording');
+  assert.deepEqual(beat.cards, [null, { cardId: 'strike' }], 'one ref per line, null where the line names no card');
+
+  // The REAL stoke resolution carries the same shape: the toll first (null), the
+  // joined card second (its id straight off the stored beat, never re-derived).
+  const stoked = snapshot(step(eventOf('sleeping_forge'), 'v1').state).event.resolved;
+  assert.equal(stoked.lines.length, stoked.cards.length, 'the array runs parallel to the lines');
+  assert.equal(stoked.cards[0], null, 'the toll names no card');
+  assert.equal(typeof stoked.cards[1].cardId, 'string', 'the joined card publishes its id');
+
+  // The smith's temper beat: the temper id rides the stored line (resolveTemper), and
+  // the ref carries the temper's own kernel wording beside it — the same fieldFor
+  // wording the modal offers row publishes.
+  const smith = eventOf('wandering_smith', { tempers: true });
+  const modal = step(smith, 'v1').state;
+  const offer = modal.event.offers[0];
+  const struck = step(modal, 't1').state;
+  assert.deepEqual(struck.event.resolved.lines,
+    [{ slug: 'temper_done', cardId: offer.cardId, temper: offer.temper }],
+    'the beat stores the temper beside the card it struck');
+  const ref = snapshot(struck).event.resolved.cards[0];
+  assert.equal(ref.cardId, offer.cardId, 'the ref names the tempered card');
+  assert.equal(ref.temper, offer.temper, 'the ref carries the temper id');
+  assert.equal(ref.temperName, TEMPERS[offer.temper].name, 'the temper names itself in kernel wording');
+  assert.ok(typeof ref.temperText === 'string' && ref.temperText.length > 0, 'the temper sentence rides the ref');
+
+  // B2 on the beat too: a temper entry publishes the TEMPERED face (snapshotDeck's row
+  // shape) — a Quenched Quench says BOTH block chips and both Gain sentences, the
+  // numbers the tempered copy actually plays, never the base card's 5-only face.
+  const quenched = {
+    ...s0,
+    event: { ...s0.event, resolved: { choice: null, lines: [{ slug: 'temper_done', cardId: 'defend', temper: 'quenched' }] } },
+  };
+  const qRef = snapshot(quenched).event.resolved.cards[0];
+  assert.equal(qRef.name, 'Quench', 'the tempered face names the card');
+  assert.match(qRef.description, /Gain 5 Block\. Gain 3 Block\./, 'the sentence carries both gains');
+  assert.deepEqual(qRef.chips.map((c) => c.amount), [5, 3], 'both block chips ride the ref');
+  assert.equal(qRef.chipsComplete, true, 'the tempered face is fully chip-covered');
+
+  // Legacy honesty: a baked-sentence beat (a pre-I18N-2 save) publishes null refs and
+  // passes its strings through untouched; a temper id the table no longer knows
+  // degrades to a bare card ref, never a throw.
+  const legacy = { ...s0, event: { ...s0.event, resolved: { choice: null, lines: ['- Baked old sentence.'] } } };
+  assert.deepEqual(snapshot(legacy).event.resolved.cards, [null]);
+  assert.deepEqual(snapshot(legacy).event.resolved.lines, ['- Baked old sentence.']);
+  const tornTemper = {
+    ...s0,
+    event: { ...s0.event, resolved: { choice: null, lines: [{ slug: 'temper_done', cardId: 'strike', temper: 'deleted_temper' }] } },
+  };
+  assert.deepEqual(snapshot(tornTemper).event.resolved.cards, [{ cardId: 'strike' }],
+    'an unknown temper id publishes the bare card ref');
 });
 
 test('torn saves degrade, never throw, and never strand the run inside the phase', () => {

@@ -1174,15 +1174,64 @@ function snapshotShop(state, legal, lang = 'en') {
 }
 
 /**
+ * The resolved beat's CARD REFS, one entry per line and null when the line names no
+ * card — the parallel array the event screen renders its card tiles from. The refs are
+ * the KERNEL's own: the stored beat lines carry `cardId` (card_joined, card_bought,
+ * card_sold) and, for the smith's temper beat, the temper id beside it, and a surface
+ * never derives a card from a sentence. A temper entry is a deck-sheet row in miniature
+ * (snapshotDeck's shape): the temper's own name and rules sentence, PLUS the TEMPERED
+ * face — synthetic def, describeCard/cardChips off it — so the event tile shows the
+ * numbers the tempered copy actually plays (B2's "every rendering shows the tempered
+ * numbers"; a Quenched Bulwark says Gain 5 Block. Gain 3 Block. here too). A plain card
+ * line publishes just the ref: the tile's resting face comes from the describe layer,
+ * which reads the plain definition. A legacy save's plain-string lines, an unknown
+ * temper id or card id, and every non-card beat degrade — null, or a bare ref with no
+ * face — never a throw, and the sentence still carries the whole story.
+ * @param {any} lines the stored `resolved.lines`
+ * @param {string} lang
+ * @returns {Array<object|null>}
+ */
+function beatCards(lines, lang) {
+  if (!Array.isArray(lines)) return [];
+  const defs = CARD_DEFS ?? defaultContent().cards;
+  return lines.map((line) => {
+    if (!line || typeof line !== 'object' || typeof line.cardId !== 'string') return null;
+    const temper = typeof line.temper === 'string' && TEMPERS[line.temper] ? line.temper : null;
+    if (!temper) return { cardId: line.cardId };
+    const plain = defs.get(line.cardId) ?? null;
+    const temperedDef = plain ? { ...plain, effects: temperEffects(plain.effects, temper) } : null;
+    return {
+      cardId: line.cardId,
+      temper,
+      temperName: fieldFor(TEMPERS[temper], 'name', lang) || temper,
+      temperText: fieldFor(TEMPERS[temper], 'text', lang),
+      // The tempered face, the deck sheet's own row fields (snapshotDeck): when the
+      // content no longer knows the card, no face rides and the tile degrades to the
+      // describe layer's raw-id shape.
+      ...(temperedDef ? {
+        name: fieldFor(plain, 'name', lang),
+        cost: plain.cost,
+        type: plain.type,
+        typeLabel: typeLabel(plain.type, lang),
+        description: describeCard(temperedDef, {}, lang),
+        chips: cardChips(temperedDef, lang),
+        chipsComplete: chipsCover(temperedDef),
+      } : {}),
+    };
+  });
+}
+
+/**
  * S6: the event section of a snapshot, or null outside the event phase.
  *
  * The ONE offer table (rules/events.js offerEventChoices) decides everything a choice
  * button needs: `actionId` is null exactly when the kernel offers no action (an unmet
  * requirement — the same afford-filter contract as a shop shelf), `reason` is the
  * WHY the dimmed button shows, and `cost`/`hpLoss` are the price chips' facts. The
- * resolved beat carries the kernel's own result lines; the temper modal's offers ride
- * beside them. A torn save (unknown story id, or the field null) degrades: `known`
- * is false, the story is empty, no choices, and `continueId` is still the way out.
+ * resolved beat carries the kernel's own result lines with their card refs beside them
+ * (beatCards above); the temper modal's offers ride beside them. A torn save (unknown
+ * story id, or the field null) degrades: `known` is false, the story is empty, no
+ * choices, and `continueId` is still the way out.
  * @param {any} state
  * @param {any[]} legal
  * @param {string} [lang]
@@ -1237,10 +1286,14 @@ function snapshotEvent(state, legal, lang = 'en') {
     // I18N-2: the beat renders in the snapshot's language from its structured slugs
     // (rules/events.js renderEventLines); a legacy save's baked English sentence
     // strings pass through verbatim — the honest degrade, documented in PLAYING.md.
+    // `cards` runs PARALLEL to `lines` (same index, null where the line names no card):
+    // the beat's own card refs, so the event screen can show the card instead of only
+    // naming it — the same kernel-publishes / surface-sinks ruling as every tile.
     resolved: ev?.resolved
       ? {
           choice: ev.resolved.choice,
           lines: renderEventLines(ev.resolved?.lines, lang, CARD_DEFS ?? defaultContent().cards),
+          cards: beatCards(ev.resolved?.lines, lang),
         }
       : null,
     continueId: legal.find((a) => a.kind === 'event_continue')?.id ?? null,

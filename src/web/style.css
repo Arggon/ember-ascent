@@ -1270,6 +1270,26 @@ html, body {
   background: linear-gradient(180deg, rgba(157, 134, 201, 0.08) 0%, rgba(0, 0, 0, 0) 45%); }
 .event-result li { color: var(--ink); font-size: var(--fs-3); line-height: 1.5; }
 
+/* The resolved beat's card reveal: the beat sentence stays as the caption (the
+   narrative), and the card it gave shows as the game's own tile — the deck sheet's
+   measured 172px face, read-only (a fact, not a control: no pointer, no hover lift). */
+.event-result li.has-card { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.event-card-caption { margin: 0; width: 100%; text-align: center; }
+.event-cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: stretch; }
+.event-cards .card {
+  width: 172px;
+  min-height: 236px;
+  cursor: default;
+  transition: border-color var(--dur) ease;
+}
+/* The tempered stamp rides the tile's last strip here, like on the deck sheet's
+   footer-less tiles — never over the rules text. */
+.event-cards .card > .ctemper { position: relative; justify-self: center; }
+/* Phones: two tiles across, the same faces the deck sheet keeps at this tier. */
+@media (max-width: 640px) {
+  .event-cards .card { width: calc(50% - 4px); max-width: none; min-height: 200px; }
+}
+
 .event .event-story,
 .event .event-choices { animation: fade-up var(--dur-slow) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
 @media (prefers-reduced-motion: reduce) {

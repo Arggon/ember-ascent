@@ -47,8 +47,13 @@ export function renderHud() {
   // the browser can never disagree with the engine about how rich you are.
   const purse = p.gold ?? 0;
   hudEl.append(stat('gold', '◉', String(purse), false, t('hud.gold.title', { n: purse })));
-  hudEl.append(renderBelt());
-  hudEl.append(renderRelics());
+  // The belt renders in COMBAT only (renderBelt's own why): potions are combat items,
+  // and the kernel offers their actions there alone — anywhere else the row was pure
+  // duplicate chrome. The relic readout is gone outright: relics act through hooks,
+  // never through a click, so the chip offered nothing a click could do and the run's
+  // relic list still names itself where it matters (the kindling screen, the reward
+  // heads, the run summary).
+  if (snap.phase === 'combat') hudEl.append(renderBelt());
   hudEl.append(el('span', { cls: 'hud-step', text: t('hud.step', { n: snap.stepIndex }) }));
 
   // PARITY: combat statuses (Vulnerable, Weak, …) moved DOWN to the hero's own card
@@ -125,44 +130,19 @@ export function renderHud() {
   }));
 }
 
-/* ------------------------------------------------------------------ RELICS (S7) */
-
-/**
- * The relic readout: ONE chip beside the belt — the kindled-heart glyph and the held
- * count, with the full list (name + the kernel's own effect sentence, one per relic)
- * in the tooltip, exactly the belt's readout contract. A READOUT, not a control: no
- * button, no flash — relics act through hooks, never through a click. A torn save's
- * unknown id still counts (the kernel lists it) and shows itself as "(unknown relic)".
- * @returns {HTMLElement} the `.relics` group
- */
-function renderRelics() {
-  const rows = snap.relics ?? [];
-  const tip = rows.length === 0
-    ? t('relics.none')
-    : rows.map((r) => `${r.name} — ${r.text || t('relics.unknown')}${r.known ? '' : t('relics.unknownId')}`).join('\n');
-  return el('span', {
-    cls: 'relics' + (rows.length === 0 ? ' none' : ''),
-    attrs: {
-      title: tip,
-      // The announced form carries the same list the tooltip shows, so a screen reader
-      // hears exactly what a sighted reader hovers.
-      'aria-label': t('relics.aria', { n: rows.length, names: rows.map((r) => r.name).join(', ') }),
-    },
-  },
-  glyphBox('relic', 'relic-glyph'),
-  el('span', { cls: 'relic-count', text: String(rows.length) }));
-}
-
 /* --------------------------------------------------------------------- BELT (S5) */
 
 /**
- * The potion belt: exactly `snap.beltSlots` slots beside the gold readout, in every
- * phase. A FILLED slot is a named glyph chip (mark + name, tooltip = the kernel's own
- * effect sentence); an EMPTY slot is a dim flask. In combat a filled slot is a BUTTON
- * that opens the quaff/discard popover (beltPanel below); anywhere else the belt is a
- * readout — the kernel offers belt actions in `phase === 'combat'` only, so a button
- * would promise an action the engine would reject. A stale belt id (a torn save)
- * renders under its raw id with the flask's rune fallback, exactly like the snapshot's
+ * The potion belt: exactly `snap.beltSlots` slots beside the gold readout — rendered in
+ * COMBAT ONLY (the renderHud call site guards on `snap.phase === 'combat'`), so every
+ * row here IS the combat shape: a FILLED slot is a named glyph chip (mark + name,
+ * tooltip = the kernel's own effect sentence) that is a BUTTON opening the quaff/discard
+ * popover (beltPanel below); an EMPTY slot is a dim flask. Combat is the belt's whole
+ * home — the kernel offers belt actions in `phase === 'combat'` alone, and potions are
+ * combat items — so there is no off-combat shape to keep: elsewhere the belt does not
+ * render at all (the elite's spoils chip, the reward heads and the run summary still
+ * name what the run carries where it matters). A stale belt id (a torn save) renders
+ * under its raw id with the flask's rune fallback, exactly like the snapshot's
  * `known: false` row: it stays VISIBLE, never thrown away.
  * @returns {HTMLElement} the `.belt` group
  */
@@ -182,31 +162,23 @@ function renderBelt() {
       }, glyphBox('flask', 'belt-glyph')));
       continue;
     }
+    // The belt only paints in combat (the call-site guard), so a filled slot is always
+    // the quaff/discard button — no inert readout shape exists any more.
     const tip = `${row.name} — ${row.text || t('belt.unknown')}${row.known ? '' : t('belt.unknownId')}`;
-    if (snap.phase === 'combat') {
-      belt.append(el('button', {
-        cls: 'belt-slot filled',
-        attrs: {
-          type: 'button',
-          title: `${tip}${t('belt.click')}`,
-          'aria-label': t('belt.slot.aria', { n: i + 1, name: row.name }),
-          'aria-haspopup': 'dialog',
-          'aria-expanded': String(beltOpenSlot === row.slot),
-        },
-        on: { click: (ev) => { ev.__dlbHandled = true; toggleBelt(row.slot); } },
+    belt.append(el('button', {
+      cls: 'belt-slot filled',
+      attrs: {
+        type: 'button',
+        title: `${tip}${t('belt.click')}`,
+        'aria-label': t('belt.slot.aria', { n: i + 1, name: row.name }),
+        'aria-haspopup': 'dialog',
+        'aria-expanded': String(beltOpenSlot === row.slot),
       },
-        glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
-        el('span', { cls: 'belt-name', text: row.name }),
-      ));
-    } else {
-      belt.append(el('span', {
-        cls: 'belt-slot filled inert',
-        attrs: { title: `${tip}${t('belt.combatOnly')}`, 'aria-label': t('belt.slot.inert.aria', { n: i + 1, name: row.name }) },
-      },
-        glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
-        el('span', { cls: 'belt-name', text: row.name }),
-      ));
-    }
+      on: { click: (ev) => { ev.__dlbHandled = true; toggleBelt(row.slot); } },
+    },
+      glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
+      el('span', { cls: 'belt-name', text: row.name }),
+    ));
   }
   return belt;
 }

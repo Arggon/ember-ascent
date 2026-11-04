@@ -639,7 +639,16 @@ export function resolveTemper(state, match) {
   if (!temperOfferOpen(offer, state)) return { state, events: [] };
   // I18N-2: the beat is a structured slug (the English column keeps the historical
   // raw-id sentence; the Spanish one names the card properly — see BEATS above).
-  const line = { slug: 'temper_done', cardId: offer.cardId };
+  // The temper id rides the line too: the beat is the ONE record of WHAT was struck
+  // (the offer table nulls the moment the modal closes), so the snapshot can publish
+  // the tempered card tile's facts from the beat alone — no guessing which deck
+  // instance of a duplicated card the smith just took. renderEventLine ignores the
+  // field (it reads slug + cardId), so the dump and both language columns stay
+  // byte-identical; a legacy beat without it still loads and renders unchanged.
+  // HASH: the field is in the canonical state, so a temper-resolution step hashes
+  // differently than the previous kernel — no golden log crosses a temper step
+  // (verified 0 occurrences in tests/golden/logs.jsonl), so the goldens stand.
+  const line = { slug: 'temper_done', cardId: offer.cardId, temper: offer.temper };
   return {
     state: {
       ...state,

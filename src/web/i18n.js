@@ -92,21 +92,21 @@ const STRINGS = {
   'lang.toggle.title': { en: 'Switch the interface to Spanish', es: 'Cambiar la interfaz al inglés' },
   'lang.toggle.aria': { en: 'Language / Idioma', es: 'Language / Idioma' },
 
-  /* ---- relics chip ----------------------------------------------------- */
-  'relics.none': { en: 'Relics: none held yet — elites always drop one, and the warden offers three.', es: 'Reliquias: aún no llevas ninguna — un élite siempre suelta una, y el guardián ofrece tres.' },
+  /* ---- relics ---------------------------------------------------------- */
+  // The HUD's relic chip is gone (relics act through hooks, never clicks); these two
+  // survive because the reward heads still speak them for a torn save's unknown id.
   'relics.unknown': { en: 'unknown relic', es: 'reliquia desconocida' },
   'relics.unknownId': { en: ' (unknown relic id in this save)', es: ' (id de reliquia desconocido en esta partida)' },
-  'relics.aria': { en: 'Relics: {n} held: {names}', es: 'Reliquias: {n} en tu poder: {names}' },
 
   /* ---- potion belt ----------------------------------------------------- */
+  // The belt paints in combat only (renderHud's phase guard), so every slot row is the
+  // quaff/discard button shape — no inert-readout strings exist.
   'belt.aria': { en: 'Potion belt: {n} of {m}', es: 'Cinturón de pociones: {n} de {m}' },
   'belt.slot.empty': { en: 'Potion slot {n}: empty', es: 'Espacio de poción {n}: vacío' },
   'belt.unknown': { en: 'unknown potion', es: 'poción desconocida' },
   'belt.unknownId': { en: ' (unknown potion id in this save)', es: ' (id de poción desconocido en esta partida)' },
   'belt.click': { en: ' — click for quaff / discard', es: ' — haz clic para beber o descartar' },
-  'belt.combatOnly': { en: ' — quaff and discard work in combat only', es: ' — beber y descartar funcionan solo en combate' },
   'belt.slot.aria': { en: 'Potion slot {n}: {name}. Open quaff or discard.', es: 'Espacio de poción {n}: {name}. Abre beber o descartar.' },
-  'belt.slot.inert.aria': { en: 'Potion slot {n}: {name}', es: 'Espacio de poción {n}: {name}' },
   'belt.panel.aria': { en: 'Potion', es: 'Poción' },
   'belt.panel.title': { en: '{name}: quaff or discard', es: '{name}: beber o descartar' },
   'belt.panel.unknownText': { en: 'An unknown potion — its id is not in this build’s table. Discard it to free the slot.', es: 'Una poción desconocida: su id no está en la tabla de esta versión. Descártala para liberar el espacio.' },

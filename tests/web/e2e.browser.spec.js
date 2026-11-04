@@ -24,12 +24,13 @@
 //      purse in view; a click buys a card (the deck sheet agrees mid-shop), the removal
 //      service is the deck as card TILES and the tile itself is the pick (UX-8),
 //      unaffordable shelves are inert, and leaving is final
-//  10. the S5 potions: three empty belt slots at boot; a won fight drops a potion into
-//      the belt (seed 1: fight 2, Ember Draught); in the next combat the chip opens the
-//      quaff/discard popover, quaffing consumes the slot and lands the effect on the
-//      engine state, and a discard frees exactly its slot
-//  11. the S7 relics: one HUD readout chip (count + the held names in its tooltip); an
-//      elite victory always drops a relic (the spoils chip, the chip counting to 2); the
+//  10. the S5 potions: the belt renders in COMBAT only (off-combat it does not render);
+//      a won fight drops a potion into the belt (seed 1: fight 2, Ember Draught); in the
+//      next combat the chip opens the quaff/discard popover, quaffing consumes the slot
+//      and lands the effect on the engine state, and a discard frees exactly its slot
+//  11. the S7 relics: NO HUD relic chip (relics act through hooks, never clicks — the
+//      kernel's own snapshot carries the held rows); an elite victory always drops a
+//      relic (the spoils chip, the held count reaching 2 in the snapshot); the
 //      boss offers three relic buttons instead of cards, taking one ends the run in
 //      victory, and the run summary names the relic count. S10: the walk boots with a
 //      doctored VETERAN ledger (the documented dlb.runs.v1 agg schema, 10 lifetime wins)
@@ -1596,9 +1597,9 @@ test('potions: the belt fills from a victory, quaffs in combat, and discards', {
   await page.locator('button.boon').first().click();
   await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
 
-  // BOOT: three empty slots, dim, beside the gold readout — and the kernel agrees.
-  assert.equal(await page.locator('.belt .belt-slot.empty').count(), 3, 'three empty belt slots at boot');
-  assert.equal(await page.locator('.belt .belt-slot.filled').count(), 0, 'nothing filled at boot');
+  // BOOT: the belt is a COMBAT surface now — off-combat (the boot map) it does not
+  // render at all, and the kernel belt agrees it is empty.
+  assert.equal(await page.locator('.belt').count(), 0, 'no belt rendered on the boot map');
   assert.deepEqual(await page.evaluate(() => window.__dlb.snapshot().belt), [], 'the kernel belt is empty');
 
   // Bludgeons end fights fast (the shop test's lever).
@@ -1641,11 +1642,9 @@ test('potions: the belt fills from a victory, quaffs in combat, and discards', {
     dropped = await page.evaluate(() => (window.__dlb.snapshot().belt ?? []).find((r) => r.known) ?? null);
   }
   assert.ok(dropped, 'a victory dropped a potion into the belt');
-  assert.equal(await page.locator('.belt .belt-slot.filled').count(), 1, 'the HUD chip lit up');
-  const chipLabel = await page.locator('.belt .belt-slot.filled').first().getAttribute('aria-label');
-  assert.ok(chipLabel.includes(dropped.name), `the chip names the kernel potion (${chipLabel})`);
-  // Off-combat the chip is a readout, not a button.
-  assert.equal(await page.locator('button.belt-slot.filled').count(), 0, 'no quaff button outside combat');
+  // The drop lands the instant the fight is won — off-combat (reward/map), where the
+  // belt does not render at all. The chip itself is claimed in the next fight, below.
+  assert.equal(await page.locator('.belt').count(), 0, 'no belt off-combat (potions are combat items)');
 
   // The walk may have exited on the reward screen itself (the drop lands the instant the
   // fight is won): land on the map before travelling on.
@@ -1958,13 +1957,15 @@ test('help sheet: the keyboard guard swallows everything but Escape, and the run
 });
 
 // ---------------------------------------------------------------------------
-// 11. the S7 relics: the HUD carries a readout chip from boot (count + names in the
-//     tooltip); an ELITE victory always drops a relic (the spoils chip on the reward
-//     head, the HUD chip counting to 2); the BOSS victory offers three relic buttons
-//     instead of cards, taking one ends the run in victory, and the summary names the
-//     relic count. Real clicks only; the injected deck ends fights fast.
+// 11. the S7 relics: the HUD paints NO relic chip (relics act through hooks, never
+//     clicks — the held rows live in the kernel's snapshot and name themselves where
+//     they matter: the reward heads, the summary); an ELITE victory always drops a
+//     relic (the spoils chip on the reward head, the held count reaching 2 in the
+//     snapshot); the BOSS victory offers three relic buttons instead of cards, taking
+//     one ends the run in victory, and the summary names the relic count. Real clicks
+//     only; the injected deck ends fights fast.
 // ---------------------------------------------------------------------------
-test('relics: the chip counts up on an elite drop and the warden offers three', { timeout: 300000 }, async (t) => {
+test('relics: no HUD chip, the held count climbs on an elite drop, and the warden offers three', { timeout: 300000 }, async (t) => {
   if (!chromium) return t.skip('playwright/chromium unavailable');
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
@@ -1996,14 +1997,15 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
   await page.goto(`${base}/src/web/index.html?seed=7`);
   await page.waitForLoadState('domcontentloaded');
 
-  // Boot: exactly one held relic (the hero's starter), counted by the HUD chip.
+  // Boot: exactly one held relic (the hero's starter), carried by the KERNEL's snapshot
+  // — the HUD itself paints no relic chip any more (relics act through hooks, never
+  // clicks, so the readout had nothing a click could do).
   await page.locator('button.boon').first().click();
   await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
-  const chip = page.locator('.relics');
-  assert.equal(await chip.count(), 1, 'the HUD carries one relic readout');
-  assert.equal(await chip.locator('.relic-count').textContent(), '1', 'one held relic at boot');
-  const chipLabel = await chip.getAttribute('aria-label');
-  assert.match(chipLabel, /Relics: 1 held: Kindled Heart|Cyan Lantern/, `the chip names the starter: ${chipLabel}`);
+  assert.equal(await page.locator('.relics').count(), 0, 'no relic chip in the HUD');
+  const bootHeld = await page.evaluate(() => window.__dlb.snapshot().relics);
+  assert.equal(bootHeld.length, 1, 'one held relic at boot (the kernel snapshot carries it)');
+  assert.match(bootHeld[0].name, /Kindled Heart|Cyan Lantern/, `the kernel names the starter: ${bootHeld[0].name}`);
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
@@ -2049,8 +2051,8 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
       const spoils = page.locator('.reward-relic');
       if ((await spoils.count()) > 0 && sawEliteSpoils === null) {
         sawEliteSpoils = (await spoils.first().textContent()).trim();
-        assert.equal(await chip.locator('.relic-count').textContent(), '2',
-          'the elite drop lit the HUD chip to 2');
+        const heldNow = await page.evaluate(() => window.__dlb.snapshot().relics.length);
+        assert.equal(heldNow, 2, 'the elite drop brought the held count to 2 (the kernel snapshot)');
       }
       const offers = page.locator('.relic-offer');
       // The boss reward paints a beat after the kernel flips (the kill-hold): poll the
@@ -2134,7 +2136,6 @@ test('relics: the chip counts up on an elite drop and the warden offers three', 
   assert.equal(ended.relics, held.length, 'the ended count matches the held rows');
   assert.ok(held.length >= 4, `starter + elite drops + two boss picks: ${JSON.stringify(held)}`);
   assert.equal(held[0].starting, true, 'the starter leads the acquisition order');
-  assert.equal(await chip.locator('.relic-count').textContent(), String(held.length), 'the chip counts every held relic');
   const endStats = await page.locator('.end-stats').textContent();
   assert.match(endStats, /Act 2 · floor/, `the summary names the act: ${endStats}`);
   assert.match(endStats, new RegExp(`· ${held.length} relics$`), `the summary counts the relics: ${endStats}`);
