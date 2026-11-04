@@ -13,7 +13,7 @@
 //   * entering the target step aims at the first living enemy (aimed = 1) and the tile
 //     still reads the resting sentence: a healthy neighbour's variant IS the resting face;
 //   * aiming at the Vulnerable enemy — through a real `mouseenter` on its card, which is
-//     what setAimed(2) is wired to — swaps the tile's `.cdesc` text, its `title` and its
+//     what setAimed(2) is wired to — swaps the tile's sentence (its `title` and its
 //     `aria-label` to that enemy's amplified sentence (`— 9 against Vulnerable.`), and no
 //     other card in the hand moves;
 //   * leaving the step — Escape's path (cancelTargeting) — puts the resting sentence back;
@@ -166,9 +166,12 @@ async function startFight(cards = 1) {
 const tile = (slot) => byId.stage.querySelector(`[data-slot="${slot}"]`);
 /** The enemy cards, in living positions. */
 const enemyTiles = () => byId.stage.querySelectorAll('.enemy');
-/** A node's visible text, flattened: `.cdesc` holds text nodes and glossary `kw` spans. */
-const textOf = (node) => (node.kids.length ? node.kids.map(textOf).join('') : node.txt);
-const descOf = (slot) => textOf(tile(slot).querySelector('.cdesc'));
+/** The tile's current sentence. EFFECT CHIPS moved the carrier: a fully chip-covered
+ *  card (plain Hammerfall is one) no longer paints its sentence as `.cdesc` — the icon
+ *  row carries the face and the sentence stays in the tile's `title` and `aria-label`
+ *  (tests/web/card-effect-chips.test.js pins that move). The fold under test rides the
+ *  same kernel sentence, so this reads the title, where the fold is still spelled out. */
+const descOf = (slot) => tile(slot).attrs.title;
 
 test('at rest the tile reads the resting sentence — the variants exist but are not used', async () => {
   const api = await startFight();

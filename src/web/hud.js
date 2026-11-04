@@ -485,6 +485,10 @@ function deckTile(c) {
     type: c.type,
     typeLabel: c.typeLabel,
     description: c.description || c.name,
+    // The row's own kernel-published chip list — already read off the TEMPERED
+    // definition by snapshotDeck, so a Red-hot row's damage chip says the tempered 9.
+    chips: c.chips ?? [],
+    chipsComplete: c.chipsComplete === true,
     playable: false,
     showSummary: false,
     temper: c.temper,
@@ -613,6 +617,11 @@ export function codexPanel() {
 function codexTile(c, inDeck) {
   const fact = cardDescribe(c.cardId);
   const rarity = t(`codex.${c.rarity}`) || c.rarity;
+  // Completeness follows the chips ACTUALLY chosen (the row's when it carries one, the
+  // fact's otherwise) — ORing the two flags could claim coverage the printed chips
+  // don't hold and drop a sentence those chips don't restate.
+  const chips = c.chips ?? fact.chips ?? [];
+  const chipsComplete = (c.chips ? c.chipsComplete : fact.chipsComplete) === true;
   const tile = cardTile({
     slot: c.cardId,
     cardId: c.cardId,
@@ -622,6 +631,11 @@ function codexTile(c, inDeck) {
     type: c.type,
     typeLabel: c.typeLabel,
     description: c.description,
+    // The chip row: the lookup-table row's own kernel-published list (cardPool words it
+    // exactly as the hand's snapshot rows do); the describe fact is the fallback for a
+    // caller whose row predates the field. Same chips everywhere, or none anywhere.
+    chips,
+    chipsComplete,
     playable: false,
     showSummary: false,
   }, { readOnly: true });

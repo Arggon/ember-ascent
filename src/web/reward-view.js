@@ -134,7 +134,9 @@ export function rewardView() {
     // The reward tile's own action: taking a card, not playing one. Marked with `data-action`
     // so the hotkey handler can also reach it.
     const tile = cardTile(
-      { slot: c.actionId, cardId: c.cardId, name: c.name, flavor: c.flavor, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, playable: true, showSummary: false },
+      // `chips` rides the reward row verbatim (snapshotReward words it off the same def
+      // the hand would) — a card picked from a reward wears the icons it will wear in hand.
+      { slot: c.actionId, cardId: c.cardId, name: c.name, flavor: c.flavor, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, chips: c.chips ?? [], chipsComplete: c.chipsComplete === true, playable: true, showSummary: false },
       { actionId: c.actionId, onClick: (ev) => { consumeClick(ev); act(c.actionId); } },
     );
     row.append(tile);

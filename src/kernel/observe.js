@@ -31,6 +31,8 @@ import {
   describePlayability,
   describePower,
   describeStatus,
+  cardChips,
+  chipsCover,
   glossary,
   glossarySections,
   helpTopics,
@@ -754,6 +756,16 @@ function snapshotHand(state, legal, lang = 'en') {
       // PARITY-2 per-target variants (null when none differs), keyed by the 1-based
       // living-enemy slot — the same k the aim actions and the GUI's `aimed` use.
       descriptionsByTarget,
+      // The EFFECT CHIPS (the tile's icon row): one `{verb, status?, amount, num, label,
+      // explain}` per effect, worded kernel-side so a tile prints and never derives. Read
+      // off the TEMPERED definition, like `summary`/`description` above, so a Red-hot
+      // Hammerfall's chip says 9×1. `chipsComplete` is the tile's licence to drop the
+      // visible sentence: true only when every effect carries a chip (a `custom` verb
+      // keeps the sentence — its meaning is bespoke and no icon claims it) AND the
+      // tempered play carries no HP rider — a "Lose 2 HP when played." tail has no chip
+      // to speak for it, so the sentence STAYS on the face beside the icons.
+      chips: cardChips(def, lang),
+      chipsComplete: chipsCover(def) && hpCost === 0,
       playable,
       // The engine's own answer to "may this card be aimed?" — so a renderer never has to
       // infer it from the card type (Defend is type 'skill', Bash is 'attack', but the
@@ -884,6 +896,10 @@ function snapshotReward(state, legal, lang = 'en') {
         typeLabel: def ? typeLabel(def.type, lang) : 'unknown',
         summary: def ? effectSummary(def) : '',
         description: def ? describeCard(def, {}, lang) : '',
+        // The reward tiles render the same chip row as the hand (kernel-worded, so a
+        // card picked from a reward and the same card drawn in a fight cannot disagree).
+        chips: def ? cardChips(def, lang) : [],
+        chipsComplete: def ? chipsCover(def) : false,
         actionId: pick.get(id) ?? null,
       };
     }),
@@ -1019,6 +1035,9 @@ function snapshotShop(state, legal, lang = 'en') {
       // The TEMPERED describe sentence, the deck sheet's own new rule: the removal
       // modal's tile must not print the base number under a temper stamp either.
       description: def ? describeCard(temperedDef, inst, lang) : '',
+      // The TEMPERED chip list, same rule: a Red-hot Hammerfall's damage chip says 9.
+      chips: temperedDef ? cardChips(temperedDef, lang) : [],
+      chipsComplete: temperedDef ? chipsCover(temperedDef) : false,
       copy,
       copies: census.get(key) ?? 1,
     };
@@ -1043,6 +1062,9 @@ function snapshotShop(state, legal, lang = 'en') {
         rarity: def?.rarity ?? 'unknown',
         summary: def ? effectSummary(def) : '',
         description: def ? describeCard(def, {}, lang) : '',
+        // Shop shelves wear the same chips as every other tile (kernel-worded).
+        chips: def ? cardChips(def, lang) : [],
+        chipsComplete: def ? chipsCover(def) : false,
         price: o.price,
         sold: Boolean(o.sold),
         affordable: actionId !== null,
@@ -1213,6 +1235,10 @@ function snapshotDeck(state, lang = 'en') {
       // with the hand about one card. The hand adds its HP-cost rider on top; the deck
       // sheet's row carries the plain sentence (the stamp's tooltip has the temper's).
       description: def ? describeCard(temperedDef, inst, lang) : '',
+      // The TEMPERED chip list, same rule: the deck sheet's tiles paint the icons the
+      // hand would.
+      chips: cardChips(temperedDef, lang),
+      chipsComplete: chipsCover(temperedDef),
       count: 1,
     });
   }
@@ -1269,9 +1295,12 @@ export function cardPool(opts = {}) {
       type: def.type,
       typeLabel: typeLabel(def.type, lang),
       // Both renderings, as on the hand tiles: `summary` is the CLI's compact form,
-      // `description` the sentence a human reads.
+      // `description` the sentence a human reads — and the chip list the codex gallery's
+      // tiles paint, worded exactly as a hand tile's would be.
       summary: effectSummary(def),
       description: describeCard(def, {}, lang),
+      chips: cardChips(def, lang),
+      chipsComplete: chipsCover(def),
     }));
 }
 

@@ -32,7 +32,7 @@ import {
   strikeSlot,
 } from './runtime.js';
 import { el, keywordText } from './dom.js';
-import { TEMPER_GLYPH, TYPE_GLYPH, enemyLook, glyphBox } from './glyphs.js';
+import { EFFECT_GLYPH, TEMPER_GLYPH, TYPE_GLYPH, enemyLook, glyphBox } from './glyphs.js';
 import { heroMove, isMeleeMove, signatureFor } from './hero-moves.js';
 import { backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, attackTier, intentGlyph } from './stage-art.js';
 import { cardArtMarkup } from './card-art.js';
@@ -577,6 +577,219 @@ function enemyCard(e, position) {
   return card;
 }
 
+/* ----------------------------------------------- effect chips (the card icon row) */
+//
+// The kernel publishes one chip per effect (`card.chips`, kernel-worded: `{verb,
+// status?, amount, num, label, explain}`); this layer only paints glyph + number and
+// opens the explainer. NO number or sentence is derived here — an unknown chip shape
+// simply renders without its number, and a card with no chips keeps its sentence.
+
+/** The one open explainer popover, plus the chip node it explains. One at a time, like
+ *  every other panel in the surface. Hosted on #pop-layer — NOT #fx-layer: the fx layer
+ *  is switched off wholesale for reduced-motion users (`#fx-layer { display: none }` in
+ *  the reduce block), and a popover inside it would be INVISIBLE for exactly the users
+ *  who most need the static reveal. A descendant rule cannot override that ancestor, so
+ *  the explainer gets its own always-visible fixed layer, created once on first open
+ *  (a sibling of #fx-layer, never cleared by render(), so a repaint under an open
+ *  popover cannot clip it inside the hand's overflow:hidden fan box or lose it). */
+let chipPop = null;
+let chipPopFor = null;
+
+/** The explainer's host layer, created lazily so narrow test hosts and pre-pop paints
+ *  never grow stray nodes. */
+function popLayer() {
+  if (chipPopHost && chipPopHost.parent) return chipPopHost;
+  let existing = null;
+  try { existing = document.getElementById('pop-layer'); } catch { /* no document */ }
+  if (existing) { chipPopHost = existing; return existing; }
+  const layer = document.createElement('div');
+  layer.setAttribute('id', 'pop-layer');
+  try { document.body.append(layer); } catch { /* no body in a narrow host */ }
+  chipPopHost = layer;
+  return layer;
+}
+let chipPopHost = null;
+
+/** Detach a node from both real and fake-DOM hosts (the test harness's nodes have no
+ *  .remove; splicing the parent's kid list is the same fact there). */
+function detachNode(node) {
+  if (!node) return;
+  if (typeof node.remove === 'function') { node.remove(); return; }
+  const p = node.parent;
+  if (p && Array.isArray(p.kids)) p.kids = p.kids.filter((k) => k !== node);
+}
+
+/** Close the chip explainer and hand focus back to the chip it came from (a read-only
+ *  chip is a real control; the keyboard user who opened this must not be dropped). */
+function closeChipPop() {
+  const back = chipPopFor;
+  detachNode(chipPop);
+  chipPop = null;
+  chipPopFor = null;
+  if (back && typeof back.focus === 'function') {
+    try { back.focus(); } catch { /* best effort */ }
+  }
+}
+
+/** Open (or toggle closed) the kernel-worded explainer for one chip node. Anchored to
+ *  the chip when the host can measure a rect (a real browser), flipped ABOVE the chip
+ *  when it would cross the viewport floor; the layer's CSS gives the unmeasured
+ *  fallback a sane resting spot, and the native `title` on the chip always carried the
+ *  same sentence for the no-JS/hover path. Focus moves to the popover's Close button
+ *  so a keyboard user lands inside what they just opened. */
+function openChipPop(chipNode, chip) {
+  if (chipPopFor === chipNode) { closeChipPop(); return; }
+  closeChipPop();
+  const host = popLayer();
+  if (!host || typeof host.append !== 'function') return; // narrow host: the title still carries the sentence
+  const pop = el('div', {
+    cls: 'cfx-pop',
+    attrs: { role: 'dialog', 'aria-label': chip.explain || '' },
+  },
+    el('b', { cls: 'cfx-pop-label', text: chip.label || '' }),
+    el('p', { cls: 'cfx-pop-body', text: chip.explain || '' }),
+    el('button', {
+      cls: 'btn secondary cfx-pop-close',
+      text: t('combat.close'),
+      attrs: { type: 'button' },
+      on: { click: (ev) => { consumeClick(ev); closeChipPop(); } },
+    }),
+  );
+  let measured = false;
+  if (typeof chipNode.getBoundingClientRect === 'function') {
+    try {
+      const r = chipNode.getBoundingClientRect();
+      pop.style.left = `${Math.round(r.left + r.width / 2)}px`;
+      pop.style.top = `${Math.round(r.bottom + 6)}px`;
+      measured = true;
+    } catch { /* decorative positioning only; the CSS fallback stands */ }
+  }
+  host.append(pop);
+  chipPop = pop;
+  chipPopFor = chipNode;
+  // Viewport clamp, measured AFTER the append (the popover must be in the tree to have
+  // a height): a chip near the screen's bottom would push the sheet off-screen, so it
+  // flips above the chip instead. Purely presentational; skipped where unmeasurable.
+  if (measured) {
+    try {
+      const h = typeof pop.offsetHeight === 'number' ? pop.offsetHeight : 0;
+      const vh = (typeof window !== 'undefined' && Number.isFinite(window.innerHeight)) ? window.innerHeight : 0;
+      if (h > 0 && vh > 0 && parseFloat(pop.style.top) + h + 6 > vh) {
+        const r = chipNode.getBoundingClientRect();
+        pop.style.top = `${Math.round(r.top - 6)}px`;
+        pop.classList.add('cfx-pop-above');
+      }
+    } catch { /* decorative only */ }
+  }
+  const closer = pop.querySelector ? pop.querySelector('.cfx-pop-close') : null;
+  if (closer && typeof closer.focus === 'function') {
+    try { closer.focus(); } catch { /* best effort */ }
+  }
+}
+
+// Escape closes the explainer. A dismissal by tapping OUTSIDE it must never also play
+// the card under the finger, and the swallow has to happen on CLICK: the Pointer Events
+// spec exempts `click` from pointerdown cancellation, so stopping pointerdown alone
+// would still let the tap through to the play button. Both listeners sit in capture
+// phase at the document, ahead of every card handler; the popover's own buttons and the
+// chips (which toggle) are let through. Registered once at module load, like i18n's
+// document-level lang sync.
+let chipPopSwallowUntil = 0;
+const insideChipUi = (at) => Boolean(at && typeof at.closest === 'function'
+  && (at.closest('.cfx-pop') || at.closest('.cfx-chip')));
+const swallowClick = (ev) => {
+  if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+  if (typeof ev.preventDefault === 'function') ev.preventDefault();
+};
+try {
+  document.addEventListener('keydown', (ev) => {
+    if (chipPop && (ev.key === 'Escape' || ev.key === 'Esc')) closeChipPop();
+  });
+  document.addEventListener('pointerdown', (ev) => {
+    if (!chipPop || !ev) return;
+    if (insideChipUi(ev.target)) return;
+    // Close early (feels immediate) and arm a short swallow window: the click this
+    // press produces is exempt from pointerdown cancellation, so it is stopped below.
+    closeChipPop();
+    chipPopSwallowUntil = Date.now() + 600;
+  }, true);
+  document.addEventListener('click', (ev) => {
+    if (!ev) return;
+    if (chipPop) {
+      if (insideChipUi(ev.target)) return; // chips toggle, popover buttons work
+      closeChipPop();
+      swallowClick(ev);
+      return;
+    }
+    // The press that dismissed us just produced this click: swallow it.
+    if (Date.now() < chipPopSwallowUntil) {
+      chipPopSwallowUntil = 0;
+      swallowClick(ev);
+    }
+  }, true);
+} catch { /* narrow test hosts with no document */ }
+
+/**
+ * One chip: the mark, the kernel's number, the kernel's sentence as the native title.
+ * On READ-ONLY tiles (a div) the chip is a real interactive element (role=button,
+ * tabindex, Enter/Space). On hand tiles the tile is a native <button> and nested
+ * interactive elements are invalid HTML, so the chip stays a span whose pointer click
+ * opens the explainer with stopPropagation — swallowing the play click, because
+ * clicking a chip must NEVER play the card. The trade-off the span buys: a disabled
+ * hand tile (no Energy, busy gate) also swallows its children's clicks in a real
+ * browser, so those chips explain through their native title only, and keyboard users
+ * reach the same sentence through the tile's aria-label, which always carries it.
+ * @param {any} chip a kernel-published chip row
+ * @param {boolean} readOnly the tile is a fact, not a control
+ * @returns {HTMLElement}
+ */
+function chipNode(chip, readOnly) {
+  const mark = EFFECT_GLYPH[chip.status ?? chip.verb] || 'rune';
+  const node = el('span', {
+    cls: 'cfx-chip',
+    attrs: {
+      title: chip.explain || '',
+      'aria-label': chip.explain || '',
+      ...(readOnly ? { role: 'button', tabindex: '0' } : {}),
+    },
+  },
+    glyphBox(mark, 'cfx-mark'),
+    chip.num ? el('b', { cls: 'cfx-num', text: chip.num }) : null,
+  );
+  const open = (ev) => {
+    consumeClick(ev);
+    // The play click dies here: the chip sits inside the play button, and without the
+    // stopPropagation the hand tile would fire right after this handler in a real DOM.
+    if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    openChipPop(node, chip);
+  };
+  node.addEventListener('click', open);
+  if (readOnly) {
+    node.addEventListener('keydown', (ev) => {
+      if (ev && (ev.key === 'Enter' || ev.key === ' ')) {
+        if (typeof ev.preventDefault === 'function') ev.preventDefault();
+        open(ev);
+      }
+    });
+  }
+  return node;
+}
+
+/**
+ * The chip row for one tile: one chip per kernel-published effect.
+ * @param {any[]} chips the snapshot card's `chips` (may be empty)
+ * @param {boolean} readOnly the tile is a fact, not a control
+ * @returns {HTMLElement}
+ */
+function chipRow(chips, readOnly) {
+  // role="group": the enemy-card readout pattern. Without a role, the aria-label on a
+  // plain span is ignored by assistive tech — the row's name would never be heard.
+  return el('span', {
+    cls: 'cfx',
+    attrs: { role: 'group', 'aria-label': t('card.effects') },
+  }, ...chips.map((c) => chipNode(c, readOnly)));
+}
+
 /**
  * One card tile. Structure: cost gem, type line (mark + word), name, plain-English
  * effect, then the compact CLI code. Auto height means a 3-line effect grows the tile
@@ -691,7 +904,18 @@ export function cardTile(card, opts = {}) {
   }
   tile.append(el('span', { cls: 'cname', text: card.name }));
   if (card.flavor) tile.append(el('span', { cls: 'cflavor', text: card.flavor }));
-  tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));
+  // The EFFECT CHIPS occupy the rules row on every surface, and they own it outright
+  // when the kernel says the chips say the whole card (`chipsComplete`): the long
+  // sentence then leaves the visible face but stays in the tile's title and aria-label
+  // above (they already carry `desc`). A card whose effects are not fully chip-
+  // expressible (a `custom` verb) keeps its sentence BESIDE the chips, so nothing its
+  // text says is ever lost to the icons. Rows without chips (an old snapshot) fall
+  // straight through to the sentence — the old face.
+  const chips = Array.isArray(card.chips) ? card.chips : [];
+  if (chips.length > 0) tile.append(chipRow(chips, readOnly));
+  if (!(chips.length > 0 && card.chipsComplete === true)) {
+    tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));
+  }
   // The compact code is NOT repeated on a reward tile: the player is choosing a card to
   // keep, not playing one, so the shorthand is noise there.
   if (card.showSummary !== false) {
@@ -743,7 +967,7 @@ const GALLERY_FACTS = {};
 
 /**
  * The describe-layer facts one content card needs for a read-only tile: its sentence,
- * its flavor line, and its type word — computed in the CURRENT language and cached per
+ * its flavor line, its type word, and its effect-chip row — computed in the CURRENT language and cached per
  * language, so a language switch re-derives exactly once like the codex pool cache.
  * The kernel's own `describeTile` is the fact bundle (it feeds the hand tiles' fields:
  * the name, the cost, the SHORT type word, the describe sentence), so every word here is
@@ -768,9 +992,13 @@ export function cardDescribe(cardId) {
           flavor: (lang === 'es' ? (def.flavor_es ?? def.flavor) : def.flavor) || '',
           type: tile.type,
           typeLabel: tile.typeLabel,
+          // The chip row rides the same fact bundle (describeTile's own), so a caller
+          // that builds tiles from facts alone still paints kernel-worded icons.
+          chips: tile.chips,
+          chipsComplete: tile.chipsComplete,
         };
       })()
-    : { description: '', flavor: '', type: 'unknown', typeLabel: 'unknown' };
+    : { description: '', flavor: '', type: 'unknown', typeLabel: 'unknown', chips: [], chipsComplete: false };
   per.set(cardId, fact);
   return fact;
 }

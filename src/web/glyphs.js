@@ -63,6 +63,19 @@ const MARKS = {
   // --- gold (S3): a struck coin, same woodcut stroke family as the marks above ---
   coin: { box: '0 0 20 20', body: '<circle class="m" cx="10" cy="10" r="6.6"/><path class="m" d="M10 6.7 V13.3"/>' },
   broken: { box: '0 0 26 26', body: '<path class="m" d="M12 3 L15 11"/><path class="m" d="M14 15 L8 23"/><path class="m" d="M18 5 L21 12"/>' },
+  // --- effect chips: the card face's icon row. New marks only where no existing one
+  //     reads honestly (see EFFECT_GLYPH below for the borrowings). ---
+  // Two fanned cards: the draw pile answering.
+  draw: { box: '0 0 20 20', body: '<path class="m" d="M7.5 3.5 H16.5 V15 H7.5 Z"/><path class="m" d="M3.5 6.5 V17 H12.5"/>' },
+  // A card released downward: away from the hand, into the discard.
+  discard: { box: '0 0 20 20', body: '<path class="m" d="M5 3.5 H15 V10.5 H5 Z"/><path class="m" d="M10 12.5 V17.5 M6.8 14.3 L10 17.7 L13.2 14.3"/>' },
+  // A crossed-out card: gone from the fight for good.
+  exhaust: { box: '0 0 20 20', body: '<path class="m" d="M5.5 3.5 H14.5 V16.5 H5.5 Z"/><path class="m" d="M7.5 6.5 L12.5 13.5 M12.5 6.5 L7.5 13.5"/>' },
+  // A kindled heart with its cross — distinct mark from the relic's, same shape language.
+  heal: { box: '0 0 20 20', body: '<path class="m" d="M10 17 C4.6 13.2 3 9.8 5.1 7.4 C6.9 5.5 9.2 6.3 10 8.1 C10.8 6.3 13.1 5.5 14.9 7.4 C17 9.8 15.4 13.2 10 17 Z"/><path class="m" d="M10 8.6 V12.6 M8 10.6 H12"/>' },
+  // The plain up-arrow: a Strength chip's "+2" sits under an arrow, not a buff chevron
+  // (the wide intent marks are sized for the enemy lane, not a 20-box chip).
+  strength: { box: '0 0 20 20', body: '<path class="m" d="M10 17 V5.5"/><path class="m" d="M5 10.5 L10 5 L15 10.5"/>' },
   // --- potions (S5): a stoppered flask and a drop, same woodcut stroke family. The belt
   //     reuses existing marks where the shape reads (flame for the draught, the ward for
   //     stone skin, the blade for the whetstone, the star for energy); an EMPTY slot and
@@ -132,6 +145,29 @@ export const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', sta
 
 /** Intent kind -> its mark. */
 export const INTENT_GLYPH = { attack: 'strike', block: 'shieldWide', buff: 'chevUp', debuff: 'chevDown' };
+
+/** Effect chip -> its mark (the kernel publishes `{verb, status?}` chips; this table is
+ *  purely presentational). Existing marks are borrowed where the shape reads honestly —
+ *  the blade for damage, the shield for Block, the star for Energy (the energy potion
+ *  already wears it), the hourglass for Retain (the fact IS "stays across the turn") and
+ *  the ward for Metallicize (its Block arrives as armour). The debuff chevron serves
+ *  Vulnerable and Weak: the enemy-side facts they are. The names must stay inside
+ *  MARKS — an unknown key falls back to the rune inside glyphBox, never an empty box. */
+export const EFFECT_GLYPH = {
+  damage: 'blade',
+  block: 'shield',
+  draw: 'draw',
+  discard: 'discard',
+  energy: 'star',
+  heal: 'heal',
+  exhaust: 'exhaust',
+  retain: 'hourglass',
+  strength: 'strength',
+  vulnerable: 'chevDown',
+  weak: 'chevDown',
+  dexterity: 'chevUp',
+  metallicize: 'ward',
+};
 
 /** Node type (after stripping the `combat_` prefix) -> its silhouette. The shop (S4)
  *  wears the coin — it is the one node that never fights and only trades. The event

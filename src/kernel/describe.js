@@ -271,6 +271,186 @@ export const statusName = (key, lang = 'en') => {
     ?? String(key).replace(/_/g, ' ');
 };
 
+/* ------------------------------------------------------- effect chips (the icons) */
+//
+// The card face's SECOND reading: an icon and a number instead of a sentence. A player
+// who has met the marks reads "arrow-up +2" faster than "Gain 2 Strength — your attacks
+// deal 2 more damage…", so every tile renders one chip per effect (`.cfx` in the web
+// layer) and, when a chip is clicked, the sentence below. The words stay HERE for the
+// same reason describeCard does: a browser that could explain a verb the CLI cannot
+// would be a second engine (R1). Statuses do not get their own wording — they borrow
+// STATUS_MEANING's label, player clause and detail verbatim, so a chip popover and a
+// status pill can never disagree about what Strength does.
+//
+// `custom`-verb effects take NO chip on purpose: their meaning is bespoke (Bloodletting
+// pays HP, Rampage grows), and a generic icon would claim a rule the handler does not
+// have. A card whose effects are not fully chip-expressible therefore KEEPS its visible
+// sentence beside its chips — `chipsCover(def)` is the flag the renderer reads.
+
+/** The number a chip prints, mirroring the compact summary's own conventions where they
+ *  exist (STATUS_ABBREV's "+" means GAIN/apply; `A2x4` means 2 damage 4 times) and the
+ *  player-facing gains spelled with a "+" where a bare number would read as a cost
+ *  (draw, energy, heal). Damage, Block and Discard are printed plain: the number IS the
+ *  whole fact, and a "+" on a cost would lie. Exhaust and Retain print no number —
+ *  their fact is the icon. */
+const CHIP_NUMBER = {
+  damage: (e) => (e.hits && e.hits > 1 ? `${e.amount}×${e.hits}` : String(e.amount)),
+  block: (e) => String(e.amount),
+  draw: (e) => `+${e.amount}`,
+  energy: (e) => `+${e.amount}`,
+  heal: (e) => `+${e.amount}`,
+  discard: (e) => String(e.amount),
+  exhaust: () => '',
+  retain: () => '',
+};
+
+/** The target phrase a SCOPED chip carries, mirroring TEMPLATES' own who-derivation
+ *  word for word. AOE and random-target chips MUST name their scope: when the covered
+ *  card's sentence ("Deal 4 damage to ALL enemies") leaves the face, the chip explain is
+ *  the only rules text left, and "Deal 4 damage." would quietly narrow an AOE. `bare`
+ *  drops the Spanish preposition — the status composition supplies its own ("sobre"),
+ *  and "sobre a TODOS" would be a grammar error. */
+function chipWho(who, lang, bare = false) {
+  const es = langOf(lang) === 'es';
+  if (who === 'all_enemies') return es ? (bare ? 'TODOS los enemigos' : 'a TODOS los enemigos') : 'ALL enemies';
+  if (who === 'random_enemy') return es ? (bare ? 'un enemigo al azar' : 'a un enemigo al azar') : 'a random enemy';
+  return '';
+}
+
+/** The one-sentence explainer per plain verb, in the glossary's own words (the D/B/E/H
+ *  rows), per language. `n` is the printed amount, `hits` the folded hit count, `who`
+ *  the effect's target scope ('all_enemies' | 'random_enemy' | null) — only damage has
+ *  a scope to name. */
+const VERB_MEANING = {
+  en: {
+    damage: (n, hits, who) => `Deal ${n} damage${who ? ` to ${chipWho(who, 'en')}` : ''}${hits > 1 ? ` ${hits} times` : ''}.`,
+    block: (n) => `Gain ${n} Block — it soaks damage and is spent at the start of your next turn.`,
+    draw: (n) => `Draw ${plural(n, 'card', 'cards')} from your draw pile.`,
+    discard: (n) => `Discard ${plural(n, 'card', 'cards')} from your hand, picked at random.`,
+    energy: (n) => `Gain ${n} Energy — it pays for cards; you get 3 each turn.`,
+    heal: (n) => `Restore up to ${n} HP — never past your maximum.`,
+    exhaust: () => 'Exhaust: this card leaves the fight for good — it does not come back in a reshuffle.',
+    retain: () => 'Retain: this card stays in your hand when your turn ends instead of being discarded.',
+  },
+  es: {
+    damage: (n, hits, who) => `Infliges ${n} de daño${who ? ` ${chipWho(who, 'es')}` : ''}${hits > 1 ? ` ${hits} veces` : ''}.`,
+    block: (n) => `Ganas ${n} de Bloqueo: absorbe daño y se consume al inicio de tu siguiente turno.`,
+    draw: (n) => `Robas ${pluralEs(n, 'carta', 'cartas')} de tu pila de robo.`,
+    discard: (n) => `Descartas ${pluralEs(n, 'carta', 'cartas')} de tu mano, elegidas al azar.`,
+    energy: (n) => `Ganas ${n} de Energía: paga las cartas; recibes 3 cada turno.`,
+    heal: (n) => `Restauras hasta ${n} HP, nunca más allá de tu máximo.`,
+    exhaust: () => 'Agotar: la carta sale del combate para siempre — no vuelve en un rebarajado.',
+    retain: () => 'Retener: la carta se queda en tu mano cuando termina tu turno, en vez de descartarse.',
+  },
+};
+
+/**
+ * The explainer sentence one chip shows when clicked, in the requested language.
+ * Statuses delegate to STATUS_MEANING so a chip and a status pill share one wording;
+ * `side` picks whose clause (a card that GRANTS Strength speaks "your attacks…", one
+ * that APPLIES Vulnerable speaks "it takes…"), and `who` names the scope when the
+ * effect hits beyond the one enemy ("on ALL enemies") — the applicator's own words.
+ * @param {string} verb the effect verb (closed vocabulary, src/kernel/rules/vocabulary.js)
+ * @param {string|null} statusKey the status key when verb is 'status', else null
+ * @param {number} amount the effect's printed amount
+ * @param {string} [lang] 'en' (default) or 'es'
+ * @param {'player'|'enemy'} [side] whose clause a status chip speaks
+ * @param {number} [hits] folded hit count for a damage chip
+ * @param {string|null} [who] target scope: 'all_enemies' | 'random_enemy' | null
+ * @returns {string} a complete sentence; an uncovered verb degrades honestly, never empty
+ */
+export function describeVerbChip(verb, statusKey, amount, lang = 'en', side = 'player', hits = 1, who = null) {
+  const es = langOf(lang) === 'es';
+  const n = amount ?? 0;
+  if (verb === 'status' && statusKey) {
+    const esTable = es ? STATUS_MEANING_ES[statusKey] : null;
+    const m = esTable ?? STATUS_MEANING[statusKey];
+    if (!m) return `${String(statusKey).replace(/_/g, ' ')} ${n}.`;
+    const scope = who ? (es ? ` sobre ${chipWho(who, 'es', true)}` : ` on ${chipWho(who, 'en')}`) : '';
+    return `${m.label}${scope} — ${m[side === 'enemy' ? 'enemy' : 'player'](n)}. ${m.detail}`;
+  }
+  const fn = (es ? VERB_MEANING.es : VERB_MEANING.en)[verb];
+  // The uncovered fallback mirrors describeEffect's own shape ("Unknown effect (x)."),
+  // so a verb that slips the vocabulary reads as a hole, never as a rule.
+  return fn ? fn(n, hits, who) : `Unknown effect (${String(verb)}).`;
+}
+
+/** The word a chip's popover titles itself with, e.g. "Strength" / "Fuerza". */
+const CHIP_LABEL_VERB = {
+  en: { damage: 'Damage', block: 'Block', draw: 'Draw', discard: 'Discard', energy: 'Energy', heal: 'Heal', exhaust: 'Exhaust', retain: 'Retain' },
+  es: { damage: 'Daño', block: 'Bloqueo', draw: 'Robo', discard: 'Descarte', energy: 'Energía', heal: 'Curación', exhaust: 'Agotar', retain: 'Retener' },
+};
+
+/**
+ * The chip list of one card definition — one row per effect, in effect order, with the
+ * number and the explainer already worded so a renderer prints and never derives. Rows
+ * are plain data (`{verb, status?, amount, num, label, explain}` plus `hits` on a folded
+ * multi-hit damage run): JSON-safe, publishable in any snapshot.
+ *
+ * Repeated identical damage effects are folded onto `hits` (Pummel's four `{damage,2}`
+ * entries read as ONE "2×4" chip, the same fold describeCard applies to its sentence), and
+ * `custom` verbs emit NO row — their meaning is bespoke, so the card's own sentence speaks
+ * for them (see chipsCover).
+ * @param {any} def card definition from content (cards.json shape)
+ * @param {string} [lang] 'en' (default) or 'es'
+ * @returns {Array<object>} one chip per chip-expressible effect
+ */
+export function cardChips(def, lang = 'en') {
+  if (!def || !Array.isArray(def.effects)) return [];
+  const es = langOf(lang) === 'es';
+  // The effect's target scope, resolved the SAME way TEMPLATES resolves its `who` (the
+  // effect's own `target` first, the definition's for an unset one), so a chip's words
+  // and the dropped sentence can never disagree about who is hit. `custom` effects skip
+  // all of this — they take no chip at all.
+  const scopeOf = (e) => (e.target === 'all_enemies' ? 'all_enemies'
+    : (e.target === 'random_enemy' || (!e.target && def.target === 'random_enemy')) ? 'random_enemy' : null);
+  const out = [];
+  for (const e of foldRepeatedDamage(def.effects)) {
+    if (e.verb === 'status' && e.status) {
+      const self = e.to === 'self' || e.to === 'player';
+      const side = self ? 'player' : 'enemy';
+      // The scope rides only on an APPLIED status (the applicator's "to ALL enemies");
+      // a granted one speaks in the player's own voice and has no target to name.
+      const who = self ? null : (e.target === 'all_enemies' ? 'all_enemies' : null);
+      out.push({
+        verb: 'status',
+        status: e.status,
+        amount: e.amount,
+        num: `+${e.amount}`,
+        label: statusName(e.status, lang),
+        explain: describeVerbChip('status', e.status, e.amount, lang, side, 1, who),
+      });
+    } else if (CHIP_NUMBER[e.verb]) {
+      const hits = e.hits ?? 1;
+      out.push({
+        verb: e.verb,
+        amount: e.amount,
+        ...(hits > 1 ? { hits } : {}),
+        num: CHIP_NUMBER[e.verb](e),
+        label: (es ? CHIP_LABEL_VERB.es : CHIP_LABEL_VERB.en)[e.verb] ?? String(e.verb),
+        explain: describeVerbChip(e.verb, null, e.amount, lang, 'player', hits, scopeOf(e)),
+      });
+    }
+    // Unknown verbs fall out silently here — chipsCover below is what reports the gap,
+    // so the renderer keeps the sentence instead of guessing an icon.
+  }
+  return out;
+}
+
+/**
+ * Whether EVERY effect of a card is chip-expressible: the flag that lets a tile drop the
+ * visible sentence without losing information (the chips + popovers say it all, and the
+ * full sentence stays in the tile's title and aria-label). A `custom` verb, an unknown
+ * verb, or an empty effect list keeps the sentence — nothing is ever lost to the icons.
+ * @param {any} def card definition
+ * @returns {boolean}
+ */
+export function chipsCover(def) {
+  if (!def || !Array.isArray(def.effects) || def.effects.length === 0) return false;
+  return foldRepeatedDamage(def.effects).every((e) => e.verb === 'status'
+    || (Object.prototype.hasOwnProperty.call(CHIP_NUMBER, e.verb)));
+}
+
 /** One-line description of a card type, for tiles and the help panel. */
 export function describeCardType(type, lang = 'en') {
   if (langOf(lang) === 'es') {
@@ -914,7 +1094,7 @@ export function helpTopics(lang = 'en') {
  * @param {{cost?: number, perPlay?: number, playable?: boolean}} [instance]
  * @param {number} [energy]
  * @param {string} [lang]
- * @returns {{name: string, cost: number, type: string, typeLabel: string, blurb: string, description: string, compact: string, compactLabel: string, hint: string}}
+ * @returns {{name: string, cost: number, type: string, typeLabel: string, blurb: string, description: string, compact: string, compactLabel: string, hint: string, chips: Array<object>, chipsComplete: boolean}}
  */
 export function describeTile(def, instance = {}, energy = 0, lang = 'en') {
   const es = langOf(lang) === 'es';
@@ -929,5 +1109,12 @@ export function describeTile(def, instance = {}, energy = 0, lang = 'en') {
     compact: effectSummary(def),
     compactLabel: es ? 'Forma compacta (lo que imprime el CLI)' : 'Compact form (what the CLI prints)',
     hint: describePlayability({ cost, playable: instance.playable ?? true }, energy, lang),
+    // The effect-chip row rides the same fact bundle, so a surface that builds tiles from
+    // describeTile alone (the cardDescribe read-only fact layer) gets the same kernel-
+    // worded icons the snapshot rows carry. The chips read the PLAIN definition: this
+    // bundle has no temper view — a tempered tile's row comes from snapshotDeck, whose
+    // builder does the tempering and words its own chips.
+    chips: cardChips(def, lang),
+    chipsComplete: chipsCover(def),
   };
 }

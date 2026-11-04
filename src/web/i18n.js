@@ -160,6 +160,8 @@ const STRINGS = {
   'card.needsEnergy': { en: 'needs more Energy', es: 'falta Energía' },
   'card.notPlayable': { en: 'Not playable: not enough Energy.', es: 'No jugable: no hay Energía suficiente.' },
   'card.costs': { en: 'Costs {n} Energy.', es: 'Cuesta {n} de Energía.' },
+  // The effect-chip row's group label (each chip's own sentence is kernel copy).
+  'card.effects': { en: 'Card effects', es: 'Efectos de la carta' },
 
   /* ---- combat --------------------------------------------------------------- */
   'busy.play.tile': { en: 'the last card is landing', es: 'la última carta está cayendo' },

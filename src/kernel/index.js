@@ -31,6 +31,9 @@ import {
   describeCardType,
   describePlayability,
   describeTile,
+  describeVerbChip,
+  cardChips,
+  chipsCover,
   GLOSSARY_SECTIONS,
   glossary,
   helpTopics,
@@ -59,6 +62,12 @@ export {
   describeCardType,
   describePlayability,
   describeTile,
+  // The effect-chip layer (the card faces' icon row): the per-chip explainer sentence,
+  // the chip list of one definition, and the "fully covered" flag a tile reads before it
+  // drops the visible sentence. Kernel-owned for the same reason every other sentence is.
+  describeVerbChip,
+  cardChips,
+  chipsCover,
   glossary,
   helpTopics,
 };

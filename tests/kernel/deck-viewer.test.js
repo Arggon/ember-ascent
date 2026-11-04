@@ -29,6 +29,11 @@ function expectedRow(id, count, temper = null) {
     temperName: temper ? TEMPERS[temper].name : '',
     temperText: temper ? TEMPERS[temper].text : '',
     description: K.describeCard(def),
+    // The effect-chip row (kernel-worded, read off the same definition): the pin here is
+    // that the deck row carries EXACTLY the chip list the codex table and the hand tile
+    // would show for this card — a row that derived its own chips fails this deepEqual.
+    chips: K.cardChips(def),
+    chipsComplete: K.chipsCover(def),
     count,
   };
 }

@@ -747,6 +747,103 @@ html, body {
   text-transform: uppercase;
 }
 
+/* ---------- Effect chips: the card face's icon row ----------
+   One glyph + number per kernel-published effect (`.cfx-chip` rows published by
+   snapshot()/cardPool(), never derived here). The marks are the woodcut stroke family;
+   a chip reads at card size, so the stroke stays fat and the number stays tabular. */
+.card .cfx {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cfx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--card-hue) 42%, transparent);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--ink);
+  line-height: 1.25;
+  min-width: 0;
+}
+/* On a read-only tile the chip is a real control (the hand's spans carry the same look
+   but live inside the play button, where a nested control would be invalid HTML). */
+.cfx-chip[role='button'] { cursor: pointer; }
+.cfx-chip[role='button']:hover { border-color: var(--gold); }
+.cfx-chip[role='button']:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.cfx-mark { flex: 0 0 auto; width: 14px; height: 14px; opacity: 0.94; }
+.cfx-mark svg { display: block; width: 100%; height: 100%; }
+/* The woodcut stroke, scoped to the chip marks — same recipe the type/node marks use.
+   The borrowed wide intent marks keep their own class (`chev`), stroked here too. */
+.cfx-mark .m,
+.cfx-mark .chev {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cfx-mark .mf { fill: currentColor; stroke: none; }
+.cfx-num {
+  font-family: var(--num);
+  font-weight: 700;
+  font-size: var(--fs-2);
+  line-height: 1;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.02em;
+}
+.card.disabled .cfx-chip { border-color: var(--edge); background: rgba(0, 0, 0, 0.18); }
+.card.disabled .cfx-num { color: var(--faint); }
+
+/* The chip explainer's OWN layer. NOT #fx-layer: that layer is switched off wholesale
+   for reduced-motion users (`#fx-layer { display: none }` in the reduce block), and a
+   descendant rule cannot un-hide it — the popover must stay visible for exactly the
+   users who most need the static reveal, so it hosts in a sibling the reduce block
+   never names. Fixed + inset 0 like its sibling, pointer-events transparent so taps
+   pass through to the page (the dismissal swallow lives in the capture listeners). */
+#pop-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 60;
+}
+
+/* The chip explainer popover, hosted on #pop-layer (above every clip box) and anchored
+   to its chip when the host can measure one — flipped above the chip by the
+   `.cfx-pop-above` class when it would cross the viewport floor. Static reveal only —
+   no motion, and it lives OUTSIDE the reduced-motion block, so it needs no exception
+   there: the sheet is the interaction, not decoration. */
+.cfx-pop {
+  position: absolute;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  max-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #1c2333 0%, #10141d 100%);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+  color: var(--ink);
+  text-align: left;
+}
+/* The above-the-chip flip: same anchor point, hung from its bottom edge instead. */
+.cfx-pop.cfx-pop-above { transform: translate(-50%, -100%); }
+.cfx-pop .cfx-pop-label {
+  display: block;
+  font-weight: 800;
+  font-size: var(--fs-3);
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+.cfx-pop .cfx-pop-body { margin: 3px 0 6px; font-size: var(--fs-2); line-height: 1.35; }
+.cfx-pop .cfx-pop-close { width: 100%; padding: 3px 8px; font-size: var(--fs-1); }
+
 /* Not enough Energy: unmistakable, and it says why rather than just going grey. */
 .card.disabled {
   cursor: not-allowed;
