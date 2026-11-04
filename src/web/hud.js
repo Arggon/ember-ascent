@@ -51,13 +51,13 @@ export function renderHud() {
   hudEl.append(renderRelics());
   hudEl.append(el('span', { cls: 'hud-step', text: t('hud.step', { n: snap.stepIndex }) }));
 
-  // A status that just landed on the PLAYER gets the same by-kind treatment as an enemy's.
-  const freshSelf = freshStatusKeys([...(p.statuses || []), ...(p.powers || [])]);
-  for (const s of p.statuses) hudEl.append(el('span', {
-    cls: `pill ${s.key}` + (freshSelf.has(s.key) ? ' juice-in' : ''),
-    text: s.text || `${s.label} ${s.stacks}`,
-    attrs: { title: s.explain || '' },
-  }));
+  // PARITY: combat statuses (Vulnerable, Weak, …) moved DOWN to the hero's own card
+  // (combat-view heroFigure) — the same place an enemy's statuses sit — because up here
+  // a landing debuff read as faint legend chrome. The HUD keeps only the POWERS:
+  // run-long counters (Combust, Rupture, …) that outlive the fight, which the combat
+  // card never shows. The juice diff is powers-only now, against the same previous-paint
+  // record render.js keeps.
+  const freshSelf = freshStatusKeys(p.powers || []);
   for (const pw of p.powers) hudEl.append(el('span', {
     cls: 'pill power' + (freshSelf.has(pw.key) ? ' juice-in' : ''),
     text: pw.text || `${pw.label || pw.key} ${pw.stacks}`,

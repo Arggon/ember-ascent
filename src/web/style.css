@@ -3410,6 +3410,11 @@ html, body {
 .stage-combat .enemy .hpbar { width: 80%; margin: 2px 0; }
 .stage-combat .enemy .eblock { font-size: 0.72rem; }
 .stage-combat .e-statuses { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+/* PARITY: the hero's own status pills sit under her HP bar, mirroring the enemy card.
+   `.page-combat .hero` carries pointer-events:none (the hero lane is click-through),
+   so the pill row must re-enable it or the pills' cursor:help + title tooltips die
+   silently — the enemy card already does the same via `.stage-combat .enemy`. */
+.stage-combat .hero .e-statuses { pointer-events: auto; max-width: 96%; }
 .stage-combat .e-intent {
   margin: 2px 0 0;
   padding: 0;

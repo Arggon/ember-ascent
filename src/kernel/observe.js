@@ -686,12 +686,48 @@ function playTargets(legal) {
 /** The hand section of a snapshot: one tile's worth of facts per card. */
 function snapshotHand(state, legal, lang = 'en') {
   const { playableSlots, targetsBySlot } = playTargets(legal);
+  // PARITY: the hand tile speaks the numbers the engine will actually land, not the
+  // printed ones. The fold context reads the LIVE combat state and its math goes through
+  // the SAME resolvers the rules use (playerStrike / vulnerableAmplify / blockGain), so
+  // a card face cannot disagree with what playing it will do. `vuln` is resolved PER
+  // TARGET: with exactly one enemy alive the aimed card's target is unambiguous and its
+  // Vulnerable folds straight into `description`; with several alive the top-level
+  // sentence keeps the honest no-vuln print (the target is the player's choice) and each
+  // living enemy's variant rides in `descriptionsByTarget` for the aiming UI to swap in
+  // live. AOE folds Vulnerable only when it is unambiguous — exactly one alive body and
+  // it is Vulnerable (every hit lands on the same ×3/2); over a mixed field it never
+  // claims it, the amplification is not one number.
+  // Collection surfaces (codex, deck sheet, shop, reward) call describeCard WITHOUT the
+  // fold and keep the printed card: with no combat to read, there is nothing to fold.
+  const inCombat = state.phase === 'combat' && state.combat?.active;
+  const alive = inCombat ? state.combat.enemies.filter((e) => !e.dead) : [];
+  const foldBase = inCombat ? {
+    strength: state.player.statuses?.strength ?? 0,
+    weak: state.player.statuses?.weak ?? 0,
+    dexterity: state.player.statuses?.dexterity ?? 0,
+  } : null;
+  const fold = foldBase ? { ...foldBase, vuln: alive.length === 1 && (alive[0].statuses?.vulnerable ?? 0) > 0 } : null;
   return (state.combat?.hand ?? []).map((card, i) => {
     const { def, temper } = temperedView(state, card, defOf(card));
     const hpCost = temperHpCost(temper);
     const slot = `p${i + 1}`;
     const playable = playableSlots.has(slot);
     const targets = targetsBySlot.get(slot) ?? [];
+    // PARITY-2: one sentence variant per LIVING enemy, keyed by the SAME 1-based
+    // living-enemy slot the `targets` aim actions use. Only target-needing cards in a
+    // multi-enemy field carry it; null when no variant differs from `description`, so a
+    // clean field adds zero payload and the renderer falls back to the resting face.
+    let descriptionsByTarget = null;
+    if (foldBase && targets.length > 0) {
+      const variants = alive.map((enemy, j) => describeCard(def, card, lang, { ...foldBase, vuln: (enemy.statuses?.vulnerable ?? 0) > 0 })
+        + (hpCost > 0 ? (lang === 'es' ? ` Pierdes ${hpCost} HP al jugarla.` : ` Lose ${hpCost} HP when played.`) : ''));
+      const resting = describeCard(def, card, lang, { ...foldBase, vuln: false })
+        + (hpCost > 0 ? (lang === 'es' ? ` Pierdes ${hpCost} HP al jugarla.` : ` Lose ${hpCost} HP when played.`) : '');
+      if (variants.some((s) => s !== resting)) {
+        descriptionsByTarget = {};
+        variants.forEach((s, j) => { descriptionsByTarget[j + 1] = s; });
+      }
+    }
     return {
       slot,
       cardId: card.cardId,
@@ -710,9 +746,14 @@ function snapshotHand(state, legal, lang = 'en') {
       // tests/budget.test.js); `description` is the sentence a human reads instead.
       typeLabel: typeLabel(def.type, lang),
       // Both read the TEMPERED definition, so a Red-hot Hammerfall says "Deal 9 damage."
+      // In combat the hand's sentence carries the status fold (PARITY above); the other
+      // surfaces read the same builder WITHOUT the fold — the printed card.
       summary: effectSummary(def),
-      description: describeCard(def, card, lang)
+      description: describeCard(def, card, lang, fold)
         + (hpCost > 0 ? (lang === 'es' ? ` Pierdes ${hpCost} HP al jugarla.` : ` Lose ${hpCost} HP when played.`) : ''),
+      // PARITY-2 per-target variants (null when none differs), keyed by the 1-based
+      // living-enemy slot — the same k the aim actions and the GUI's `aimed` use.
+      descriptionsByTarget,
       playable,
       // The engine's own answer to "may this card be aimed?" — so a renderer never has to
       // infer it from the card type (Defend is type 'skill', Bash is 'attack', but the

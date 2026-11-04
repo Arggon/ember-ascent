@@ -36,7 +36,7 @@ import { TEMPER_GLYPH, TYPE_GLYPH, enemyLook, glyphBox } from './glyphs.js';
 import { heroMove, isMeleeMove, signatureFor } from './hero-moves.js';
 import { backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, attackTier, intentGlyph } from './stage-art.js';
 import { cardArtMarkup } from './card-art.js';
-import { dyingCard, efxBox, freshEnemyStatusKeys, heroEfx, hitClass } from './floats.js';
+import { dyingCard, efxBox, freshEnemyStatusKeys, freshStatusKeys, heroEfx, hitClass } from './floats.js';
 import { aimed, cancelTargeting, clickCard, consumeClick, enemyLabel, pendingCard, pendingSlot, pickTarget, setAimed } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
@@ -142,6 +142,20 @@ export function heroFigure() {
   bar.querySelector('i').style.width = `${Math.max(0, Math.round((p.hp / Math.max(1, p.maxHp)) * 100))}%`;
   node.append(bar);
   if (p.block > 0) node.append(el('div', { cls: 'eblock', text: `⛨ ${p.block}` }));
+  // PARITY: the hero's statuses (Vulnerable, Weak, …) read as pills UNDER her own HP
+  // bar — the same place an enemy's statuses sit on its card — instead of only in the
+  // top HUD bar, where a landing debuff read as faint legend chrome. Powers (run-long
+  // counters: Combust, Rupture, …) STAY on the HUD: they outlive the fight, and this
+  // card exists only in combat. Same pill markup and diff (`freshStatusKeys` diffs
+  // against the PREVIOUS paint, which render.js records before this view is built),
+  // so the by-key colour and the juice-in animation carry over unchanged.
+  const freshHero = freshStatusKeys(p.statuses || []);
+  const heroStatuses = (p.statuses || []).map((s) => el('span', {
+    cls: `pill ${s.key}` + (freshHero.has(s.key) ? ' juice-in' : ''),
+    text: s.text || `${s.label} ${s.stacks}`,
+    attrs: { title: s.explain || '' },
+  }));
+  if (heroStatuses.length > 0) node.append(el('div', { cls: 'e-statuses' }, ...heroStatuses));
   node.append(heroEfx());
   return node;
 }
@@ -601,7 +615,13 @@ export function cardTile(card, opts = {}) {
   // The plain-English text comes from the kernel (`describeCard`), never from the
   // renderer. The compact shorthand stays visible but secondary and labelled, so a
   // reader who meets "A6" in the CLI can still connect the two.
-  const desc = card.description || card.summary;
+  // PARITY-2: while THIS card waits for a target, its sentence is the AIMED enemy's own
+  // variant (kernel-published `descriptionsByTarget`, keyed by the same 1-based living
+  // slot `aimed` holds) — the fold preview follows the crosshair, so a Vulnerable foe
+  // shows its amplified number the moment the pointer rests on it. No variant, or not
+  // aiming: the resting face.
+  const aimedDesc = isPending && aimed != null ? (card.descriptionsByTarget?.[aimed] ?? null) : null;
+  const desc = aimedDesc || card.description || card.summary;
   const awaiting = isPending ? t('combat.choosing') : '';
   // The locked wait is named in the tile's own sentence (the i18n busy keys), so a
   // screen reader hears why the playable card is not taking input right now.

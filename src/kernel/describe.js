@@ -19,6 +19,7 @@
 // at 1) and never "heal".
 import { ENEMIES } from './rules/encounters.js';
 import { intentDamage } from './rules/act.js';
+import { blockGain, playerStrike, vulnerableAmplify } from './rules/vocabulary.js';
 import { defaultContent } from './content.js';
 import { effectSummary, CUSTOM_SUMMARY, STATUS_ABBREV } from './observe.js';
 
@@ -342,25 +343,69 @@ const CUSTOM_SENTENCE_ES = {
  * (src/kernel/rules/vocabulary.js: damage, block, draw, energy, status, discard,
  * exhaust, custom) — one template TABLE per language, keyed by the same verb.
  *
- * `amount` is the printed card number; Strength and Dexterity are added at play time and
- * are deliberately NOT folded in here (the card cannot know your counters, and the status
- * pills already explain those).
+ * `amount` is the printed card number. Strength, Weak, Dexterity and the target's
+ * Vulnerable ARE folded in — but never silently: a combat-phase caller (snapshotHand)
+ * passes a `fold` context derived from the LIVE state through the SAME resolver helpers
+ * the rules use (`playerStrike`, `vulnerableAmplify`, `blockGain`), and the template
+ * prints the folded number as an explicit rider after the printed one, so the card can
+ * never disagree with what the engine will land. A collection surface (codex, deck
+ * sheet, shop, reward) passes no context and keeps the printed card. The status pills
+ * still explain WHY the number moved.
  * @param {any} effect one entry of a card definition's `effects` array
  * @param {any} def the card definition the effect belongs to
  * @param {string} [lang] 'en' (default) or 'es'
+ * @param {{strength: number, weak: number, dexterity: number, vuln: boolean}} [fold]
+ *        live-combat fold numbers, or null for the printed card
  * @returns {string} a complete sentence
  */
+/**
+ * The em-dash clause a folded damage sentence carries — the SAME per-hit number the
+ * resolution will land, spelled with its reason. The per-hit fold goes through
+ * `playerStrike` itself (add Strength, then Weak ×3/4 floored), so the preview number
+ * has exactly one source. `allowVuln` is the unambiguity gate: the ×3/2 folds into ONE
+ * number only when every hit lands on the same vulnerable body — a single target, or an
+ * AOE whose fold context says exactly one enemy is alive and Vulnerable (`fold.vuln`).
+ * A mixed target set (Reaper over healthy neighbours) still refuses the clause.
+ * @param {any} fold live-combat fold context (plain numbers)
+ * @param {number} printed the effect's printed amount
+ * @param {string} lang
+ * @param {boolean} [allowVuln]
+ * @returns {string} '' when nothing would change
+ */
+function damageRider(fold, printed, lang, allowVuln = true) {
+  const es = langOf(lang) === 'es';
+  const per = playerStrike(printed, { statuses: { strength: fold.strength, weak: fold.weak } });
+  const parts = [];
+  if (fold.strength > 0 && fold.weak > 0) parts.push(es ? `${per} con Fuerza ${fold.strength} y Débil` : `${per} with Strength ${fold.strength} and Weak`);
+  else if (fold.strength > 0) parts.push(es ? `${per} con Fuerza ${fold.strength}` : `${per} with Strength ${fold.strength}`);
+  else if (fold.weak > 0) parts.push(es ? `${per} con Débil` : `${per} with Weak`);
+  if (allowVuln && fold.vuln) parts.push(es ? `${vulnerableAmplify(per)} contra Vulnerable` : `${vulnerableAmplify(per)} against Vulnerable`);
+  return parts.join(', ');
+}
+
 const TEMPLATES = {
   en: {
-    damage: (e, def) => {
+    damage: (e, def, f) => {
       const hits = e.hits ?? 1;
       const who = e.target === 'all_enemies'
         ? 'ALL enemies'
         : def.target === 'random_enemy' ? 'a random enemy' : 'the enemy';
-      if (hits > 1) return `Deal ${e.amount} damage to ${who} ${hits} times.`;
-      return `Deal ${e.amount} damage to ${who}.`;
+      const core = hits > 1 ? `Deal ${e.amount} damage to ${who} ${hits} times` : `Deal ${e.amount} damage to ${who}`;
+      if (f) {
+        // Unambiguous amplification only: a single target, or the fold's word that every
+        // hit lands on the one vulnerable body (`fold.vuln`); a mixed set stays silent.
+        const rider = damageRider(f, e.amount, 'en', e.target !== 'all_enemies' || f.vuln);
+        if (rider) return `${core} — ${rider}${hits > 1 ? ' per hit' : ''}.`;
+      }
+      return `${core}.`;
     },
-    block: (e) => `Gain ${e.amount} Block.`,
+    block: (e, _def, f) => {
+      if (f) {
+        const n = blockGain(e.amount, f.dexterity);
+        if (n !== e.amount) return `Gain ${e.amount} (${n}) Block.`;
+      }
+      return `Gain ${e.amount} Block.`;
+    },
     draw: (e) => `Draw ${plural(e.amount, 'card', 'cards')}.`,
     energy: (e) => `Gain ${e.amount} Energy.`,
     status: (e) => {
@@ -387,17 +432,28 @@ const TEMPLATES = {
     custom: (e) => CUSTOM_SENTENCE[e.handler] ?? `Special effect (${e.handler}).`,
   },
   es: {
-    damage: (e, def) => {
+    damage: (e, def, f) => {
       const hits = e.hits ?? 1;
       // The target phrase carries its own preposition: Spanish contracts "a el" into
       // "al", so each form is written whole ("al enemigo", "a TODOS los enemigos").
       const who = e.target === 'all_enemies'
         ? 'a TODOS los enemigos'
         : def.target === 'random_enemy' ? 'a un enemigo al azar' : 'al enemigo';
-      if (hits > 1) return `Infliges ${e.amount} de daño ${who} ${hits} veces.`;
-      return `Infliges ${e.amount} de daño ${who}.`;
+      const core = hits > 1 ? `Infliges ${e.amount} de daño ${who} ${hits} veces` : `Infliges ${e.amount} de daño ${who}`;
+      if (f) {
+        // Misma regla de no ambigüedad que la plantilla inglesa (ver su comentario).
+        const rider = damageRider(f, e.amount, 'es', e.target !== 'all_enemies' || f.vuln);
+        if (rider) return `${core} — ${rider}${hits > 1 ? ' por golpe' : ''}.`;
+      }
+      return `${core}.`;
     },
-    block: (e) => `Ganas ${e.amount} de Bloqueo.`,
+    block: (e, _def, f) => {
+      if (f) {
+        const n = blockGain(e.amount, f.dexterity);
+        if (n !== e.amount) return `Ganas ${e.amount} (${n}) de Bloqueo.`;
+      }
+      return `Ganas ${e.amount} de Bloqueo.`;
+    },
     draw: (e) => `Robas ${pluralEs(e.amount, 'carta', 'cartas')}.`,
     energy: (e) => `Ganas ${e.amount} de Energía.`,
     status: (e) => {
@@ -421,11 +477,11 @@ const TEMPLATES = {
   },
 };
 
-export function describeEffect(effect, def = {}, lang = 'en') {
+export function describeEffect(effect, def = {}, lang = 'en', fold = null) {
   const table = TEMPLATES[langOf(lang)] ?? TEMPLATES.en;
   const fn = table[effect.verb];
   if (!fn) return `Unknown effect (${effect.verb}).`;
-  return fn(effect, def);
+  return fn(effect, def, fold);
 }
 
 /* ------------------------------------------------------------------ card describe */
@@ -456,6 +512,43 @@ function foldRepeatedDamage(effects) {
 }
 
 /**
+ * Folded sentences for the `custom` handlers whose engine bodies fold player Strength
+ * (and the target's Vulnerable) through playerStrike/damageEnemy — rules/effects/index.js.
+ * Each returns null when no number would move, so the static CUSTOM_SENTENCE keeps
+ * rendering byte-identically for a clean state.
+ * @param {any} e the custom effect entry
+ * @param {any} instance the hand instance (Rampage's perPlay bonus)
+ * @param {{strength: number, weak: number, dexterity: number, vuln: boolean}} fold
+ * @param {string} lang
+ * @returns {string|null}
+ */
+function customFold(e, instance, fold, lang) {
+  const es = langOf(lang) === 'es';
+  switch (e.handler) {
+    case 'hemokinesis': {
+      const rider = damageRider(fold, 15, lang, true);
+      return rider ? (es ? `Pierdes 2 HP. Infliges 15 de daño — ${rider}.` : `Lose 2 HP. Deal 15 damage — ${rider}.`) : null;
+    }
+    case 'reaper': {
+      // AOE obeys the same unambiguity gate as the plain verbs: the Vulnerable clause
+      // speaks only when the fold says every hit lands on the one vulnerable body
+      // (`fold.vuln`); over a mixed set the amplification is not one number, so it drops.
+      const rider = damageRider(fold, 4, lang, fold.vuln);
+      return rider ? (es ? `Infliges 4 de daño a TODOS los enemigos — ${rider} a cada uno.` : `Deal 4 damage to ALL enemies — ${rider} each.`) : null;
+    }
+    case 'rampage': {
+      const base = 8 + (instance?.perPlay ?? 0);
+      const rider = damageRider(fold, base, lang, true);
+      if (!rider) return null;
+      const growth = instance?.perPlay ? (es ? ' (+5 más cada vez que la juegas)' : ' (+5 more each time you play it)') : '';
+      return es ? `Infliges ${base} de daño${growth} — ${rider}.` : `Deal ${base} damage${growth} — ${rider}.`;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
  * Plain-language description of a card, as a human would read it aloud.
  *
  * `Hammerfall` -> "Deal 6 damage to the enemy." / "Infliges 6 de daño al enemigo."
@@ -465,21 +558,34 @@ function foldRepeatedDamage(effects) {
  * @param {{perPlay?: number}} [instance] runtime instance, when one is available:
  *   Rampage's damage depends on how often it has been played this run.
  * @param {string} [lang] 'en' (default) or 'es'
+ * @param {{strength: number, weak: number, dexterity: number, vuln: boolean}} [fold]
+ *        live-combat fold numbers (snapshotHand only); omitted/null keeps the printed card
  * @returns {string} at least one complete sentence, never empty
  */
-export function describeCard(def, instance = {}, lang = 'en') {
+export function describeCard(def, instance = {}, lang = 'en', fold = null) {
   if (!def || !Array.isArray(def.effects)) {
     return langOf(lang) === 'es' ? 'Sin descripción disponible.' : 'No description available.';
   }
   const effects = foldRepeatedDamage(def.effects);
   const parts = effects.map((e) => {
-    // Rampage is the one handler whose numbers move with the instance.
+    // Live-combat fold for the Strength-folding custom handlers; null keeps the static
+    // sentence so a clean state renders byte-identically to the printed card. This runs
+    // BEFORE Rampage's instance early return below: once its first play moves the number,
+    // the grown sentence must still carry the same Strength/Weak/Vulnerable rider as the
+    // plain verbs — returning early would drop the fold the moment it had something to say.
+    if (e.verb === 'custom' && fold) {
+      const folded = customFold(e, instance, fold, lang);
+      if (folded) return folded;
+    }
+    // Rampage is the one handler whose numbers move with the instance. Without a fold
+    // (collection surfaces — codex, deck sheet) there is no combat to read, but the
+    // grown base is still the card's true number, so it prints the moved sentence.
     if (e.verb === 'custom' && e.handler === 'rampage' && instance.perPlay) {
       return langOf(lang) === 'es'
         ? `Infliges ${8 + instance.perPlay} de daño (+5 más cada vez que la juegas).`
         : `Deal ${8 + instance.perPlay} damage (+5 more each time you play it).`;
     }
-    return describeEffect(e, def, lang);
+    return describeEffect(e, def, lang, fold);
   });
   return parts.map(sentence).join(' ');
 }

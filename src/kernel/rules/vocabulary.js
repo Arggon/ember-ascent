@@ -83,13 +83,35 @@ export function playerStrike(base, player) {
 }
 
 /**
+ * The vulnerable amplification exactly as damageEnemy applies it — ONE fold, one home.
+ * describe.js reuses this so a card's preview number cannot disagree with the resolution.
+ * @param {number} amount pre-modifier damage
+ * @returns {number}
+ */
+export function vulnerableAmplify(amount) {
+  return Math.floor(amount * 3 / 2);
+}
+
+/**
+ * Block one block-granting effect lands: printed amount plus Dexterity, floored at 0 —
+ * the exact fold the `block` verb applies. Exported for the same reason as
+ * vulnerableAmplify: the card preview reads the resolver, never a re-derivation.
+ * @param {number} amount printed block
+ * @param {number} dexterity the combatant's Dexterity stacks
+ * @returns {number}
+ */
+export function blockGain(amount, dexterity = 0) {
+  return Math.max(0, amount + dexterity);
+}
+
+/**
  * Deal damage to one enemy: block absorbs first, then Vulnerable amplifies by 50%.
  * @param {any} enemy
  * @param {number} amount pre-modifier damage
  * @returns {{enemy: any, dealt: number, blocked: number, raw: number}}
  */
 export function damageEnemy(enemy, amount) {
-  const raw = (enemy.statuses?.vulnerable ?? 0) > 0 ? Math.floor(amount * 3 / 2) : amount;
+  const raw = (enemy.statuses?.vulnerable ?? 0) > 0 ? vulnerableAmplify(amount) : amount;
   const blocked = Math.min(enemy.block, raw);
   const dealt = raw - blocked;
   const hp = clamp(enemy.hp - dealt, enemy.maxHp);
@@ -103,7 +125,7 @@ export function damageEnemy(enemy, amount) {
  * @returns {{player: any, dealt: number, blocked: number}}
  */
 export function damagePlayer(player, amount) {
-  const raw = (player.statuses?.vulnerable ?? 0) > 0 ? Math.floor(amount * 3 / 2) : amount;
+  const raw = (player.statuses?.vulnerable ?? 0) > 0 ? vulnerableAmplify(amount) : amount;
   const blocked = Math.min(player.block, raw);
   const dealt = raw - blocked;
   return { player: { ...player, block: player.block - blocked, hp: clamp(player.hp - dealt, player.maxHp) }, dealt, blocked };
