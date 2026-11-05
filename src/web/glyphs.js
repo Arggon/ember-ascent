@@ -254,7 +254,8 @@ export const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', sta
 /** Effect chip -> its mark (the kernel publishes `{verb, status?}` chips; this table is
  *  purely presentational). Existing marks are borrowed where the shape reads honestly —
  *  the blade for damage, the shield for Block, the star for Energy (the energy potion
- *  already wears it), the hourglass for Retain (the fact IS "stays across the turn") and
+ *  already wears it), the hourglass for Retain (the fact IS "never leaves your hand —
+ *  not at play, not at the end of the turn") and
  *  the ward for Metallicize (its Block arrives as armour). The debuff chevron serves
  *  Vulnerable and Weak: the enemy-side facts they are. The names must stay inside
  *  MARKS — an unknown key falls back to the rune inside glyphBox, never an empty box. */
