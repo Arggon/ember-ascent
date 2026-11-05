@@ -514,6 +514,39 @@ function enemyCard(e, position) {
     }
     card.classList.add('is-striking');
   }
+  // UX-9 D3: the chip juices off THIS enemy's own previous status keys (per-index), not
+  // off the player's list, which made an enemy chip animate whenever the player gained one.
+  // Statuses read as CHIPS now — mark + stacks, no visible sentence (the user's ask):
+  // the kernel's explain is the native title and one click away through the shared
+  // popover. While TARGETING the enemy card is a native <button>, so the chips take the
+  // hand-card path (spans whose click stops propagation — clicking a chip must never
+  // pick the target); the rest state is a read-only readout (a div) and gets real
+  // controls, exactly like the read-only card tiles.
+  //
+  // THE SPLIT (the user's ask): the kernel publishes each row's `kind` (observe.js
+  // statusPairs, from vocabulary.js STATUS_KINDS — no key matching here). The enemy's
+  // own BUFFS go up with the intent row (hosted above the fig); the hero-applied
+  // DEBUFFS stay at the foot. A row missing `kind` (a hand-crafted snapshot) reads as a
+  // debuff — the bottom group it always rendered in before this split. Chip internals,
+  // the juice-in entrance and the targeting demotion are the same component in both
+  // rows; only which row hosts a chip changed.
+  const fresh = freshEnemyStatusKeys(e.index, e.statuses);
+  const statusChip = (s) => chipNode(
+    {
+      verb: 'status',
+      status: s.key,
+      num: String(s.stacks ?? 0),
+      label: s.name || s.label || s.key,
+      explain: s.explain || s.text || '',
+    },
+    !targeting,
+    fresh.has(s.key) ? 'juice-in' : '',
+  );
+  const buffs = e.statuses.filter((s) => s.kind === 'buff').map(statusChip);
+  const debuffs = e.statuses.filter((s) => s.kind !== 'buff').map(statusChip);
+  // Plain visual grouping: no sentence of its own (the chips carry their own aria),
+  // so a bare div — the same treatment the foot row has always had.
+  const buffRow = buffs.length > 0 ? el('div', { cls: 'e-statuses e-buffs' }, ...buffs) : null;
   const fig = el('div', { cls: `fig pose-${pose}${enemyVariant(e.id)}`, attrs: { 'aria-hidden': 'true' } });
   if (seq && pose === 'slam') {
     // Same resume mechanism as the hero's pose: a positive delay waits for the
@@ -525,6 +558,26 @@ function enemyCard(e, position) {
     }
   }
   fig.innerHTML = enemyMarkup(e.id);
+  // THE ENEMY'S OWN HEADLINE sits ABOVE the figure, where the retired intent badge used
+  // to float (the user's ask): the ACTIONS row (the `.e-intent` chips — what the enemy is
+  // about to do) topmost, then the enemy's own BUFFS (`.e-statuses.e-buffs`, from the
+  // kernel-published `kind`), then the art. The hero-applied DEBUFFS stay at the card's
+  // foot below (their own row further down this function). The strike-lit ring stays
+  // exactly what it was: the class and the --seq-* variables ride the CARD, the
+  // keyframes light `.e-intent` wherever the row lives, and both branch shapes below
+  // carry the class — so the animation follows the row up unchanged.
+  const plain = e.intent.text || `${e.intent.label}`;
+  const ichips = intentChips(e, currentLang());
+  card.append(ichips.length > 0
+    ? el('div', {
+        cls: `e-intent kind-${kind}`,
+        attrs: { role: 'group', title: plain, 'aria-label': plain },
+      }, ...ichips.map((c) => chipNode(c, !targeting)))
+    : el('div', {
+        cls: `e-intent kind-${kind}`,
+        attrs: { title: plain },
+      }, el('span', { cls: 'ilabel', text: plain })));
+  if (buffRow) card.append(buffRow);
   card.append(fig);
   // The target mark is a SHAPE, not a colour: a slot number, plus a crosshair on the
   // enemy the player has actually selected.
@@ -544,46 +597,11 @@ function enemyCard(e, position) {
     bb.querySelector('i').style.width = `${Math.min(100, Math.round((e.block / Math.max(1, e.maxHp)) * 100))}%`;
     card.append(bb);
   }
-  // UX-9 D3: the chip juices off THIS enemy's own previous status keys (per-index), not
-  // off the player's list, which made an enemy chip animate whenever the player gained one.
-  // Statuses read as CHIPS now — mark + stacks, no visible sentence (the user's ask):
-  // the kernel's explain is the native title and one click away through the shared
-  // popover. While TARGETING the enemy card is a native <button>, so the chips take the
-  // hand-card path (spans whose click stops propagation — clicking a chip must never
-  // pick the target); the rest state is a read-only readout (a div) and gets real
-  // controls, exactly like the read-only card tiles.
-  const fresh = freshEnemyStatusKeys(e.index, e.statuses);
-  const statuses = e.statuses.map((s) => chipNode(
-    {
-      verb: 'status',
-      status: s.key,
-      num: String(s.stacks ?? 0),
-      label: s.name || s.label || s.key,
-      explain: s.explain || s.text || '',
-    },
-    !targeting,
-    fresh.has(s.key) ? 'juice-in' : '',
-  ));
-  if (statuses.length > 0) card.append(el('div', { cls: 'e-statuses' }, ...statuses));
+  // The DEBUFF foot row: the hero-applied statuses (Vulnerable, Weak — the kernel's
+  // `kind: 'debuff'` half), exactly where the single status row always sat. The
+  // floating-damage efx box follows it, as before.
   card.append(efxBox(e.index));
-  // The intent reads as CHIPS now (attack / block / each applied status), built from the
-  // kernel's own `intentChips` facts — no label parsing, every number the engine's own.
-  // The sentence leaves the VISIBLE row (the user's ask) but stays the row's native
-  // title and aria-label, and is every chip's popover explain: one click says the whole
-  // move. A move shape that yields no chips (an unknown kind) falls back to the old
-  // sentence row — never a guess. Death ghosts (floats.js dyingCard) and the boss-down
-  // hold never render this row, so they are untouched by the swap.
-  const plain = e.intent.text || `${e.intent.label}`;
-  const ichips = intentChips(e, currentLang());
-  card.append(ichips.length > 0
-    ? el('div', {
-        cls: `e-intent kind-${kind}`,
-        attrs: { role: 'group', title: plain, 'aria-label': plain },
-      }, ...ichips.map((c) => chipNode(c, !targeting)))
-    : el('div', {
-        cls: `e-intent kind-${kind}`,
-        attrs: { title: plain },
-      }, el('span', { cls: 'ilabel', text: plain })));
+  if (debuffs.length > 0) card.append(el('div', { cls: 'e-statuses' }, ...debuffs));
   return card;
 }
 

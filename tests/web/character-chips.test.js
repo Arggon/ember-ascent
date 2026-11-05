@@ -170,6 +170,48 @@ test('the enemy card speaks in chips: no visible intent sentence, no visible sta
     'every intent chip\u2019s explain is the whole move\u2019s kernel sentence');
 });
 
+test('the enemy\'s own buffs float ABOVE the art with the intent row; the hero-applied debuffs stay at the foot', () => {
+  // The user's ask: actions (the intent chips) and the enemy's own buffs live where the
+  // retired intent badge floated — over the enemy — while the statuses the HERO applies
+  // (Vulnerable, Weak) keep the foot row. The split reads the kernel-published `kind`
+  // (observe.js statusPairs), never a key match. Death ghosts (floats.js dyingCard) and
+  // the boss-down hold never build any of these rows — they paint fig/name/ehp only —
+  // so this reordering cannot reach them.
+  const api = startFight({ enemyStatuses: { strength: 3, vulnerable: 2 } });
+  api.render();
+  const card = enemyCard();
+  assert.ok(card, 'the enemy card painted');
+  const marker = (n) => (n.classList.contains('e-buffs') ? 'e-buffs'
+    : n.classList.contains('e-statuses') ? 'e-statuses'
+    : n.classList.contains('e-intent') ? 'e-intent'
+    : n.classList.contains('fig') ? 'fig' : null);
+  const order = card.kids.map(marker).filter(Boolean);
+  assert.ok(order.includes('e-intent') && order.includes('e-buffs') && order.includes('fig') && order.includes('e-statuses'),
+    `all four bands painted, got ${order.join(',')}`);
+  const intentAt = order.indexOf('e-intent');
+  const buffsAt = order.indexOf('e-buffs');
+  const figAt = order.indexOf('fig');
+  const debuffAt = order.indexOf('e-statuses');
+  assert.ok(intentAt === 0, 'the intent row is the card\'s topmost band');
+  assert.ok(intentAt < buffsAt && buffsAt < figAt, 'the buff row sits between the intent row and the art');
+  assert.ok(figAt < debuffAt, 'the debuff row stays at the foot, below the art');
+  // Which chip went where — kernel `kind`, same chip component in both rows.
+  const buffChips = chipsIn(card.kids.filter((n) => marker(n) === 'e-buffs')[0]);
+  assert.equal(buffChips.length, 1, 'one buff chip above the art');
+  assert.match(buffChips[0].attrs.title, /^Strength 3 — its attacks/, 'the up-top chip is the enemy\'s own Strength');
+  const footRow = card.kids.filter((n) => marker(n) === 'e-statuses')[0];
+  const footChips = chipsIn(footRow);
+  assert.equal(footChips.length, 1, 'one debuff chip at the foot');
+  assert.match(footChips[0].attrs.title, /^Vulnerable 2 — /, 'the foot chip is the hero-applied Vulnerable');
+  // A buffless enemy renders no top buff row at all (the conditional pattern), and the
+  // foot row is a plain `.e-statuses` — no new chrome for the old shape.
+  const bare = startFight({ enemyStatuses: {} });
+  bare.render();
+  const bareCard = enemyCard();
+  assert.equal(bareCard.kids.some((n) => marker(n) === 'e-buffs'), false, 'no buffs row when the enemy holds none');
+  assert.equal(bareCard.kids.some((n) => marker(n) === 'e-statuses'), false, 'and no foot row either');
+});
+
 test('clicking the Vulnerable status chip explains it through the shared popover; Escape closes', () => {
   const api = startFight();
   api.render();

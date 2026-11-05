@@ -254,3 +254,20 @@ test('an ENEMY status chip speaks the enemy variant of the meaning, not the play
   const es = await combatState('defend', { enemyId: 'cultist', enemyOver: { moveIndex: 0, statuses: { strength: 3 } } });
   assert.equal(snapshot(es, { lang: 'es' }).enemies[0].statuses[0].text, 'Fuerza 3 — sus ataques infligen 3 de daño más');
 });
+
+test('each snapshot status row publishes its kind (the one buff/debuff classification, from STATUS_KINDS)', async () => {
+  // The web splits the enemy card into an ABOVE-the-art buffs row and a foot debuffs
+  // row off this field — a surface must never string-match status keys, so the kernel's
+  // own table (rules/vocabulary.js STATUS_KINDS, the same source the Purge Flask list
+  // derives from) is what the row carries. Additive metadata: every existing field is
+  // untouched, and the compact dump reads statuses through statusLine, so no dump byte
+  // moves (the goldens pin that separately).
+  const st = await combatState('defend', {
+    enemyId: 'jaw_worm', enemyOver: { moveIndex: 0, statuses: { strength: 2, dexterity: 1, metallicize: 3, vulnerable: 2, weak: 1 } },
+  });
+  const kinds = Object.fromEntries(snapshot(st).enemies[0].statuses.map((r) => [r.key, r.kind]));
+  assert.deepEqual(kinds, {
+    strength: 'buff', dexterity: 'buff', metallicize: 'buff',
+    vulnerable: 'debuff', weak: 'debuff',
+  });
+});

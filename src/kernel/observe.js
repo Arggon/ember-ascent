@@ -21,6 +21,7 @@ import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
 import { POTION_SLOTS, potionDef } from './rules/potions.js';
+import { STATUS_KINDS } from './rules/vocabulary.js';
 import { eventDef, offerEventChoices, renderEventLines, temperOfferOpen } from './rules/events.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
@@ -642,6 +643,13 @@ export function observeActions(state) {
  * N more damage", an ENEMY's says "its attacks deal N more damage" — the same counters
  * mean different things per side, and a chip that borrowed the player's wording on an
  * enemy told the reader the buff was theirs.
+ *
+ * Each row also carries `kind` — the buff/debuff classification PUBLISHED from the
+ * kernel's one such table (rules/vocabulary.js STATUS_KINDS, the same single source
+ * rules/potions.js derives its Purge list from), so a surface can split an enemy's own
+ * buffs from hero-applied debuffs without string-matching keys. Additive metadata only:
+ * the compact dump reads statuses through statusLine (plain "PWR2 VULN1" tokens) and the
+ * run hash reads canonical(state), so no dump byte and no hash can move because of it.
  * @param {any} statuses
  * @param {string} [lang]
  * @param {'player'|'enemy'} [side]
@@ -652,6 +660,11 @@ function statusPairs(statuses, lang = 'en', side = 'player') {
     .map(([key, stacks]) => ({
       key,
       stacks,
+      // 'buff' (helps its holder: strength, dexterity, metallicize) or 'debuff'
+      // (hurts it: vulnerable, weak). The `?? 'debuff'` is a fallback for a key the
+      // table somehow does not know — unreachable through addStatus's validation —
+      // and it keeps such a row in the BOTTOM status group it always rendered in.
+      kind: STATUS_KINDS[key] ?? 'debuff',
       // Compact form for the CLI and for anyone who has read the glossary.
       label: `${STATUS_ABBREV[key] ?? key.toUpperCase()}${stacks}`,
       // The human word for the status ("Strength"), for the chip popovers: the compact

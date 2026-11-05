@@ -3532,6 +3532,15 @@ html, body {
 .stage-combat .enemy .hpbar { width: 80%; margin: 2px 0; }
 .stage-combat .enemy .eblock { font-size: 0.72rem; }
 .stage-combat .e-statuses { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+/* The enemy's own BUFFS ride ABOVE the figure, under the intent row — the retired
+   intent badge's slot (the user's ask: the enemy's actions and its own buffs float over
+   it, the hero-applied debuffs stay at the foot). The row reuses the `.e-statuses` chip
+   sizing above and adds nothing of its own but its place: chrome-less, centered.
+   `min-height` reserves one chip row so an enemy with NO buffs keeps the same top band
+   as one with two: the enemies row is bottom-anchored on the ground line
+   (`align-items: flex-end`), and without the reserve a buffless neighbour's art would
+   stand a chip-row taller than its buffed neighbour's. */
+.stage-combat .e-buffs { min-height: 16px; margin: 0 0 2px; }
 /* The status CHIPS: the same component the card faces carry, on the readouts. The rows
    are narrower than a card tile and sit on tinted ground, so the chip tightens its pad
    and darkens its well; the mark and number do the talking, the sentence is the title. */
