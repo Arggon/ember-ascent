@@ -7814,21 +7814,21 @@ html, body {
    `.gr` ground stroke — the enemy-mark language in miniature. The Cyan Lantern's flame is
    the one cool accent (`.cb`), the quenched-temper cold blue precedent (the card
    temper class ships #8fd0f2). */
-.boon-art { display: block; align-self: center; width: 48px; height: 48px; margin-bottom: 2px; }
+.boon-art { --glow-base: drop-shadow(0 0 3px rgba(255, 122, 90, 0.85)); display: block; align-self: center; width: 48px; height: 48px; margin-bottom: 2px; }
 .boon-art svg { display: block; width: 100%; height: 100%; }
 .boon-art .b { fill: #0b0705; }
 .boon-art .r { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.boon-art .g { fill: #ff9d3a; filter: drop-shadow(0 0 3px rgba(255, 122, 90, 0.85)); transition: filter 0.15s; }
+.boon-art .g { fill: #ff9d3a; filter: var(--glow-base); transition: filter 0.15s; }
 .boon-art .cb { fill: #8fd0f2; filter: drop-shadow(0 0 3px rgba(111, 182, 228, 0.85)); transition: filter 0.15s; }
 .boon-art .gr { fill: none; stroke: #2a1810; stroke-width: 2.8; stroke-linecap: round; }
 .boon:hover .boon-art .g, .boon:hover .boon-art .cb,
 .boon:focus-visible .boon-art .g, .boon:focus-visible .boon-art .cb { filter: drop-shadow(0 0 5px rgba(255, 122, 90, 0.95)); }
 /* The event's dimmed choices share the boon shell, so its hover glow would brighten the
    art of a choice the kernel refused; this pins the glow at its BASE value on a dim
-   hover (the shell's own `.event-choice.dim:hover` already holds the lift). The 3px
-   filter repeats the base `.g`/`.cb` values on purpose — retune both together. The `.cb`
-   arm is defensive: no event mark wears the cool accent yet. */
-.event-choice.dim:hover .boon-art .g, .event-choice.dim:hover .boon-art .cb { filter: drop-shadow(0 0 3px rgba(255, 122, 90, 0.85)); }
+   hover (the shell's own `.event-choice.dim:hover` already holds the lift). `--glow-base`
+   is the one copy of that value. The `.cb` arm is defensive: no event mark wears the
+   cool accent yet. */
+.event-choice.dim:hover .boon-art .g, .event-choice.dim:hover .boon-art .cb { filter: var(--glow-base); }
 /* SMALL chip mark (.boon-glyph): the SAME mark, restyled to strokes at chip size — the
    `.b` silhouette draws as its outline, the glow dots fill. Stroke widths are in the
    100-box viewBox units, so 8-9 units ≈ the 14px chip's ~1.2px line (the .m family's 2.1
@@ -7856,12 +7856,11 @@ html, body {
   .boon .boon-glyph { width: 16px; height: 16px; }
 }
 /* Reduced motion: the glow's hover transition is killed and the glow rests at its base —
-   the same kill the `.boon` shell gets in the kindling block. The 3px filter repeats the
-   base `.g`/`.cb` values above on purpose; retune both together when the glow changes. */
+   the same kill the `.boon` shell gets in the kindling block. */
 @media (prefers-reduced-motion: reduce) {
   .boon-art .g, .boon-art .cb { transition: none; }
   .boon:hover .boon-art .g, .boon:hover .boon-art .cb,
-  .boon:focus-visible .boon-art .g, .boon:focus-visible .boon-art .cb { filter: drop-shadow(0 0 3px rgba(255, 122, 90, 0.85)); }
+  .boon:focus-visible .boon-art .g, .boon:focus-visible .boon-art .cb { filter: var(--glow-base); }
 }
 
 /* ==========================================================================================

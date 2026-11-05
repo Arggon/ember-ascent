@@ -239,7 +239,9 @@ export const BOON_GLYPH = {
  *      whose 20-box single-stroke `.m` layer set has no art context here.
  *  NOTE: an event the kernel no longer knows (`ev.known === false`) renders NO choices at
  *  all, so this table never meets a torn event id on a live screen — the `r-unknown` arm
- *  is purely defensive (a roster slug renamed without its table row). */
+ *  is purely defensive (a roster slug renamed without its table row). Drift guard:
+ *  tests/web/event-art-surfaces.test.js drives real kernel snapshots for every roster
+ *  event, so a slug renamed without its row here fails a test, never ships a fallback. */
 export const EVENT_CHOICE_GLYPH = {
   sleeping_forge: { stoke: 'ev-stoke', leave: 'ev-road', ember: 'ev-ember' },
   ash_peddler: { potion: 'ev-potion', sell: 'ev-sell', wave: 'ev-road' },

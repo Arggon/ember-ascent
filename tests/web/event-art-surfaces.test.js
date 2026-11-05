@@ -108,7 +108,7 @@ const { prelude, body, mods: importedModules } = await bundleApp(appUrl, { stubC
 // view the player actually gets and compare what it paints against what glyphMarkup
 // would emit for the mapped mark.
 let src = body;
-src += '\nreturn { snapNow: () => snap, eventView, glyphMarkup, EVENT_CHOICE_GLYPH };';
+src += '\nreturn { snapNow: () => snap, eventView, glyphMarkup, EVENT_CHOICE_GLYPH, t };';
 
 const ctlMod = await import('../../src/surface/gui/controller.js');
 const factory = new Function('__ctl', '__mods', `
@@ -264,7 +264,7 @@ test('the aria-labels still speak the kernel\u2019s sentences verbatim (the art 
       const c = snapChoices[i];
       const expected = c.actionId !== null
         ? `${c.label}. ${c.effect}`
-        : `${c.label}. Unavailable: ${c.reason}.`;
+        : `${c.label}. ${apiV.t('event.unavailable', { reason: c.reason })}`;
       assert.equal(buttons[i].attrs['aria-label'], expected,
         `${c.slug}: the aria contract holds (${c.actionId === null ? 'dim' : 'affordable'} form)`);
       // The art span is decorative: the aria-hidden rides the mark's <svg> markup
