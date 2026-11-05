@@ -118,6 +118,27 @@ const MARKS = {
   'b-purge': { box: '0 0 20 20', body: '<path class="m" d="M5 3.5 H12.5 V8 H5 Z"/><path class="m" d="M8.75 8 V17"/><path class="m" d="M3.5 3.5 L16.5 16.5 M16.5 3.5 L3.5 16.5"/>' },
   'b-stoke': { box: '0 0 20 20', body: '<path class="m" d="M10 17.5 C5.8 14.6 7.7 11.2 9.7 8.4 C10.3 10.8 12.9 10.6 12.1 7.6 C15.3 10.4 15.6 14.7 10 17.5 Z"/><circle class="mf" cx="12.4" cy="6.2" r="1.3"/><path class="m" d="M15.2 2.2 L12.8 5.4 M18.6 3.6 L13.9 6"/>' },
 
+  // --- event choice art (ev-*): the wayside's choice buttons wear their own mark, the
+  //     same forged-iron woodcut language as the relic art (`.b` iron body, `.r` rim
+  //     light = currentColor, `.g` ember glow, `.gr` ground stroke). One mark per
+  //     eventId+slug pair (the roster's own slugs, src/kernel/rules/events.js's
+  //     EVENT_ROSTER); the four no-op
+  //     beats (leave/wave/walk/move) share the ONE footprint-on-the-road mark. The
+  //     silhouettes echo the marks this surface already knows: the coin (ev-ember's
+  //     struck disc), the flask (ev-potion's stoppered bottle), the draw cards
+  //     (ev-sell's face-up card), r-deep_well's ellipse mouth (ev-climb), the flame
+  //     teardrop (ev-torch), r-forge_iron's riveted bench (ev-temper), the hearth's
+  //     warm coals (ev-stories). Constant markup, no interpolation. ---
+  'ev-stoke': { box: '0 0 100 100', body: '<path class="r" d="M30 8 C40 20 48 40 50 56"/><path class="r" d="M74 10 C62 24 54 40 52 56"/><circle class="r" cx="52" cy="26" r="3"/><path class="b" d="M20 68 C28 58 42 52 50 52 C58 52 72 58 80 68 L76 80 H24 Z"/><path class="g" d="M42 46 l5 4 -5 3z"/><path class="g" d="M58 42 l5 4 -5 3z"/><circle class="g" cx="50" cy="62" r="3.4"/><circle class="g" cx="64" cy="68" r="2.4"/><path class="gr" d="M10 90 H90"/>' },
+  'ev-ember': { box: '0 0 100 100', body: '<circle class="b" cx="50" cy="64" r="24"/><path class="r" d="M50 46 V82"/><path class="g" d="M40 26 L54 20 L62 30 L58 42 L44 42 L38 32 Z"/><path class="r" d="M40 26 L54 20 L62 30 L58 42"/><circle class="g" cx="68" cy="18" r="2.2"/><circle class="g" cx="31" cy="20" r="2"/><path class="gr" d="M12 92 H88"/>' },
+  'ev-road': { box: '0 0 100 100', body: '<ellipse class="b" cx="38" cy="50" rx="7.5" ry="12"/><ellipse class="b" cx="62" cy="68" rx="7.5" ry="12"/><path class="r" d="M33 64 L32 67 M38 65 L38 68 M43 64 L44 67"/><path class="r" d="M57 82 L56 85 M62 83 L62 86 M67 82 L68 85"/><path class="gr" d="M8 88 H92"/>' },
+  'ev-potion': { box: '0 0 100 100', body: '<path class="b" d="M37 10 H53 V20 H37 Z"/><path class="b" d="M39 20 H49 V34 L60 54 C64 63 60 76 50 78 H38 C28 76 24 63 28 54 L39 34 Z"/><path class="r" d="M33 56 H55"/><circle class="g" cx="44" cy="27" r="2.6"/><path class="r" d="M16 78 H84"/><circle class="r" cx="72" cy="78" r="8"/><path class="gr" d="M10 92 H90"/>' },
+  'ev-sell': { box: '0 0 100 100', body: '<path class="b" d="M33 18 H67 C70 18 72 20 72 23 V69 C72 72 70 74 67 74 H33 C30 74 28 72 28 69 V23 C28 20 30 18 33 18 Z"/><path class="r" d="M36 28 H64 V64 H36 Z"/><path class="b" d="M30 76 H70 L68 83 H32 Z"/><path class="b" d="M34 83 H66 L64 90 H36 Z"/><path class="r" d="M30 76 H70 M34 83 H66"/><circle class="g" cx="50" cy="46" r="3"/><path class="gr" d="M14 94 H86"/>' },
+  'ev-climb': { box: '0 0 100 100', body: '<path class="r" d="M38 8 L33 66"/><path class="r" d="M62 8 L67 66"/><path class="r" d="M36 22 H64 M34.5 40 H65.5 M33.5 58 H66.5"/><path class="b" fill-rule="evenodd" d="M18 68 A32 13 0 1 0 82 68 A32 13 0 1 0 18 68 Z M29 68 A21 8 0 1 1 71 68 A21 8 0 1 1 29 68 Z"/><circle class="g" cx="50" cy="69" r="3"/><path class="gr" d="M8 90 H92"/>' },
+  'ev-torch': { box: '0 0 100 100', body: '<path class="b" d="M46 36 L60 28 L68 40 L54 48 Z"/><path class="r" d="M46 36 L60 28"/><path class="b" d="M56 46 L76 72 L68 78 L48 52 Z"/><path class="r" d="M52 44 L58 48"/><path class="g" d="M36 10 C44 18 46 26 42 32 C38 28 32 20 32 14 C33 12 34.5 11 36 10 Z"/><circle class="g" cx="30" cy="30" r="2.2"/><circle class="g" cx="46" cy="18" r="1.8"/><path class="gr" d="M12 90 H88"/>' },
+  'ev-temper': { box: '0 0 100 100', body: '<path class="b" d="M46 8 L66 16 L61 30 L41 22 Z"/><path class="r" d="M46 8 L66 16"/><path class="r" d="M56 22 L46 50"/><path class="b" d="M22 58 H78 L84 76 H16 Z"/><path class="r" d="M22 58 H78"/><path class="r" d="M16 76 L22 58"/><circle class="r" cx="33" cy="67" r="2.4"/><circle class="r" cx="50" cy="67" r="2.4"/><circle class="r" cx="67" cy="67" r="2.4"/><path class="g" d="M38 76 H62 L60 80 H40 Z"/><path class="gr" d="M10 90 H90"/>' },
+  'ev-stories': { box: '0 0 100 100', body: '<path class="b" d="M26 56 C26 72 36 82 50 82 C64 82 74 72 74 56 Z"/><path class="r" d="M26 56 H74"/><path class="r" d="M42 46 C40 38 44 34 42 26"/><path class="r" d="M56 46 C54 38 58 34 56 26"/><path class="r" d="M80 22 C86 22 90 26 90 31 C90 36 86 40 81 40 L76 46 L77 40 C74 38 72 35 72 31 C72 26 75 22 80 22 Z"/><circle class="g" cx="50" cy="62" r="3.2"/><circle class="r" cx="59" cy="66" r="1.8"/><path class="gr" d="M12 92 H88"/>' },
+
   // --- enemy illustrations (art-direction rev): forged-iron woodcut. Three layers per
   //     creature: `.b` body (near-black iron), `.r` rim light (currentColor = the creature's
   //     tint), `.g` ember glow (eyes, cores, cracks). Constant markup, no interpolation. ---
@@ -204,6 +225,26 @@ export const BOON_GLYPH = {
   sparkfall: 'b-sparkfall',
   purge: 'b-purge',
   stoke: 'b-stoke',
+};
+
+/** Event choice -> its per-choice mark (the ev-* table above), keyed eventId THEN slug —
+ *  the same two-level keying the kernel itself uses (resolveChoice rejects a slug/index
+ *  mismatch, so the slug is kernel-verified identity; snapshotEvent publishes both on
+ *  every choice row). Presentation only: the event view resolves it from the snapshot's
+ *  own `eventId`/`slug`. The four no-op beats (leave/wave/walk/move — one per event, the
+ *  roster's shared "nothing happens" exit) share the ONE `ev-road` footprint mark, the
+ *  same way every relic chip shares one silhouette language. The fallback is the CALLER's
+ *  (an unknown eventId/slug must never render an empty box):
+ *    * event view -> `r-unknown`, the generic riveted plate — NEVER the small `rune`,
+ *      whose 20-box single-stroke `.m` layer set has no art context here.
+ *  NOTE: an event the kernel no longer knows (`ev.known === false`) renders NO choices at
+ *  all, so this table never meets a torn event id on a live screen — the `r-unknown` arm
+ *  is purely defensive (a roster slug renamed without its table row). */
+export const EVENT_CHOICE_GLYPH = {
+  sleeping_forge: { stoke: 'ev-stoke', leave: 'ev-road', ember: 'ev-ember' },
+  ash_peddler: { potion: 'ev-potion', sell: 'ev-sell', wave: 'ev-road' },
+  collapsed_shaft: { climb: 'ev-climb', torch: 'ev-torch', walk: 'ev-road' },
+  wandering_smith: { temper: 'ev-temper', stories: 'ev-stories', move: 'ev-road' },
 };
 
 export const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', status: 'hourglass', curse: 'skull' };

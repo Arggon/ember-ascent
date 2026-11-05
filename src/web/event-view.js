@@ -15,7 +15,7 @@ import { el, keywordText, sceneIllus } from './dom.js';
 import { consumeClick } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
-import { glyphBox } from './glyphs.js';
+import { EVENT_CHOICE_GLYPH, glyphBox } from './glyphs.js';
 import { cardDescribe, cardTile } from './combat-view.js';
 import { loadContent } from '../kernel/index.js';
 import { currentLang, t } from './i18n.js';
@@ -112,6 +112,12 @@ export function eventView() {
       },
       on: affordable ? { click: (e) => { consumeClick(e); act(c.actionId); } } : {},
     },
+    // Every choice wears its own mark, the relic offer's contract (per-relic `.boon-art`):
+    // the kernel-verified eventId+slug picks the ev-* mark, an unknown pair falls to the
+    // generic r-unknown plate — never an empty box, never the small rune (wrong layer set
+    // for this art context). Decorative: the span is aria-hidden, the kernel sentences
+    // below carry the words.
+    glyphBox(EVENT_CHOICE_GLYPH[ev.eventId]?.[c.slug] || 'r-unknown', 'boon-art'),
     el('span', { cls: 'boon-name', text: c.label }),
     keywordText(el('span', { cls: 'boon-text' }), c.effect),
     // The dimmed button still says WHY: the requirement is a fact, not a mystery.

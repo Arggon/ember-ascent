@@ -7823,6 +7823,12 @@ html, body {
 .boon-art .gr { fill: none; stroke: #2a1810; stroke-width: 2.8; stroke-linecap: round; }
 .boon:hover .boon-art .g, .boon:hover .boon-art .cb,
 .boon:focus-visible .boon-art .g, .boon:focus-visible .boon-art .cb { filter: drop-shadow(0 0 5px rgba(255, 122, 90, 0.95)); }
+/* The event's dimmed choices share the boon shell, so its hover glow would brighten the
+   art of a choice the kernel refused; this pins the glow at its BASE value on a dim
+   hover (the shell's own `.event-choice.dim:hover` already holds the lift). The 3px
+   filter repeats the base `.g`/`.cb` values on purpose — retune both together. The `.cb`
+   arm is defensive: no event mark wears the cool accent yet. */
+.event-choice.dim:hover .boon-art .g, .event-choice.dim:hover .boon-art .cb { filter: drop-shadow(0 0 3px rgba(255, 122, 90, 0.85)); }
 /* SMALL chip mark (.boon-glyph): the SAME mark, restyled to strokes at chip size — the
    `.b` silhouette draws as its outline, the glow dots fill. Stroke widths are in the
    100-box viewBox units, so 8-9 units ≈ the 14px chip's ~1.2px line (the .m family's 2.1
