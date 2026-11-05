@@ -597,8 +597,8 @@ function enemyCard(e, position) {
     bb.querySelector('i').style.width = `${Math.min(100, Math.round((e.block / Math.max(1, e.maxHp)) * 100))}%`;
     card.append(bb);
   }
-  // The DEBUFF foot row: the hero-applied statuses (Vulnerable, Weak — the kernel's
-  // `kind: 'debuff'` half), exactly where the single status row always sat. The
+  // The DEBUFF foot row: the statuses the kernel classifies as debuffs (Vulnerable,
+  // Weak — `kind: 'debuff'`), exactly where the single status row always sat. The
   // floating-damage efx box follows it, as before.
   card.append(efxBox(e.index));
   if (debuffs.length > 0) card.append(el('div', { cls: 'e-statuses' }, ...debuffs));
