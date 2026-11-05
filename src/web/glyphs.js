@@ -10,9 +10,9 @@
 // Anything unknown falls back to a rune, so a new enemy or node type in the kernel
 // renders as a generic shape rather than an empty box.
 //
-// The table is named MARKS (not GLYPHS) because src/web/stage-art.js keeps its own
-// private intent-glyph table of that name — the two must stay distinct when tests
-// concatenate the web modules into one scope.
+// The table is named MARKS (not GLYPHS) — the retired stage-art intent table of
+// that name once made the two collide when tests concatenated the web modules
+// into one scope, and the distinct name outlived it.
 
 import { el } from './dom.js';
 

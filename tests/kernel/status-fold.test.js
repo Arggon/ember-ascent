@@ -7,7 +7,7 @@
 //
 //   * The enemy side was ALREADY correct — rules/act.js strikeDamage() folds the enemy's
 //     live Strength into every hit and into intentDamage()'s announced number, and both
-//     the web badge and the intent sentence read that folded value (an exhaustive sweep:
+//     the intent chips and the intent sentence read that folded value (an exhaustive sweep:
 //     7043 resolved attacks and 5315 announced intents across every enemy × 120 seeds,
 //     zero disagreements). The user's exact measurement could not be reproduced from any
 //     build in the repo. These pins exist to keep it that way.
@@ -92,7 +92,7 @@ test('an intent built AFTER a strength buff shows the buffed number — intents 
   assert.equal(state.combat.enemies[0].statuses.strength, 3, 'the stacks are live state');
 
   // The NEXT intent was built after the buff: the announced number is the buffed one,
-  // and the compact badge and the sentence cannot disagree (they read intentDamage()).
+  // and the chip row and the sentence cannot disagree (they read intentDamage()).
   const snap = snapshot(state);
   assert.equal(snap.enemies[0].intent.damage, 9, '6 printed + 3 Strength announced as 9');
   assert.match(snap.enemies[0].intent.text, /9/);

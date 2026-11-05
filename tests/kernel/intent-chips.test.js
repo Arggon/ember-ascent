@@ -8,8 +8,8 @@
 //     beside the sentence, kernel-side;
 //   * intentChips() turns those facts into the same chip shape a card face carries, with
 //     the describeIntent sentence as every chip's explain — one click says the whole move;
-//   * the numbers are the engine's own (intentDamage), so a chip and the compact badge
-//     can never disagree.
+//   * the numbers are the engine's own (intentDamage), so a chip and the intent
+//     sentence can never disagree.
 //
 // Pins: thrash → attack 7 + block 5; a debuff move → a status chip; a buff move → a
 // self Strength chip and its block; the ES rows word the same chips in Spanish.
@@ -45,11 +45,11 @@ test('intentChips: thrash reads as attack 7 + block 5', async () => {
       'every chip explains the WHOLE move with the kernel sentence');
     assert.ok(chip.label.length > 0, 'each chip titles itself');
   }
-  // A multi-hit attack reads per-hit × hits, the badge's own convention.
+  // A multi-hit attack reads per-hit × hits, the row's own convention.
   const multi = K.intentChips({
     intent: { kind: 'attack', damage: 12, hits: 3, text: 'Will attack for 4 damage 3 times' },
   });
-  assert.equal(multi[0].num, '4×3', 'the total splits onto the chip like the badge');
+  assert.equal(multi[0].num, '4×3', 'the total splits onto the chip per-hit × hits');
 });
 
 test('intentChips: a debuff move yields a status chip; a buff yields self Strength and block', async () => {

@@ -1,8 +1,7 @@
 // src/web/stage-art.js — original woodcut figures for the combat stage.
 //
 // Figures are illustrated woodcut sprites (local WebP in src/web/assets/sprites/, no
-// network). The backdrop and intent glyphs stay SVG with `.b` iron / `.r` rim / `.g`
-// ember classes. Constant markup only: no kernel value is interpolated, so innerHTML
+// network). The backdrop stays SVG with `.b` iron / `.r` rim / `.g` ember classes. Constant markup only: no kernel value is interpolated, so innerHTML
 // stays safe. No ids, no xmlns, no external asset. Decoration only.
 
 const svg = (body, box = '0 0 120 160') =>
