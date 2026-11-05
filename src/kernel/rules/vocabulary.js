@@ -302,12 +302,18 @@ export const VOCABULARY = {
   },
 
   /**
-   * retain — a MARKER verb: it does nothing at play time and is instead consumed by the
-   * end-of-turn discard phase (rules/act.js endTurn), which keeps a hand card whose
-   * definition carries this verb in the hand instead of discarding it. The card keeps
-   * its decorated instance (cost included) and stays retained turn after turn — the
-   * check reads the definition, not a one-shot flag. Zero draws at play AND at the
-   * discard phase: nothing rolls, the card simply does not move.
+   * retain — a MARKER verb: it emits nothing here, and two phases consume the marker
+   * by reading the DEFINITION (never a one-shot flag, so a tempered copy keeps the
+   * behavior). (1) THE PLAY PATH (rules/steps.js playCard): a played retain card
+   * never moves to the discard pile — after its effects resolve, the played instance
+   * RETURNS to the hand as its decorated self (cost included, perPlay preserved, the
+   * same decorated-instance rule endTurn documents) and a `{ t: 'retain', uids }`
+   * event marks the return, keeping the stream honest beside the play it follows.
+   * Replaying it the same turn is legal whenever its cost is payable again. (2) THE
+   * END-OF-TURN DISCARD PHASE (rules/act.js endTurn): a hand card whose definition
+   * carries this verb stays in the hand instead of discarding, turn after turn.
+   * Zero draws at play, at the return, AND at the discard phase: nothing rolls, the
+   * card simply does not move.
    */
   retain(state, _ctx, _params) {
     return { state, events: [] };

@@ -5,10 +5,13 @@
 //   heal — restores up to the printed HP, capped at maxHp; the event carries the HP
 //          ACTUALLY restored (a full-HP play heals 0 and says so); ignores Block by
 //          construction (it never touches the damage path); zero draws.
-//   retain — a play-time no-op (zero events, zero draws); the end-of-turn discard
-//          phase keeps the card in the hand with its decorated instance intact,
-//          turn after turn, while non-retain cards discard exactly as before; the
-//          partition itself consumes no rng draws (measured against a control).
+//   retain — a played retain card RETURNS to the hand after its effects resolve
+//          (the decorated instance, cost included; zero draws; a `retain` event
+//          marks the return) and can be replayed the same turn; the end-of-turn
+//          discard phase keeps the card in the hand with its decorated instance
+//          intact, turn after turn, while non-retain cards discard exactly as
+//          before; the partition itself consumes no rng draws (measured against a
+//          control).
 //   hits — per-hit Block absorption (block soaks hit by hit), Strength added to every
 //          hit, and the loop stops when the target dies mid-card (rule 5: no writing
 //          to a corpse).
@@ -67,13 +70,38 @@ async function handState(cardIds, over = {}) {
   return freezeDeep({ ...base, combat: { ...base.combat, hand, draw: dummyPile(c, 20) } });
 }
 
-test('retain: playing a retain card is a no-op — it discards like any attack', async () => {
-  const state = await handState(['kindled_blade']);
+test('retain: a played retain card returns to the hand, decorated', async () => {
+  const state = await handState(['ember_ward']);
   const res = step(state, 'p1');
   assert.equal(res.error, null);
-  assert.deepEqual(res.events.map((e) => e.t), ['damage'], 'the marker verb emits nothing');
-  assert.equal(res.state.combat.discard.length, 1, 'played retain card goes to discard normally');
+  assert.deepEqual(res.events.map((e) => e.t), ['block', 'retain'], 'the effects resolve, then the return is observable');
+  assert.equal(res.state.combat.discard.length, 0, 'the played card never entered the discard pile');
+  const back = res.state.combat.hand.find((c) => c.uid === 'H0');
+  assert.ok(back, 'the played instance is back in hand');
+  assert.equal(back.cardId, 'ember_ward');
+  assert.equal(back.cost, 2, 'the decorated instance (cost) survives the play');
   assert.equal(res.state.combat.exhaust.length, 0);
+});
+
+test('retain: a non-retain play still discards like any attack (control)', async () => {
+  const state = await handState(['cinder_flick']);
+  const res = step(state, 'p1');
+  assert.equal(res.error, null);
+  assert.equal(res.state.combat.discard.length, 1, 'the played card goes to discard normally');
+  assert.equal(res.state.combat.hand.length, 0);
+});
+
+test('retain: the returned card can be replayed the same turn', async () => {
+  const state = await handState(['kindled_blade']);
+  let res = step(state, 'p1');
+  assert.equal(res.error, null);
+  assert.ok(res.state.combat.hand.some((c) => c.uid === 'H0'), 'back in hand after the first play');
+  const first = res;
+  res = step(freezeDeep(res.state), 'p1');
+  assert.equal(res.error, null, 'replaying the retained card is legal while its cost is payable');
+  assert.deepEqual(res.events.map((e) => e.t), ['damage', 'retain'], 'the replay resolves and returns exactly like the first play');
+  assert.equal(first.events.filter((e) => e.t === 'damage').length + res.events.filter((e) => e.t === 'damage').length, 2, 'both plays landed their effects');
+  assert.equal(res.state.combat.discard.length, 0);
 });
 
 test('retain: a held card survives the discard phase — event, hand, decorated cost', async () => {

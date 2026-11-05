@@ -39,11 +39,14 @@ const toInstance = (c) => ({ uid: c.uid, cardId: c.cardId, perPlay: c.perPlay ??
  * its definition carries the `retain` marker verb (rules/vocabulary.js). The check reads
  * the DEFINITION, so a card stays retained every turn it sits in hand, and a tempered
  * copy keeps the marker (temperEffects only appends or rescales — it never drops a verb).
+ * The PLAY path shares this check (rules/steps.js playCard): a played retain card
+ * returns to the hand instead of discarding, so the definition is the single source
+ * for both the keep-through-play and the keep-through-turn-end behavior.
  * @param {Map<string, any>} cardDefs
  * @param {{cardId: string}} card
  * @returns {boolean}
  */
-function retainsCard(cardDefs, card) {
+export function retainsCard(cardDefs, card) {
   const def = cardDefs?.get(card.cardId);
   return Array.isArray(def?.effects) && def.effects.some((e) => e.verb === 'retain');
 }

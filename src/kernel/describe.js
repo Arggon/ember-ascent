@@ -330,7 +330,7 @@ const VERB_MEANING = {
     energy: (n) => `Gain ${n} Energy — it pays for cards; you get 3 each turn.`,
     heal: (n) => `Restore up to ${n} HP — never past your maximum.`,
     exhaust: () => 'Exhaust: this card leaves the fight for good — it does not come back in a reshuffle.',
-    retain: () => 'Retain: this card stays in your hand when your turn ends instead of being discarded.',
+    retain: () => 'Retain: playing this card returns it to your hand after its effects resolve — it never moves to the discard pile, and it stays in your hand when your turn ends too.',
   },
   es: {
     damage: (n, hits, who) => `Infliges ${n} de daño${who ? ` ${chipWho(who, 'es')}` : ''}${hits > 1 ? ` ${hits} veces` : ''}.`,
@@ -340,7 +340,7 @@ const VERB_MEANING = {
     energy: (n) => `Ganas ${n} de Energía: paga las cartas; recibes 3 cada turno.`,
     heal: (n) => `Restauras hasta ${n} HP, nunca más allá de tu máximo.`,
     exhaust: () => 'Agotar: la carta sale del combate para siempre — no vuelve en un rebarajado.',
-    retain: () => 'Retener: la carta se queda en tu mano cuando termina tu turno, en vez de descartarse.',
+    retain: () => 'Retener: al jugarla, la carta vuelve a tu mano tras resolver sus efectos — nunca va al descarte, y también se queda en tu mano cuando termina tu turno.',
   },
 };
 
@@ -640,7 +640,7 @@ const TEMPLATES = {
     // The engine caps the restore at maxHp (rules/vocabulary.js), so "up to" is the
     // honest wording — a full-HP play restores nothing.
     heal: (e) => `Restore up to ${e.amount} HP.`,
-    retain: () => 'Retain this card — it stays in your hand when your turn ends.',
+    retain: () => 'Retain this card — playing it returns it to your hand after its effects resolve, and it stays in your hand when your turn ends.',
     custom: (e) => CUSTOM_SENTENCE[e.handler] ?? `Special effect (${e.handler}).`,
   },
   es: {
@@ -684,7 +684,7 @@ const TEMPLATES = {
     discard: (e) => `Descartas ${pluralEs(e.amount, 'carta', 'cartas')} al azar.`,
     exhaust: () => 'Agotas esta carta por el resto del combate.',
     heal: (e) => `Restauras hasta ${e.amount} HP.`,
-    retain: () => 'Retienes esta carta: se queda en tu mano cuando termina tu turno.',
+    retain: () => 'Retienes esta carta: al jugarla vuelve a tu mano tras resolver sus efectos, y se queda en tu mano cuando termina tu turno.',
     custom: (e) => CUSTOM_SENTENCE_ES[e.handler] ?? CUSTOM_SENTENCE[e.handler] ?? `Special effect (${e.handler}).`,
   },
 };
@@ -1012,7 +1012,7 @@ const GLOSSARY_CORE = {
     glossRow('d', 'Discard', 'Discard that many cards from your hand (lower case d, to keep it apart from Draw).'),
     glossRow('EXH', 'Exhaust', 'The card leaves the fight for good — it does not come back in a reshuffle.'),
     glossRow('H', 'Heal', 'Restore that much HP, never past your maximum. A card played at full HP restores nothing.'),
-    glossRow('RTN', 'Retain', 'The card stays in your hand when your turn ends, instead of being discarded. It keeps staying until you play or discard it.'),
+    glossRow('RTN', 'Retain', 'The card stays in your hand when your turn ends, instead of being discarded — and playing it returns it to your hand after its effects resolve.'),
     glossRow('+', 'grows', 'A plus after an ATTACK or BLOCK value means the number grows: each time you play the card, or each turn while a power lasts.'),
     // Status and power names: the B group.
     glossRow('HP', 'Your HP', 'Lose that much HP. This is a COST you pay, not healing: it ignores Block and never drops you below 1 HP.', 'B'),
@@ -1030,7 +1030,7 @@ const GLOSSARY_CORE = {
     glossRow('d', 'Descarte', 'Descartas esa cantidad de cartas de tu mano (d minúscula, para no confundirla con Robo).'),
     glossRow('EXH', 'Agotar', 'La carta sale del combate para siempre: no vuelve en un rebarajado.'),
     glossRow('H', 'Curar', 'Recuperas esa cantidad de HP, nunca más allá de tu máximo. Una carta jugada con todo el HP no recupera nada.'),
-    glossRow('RTN', 'Retener', 'La carta se queda en tu mano cuando termina tu turno, en vez de descartarse. Sigue ahí hasta que la juegues o la descartes.'),
+    glossRow('RTN', 'Retener', 'La carta se queda en tu mano cuando termina tu turno, en vez de descartarse — y al jugarla vuelve a tu mano tras resolver sus efectos.'),
     glossRow('+', 'crece', 'Un signo + tras un valor de ATAQUE o BLOQUEO significa que el número crece: cada vez que juegas la carta, o cada turno mientras dure un poder.'),
     // Status and power names: the B group.
     glossRow('HP', 'Tu HP', 'Pierdes esa cantidad de HP. Es un COSTE que pagas, no curación: ignora el Bloqueo y nunca te deja por debajo de 1 HP.', 'B'),
