@@ -34,7 +34,7 @@ import {
 import { el, keywordText } from './dom.js';
 import { EFFECT_GLYPH, TEMPER_GLYPH, TYPE_GLYPH, enemyLook, glyphBox } from './glyphs.js';
 import { heroMove, isMeleeMove, signatureFor } from './hero-moves.js';
-import { backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, attackTier, intentGlyph } from './stage-art.js';
+import { backdropMarkup, enemyMarkup, enemyVariant, heroMarkup } from './stage-art.js';
 import { cardArtMarkup } from './card-art.js';
 import { dyingCard, efxBox, freshEnemyStatusKeys, freshStatusKeys, heroEfx, hitClass } from './floats.js';
 import { aimed, cancelTargeting, clickCard, consumeClick, enemyLabel, pendingCard, pendingSlot, pickTarget, setAimed } from './targeting.js';
@@ -243,28 +243,6 @@ function enemyPose(e) {
   if (e.hp / Math.max(1, e.maxHp) <= 0.35) return 'low';
   if (e.intent && e.intent.kind === 'attack') return 'windup';
   return 'idle';
-}
-
-export function intentBadge(e) {
-  const kind = e.intent.kind;
-  let which = 'buff';
-  let tier = 1;
-  if (kind === 'attack') {
-    tier = attackTier(e.intent.damage);
-    which = tier >= 3 ? 'meteor' : tier >= 2 ? 'axe' : 'dagger';
-  } else if (kind === 'block') which = 'shield';
-  else if (kind === 'debuff') which = 'down';
-  const badge = el('div', {
-    cls: `intent-badge kind-${kind} tier-${tier}`,
-    attrs: { title: e.intent.text || e.intent.label || '', 'aria-hidden': 'true' },
-  });
-  badge.innerHTML = intentGlyph(which);
-  if (kind === 'attack') {
-    // `damage` is the intent's TOTAL (all hits); the badge reads per-hit × hits, as the label does.
-    const n = e.intent.hits > 1 ? `${Math.round(e.intent.damage / e.intent.hits)}×${e.intent.hits}` : String(e.intent.damage ?? '');
-    badge.append(el('b', { cls: 'intent-num', text: n }));
-  }
-  return badge;
 }
 
 function pileButton(which) {
@@ -521,13 +499,13 @@ function enemyCard(e, position) {
 
   const pose = enemyPose(e);
   // UX-2: the sequenced attacker. The plan clock gives this enemy its own beat: the
-  // intent badge lights up exactly while ITS slam plays (a CSS animation whose delay is
-  // the same clock, so a repaint re-derives it without restarting the timeline), and the
-  // .fig's slam waits for (or resumes at) its slot. Reduced motion and » never arm a
-  // plan, so both fall through to the static forms.
+  // intent row (its `.e-intent` chips) lights up exactly while ITS slam plays (a CSS
+  // animation whose delay is the same clock, so a repaint re-derives it without
+  // restarting the timeline), and the .fig's slam waits for (or resumes at) its slot.
+  // Reduced motion and » never arm a plan, so both fall through to the static forms.
   const seq = strikeSlot(e.index);
   if (seq) {
-    // The badge highlight rides a CSS variable pair so the stylesheet owns the look and
+    // The row highlight rides a CSS variable pair so the stylesheet owns the look and
     // the plan only owns the clock. setProperty is guarded: the fake-DOM test hosts carry
     // a plain style object, and only a real CSSOM can hold custom properties anyway.
     if (card.style && card.style.setProperty) {
@@ -536,7 +514,6 @@ function enemyCard(e, position) {
     }
     card.classList.add('is-striking');
   }
-  card.append(intentBadge(e));
   const fig = el('div', { cls: `fig pose-${pose}${enemyVariant(e.id)}`, attrs: { 'aria-hidden': 'true' } });
   if (seq && pose === 'slam') {
     // Same resume mechanism as the hero's pose: a positive delay waits for the

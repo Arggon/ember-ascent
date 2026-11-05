@@ -406,8 +406,8 @@ html, body {
 
 /* ---------- Intent banner ----------
    Four visually distinct treatments. Each carries a glyph AND a label, so the kind is
-   never communicated by colour alone. (The telegraph itself is the scaled
-   `.intent-badge` token on the combat stage; this banner is the sentence row.) */
+   never communicated by colour alone. (On the combat stage the stage override below
+   strips this chrome; the row there reads as plain centered chips.) */
 
 .e-intent {
   margin-top: 10px;
@@ -3547,7 +3547,9 @@ html, body {
 .stage-combat .e-intent {
   margin: 2px 0 0;
   padding: 0;
-  border: none;
+  /* The transparent ring the UX-2 intent-strike keyframes light (the badge that used to
+     carry that animation is gone; see the keyframes below). Invisible at rest. */
+  border: 1px solid transparent;
   background: none;
   display: block;
   text-align: center;
@@ -3563,54 +3565,22 @@ html, body {
   font-weight: 700;
   color: #e7d2c0;
 }
-.stage-combat .intent-badge {
-  width: 40px;
-  height: 48px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  color: #ff9d3a;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
-  /* A carved iron token instead of a bare glyph floating in the air. */
-  border-radius: 12px 12px 14px 14px;
-  background: radial-gradient(circle at 50% 35%, #2e1b11, #120a06 70%);
-  border: 1px solid #5a3420;
-  box-shadow: inset 0 1px 0 rgba(255, 190, 120, 0.18), 0 3px 8px rgba(0, 0, 0, 0.6);
-  padding: 3px 0 2px;
-}
-.stage-combat .intent-badge svg { width: 100%; height: 58%; display: block; }
-.stage-combat .intent-badge .b { fill: #1a100c; }
-.stage-combat .intent-badge .r { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
-.stage-combat .intent-badge .g { fill: none; stroke: #ff9d3a; stroke-width: 1.5; }
-.stage-combat .intent-badge.kind-block { color: #8fd0f2; }
-.stage-combat .intent-badge.kind-buff { color: #f5c542; }
-.stage-combat .intent-badge.kind-debuff { color: #c9a6ee; }
-.stage-combat .tier-1 { transform: scale(0.9); }
-.stage-combat .tier-2 { transform: scale(1.15); }
-.stage-combat .tier-3 { transform: scale(1.45); }
-.stage-combat .intent-num {
-  font-family: var(--num);
-  font-size: 0.95rem;
-  font-weight: 700;
-  line-height: 1;
-  color: #ffe6c8;
-  text-shadow: 0 1px 0 #000, 0 0 6px rgba(255, 120, 40, 0.6);
-}
-/* UX-2: the CURRENT attacker's intent badge lights while its own slam plays. The class
-   is painted on every attacker of the playing sequence; the CSS variable pair written by
-   enemyCard (--seq-delay / --seq-dur, from the same clock as the slam delays) spaces the
-   highlights one attacker apart, so "who is striking" reads without measuring anything.
-   `both` holds the unlit 0% frame while an attacker waits for its beat and returns to it
-   after, so the badge is lit exactly for its own attack. */
+/* UX-2: the CURRENT attacker's intent row (its `.e-intent` chips) lights while its own
+   slam plays. The class is painted on every attacker of the playing sequence; the CSS
+   variable pair written by enemyCard (--seq-delay / --seq-dur, from the same clock as
+   the slam delays) spaces the highlights one attacker apart, so "who is striking" reads
+   without measuring anything. `both` holds the unlit 0% frame while an attacker waits
+   for its beat and returns to it after, so the row is lit exactly for its own attack.
+   The stage row itself is chrome-less (the override above), so the keyframes light a
+   transparent ring around it plus an ember glow — invisible at rest, unmistakable lit. */
 @keyframes intent-strike {
-  0%, 100% { border-color: #5a3420; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7)); }
+  0%, 100% { border-color: transparent; filter: none; }
   30%, 70% {
     border-color: #ffb45e;
     filter: drop-shadow(0 0 10px rgba(255, 150, 50, 0.95)) brightness(1.45);
   }
 }
-.stage-combat .enemy.is-striking .intent-badge {
+.stage-combat .enemy.is-striking .e-intent {
   animation: intent-strike var(--seq-dur, calc(640ms * var(--pace, 1))) ease-in-out both;
   animation-delay: var(--seq-delay, calc(0ms * var(--pace, 1)));
 }
@@ -3929,9 +3899,6 @@ html, body {
   .stage-combat .enemy .eblock { font-size: 0.62rem; line-height: 1; }
   .stage-combat .e-intent { margin: 0; }
   .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; font-size: 0.6rem; }
-  .stage-combat .intent-badge { width: 22px; height: 26px; }
-  .stage-combat .tier-2,
-  .stage-combat .tier-3 { transform: none; }
   .page-combat .energy-orb { width: 48px; height: 48px; }
   .page-combat .orb-num { font-size: 1.2rem; }
   .page-combat .pile { width: 46px; min-height: 48px; box-shadow: 3px 3px 0 #0c0806; }
@@ -3975,7 +3942,6 @@ html, body {
 @media (max-width: 700px) and (max-height: 760px) {
   .stage-combat .hero .fig,
   .stage-combat .fig { height: 100px; }
-  .stage-combat .intent-badge { width: 26px; height: 28px; }
   .stage-combat .enemy .ename,
   .stage-combat .enemy .ehp { font-size: 0.68rem; line-height: 1.05; }
   .stage-combat .card { height: 100px; }
@@ -4142,7 +4108,6 @@ html, body {
     radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55));
 }
 
-/* Intent token and number styles live with the base .intent-badge / .intent-num rules. */
 /* HP plates: framed iron troughs with molten fill. */
 .stage-combat .hpbar { background: #0a0605; border: 1px solid #4e2e1c; box-shadow: inset 0 1px 2px #000; border-radius: 3px; }
 .stage-combat .hpbar i { background: linear-gradient(180deg, #ff8a4a, #c0301c 60%, #8a1c12); box-shadow: 0 0 6px rgba(255, 90, 40, 0.45); }

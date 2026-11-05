@@ -898,8 +898,8 @@ function snapshotEnemies(state, lang = 'en') {
  * in kernel wording, and no renderer parses the label string to learn any of it.
  *
  * Numbers come from the snapshot's own facts (`intent.damage` is the engine's
- * intentDamage — Strength already added, Weak already applied; `hits` the move's), so a
- * chip and the compact badge can never disagree. A move kind the shape does not cover
+ * intentDamage — Strength already added, Weak already applied; `hits` the move's), so the
+ * row and the intent label can never disagree. A move kind the shape does not cover
  * yields no chips and the renderer falls back to the sentence — never a guess.
  * @param {any} enemy a snapshot enemy row (its `intent` carries the facts)
  * @param {string} [lang] 'en' (default) or 'es'
@@ -912,7 +912,7 @@ export function intentChips(enemy, lang = 'en') {
   const push = (chip) => out.push({ ...chip, explain });
   if (intent.kind === 'attack' && typeof intent.damage === 'number' && intent.damage > 0) {
     const hits = intent.hits ?? 1;
-    // The badge's own convention: the per-hit number × hits (intent.damage is the TOTAL).
+    // The row's own convention: the per-hit number × hits (intent.damage is the TOTAL).
     push({
       verb: 'attack',
       amount: intent.damage,

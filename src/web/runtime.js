@@ -105,7 +105,7 @@ export function setDealClock(clock) { dealClock = clock; }
 
 /* ------------------------------------------------------- UX-2: the strike sequence ---
  * The enemy turn, SEQUENCED: one attacker at a time, each with its own windup-to-slam
- * beat, its own named damage float on the hero, and its own intent-badge highlight.
+ * beat, its own named damage float on the hero, and its own intent-row highlight.
  * The plan is armed by `act()` (BEFORE the paint, so the poses it schedules are painted
  * with their delays from the first frame) from the kernel's own per-attacker events, and
  * it is pure presentation: it decides when a pose plays, never what a rule does. Like

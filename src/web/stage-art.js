@@ -92,26 +92,3 @@ export const BACKDROPS = Object.freeze({
 export function backdropMarkup(key) {
   return (BACKDROPS[key] ?? BACKDROPS.forge)();
 }
-
-const GLYPHS = {
-  dagger: '<path class="r" d="M16 4 L20 28 H12 Z M16 28 V40 M10 34 H22"/>',
-  axe: '<path class="b" d="M8 6 H28 L24 22 H8 Z"/><path class="r" d="M8 6 H28 L24 22 H8 Z M18 22 V42"/>',
-  meteor: '<circle class="b" cx="18" cy="16" r="10"/><path class="g" d="M10 14 H26"/><path class="r" d="M8 28 L14 22 M18 32 L22 22 M28 30 L24 20"/>',
-  shield: '<path class="b" d="M16 4 L28 10 V20 C28 30 22 36 16 40 C10 36 4 30 4 20 V10 Z"/><path class="r" d="M16 4 L28 10 V20 C28 30 22 36 16 40 C10 36 4 30 4 20 V10 Z"/>',
-  up: '<path class="r" d="M8 26 L16 10 L24 26 M10 16 L16 8 L22 16"/>',
-  down: '<path class="r" d="M8 12 L16 28 L24 12 M10 22 L16 30 L22 22"/>',
-  buff: '<path class="r" d="M6 28 L16 8 L26 28"/>',
-};
-
-/** Compact intent mark. `which` is dagger | axe | meteor | shield | up | down | buff. */
-export function intentGlyph(which) {
-  return svg(GLYPHS[which] || GLYPHS.dagger, '0 0 32 44');
-}
-
-/** Damage bracket for an attack intent. 1 dagger, 2 axe, 3 meteor. */
-export function attackTier(damage) {
-  const n = Number(damage) || 0;
-  if (n >= 16) return 3;
-  if (n >= 8) return 2;
-  return 1;
-}

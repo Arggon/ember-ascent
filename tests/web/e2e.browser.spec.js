@@ -707,7 +707,7 @@ test('UX-3: every cost gem is a whole circle inside its card, and the type word 
 //   * the kernel truth is unchanged (turn advances, the announced total lands);
 //   * each attacker's OWN named float ("Kiln Mite −6") lands over the hero, in
 //     attack order, one beat apart — and no aggregate "−12" float paints;
-//   * the current attacker's intent badge carries the striking highlight, and the
+//   * the current attacker's intent row carries the striking highlight, and the
 //     highlight MOVES: attacker 1's window starts a beat before attacker 2's.
 // The floats and the highlight are transient (~1s), so an in-page 40ms collector
 // samples them, exactly like the kill beat's collector.
@@ -734,13 +734,15 @@ test('the enemy turn plays as ordered, named attacks (UX-2 sequence)', { timeout
       }
       const running = [];
       for (const card of document.querySelectorAll('.enemy.is-striking')) {
-        const badge = card.querySelector('.intent-badge');
+        // The intent ROW (`.e-intent`, the chips under the card) is the UX-2 highlight
+        // host since the floating badge was removed — the same intent-strike animation.
+        const row = card.querySelector('.e-intent');
         // ACTIVELY lit, not merely scheduled: a delayed CSS animation reports playState
-        // 'running' and progress 0 through its delay phase too (the badge is held unlit
+        // 'running' and progress 0 through its delay phase too (the row is held unlit
         // there), so the lit window is computed from the animation's own clock: from
         // its delay to delay+duration is exactly while that attacker's slam plays.
-        const live = badge && badge.getAnimations
-          ? badge.getAnimations().some((a) => {
+        const live = row && row.getAnimations
+          ? row.getAnimations().some((a) => {
             if (a.animationName !== 'intent-strike' || a.playState !== 'running' || !a.effect) return false;
             const t = a.effect.getComputedTiming();
             const at = (a.currentTime ?? 0) - (t.delay ?? 0);
@@ -775,13 +777,13 @@ test('the enemy turn plays as ordered, named attacks (UX-2 sequence)', { timeout
   assert.ok(seq.floats[1].t - seq.floats[0].t >= 700,
     `the strikes land in ORDER, a beat apart (the UX-4 beat is 1000ms): ${seq.floats.map((f) => `${f.text}@${f.t - seq.floats[0].t}ms`).join(', ')}`);
 
-  // The striking badge highlight moves with the sequence: attacker 1's window opens
+  // The striking row highlight moves with the sequence: attacker 1's window opens
   // first, attacker 2's a beat later.
   const firstOf = (k) => seq.badgeRuns.find((r) => r.ks.includes(k)) ?? null;
   const one = firstOf('1');
   const two = firstOf('2');
-  assert.ok(one, 'attacker 1 badge carried the intent-strike highlight');
-  assert.ok(two, 'attacker 2 badge carried the intent-strike highlight');
+  assert.ok(one, 'attacker 1 intent row carried the intent-strike highlight');
+  assert.ok(two, 'attacker 2 intent row carried the intent-strike highlight');
   assert.ok(two.t - one.t >= 700,
     `the highlight moved attacker 1 -> attacker 2, a beat apart (the UX-4 beat is 1000ms): ${two.t - one.t}ms`);
 });

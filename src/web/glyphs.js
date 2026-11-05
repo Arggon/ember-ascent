@@ -251,9 +251,6 @@ export const EVENT_CHOICE_GLYPH = {
 
 export const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', status: 'hourglass', curse: 'skull' };
 
-/** Intent kind -> its mark. */
-export const INTENT_GLYPH = { attack: 'strike', block: 'shieldWide', buff: 'chevUp', debuff: 'chevDown' };
-
 /** Effect chip -> its mark (the kernel publishes `{verb, status?}` chips; this table is
  *  purely presentational). Existing marks are borrowed where the shape reads honestly —
  *  the blade for damage, the shield for Block, the star for Energy (the energy potion
