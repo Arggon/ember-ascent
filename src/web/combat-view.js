@@ -97,16 +97,24 @@ export function heroFigure() {
     attrs: { role: 'group', 'aria-label': t('combat.hero.aria', { name: snap.characterName || 'Ashwright', hp: p.hp, max: p.maxHp, block: p.block }) },
   });
   const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
-  // The stage tree is rebuilt on every paint, which would restart the keyframe from 0%
-  // on each hover repaint during the hold. A negative animation-delay resumes the run
-  // from where it should be, so the movement stays in phase across repaints.
+  // The stage tree is rebuilt on every paint, which would restart every pose keyframe
+  // from 0% on each repaint during the hold. MID-RUN a negative animation-delay resumes
+  // the run where it should be, so the movement stays in phase across repaints. PAST
+  // THE END (hit-stop grace) the pose class stays but every layer is frozen with
+  // animation:none — which lands each child on its own base styles, the pose's natural
+  // end state (idle sprite visible, frames at their base opacity 0, no transform) — so
+  // no repaint can ever replay the swing. The layers are the .fig AND every child its
+  // markup paints (.sh, .spr, each .spr-frame-*): the children are phased together
+  // further down, once the markup above has painted them.
   const held = heroMoveHold;
-  if (held && held.pose === pose && pose !== 'idle') {
-    const elapsed = Math.max(0, Date.now() - held.start);
-    if (elapsed < held.dur) {
+  const holding = Boolean(held && held.pose === pose && pose !== 'idle');
+  const heldElapsed = holding ? Math.max(0, Date.now() - held.start) : -1;
+  const midRun = holding && heldElapsed < held.dur;
+  if (holding) {
+    if (midRun) {
       // Mid-run: resume the keyframe where it should be, so hover repaints do not stutter.
       fig.style.animationDuration = `${held.dur}ms`;
-      fig.style.animationDelay = `-${elapsed}ms`;
+      fig.style.animationDelay = `-${heldElapsed}ms`;
     } else {
       // Past the end (hit-stop grace): keep the pose class but stop the motion, so a
       // repaint can never replay the swing.
@@ -118,8 +126,10 @@ export function heroFigure() {
   // back, over the pose's full duration. The distance lands after the paint (fx.js
   // measures it and writes --approach-x both live and onto this hold), so a mid-hold
   // repaint re-applies it from here. Reduced motion and speed 0 never arm the hold.
-  if (held && held.melee && held.pose === pose) {
-    const elapsed = Math.max(0, Date.now() - held.start);
+  // MID-RUN ONLY: past the end the class stays off — the approach's 100% keyframe is
+  // translateX(0), the hero's own place, so a grace-window repaint cannot restart the
+  // walk from 0%.
+  if (held && held.melee && held.pose === pose && midRun) {
     node.classList.add('is-approach');
     // setProperty is guarded: the fake-DOM test hosts carry a plain style object, and
     // only a real CSSOM can hold custom properties anyway.
@@ -127,14 +137,26 @@ export function heroFigure() {
       node.style.setProperty('--approach-dur', `${held.dur}ms`);
       if (held.approachX != null) node.style.setProperty('--approach-x', `${held.approachX}px`);
     }
-    if (elapsed < held.dur) {
-      node.style.animationDuration = `${held.dur}ms`;
-      node.style.animationDelay = `-${elapsed}ms`;
-    } else {
-      node.style.animation = 'none';
-    }
+    node.style.animationDuration = `${held.dur}ms`;
+    node.style.animationDelay = `-${heldElapsed}ms`;
   }
   fig.innerHTML = heroMarkup(snap.character);
+  // The pose's frame layers are the .fig's CHILDREN, painted fresh by the markup above
+  // — the .fig's own phasing does not cover them, and an unphased child restarts its
+  // timeline from 0% on the next repaint (the whole swing replaying after its impact).
+  // Phase them with the .fig: mid-run they resume at the hold's elapsed point; past
+  // the end they freeze with it. (Only a real DOM parses markup into children; the
+  // fake-DOM test hosts carry no child list, so this sweep is empty there.)
+  if (holding) {
+    for (const child of fig.children ?? []) {
+      if (midRun) {
+        child.style.animationDuration = `${held.dur}ms`;
+        child.style.animationDelay = `-${heldElapsed}ms`;
+      } else {
+        child.style.animation = 'none';
+      }
+    }
+  }
   node.append(fig);
   node.append(el('div', { cls: 'hero-name', text: snap.characterName || 'Ashwright' }));
   node.append(el('div', { cls: 'ehp', text: `${p.hp}/${p.maxHp}` }));

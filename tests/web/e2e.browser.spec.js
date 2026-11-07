@@ -310,12 +310,15 @@ test('deck: the master-deck sheet shows the starting deck from the map, and agai
   assert.equal(await tiles.filter({ hasText: 'Quench' }).count(), 4);
   assert.equal(await tiles.filter({ hasText: 'Anvil Blow' }).count(), 1);
   assert.equal(await sheet.locator('.ctemper').count(), 0, 'nothing in the starting deck may wear a temper stamp');
-  // Each tile is the game's card face: the kernel's describe sentence in the rules row
-  // (and in the label), the cost gem, and the woodcut illustration of the card id.
+  // Each tile is the game's card face: the cost gem, the woodcut illustration of the
+  // card id, and the kernel's describe sentence — which the chips-first face no longer
+  // prints as a `.cdesc` row on a chip-complete card like Hammerfall (the chips row owns
+  // the visible rules row); the sentence lives verbatim on the tile's native title and
+  // aria-label (cardTile).
   const firstHammer = hammer.first();
   assert.equal(await firstHammer.locator('.cname').textContent(), 'Hammerfall');
   assert.equal(await firstHammer.locator('.gem-core').textContent(), '1');
-  assert.match(await firstHammer.locator('.cdesc').textContent(), /Deal 6 damage/);
+  assert.match(await firstHammer.getAttribute('title'), /Deal 6 damage/);
   assert.match(await firstHammer.getAttribute('aria-label'), /Costs 1 Energy/);
   assert.equal(await firstHammer.locator('.c-illus svg').count(), 1, 'a deck tile carries the card art');
   assert.equal(await firstHammer.getAttribute('role'), 'group', 'a read-only tile is a labelled fact, not a button');
@@ -421,14 +424,21 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
   assert.equal(await tiles.count(), 20, 'every pool card is one full card tile');
 
   // Spot-check one known tile: Slag Surge (cardId ironwave) — the game's card face, with
-  // its cost gem, its woodcut illustration and its describe-layer sentence verbatim —
-  // while the full-table card Maul stays ABSENT from a fresh sheet (the codex shows what
-  // the run can be offered, never the whole shipped table).
+  // its cost gem, its woodcut illustration and its describe-layer sentence verbatim (the
+  // chips-first face owns the visible rules row — one chip per kernel effect — and the
+  // sentence itself stays verbatim on the tile's native title, cardTile) — while the
+  // full-table card Maul stays ABSENT from a fresh sheet (the codex shows what the run
+  // can be offered, never the whole shipped table).
   const surge = tiles.filter({ hasText: 'Slag Surge' });
   assert.equal(await surge.count(), 1, 'Slag Surge renders exactly one tile');
   assert.equal(await surge.locator('.cname').textContent(), 'Slag Surge');
   assert.equal(await surge.locator('.gem-core').textContent(), '1');
-  assert.equal(await surge.locator('.cdesc').textContent(), 'Gain 5 Block. Deal 5 damage to the enemy.');
+  assert.equal(await surge.locator('.cfx .cfx-chip').count(), 2,
+    'the chips row carries one chip per kernel effect (Gain 5 Block, Deal 5 damage)');
+  // The codex tile's title is the sentence PLUS the rarity word (codexTile keeps rarity
+  // spoken deep in a long group), so the verbatim sentence is pinned as the title's head
+  // and the rarity as its tail.
+  assert.equal(await surge.getAttribute('title'), 'Gain 5 Block. Deal 5 damage to the enemy. (Common)');
   assert.equal(await surge.locator('.c-illus svg').count(), 1, 'the tile renders the card art');
   assert.equal(await surge.getAttribute('role'), 'group', 'a codex tile is a labelled fact, not a button');
   assert.match(await surge.getAttribute('aria-label'), /Costs 1 Energy/);
@@ -2425,7 +2435,10 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   const endBtn = page.locator('.controls button', { hasText: 'End Turn' });
   assert.equal(await endBtn.count(), 1, 'the English End Turn button is present');
   assert.equal((await page.locator('.pile-draw .pile-name').textContent()).trim(), 'Draw');
-  const enDesc = await page.locator('.card .cdesc').first().textContent();
+  // The chips-first face prints effect chips, not the sentence row; the kernel's own
+  // sentence still rides every tile's native title (cardTile), so that is where the
+  // localized content is read.
+  const enDesc = await page.locator('.card').first().getAttribute('title');
   assert.match(enDesc, /^(Deal|Gain|Draw|Discard|Restore|Exhaust|Retain|Lose|Apply|Double|Special)/,
     'an English kernel sentence shows before the switch');
   const enEnemyName = (await page.locator('.enemy .ename').first().textContent()).trim();
@@ -2455,8 +2468,9 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   assert.notEqual(esEnemyName, enEnemyName, `the enemy name localizes ("${enEnemyName}" -> "${esEnemyName}")`);
   assert.doesNotMatch(esEnemyName, /^(Cinder|Ash|Kiln|Slag|Gremlin|The) /, 'no English enemy name survives the switch');
 
-  // Spanish card sentences, re-derived kernel-side from the same effect data.
-  const esDesc = await page.locator('.card .cdesc').first().textContent();
+  // Spanish card sentences, re-derived kernel-side from the same effect data (read off
+  // the tile's native title — the chips-first face has no sentence row; see above).
+  const esDesc = await page.locator('.card').first().getAttribute('title');
   assert.match(esDesc, /^(Infliges|Ganas|Robas|Descartas|Restauras|Agotas|Retienes|Pierdes|Aplicas|Duplicas|Gana)/,
     'a Spanish kernel sentence shows after the switch');
   assert.doesNotMatch(esDesc, /^(Deal|Gain|Draw|Discard|Restore|Exhaust|Retain|Apply) /,
@@ -2497,4 +2511,85 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
   assert.equal((await page.locator('#hud button.lang-toggle').textContent()).trim(), 'EN');
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en');
+});
+
+// ---------------------------------------------------------------------------
+// MELEE SWING REGRESSION (the user's symptom): a melee stroke — the starter
+// Hammerfall — must END with its impact; the attack must never play again.
+// heroFigure() (src/web/combat-view.js) compensates the pose keyframe on the
+// .fig only; the frame layers (.spr-frame-windup / .spr-frame-strike of the
+// hero markup, stage-art.js) are FRESH nodes on every paint, so the internal
+// repaint after the swing — the past-the-end grace branch freezes only the
+// .fig — re-arms the children's keyframes from 0% and the whole attack plays a
+// second time. Measured in vivo at --pace=2 (the 560ms pose x2): the strike
+// impact paints ~120ms after the stroke commits, everything rests by ~1320ms,
+// then a repaint at ~1354ms replays the windup (~1.4s) and the strike
+// (~2.0s), and the pose class sticks until the hold's expiry repaint (~2.2s).
+// The pinned contract is the player's own sentence — the animation ends with
+// the impact: the strike frame's visible window (>0.5 opacity) happens ONCE,
+// and once it has ended, NEITHER frame may show again. The in-page 40ms
+// collector (see header: transient animation round-trips Node polling) reads
+// both frames' computed opacities; querySelector re-resolves every tick, so a
+// repaint that re-creates the frames is sampled like any other tick.
+// ---------------------------------------------------------------------------
+test('la pose melee no se repite tras el impacto (Hammerfall)', { timeout: 60000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  // Seed 3's first travel lands DIRECTLY in a two-enemy fight (Twin Mites):
+  // the shape where the card click enters targeting and the committed stroke
+  // is the melee Hammerfall. Check .fight, never map nodes, past the travel.
+  const page = await freshPage(t, 3);
+  await bootToMap(page);
+  await page.locator('button[aria-label^="Travel to"]').first().click();
+  await page.waitForSelector('.fight', { timeout: 5000 });
+  const opened = await readState(page);
+  assert.equal(opened.phase, 'combat');
+  assert.equal(opened.enemies.length, 2, 'seed 3 opens on the two-enemy fight');
+
+  await waitIdle(page); // the arriving hand's deal gates the input
+  await page.waitForSelector('.fight .hero .fig', { timeout: 5000 });
+
+  // The collector, installed BEFORE the play: every 40ms, the computed
+  // opacities of the hero's windup and strike frame imgs.
+  await page.evaluate(() => {
+    window.__hswing = [];
+    const t0 = performance.now();
+    const opacityOf = (sel) => {
+      const n = document.querySelector(sel);
+      return n ? Number(getComputedStyle(n).opacity) : 0;
+    };
+    window.__hswingTimer = setInterval(() => {
+      window.__hswing.push({
+        dt: Math.round(performance.now() - t0),
+        windup: opacityOf('.fight .hero .fig .spr-frame-windup'),
+        strike: opacityOf('.fight .hero .fig .spr-frame-strike'),
+      });
+    }, 40);
+  });
+
+  // The card face is Hammerfall (the kernel id is strike); with two enemies the
+  // click enters targeting — commit the stroke on the first aim.
+  const card = page.locator('button[data-slot][aria-label^="Hammerfall"][aria-disabled="false"]');
+  assert.ok((await card.count()) > 0, 'Hammerfall must be playable in the opening hand');
+  await card.first().click();
+  await page.waitForSelector('.enemy.targeting', { timeout: 3000 });
+  await page.locator('.enemy.targeting').first().click();
+
+  // Sample through the swing AND past the ghost-pose window (~2.2s): the
+  // replay lands its windup ~1.4s and its strike ~2.0s after the impact.
+  await sleep(3000);
+  const samples = await page.evaluate(() => { clearInterval(window.__hswingTimer); return window.__hswing; });
+
+  // THE CONTRACT: the impact is ONE contiguous window of strike >0.5 samples,
+  // and once it ended, no later sample may show windup >0.3 or strike >0.5 —
+  // the pose's animation ends with the stroke.
+  const impactIdx = samples.map((s, i) => (s.strike > 0.5 ? i : -1)).filter((i) => i >= 0);
+  assert.ok(impactIdx.length >= 2,
+    `the impact must be visible (strike >0.5 in ${impactIdx.length} of ${samples.length} samples)`);
+  const first = impactIdx[0];
+  const last = impactIdx[impactIdx.length - 1];
+  assert.equal(last - first + 1, impactIdx.length,
+    `the impact must be ONE contiguous window: ${JSON.stringify(samples.slice(first, last + 1).map((s) => [s.dt, s.strike]))}`);
+  const ghosts = samples.slice(last + 1).filter((s) => s.windup > 0.3 || s.strike > 0.5);
+  assert.deepEqual(ghosts, [],
+    `nothing of the swing may replay after the impact: ${JSON.stringify(ghosts)}`);
 });
