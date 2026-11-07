@@ -235,9 +235,12 @@ export function deathHoldMs(d) {
   return 0;
 }
 
-/** The collapsing card for one just-dead enemy. `data-death-index` is its slot in the
- *  row it died in — a kill re-indexes the survivors, so the fx layer needs a stable
- *  handle on the body the blow is still flying toward. */
+/** The collapsing card for one just-dead enemy. `data-death-index` carries the burst's
+ *  `enemy` — the victim's STABLE kernel index, not its row slot: the kernel keeps dead
+ *  rows in its enemy list while snapshots omit them, so after one death has left the
+ *  painted row the two drift apart (the slot the ghost sits in is the burst's `slot`).
+ *  The fx layer matches on exactly this value — `card-fly.enemy` resolves to the same
+ *  stable index on a kill — so the hammer lands on the body it was still flying toward. */
 export function dyingCard(d) {
   // A boss says so: its collapse is the biggest single event in the run, and the word is
   // what makes the difference readable with no motion at all (the row is also the only

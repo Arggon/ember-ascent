@@ -391,9 +391,11 @@ export function act(actionId, targetK = null) {
   }
 
   const dying = before.enemies
-    .filter((e) => !after.enemies.some((a) => a.index === e.index))
-    .map((e) => ({
+    .map((e, slot) => ({ e, slot }))
+    .filter(({ e }) => !after.enemies.some((a) => a.index === e.index))
+    .map(({ e, slot }) => ({
       ...e,
+      slot,
       side: positionClass(e.index, after.enemies, before.enemies, e.index),
       // Whether a BOSS just left the field. Read from the name (`enemyLook` already maps
       // "Guardian" -> boss for the card frame), never from a stat: it decides how large the
@@ -403,11 +405,18 @@ export function act(actionId, targetK = null) {
       boss: enemyLook(e.id).boss,
     }));
   // Each departure becomes a `death` burst, which the next paint draws as an inert ghost
-  // card that collapses. The ghost is positioned by ENEMY ROW ORDER (`side-*`), never by a
-  // measured coordinate.
+  // card that holds the victim's own slot while it collapses. The burst carries BOTH
+  // index namespaces the row speaks: `slot` — the position the body occupied in the
+  // BEFORE painted row (this array), which combatView keys the ghost by so the row's
+  // living and ghost slots keep partitioning 0..n-1; and `enemy` — the STABLE kernel
+  // index, which the fx layer matches on (`card-fly.enemy` <-> the ghost's
+  // `data-death-index`). They differ once a kernel death is compacted out of the
+  // snapshots (the kernel keeps dead rows; `snapshotEnemies` omits them): every later
+  // stable index then sits above its painted position, and a ghost keyed by the stable
+  // index lands past the row's end — the aimed-kill crash.
   // `id` rides along too: the ghost card's art is keyed by it (`dyingCard` -> `enemyMarkup`),
   // and without it every death ghost fell back to the jaw-worm sprite (SPRITES.jaw_worm).
-  for (const d of dying) fx.push({ kind: 'death', enemy: d.index, id: d.id, name: d.name, side: d.side, boss: d.boss });
+  for (const d of dying) fx.push({ kind: 'death', enemy: d.index, slot: d.slot, id: d.id, name: d.name, side: d.side, boss: d.boss });
 
   /* ------------------------------------------------------------- PHASE ARRIVALS ------
    * The end-of-run beat. `ended` is reached the instant the last enemy (or the player) is

@@ -390,15 +390,28 @@ export function combatView() {
   // The row paints the LINEUP the stroke was aimed at: a just-killed enemy keeps its slot
   // as a collapsing ghost and the survivors keep theirs, so the killing blow reads
   // against the target it was aimed at and no survivor slides into a dead foe's place
-  // while the weapon is still in the air. (The row never reorders, so the stable kernel
-  // index IS the old slot; death only removes — living slots and ghost slots together
-  // are exactly 0..n-1.)
-  const ghostAt = new Map(dyingThisPaint.map((d) => [d.enemy, d]));
+  // while the weapon is still in the air. (The row never reorders, so a ghost holds the
+  // slot its body occupied in the PREVIOUS row — the burst's `slot`, its position in the
+  // before snapshot's enemies array, the same position the aim's `targetK` names. The
+  // stable kernel `index` is a DIFFERENT namespace: the kernel keeps dead rows in its
+  // enemy list while snapshots omit them, so once one death has left the painted row
+  // every later stable index sits ABOVE its painted position — keying ghosts by it put
+  // the ghost past the row's end and fed `undefined` into enemyCard. Living slots and
+  // ghost slots together are exactly 0..n-1.)
+  const ghostAt = new Map(dyingThisPaint.map((d) => [d.slot, d]));
   const slots = snap.enemies.length + dyingThisPaint.length;
   const row = el('div', { cls: 'enemies' });
   for (let slot = 0, live = 0; slot < slots; slot += 1) {
-    if (ghostAt.has(slot)) row.append(dyingCard(ghostAt.get(slot)));
-    else row.append(enemyCard(snap.enemies[live], live++));
+    const ghost = ghostAt.get(slot);
+    if (ghost) row.append(dyingCard(ghost));
+    else if (snap.enemies[live]) row.append(enemyCard(snap.enemies[live], live++));
+    /* DEFENSIVE (must stay unreachable): the partition above is computed, not assumed —
+     * `slot` is the victim's own position in the before row, so every slot lands either a
+     * ghost or a living enemy. Should a future burst shape break that invariant, SKIP the
+     * hole here rather than crash the whole stage — an enemy card missing beats a dead
+     * screen. Do not tighten this into an assert: a throw here is the aimed-kill crash
+     * this loop once shipped with. */
+    else console.error('[combat] enemy row slot %d has no ghost and no living enemy (live=%d, slots=%d, dying=%o) — skipped', slot, live, slots, dyingThisPaint);
   }
   fight.append(row);
   fight.append(speedDock());
