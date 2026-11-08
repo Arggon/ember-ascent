@@ -62,6 +62,7 @@ export function fxTwin(fire, lane, b, sigMs, gen) {
         hammer.style.left = `${lane.from.x - 27}px`;
         hammer.style.top = `${lane.from.y - 11}px`;
         hammer.style.setProperty('--fly-x', `${lane.x - lane.from.x}px`);
+        hammer.style.setProperty('--fly-y', `${lane.y - lane.from.y}px`);
       }
       fxAdd(hammer, animMs(THROW_MS) || THROW_MS);
       fire(() => {

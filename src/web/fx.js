@@ -365,6 +365,7 @@ export function dispatchFx() {
               hammer.style.left = `${lane.from.x - 27}px`;
               hammer.style.top = `${lane.from.y - 11}px`;
               hammer.style.setProperty('--fly-x', `${lane.x - lane.from.x}px`);
+              hammer.style.setProperty('--fly-y', `${lane.y - lane.from.y}px`);
             }
             fxAdd(hammer, animMs(flight) || flight);
             fire(() => {

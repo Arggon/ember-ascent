@@ -2038,6 +2038,7 @@ test('relics: no HUD chip, the held count climbs on an elite drop, and the warde
   let bossOffers = 0;
   let climbedPre = null; // the max-HP the hero carried INTO the first boss pick
   let firstPickDone = false;
+  let eliteMeasured = false; // the elite-height probe fires once, at the first elite fight's opening
   for (let guard = 0; guard < 600; guard += 1) {
     const phase = await page.evaluate(() => window.__dlb.snapshot().phase);
     if (phase === 'ended') break;
@@ -2049,6 +2050,55 @@ test('relics: no HUD chip, the held count climbs on an elite drop, and the warde
       else await page.locator('button[aria-label^="Travel to"]').last().click();
       await sleep(500);
     } else if (phase === 'combat') {
+      // PROBE — the user's contract: élites más altos que el héroe. At the FIRST
+      // coexistence of .fight, .enemy.e-elite and .fight .hero .fig (the elite alive:
+      // this is the loop's first iteration of that fight, before any card has flown),
+      // the same live fight is sampled at three viewports, then the walk resumes:
+      //   1280x800 — the desktop contract: the elite's .fig TALLER than the hero's;
+      //   1280x720 — the laptop cap band (fight capped at 348px): still taller, AND
+      //     the elite card fits the fight — it clips from the top, so an oversized card
+      //     eats the intent row, the fight's central reading;
+      //   844x390 — the compact stage suspends the contract by design: elite and hero
+      //     flatten to the same 64px figure.
+      // The walk prefers elites on the map, so the first coexistence is the first
+      // elite fight. Measured once; later fights pass the probe by.
+      if (!eliteMeasured) {
+        const sample = () => page.evaluate(() => {
+          const eliteFig = document.querySelector('.enemy.e-elite .fig');
+          const heroFig = document.querySelector('.fight .hero .fig');
+          const fight = document.querySelector('.fight');
+          if (!fight || !eliteFig || !heroFig) return null;
+          const c = eliteFig.closest('.enemy').getBoundingClientRect();
+          const f = fight.getBoundingClientRect();
+          return {
+            elite: eliteFig.getBoundingClientRect().height,
+            hero: heroFig.getBoundingClientRect().height,
+            cardTop: c.top, fightTop: f.top,
+          };
+        });
+        const tall = await sample();
+        if (tall) {
+          eliteMeasured = true;
+          assert.ok(tall.elite > tall.hero,
+            `the elite must stand taller than the hero — .enemy.e-elite .fig = ${tall.elite}px vs .fight .hero .fig = ${tall.hero}px (1280x800)`);
+          await page.setViewportSize({ width: 1280, height: 720 });
+          await sleep(150);
+          const capped = await sample();
+          assert.ok(capped, 'the elite fight is still on stage at 1280x720');
+          assert.ok(capped.elite > capped.hero,
+            `the elite must stand taller than the hero in the laptop cap band — ${capped.elite}px vs ${capped.hero}px (1280x720)`);
+          assert.ok(capped.cardTop >= capped.fightTop - 0.5,
+            `the elite card must fit the capped fight at 1280x720 (the top clip eats the intent row) — card top ${capped.cardTop} vs fight top ${capped.fightTop}`);
+          await page.setViewportSize({ width: 844, height: 390 });
+          await sleep(150);
+          const flat = await sample();
+          assert.ok(flat, 'the elite fight is still on stage at 844x390');
+          assert.ok(Math.abs(flat.elite - 64) < 0.5 && Math.abs(flat.hero - 64) < 0.5,
+            `the compact stage flattens elite and hero alike to 64px — got ${flat.elite}px vs ${flat.hero}px at 844x390`);
+          await page.setViewportSize({ width: 1280, height: 800 });
+          await sleep(150);
+        }
+      }
       const card = page.locator('button[data-slot][aria-disabled="false"]').first();
       if ((await card.count()) > 0) {
         await card.click();

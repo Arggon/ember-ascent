@@ -3483,6 +3483,16 @@ html, body {
 .page-combat .speed-btn.is-on { color: var(--gold); border-color: var(--gold); }
 .page-combat .is-on { color: var(--gold); }
 
+/* The enemy row's floor pad was 6% of the fight's width (74px at 1280) and it pinned
+   the elite card's ceiling BELOW the hero: 270px figure + ~70px of intent/name/HP rows
+   + 74px of pad = 414px against a 344px capped fight interior (measured: the band
+   clipped 30px of a chipless elite card). A card-side percentage margin cannot cancel
+   that pad — it resolves against the FIGHT's width while a card margin resolves
+   against the ROW's width, narrower by the hero column (-57.7 vs 73.1 at 1280x720,
+   measured) — so the pad is gone: every enemy card stands on the fight's floor line,
+   the elite fits, and the plain cards' pre-existing 6px top clip at 768-tall laptops
+   heals. The fight's height is hero-driven at ≥700 (the hero column's own overhang
+   out-sizes the row), so the fight, the hand and End Turn do not move. */
 .stage-combat .enemies {
   position: relative;
   z-index: 2;
@@ -3490,7 +3500,7 @@ html, body {
   max-height: none;
   max-width: none;
   margin: 0;
-  padding: 0 2% 6% 0;
+  padding: 0 2% 0 0;
   gap: 4px;
   flex-wrap: nowrap;
   align-items: flex-end;
@@ -3995,9 +4005,6 @@ html, body {
   .hint { display: none; }
   .stage-combat .hero .fig { height: min(140px, 24vh); }
   .stage-combat .fig { height: min(140px, 22vh); }
-  /* The enemy row's 6%-of-width floor pad is ~48px at 800px wide (measured); 2% keeps the
-     sprites clear of the dock and gives the band's short end (~481px) its last ~20px. */
-  .stage-combat .enemies { padding-bottom: 2%; }
   .stage-combat .e-intent { margin-top: 2px; padding: 3px 7px; }
   .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; }
   .stage-combat .card {
@@ -4038,7 +4045,6 @@ html, body {
   .hint { display: none; }
   .stage-combat .hero .fig,
   .stage-combat .fig { height: 100px; }
-  .stage-combat .enemies { padding-bottom: 2%; }
   .stage-combat .e-intent { margin-top: 2px; padding: 3px 7px; }
   .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; }
   .stage-combat .card { height: 100px; padding: 6px 6px 4px; gap: 1px; }
@@ -6855,14 +6861,17 @@ html, body {
 }
 /* The arc: rise from the hero's shoulder to the enemy row, with the whole hammer
    spinning around its own centre (the head leads on the way out). The horizontal
-   travel is the lane's --fly-x, so every keyframe lands where the aimed enemy is. */
+   travel is the lane's --fly-x and the landing drop is the lane's --fly-y, so every
+   keyframe lands where the aimed enemy is; callers that don't feed --fly-y keep the
+   historical 16px shoulder drop. (The enemies row's floor pad was removed for the
+   elite's card — with the row lower, a fixed 16px drop measured 123px off the aim.) */
 @keyframes hammer-fly {
   0% { transform: translate(0, 0) rotate(0deg) scale(0.7); opacity: 0; }
   8% { opacity: 1; }
   50% { transform: translate(calc(var(--fly-x) * 0.56), -90px) rotate(540deg) scale(1); opacity: 1; }
-  78% { transform: translate(calc(var(--fly-x) * 0.96), 10px) rotate(900deg) scale(1); opacity: 1; }
-  84% { transform: translate(var(--fly-x), 16px) rotate(960deg) scale(1.25); opacity: 1; }
-  92%, 100% { transform: translate(var(--fly-x), 16px) rotate(960deg) scale(0); opacity: 0; }
+  78% { transform: translate(calc(var(--fly-x) * 0.96), calc(var(--fly-y, 16px) - 6px)) rotate(900deg) scale(1); opacity: 1; }
+  84% { transform: translate(var(--fly-x), var(--fly-y, 16px)) rotate(960deg) scale(1.25); opacity: 1; }
+  92%, 100% { transform: translate(var(--fly-x), var(--fly-y, 16px)) rotate(960deg) scale(0); opacity: 0; }
 }
 /* Returning Brand: out to the lane, then all the way back to the hero. */
 .fx-hammer.fx-hammer-returns { animation-name: hammer-return; animation-duration: calc(1.25s * var(--pace, 1)); }
@@ -7252,7 +7261,57 @@ html, body {
   background: linear-gradient(90deg, transparent, rgba(255, 120, 50, 0.55) 30%, rgba(255, 150, 70, 0.6) 70%, transparent);
   filter: blur(1px);
 }
-.stage-combat .enemy .fig.is-elite-variant .spr { filter: hue-rotate(-12deg) saturate(1.3) drop-shadow(0 0 12px rgba(190, 120, 255, 0.45)); scale: 1.12; transform-origin: 50% 100%; }
+/* The elite's mark of rank is SIZE, not just the purple border (.enemy.e-elite,
+   combat-view.js:502). The base rule covers the uncompressed desktop band: 270 stands
+   over the hero's 250-260 at every height the fight serves (measured fightClient 346
+   capped, 407-417 uncapped). Taller figures also grow the fight's content basis and
+   scrolled the page at 1280x800 (measured docH 826 at 300px) — 270 is the largest
+   figure whose whole card (figure + ~70px of intent/name/HP rows, measured) fits the
+   capped 348px fight with the intent row painted.
+   Every compressed band owns its own elite row BELOW this rule: equal specificity
+   (0,4,0) resolves by file order, so a band row placed earlier would lose to this
+   rule exactly the way the first 480px row did. The compact stage is LAST on purpose:
+   at ≤700px-wide × ≤480px-tall it must win the overlap and suspend the taller-than
+   contract (everything there, elite included, flattens to the same 64px). */
+.stage-combat .enemy.e-elite .fig { width: min(190px, 100%); height: min(270px, 48vh); }
+.stage-combat .enemy .fig.is-elite-variant .spr { filter: hue-rotate(-12deg) saturate(1.3) drop-shadow(0 0 12px rgba(190, 120, 255, 0.45)); transform-origin: 50% 100%; }
+/* Band rows, after the base rule on purpose (cascade = file order at equal
+   specificity). */
+@media (min-width: 761px) and (min-height: 481px) and (max-height: 699px) {
+  /* The short-wide arm compresses figs to min(140px, 22vh) and the hero to 24vh — the
+     elite rides 30vh, over the hero at every height in the band, inside the fight
+     (measured 800x600: card 256 in a 334px fight; 800x481: card 220 in 239). */
+  .stage-combat .enemy.e-elite .fig { height: min(190px, 30vh); }
+}
+@media (max-width: 700px) and (max-height: 760px) {
+  /* Portrait phones compress figs to 100px; the elite rides 23vh — 130 at the band's
+     tall end, over the hero's 100 down to ~435px of height, then the fold wins (the
+     band's own 390x481 row scrolls with plain cards already). */
+  .stage-combat .enemy.e-elite .fig { height: min(130px, 23vh); }
+}
+@media (min-width: 621px) and (max-width: 760px) and (min-height: 481px) and (max-height: 699px) {
+  /* The narrow arm restates the portrait tier's 100px figs — the elite shadows them
+     at 130 (measured 640x600: card 193 in a 297px fight). */
+  .stage-combat .enemy.e-elite .fig { height: 130px; }
+}
+@media (min-width: 621px) and (max-width: 760px) and (min-height: 481px) and (max-height: 601px) {
+  /* The deep sub-arm compresses further (min(100px, 15vh), hero the same) — the elite
+     rides 22vh, over the hero at every height in the arm (measured 640x481: card 168
+     in a 196px fight). */
+  .stage-combat .enemy.e-elite .fig { height: min(150px, 22vh); }
+}
+@media (max-width: 620px) and (min-height: 700px) and (max-height: 780px) {
+  /* The tall-narrow large-text band (the min(160px, 26vh) rule late in this file)
+     shrinks the hero to 160-26vh inside this overlap of the portrait tier — the elite
+     rides 30vh over it, inside the capped fight (344px interior − 59px of rows holds a
+     190px figure with room). After the portrait row so it wins their 700-760 overlap. */
+  .stage-combat .enemy.e-elite .fig { height: min(190px, 30vh); }
+}
+@media (max-height: 480px) {
+  /* The compact stage flattens EVERY fig to 64px, elite included — one uniform
+     geometry. */
+  .stage-combat .enemy.e-elite .fig { height: 64px; width: auto; }
+}
 .stage-combat .enemy .fig .spr-cinder_foreman { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
 .biome-select { display: flex; gap: 6px; justify-content: center; align-items: center; margin: -4px 0 8px; font-size: 0.78rem; }
 .biome-select .bs-label { color: #b9a28c; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.66rem; }
@@ -7263,8 +7322,6 @@ html, body {
   .biome-select { margin: -2px 0 4px; font-size: 0.66rem; }
   .biome-pick { padding: 1px 8px; }
 }
-@media (max-height: 480px) { .stage-combat .enemy .fig.is-elite-variant .spr { scale: 1; } }
-
 /* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
    than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at
    768x1024. UX-1: the hand card is a FIXED-height uniform face now, so the row cannot
