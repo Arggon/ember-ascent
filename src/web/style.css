@@ -8583,6 +8583,9 @@ button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
 .tour-count { display: block; font-size: var(--fs-1); letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; }
 .tour-head { margin: 4px 0 6px; font-size: var(--fs-4); color: var(--ink); }
 .tour-body { margin: 0 0 10px; font-size: var(--fs-2); color: var(--dim); line-height: 1.45; }
+/* The action hint (review round 2): on a step whose way forward is the player's own act
+   (take the boon, travel a node) this line stands where a Next would mis-teach. */
+.tour-hint { margin: -4px 0 10px; font-size: var(--fs-2); color: var(--accent); }
 .tour-nav { display: flex; gap: 8px; align-items: center; }
 /* The nav buttons wear the shared .btn chrome; these rules exist so the checker's class
    coverage is truthful (each emitted class has a rule) and to keep the row from wrapping

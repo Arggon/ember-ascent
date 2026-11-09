@@ -1,4 +1,4 @@
-# ONBOARDING-TOUR — the first-run Product Tour (five coach-marks over the real screens)
+# ONBOARDING-TOUR — the first-run Product Tour (six coach-marks over the real screens)
 
 **Owner:** Tech Lead → Frontend Engineer · 2026-11-09.
 **Ask:** "El juego puede ser un poco difícil de jugarlo por primera vez… agrega un Product Tour, User Onboarding o Guías dinámicas de interfaz para hacer más ameno el juego para usuarios primerizos."
@@ -18,7 +18,7 @@ phase: kindling
 
 (without the `kindling` flag the raw kernel boots at `phase: 'map'` — the flag is what the page passes, so the page boots at kindling. The e2e boot walk agrees: `tests/web/e2e.browser.spec.js:272` "boot: kindling choice leads to the map".)
 
-Today a first-time player's only guidance is the **auto-opened Help sheet**: `render()` appends `helpPanel()` whenever `dlb.helpSeen.v1` is unset (`src/web/render.js:296-302`), a wall of kernel help topics plus a ~40-row glossary (`src/web/hud.js:317-383`). It explains vocabulary, not the loop, and it covers the screen the player must act on. This spec replaces that first-run surface with a **five-step contextual tour**: short coach-marks anchored to elements the views already paint, advanceable and dismissable by click and by keyboard, replayable by veterans, localized in both languages, presentation-only, zero dependencies.
+Today a first-time player's only guidance is the **auto-opened Help sheet**: `render()` appends `helpPanel()` whenever `dlb.helpSeen.v1` is unset (`src/web/render.js:296-302`), a wall of kernel help topics plus a ~40-row glossary (`src/web/hud.js:317-383`). It explains vocabulary, not the loop, and it covers the screen the player must act on. This spec replaces that first-run surface with a **six-step contextual tour**: short coach-marks anchored to elements the views already paint, phase-gated so a step only advances onto the screen it describes, dismissable by click and by keyboard, replayable by veterans, localized in both languages, presentation-only, zero dependencies.
 
 ## 2. Current mechanism (real names)
 
@@ -32,17 +32,20 @@ Today a first-time player's only guidance is the **auto-opened Help sheet**: `re
 
 ## 3. The tour at a glance
 
-Five steps, in player order, each anchored to a real element:
+**Review round 2 (a real player, live, 2026-11-09)** reported two things: pressing Next showed the next message but not the next screen (on the MAP the card read "Your hand and your Energy" parked bottom-centre with no ring, because Next had stepped the tour onto `hand` and `.hand` does not exist on the map), and the hero/path pick should have its own guide instead of being folded into the kindling step's copy while the ring only covered `.boon-list`. The rework below — **six steps, phase-gated navigation, a union ring** — is the shipped answer to exactly those two reports.
+
+Six steps, in player order, each anchored to a real element:
 
 | # | id | fires when | anchor (live selector) | teaches |
 |---|----|-----------|------------------------|---------|
-| 1 | `kindling` | boot (`phase: 'kindling'`) | `.boon-list` | hero + path above, take exactly ONE boon — each gift has a price |
-| 2 | `map` | first arrival at `phase: 'map'` under an open tour | `.map` | click a glowing node to travel; fights pay cards, campfire heals, the Slag Warden is at the top |
-| 3 | `hand` | first arrival at `phase: 'combat'` under an open tour | `.hand` | click a card or press its number; the `.energy-orb` counts the turn's Energy |
-| 4 | `intent` | within the combat steps (Next/Enter) | first `.e-intent` | the enemy's row announces its next move; a number is damage headed your way |
-| 5 | `endTurn` | within the combat steps (Next/Enter) | `.controls` | End Turn (or `e`, or Space) passes; enemies act; a fresh hand is dealt — the whole loop |
+| 1 | `heroes` | boot (`phase: 'kindling'`) | `.hero-select` + `.biome-select` (one union hole, §5.2) | pick a hero and a path; the choice rebuilds the run |
+| 2 | `kindling` | within the kindling steps (Next/Enter) | `.boon-list` | take exactly ONE kindling — each gift has a price, and taking it starts the ascent |
+| 3 | `map` | first arrival at `phase: 'map'` under an open tour | `.map` | click a glowing node to travel; fights pay cards, campfire heals, the Slag Warden is at the top |
+| 4 | `hand` | first arrival at `phase: 'combat'` under an open tour | `.hand` | click a card; the `.energy-orb` counts the turn's Energy |
+| 5 | `intent` | within the combat steps (Next/Enter) | first `.e-intent` | the enemy's row announces its next move; a number is damage headed your way |
+| 6 | `endTurn` | within the combat steps (Next/Enter) | `.controls` | End Turn passes; enemies act; a fresh hand is dealt — the whole loop |
 
-Steps 3→5 share the first combat and are walked with Next; steps 1→2 advance contextually when the player acts (the shade ring leaves the anchored element clickable, so taking the boon or clicking a node IS the way to step 2/3 — learn by doing). Five steps total, per the ask's ceiling.
+**Decision — phase-gated navigation ("teach by doing")** `[INFERRED, review round 2]`: a Next/Back button exists **only when its DESTINATION step shares the phase on screen** (`STEPS[n].phase === snap.phase`); where the continuation is an **action** (the kindling step → the map, the map step → combat) there is no Next and the card carries a readable **hint line** instead (`tour.hint.kindling` / `tour.hint.map`), because the player's own act — taking the boon, travelling a node — is what advances the tour, via the phase jump that already existed in `tourSync` (`phaseChanged` → the new phase's FIRST step; `findIndex` returns the first match, so kindling resolves to the heroes step, map to `map`, combat to `hand` — that jump is kept untouched). The gate binds the keyboard too: `tourNext()`/`tourBack()` no-op across a phase boundary, so no key can park a coach-mark over a screen its anchor is not painted on — the player's exact bug. Navigation matrix: `heroes` has Next (→ kindling); `kindling` has Back and a hint; `map` has neither button and a hint (Skip remains everywhere); `hand` has Next only; `intent` has both; `endTurn` has Back and Done.
 
 ## 4. Decision — flags and coexistence with the Help sheet
 
@@ -78,7 +81,9 @@ Imports: `snap`, `repaint` from `./runtime.js`; `el`, `announce` from `./dom.js`
 
 ### 5.2 The persistent layer — outside `#stage`
 
-`index.html` gains one sibling after `#live`: `<div id="tour-layer"></div>` (the `#fx-layer` declaration convention, `index.html:39`; the null-guard convention for harnesses without it, `runtime.js:21-27`). `tour.js` grabs it per paint; `#tour-layer:empty { display: none }` makes the idle layer invisible and unhit. Per paint the layer holds: one `.tour-card` (`role="dialog"`) and, when the anchor exists, **four `.tour-shade` boxes around the anchor's measured rect** — a hole, not an outline.
+`index.html` gains one sibling after `#live`: `<div id="tour-layer"></div>` (the `#fx-layer` declaration convention, `index.html:39`; the null-guard convention for harnesses without it, `runtime.js:21-27`). `tour.js` grabs it per paint; `#tour-layer:empty { display: none }` makes the idle layer invisible and unhit. Per paint the layer holds: one `.tour-card` (`role="dialog"`, `tabindex="-1"` so an action step with no button can still take the caret on its step change) and, when the anchor exists, **four `.tour-shade` boxes around the anchor's measured rect** — a hole, not an outline.
+
+**The union ring** `[INFERRED, review round 2]`: a step's `sel` may be an **array** — the heroes step anchors `.hero-select` AND its sibling `.biome-select`, so ONE hole keeps both radio groups visible and clickable and the copy's subject never sits dimmed behind its own coach-mark. The mechanism is the **union bounding box** of the selectors that resolved, documented in `paintTour()` over a wrapper element: the two groups are independent siblings the view paints separately and no shared box hugs just them. Missing selectors drop out (`filter(Boolean)`); a step with none resolved falls to the missing-anchor parking.
 
 **The hole passes pointer events through** (`#tour-layer` is `pointer-events: none`; only the shades and the card opt back in): the anchored element stays visible AND clickable, so the boon click / node click that advances the run also advances the tour. Shades swallow clicks elsewhere; a shade click dismisses the tour (the `.modal-back` click-through convention, `hud.js:319`).
 
@@ -95,47 +100,57 @@ Geometry is measured per paint with `getBoundingClientRect()` on the anchor and 
 
 ### 5.4 Integration into the keyboard guard chain
 
-New guard at the very top of the listener (`app.js:52`), before the Help guard:
+The guard at the very top of the listener (`app.js`), before the Help guard — as shipped (the round-2 phase gate plus the two exceptions its review round 1 added):
 
 ```
 tourOpen || freshOnboarding()  →
   Escape (or Esc)  → dismissTour()      [preventDefault]
-  Enter, ArrowRight → tourNext()        [preventDefault]
-  ArrowLeft         → tourBack()        [preventDefault]
+  Enter on a focused BUTTON inside #tour-layer
+                    → return (native activation: THAT button runs — Back steps back,
+                      Skip dismisses; the guard used to preventDefault here and run
+                      tourNext instead of the focused control)
+  Enter, ArrowRight → tourNext()        [preventDefault; no-ops across a phase
+                                         boundary — the way forward there is the act]
+  ArrowLeft         → tourBack()        [preventDefault; same phase gate]
   anything else     → return (swallowed: no sheet, no card, no turn, no run)
 ```
 
-Everything else falls through untouched, so native Tab keeps working exactly as it does behind every existing sheet (§2). Space is deliberately NOT bound (it is End Turn muscle memory; unbound avoids training a conflict). After a dismiss both flags are set, so the guard's fresh-onboarding half goes false and the chain behaves as today. The Help guard that follows loses its `!helpSeen` half (§4.4); `window.__dlb` gains `tour: () => ({ open: tourOpen, step: tourStep })` beside `busy()` (`app.js:161`) so walks wait on the tour's own published truth instead of querying CSS.
+Two corollaries keep the contract honest. (1) **The kindling pickers stop their handled keys at the source**: `kindling-view`'s two radiogroup keydown handlers call `stopPropagation()` after `preventDefault()` on a key they act on (arrows/Home/End), so an arrow on a focused hero or path under the open tour switches it WITHOUT reaching the guard's ←/→ — measured before the fix (boot seed 7, focus on `.hero-pick.on`, ArrowRight → `{step: 1, hero: 'bellows', focus: 'tour-card'}`: the pick switched, the tour stepped off its own subject and the card stole the caret) and after (`{step: 0, hero: 'bellows', focus: 'hero-pick …'}`). Unhandled keys still bubble, so the guard keeps owning everything else. (2) Enter on the card div itself (an action step's caret target) still advances — the exception is scoped to real `<button>`s inside `#tour-layer`.
+
+Everything else falls through untouched, so native Tab keeps working exactly as it does behind every existing sheet (§2). Space is deliberately NOT bound (it is End Turn muscle memory; unbound avoids training a conflict) and natively activates a focused card button on keyup. After a dismiss both flags are set, so the guard's fresh-onboarding half goes false and the chain behaves as today. The Help guard that follows loses its `!helpSeen` half (§4.4); `window.__dlb` gains `tour: () => ({ open: tourOpen, step: tourStep })` beside `busy()` (`app.js:161`) so walks wait on the tour's own published truth instead of querying CSS.
 
 ## 6. Veteran re-entry (rejugable)
 
-The Help sheet footer (`hud.js:364-379`) gains one button between "Got it" and "New Run": **"Replay the guided tour"** (`t('tour.replay')`, `.btn.secondary`), which closes the sheet and calls `startTour()`. It is visible to every veteran who opens Help, needs no new HUD chrome (the HUD row is already five buttons wide and the ≤620px band trims it), and reopens the tour at the step for the phase the player is standing on — a veteran in combat gets steps 3-5, not a kindling lecture. Escape still closes Help without starting anything.
+The Help sheet footer (`hud.js:364-379`) gains one button between "Got it" and "New Run": **"Replay the guided tour"** (`t('tour.replay')`, `.btn.secondary`), which closes the sheet and calls `startTour()`. It is visible to every veteran who opens Help, needs no new HUD chrome (the HUD row is already five buttons wide and the ≤620px band trims it), and reopens the tour at the step for the phase the player is standing on — a veteran in combat gets steps 4-6, a veteran on the map gets the map step (§11 test 7), not a kindling lecture. Escape still closes Help without starting anything.
 
 ## 7. i18n (en/es) — no hardcoded strings
 
-All copy lives in `STRINGS` (`src/web/i18n.js`) under a `tour.*` group, verbatim (this exact block is what §10 measures; **review round 1** reworded the hand/endTurn bodies to the click path — the tour's own keyboard guard swallows those shortcuts while it shows, §5.4 — and dropped the unused `tour.aria`; `src/web/i18n.js` is the living copy):
+All copy lives in `STRINGS` (`src/web/i18n.js`) under a `tour.*` group, verbatim (this exact block is what §10 measures; **review round 1** reworded the hand/endTurn bodies to the click path — the tour's own keyboard guard swallows those shortcuts while it shows, §5.4 — and dropped the unused `tour.aria`; **review round 2** split hero/path into its own step, reduced the kindling body to the boon, added the two action hints, and re-counted the Replay title; **the rework's review round 1** kept the heroes body's arrow claim only because the pickers' keydown now stops propagation for the keys it handles — an arrow on a focused pick switches it without reaching the tour guard (§5.4), so the copy's promise is measured true, and the click stays first; `src/web/i18n.js` is the living copy):
 
 ```js
 /* ---- product tour (ONBOARDING-TOUR) ---------------------------------- */
 'tour.title': { en: 'First steps at the forge', es: 'Primeros pasos en la forja' },
-'tour.aria': { en: 'Guided tour', es: 'Recorrido guiado' },
 'tour.stepOf': { en: 'Step {n} of {m}', es: 'Paso {n} de {m}' },
 'tour.next': { en: 'Next', es: 'Siguiente' },
 'tour.back': { en: 'Back', es: 'Atrás' },
 'tour.done': { en: 'Done — climb', es: 'Listo — a escalar' },
 'tour.skip': { en: 'Skip the tour  (Esc)', es: 'Saltar el recorrido  (Esc)' },
 'tour.replay': { en: 'Replay the guided tour', es: 'Repetir el recorrido guiado' },
-'tour.replay.title': { en: 'Five short steps over the real screens', es: 'Cinco pasos cortos sobre las pantallas reales' },
-'tour.step.kindling.title': { en: 'The kindling: hero, path, boon', es: 'El rescoldo: héroe, camino, rescoldo' },
-'tour.step.kindling.body': { en: 'Pick a hero and a path above — the arrows switch them, and the choice rebuilds the run. Take exactly one boon below: each gift has a price, and taking one starts the climb.', es: 'Elige héroe y camino arriba — las flechas los cambian, y la elección reconstruye la partida. Toma exactamente un rescoldo abajo: cada regalo tiene un precio, y tomarlo empieza el ascenso.' },
+'tour.replay.title': { en: 'Six short steps over the real screens', es: 'Seis pasos cortos sobre las pantallas reales' },
+'tour.hint.kindling': { en: 'Take a boon to continue — the tour follows.', es: 'Toma un rescoldo para continuar — el recorrido te sigue.' },
+'tour.hint.map': { en: 'Travel to a glowing node to continue — the tour follows.', es: 'Viaja a un nodo brillante para continuar — el recorrido te sigue.' },
+'tour.step.heroes.title': { en: 'Your hero and your path', es: 'Tu héroe y tu camino' },
+'tour.step.heroes.body': { en: 'Choose a hero and a path: click a portrait or a path name — the arrows switch them too, once a pick has focus. The choice rebuilds the run.', es: 'Elige un héroe y un camino: haz clic en un retrato o en el nombre de un camino — las flechas también los cambian, cuando una opción tiene el foco. La elección reconstruye la partida.' },
+'tour.step.kindling.title': { en: 'The kindling', es: 'El rescoldo' },
+'tour.step.kindling.body': { en: 'Take exactly one below: each gift has a price, and taking it starts the ascent.', es: 'Toma exactamente uno abajo: cada regalo tiene un precio, y tomarlo inicia el ascenso.' },
 'tour.step.map.title': { en: 'The ascent map', es: 'El mapa del ascenso' },
 'tour.step.map.body': { en: 'You climb floor by floor: click a glowing node to travel. Fights pay cards, the campfire heals, the Slag Warden waits at the top — you can only reach the nodes linked to your floor.', es: 'Subes piso a piso: haz clic en un nodo brillante para viajar. Las peleas pagan cartas, la hoguera cura, y el Guardián de Escoria espera arriba — solo puedes alcanzar los nodos enlazados a tu piso.' },
 'tour.step.hand.title': { en: 'Your hand and your Energy', es: 'Tu mano y tu Energía' },
-'tour.step.hand.body': { en: 'Click a card to play it, or press its number. The orb counts the Energy left this turn — every card costs its gem, and the hand refills each turn.', es: 'Haz clic en una carta para jugarla, o pulsa su número. El orbe cuenta la Energía que queda este turno — cada carta cuesta su gema, y la mano se rellena cada turno.' },
+'tour.step.hand.body': { en: 'Click a card to play it. The orb counts the Energy left this turn — every card costs its gem, and the hand refills each turn. (Number keys come back when the tour ends.)', es: 'Haz clic en una carta para jugarla. El orbe cuenta la Energía que queda este turno — cada carta cuesta su gema, y la mano se rellena cada turno. (Las teclas de número vuelven cuando termina el recorrido.)' },
 'tour.step.intent.title': { en: 'What the enemy intends', es: 'Lo que el enemigo pretende' },
 'tour.step.intent.body': { en: 'The row over each enemy announces its next move — a number is damage headed your way. Read it before you spend the turn: the enemy acts the moment you end the turn.', es: 'La fila sobre cada enemigo anuncia su próximo movimiento — un número es daño que viene hacia ti. Léelo antes de gastar el turno: el enemigo actúa en cuanto termines el turno.' },
 'tour.step.endTurn.title': { en: 'End the turn', es: 'Termina el turno' },
-'tour.step.endTurn.body': { en: 'When the Energy is spent or the plan is set, press End Turn (or e, or Space). The enemies act, then a fresh hand is dealt. That is the whole loop: play, end, climb.', es: 'Cuando gastes la Energía o el plan esté listo, pulsa Terminar turno (o e, o Espacio). Los enemigos actúan y llega una mano nueva. Ese es todo el bucle: jugar, terminar, escalar.' },
+'tour.step.endTurn.body': { en: 'When the Energy is spent or the plan is set, click End Turn. The enemies act, then a fresh hand is dealt. That is the whole loop: play, end, climb. (The e and Space keys come back when the tour ends.)', es: 'Cuando gastes la Energía o el plan esté listo, haz clic en Terminar turno. Los enemigos actúan y llega una mano nueva. Ese es todo el bucle: jugar, terminar, escalar. (Las teclas e y Espacio vuelven cuando termina el recorrido.)' },
 ```
 
 Proper nouns follow `NAMES.md` (Ashwright is id-stable and renders identically; "Slag Warden" localizes as "El Guardián de Escoria", the enemy table's own twin — the same convention `map.node.boss` already uses, `i18n.js:234`). Step titles/bodies are resolved per paint via `t()`, so a language switch mid-tour repaints the card in the new language on the next render. The `i18n` unit test (`tests/web/i18n.test.js`) already fails a key missing its `en` row; it now also covers the `tour.*` rows automatically.
@@ -161,33 +176,52 @@ PASS  R4 --verbose dump (+pile list)            worst=131  ceiling=250
 PASS  R8 --help example block                   worst=42   ceiling=60
 ```
 
-The tour's own payloads, measured with the script's exported `countWorst()` (worst of o200k_base/cl100k_base) over the SHIPPED sources (**review round 1** numbers; Appendix A's reference measured 2392/947):
+The tour's own payloads, measured with the script's exported `countWorst()` (worst of o200k_base/cl100k_base) over the SHIPPED sources (**review round 2, corrected by its review round 1**: the first round-2 table quoted 1633/399/523 for the three i18n rows and did not reproduce — it had measured the wrong span and a key+value join; the rows below re-measure with the extraction commands quoted verbatim so the table self-verifies. Appendix A's reference measured 2392/947):
 
 | payload | o200k | cl100k | **worst** |
 |---|---|---|---|
-| `src/web/tour.js` (shipped source) | 3113 | 3086 | **3113** |
-| `tour.*` i18n block in `i18n.js` (en+es source) | 976 | 1040 | **1040** |
-| player-visible strings, en only | 366 | 367 | **367** |
-| player-visible strings, es only | 416 | 479 | **479** |
+| `src/web/tour.js` (shipped source, whole file) | 4099 | 4075 | **4099** |
+| `tour.*` i18n block in `i18n.js` (en+es source: the banner comment through the last `'tour.*'` row) | 1218 | 1284 | **1284** |
+| player-visible strings, en only (the 22 `tour.*` values, `'\n'`-joined) | 316 | 317 | **317** |
+| player-visible strings, es only (same join) | 378 | 443 | **443** |
 
-There is no pre-existing ceiling for UI module source (the frozen ones are engine-output payloads: dump ≤250, action line ≤8, `tests/budget.test.js:19`). History of the ceiling sentence: this spec first set **≤ 3,000 combined** and then annotated 2392 + 947 = 3339 against it — self-contradictory from the start, so that nominal line never operated as a gate. The operative rule is the growth limit: **past ~4,000 worst combined, split rather than grow.** Review round 1's own mandated fixes cost real tokens against Appendix A's reference — the §5.2/AC2 shade-click dismissal, the AC7 parking that decides on RESTING geometry and scores actionable coverage (the reference's XOR heuristic covered a travel node at 640x460 and grazed the map at 390x844), the shared flag constant, and the §5.4-honest click-path copy — shipping 3113 + 1040 = **4153**, 153 over the line. The prescribed remedy (split strings from code) does not map: no player string lives in `tour.js`; the mass is geometry code plus its evidence comments. The disclosed follow-up is the Tech Lead's call — raise the line for coach-mark geometry or split the parking math into its own module. Against the *player-visible* payload (367 en / 479 es) the feature still costs the reader ~one Help topic. Numbers measured 2026-11-09, review round 1, on this tree.
+Extraction, reproducible as-is:
+
+```
+node -e "import('./scripts/measure-tokens.mjs').then(async (m) => {
+  const lines = (await import('node:fs')).readFileSync('src/web/i18n.js', 'utf8').split('\n');
+  const first = lines.findIndex((l) => l.includes('---- product tour'));
+  const lastTour = lines.reduce((acc, l, i) => (/^\s*'tour\./.test(l) ? i : acc), -1);
+  console.log('block', m.countWorst(lines.slice(first, lastTour + 1).join('\n')));
+  const { strings } = await import('./src/web/i18n.js');
+  const tours = Object.entries(strings()).filter(([k]) => k.startsWith('tour.'));
+  console.log('en', m.countWorst(tours.map(([, v]) => v.en).join('\n')));
+  console.log('es', m.countWorst(tours.map(([, v]) => v.es).join('\n')));
+})"
+```
+
+(The independent review probe measured the same block span at 1283 and the visible rows at 341/460 under an unspecified join — the block agrees to the boundary newline; the visible-row delta is the join, so the table cites its own command instead.)
+
+There is no pre-existing ceiling for UI module source (the frozen ones are engine-output payloads: dump ≤250, action line ≤8, `tests/budget.test.js:19`). History of the ceiling sentence: this spec first set **≤ 3,000 combined** and then annotated 2392 + 947 = 3339 against it — self-contradictory from the start, so that nominal line never operated as a gate. The operative rule is the growth limit: **past ~4,000 worst combined, split rather than grow.** Review round 1's mandated fixes took the payload to 3113 + 1040 = **4153**; review round 2's live-player rework took it further to 4099 + 1284 = **5383** — the six-step split (a new step with its own copy), the phase gate, the union ring and the two hint lines are all ask-mandated structure, not prose. The prescribed remedy (split strings from code) still does not map: no player string lives in `tour.js`; the mass is geometry code plus its evidence comments. The disclosed follow-up remains the Tech Lead's call — raise the line for coach-mark geometry or split the parking/union math into its own module. Against the *player-visible* payload (317 en / 443 es) the feature still costs the reader ~one Help topic. Numbers measured 2026-11-09 on this tree with the command above.
 
 ## 11. Test plan — `tests/web/e2e.browser.spec.js`
 
-All new tests carry **`tour`** in the title, use the file's existing helpers (`freshPage`'s context shape, `waitIdle`, `readState`), real clicks only, and seed `dlb.tourSeen.v1`/`dlb.helpSeen.v1` explicitly where the flag state matters (the inverse of today's `addInitScript` contract):
+All new tests carry **`tour`** in the title, use the file's existing helpers (`freshPage`'s context shape, `waitIdle`, `readState`), real clicks only, and seed `dlb.tourSeen.v1`/`dlb.helpSeen.v1` explicitly where the flag state matters (the inverse of today's `addInitScript` contract). **Review round 2** re-shaped the walk (six steps, phase gate) and added the two Replay/landing claims; the ring helpers (`tourRing`, `tourCardClearOfAnchor`) take a selector OR an array — the heroes union is measured the way `paintTour` draws it:
 
-1. **`tour: a fresh boot opens the guided tour on the kindling screen instead of the auto-Help sheet`** — no seeded flags → goto → `#tour-layer .tour-card` exists with "Step 1 of 5", `.modal` count is 0 (the auto-Help is gone), the HUD Help button still renders, and no page errors.
-2. **`tour: the steps advance by click and keyboard, follow the phase, and Escape writes both flags`** — walk step 1 → click a real boon **through the step-1 hole** (the anchored `.boon-list` is the clickable region) → the card reads step 2 with the `.map` anchor ring; Enter advances, ArrowLeft steps back, `d`/`n` are swallowed mid-tour (no deck sheet, run intact); Escape dismisses; localStorage then holds `dlb.tourSeen.v1=1` AND `dlb.helpSeen.v1=1`; a `d` press afterwards opens the deck sheet again (guard released).
-3. **`tour: a dismissed tour never auto-opens again, and the Help sheet carries the Replay entry`** — seed both flags → reload → no `.tour-card`, no auto Help, two consecutive boots; open Help → the Replay button exists → clicking it opens the tour at the step for the current phase without changing the run snapshot; Escape closes the tour, flags unchanged.
-4. **`tour: the combat steps anchor the hand, the intent row and End Turn, and finishing releases the keyboard`** — fresh flags, fixed seed → kindling → travel to the first fight → steps 3/4/5 exist with anchors `.hand`, `.e-intent`, `.controls` (the ring's shades cover everything but the anchored element); Next through step 5 → "Done" dismisses → End Turn (`e`) works immediately, `waitIdle` confirms the gate is the game's own.
-5. **`tour: the coach card parks and stays legible in the small bands`** — viewport 390×844 (portrait phone) and 700×440 (landscape phone): the card is bottom-parked, the anchor ring still frames its element, the card never covers the anchor, and Escape still dismisses.
+1. **`tour: a fresh boot opens the guided tour on the kindling screen instead of the auto-Help sheet`** — no seeded flags → goto → `#tour-layer .tour-card` exists with "Step 1 of 6" (the heroes step), `.modal` count is 0 (the auto-Help is gone), the HUD Help button still renders, the ring's hole covers the `.hero-select`+`.biome-select` union, the checked hero pick is clickable (its centre hits the pick, never a shade), and an arrow on the FOCUSED pick switches it while the tour stays on step 0 and the caret stays on the pick (the picker's `stopPropagation`, §5.4).
+2. **`tour: the steps advance by click and keyboard, follow the phase, and a shade click writes both flags`** — Next walks heroes → kindling; on the kindling step there is **no `.tour-next` and the hint line reads "Take a boon to continue — the tour follows."** while Back exists and Enter (on the card, not a button) is a no-op; **Enter with Back focused steps BACK** (native activation, §5.4 — the guard used to run tourNext there); ← / → walk back and forth inside the phase; a real boon click **through the step-2 hole** lands the map step ("Step 3 of 6") with the `.map` ring; on the map step there is **no Next and no Back, only the hint "Travel to a glowing node to continue — the tour follows."**; `d`/`n` are swallowed mid-tour (no deck sheet, run intact); a shade click dismisses; localStorage then holds `dlb.tourSeen.v1=1` AND `dlb.helpSeen.v1=1`; a `d` press afterwards opens the deck sheet again (guard released).
+3. **`tour: a dismissed tour never auto-opens again, and the Help sheet carries the Replay entry`** — seed both flags → reload → no `.tour-card`, no auto Help, two consecutive boots; open Help → the Replay button exists → clicking it opens the tour at the heroes step ("Step 1 of 6") without changing the run snapshot; Skip closes the tour, flags unchanged — once by clicking Skip and once by focusing it and pressing Enter (native activation again).
+4. **`tour: the combat steps anchor the hand, the intent row and End Turn, and finishing releases the keyboard`** — fresh flags, fixed seed → Next to kindling → boon click → travel to the first fight → steps 4/5/6 exist with anchors `.hand`, `.e-intent`, `.controls` (the ring's shades cover everything but the anchored element); **the hand step has no Back** (its previous step lives on the map screen); Next chains hand → intent → endTurn → "Done" dismisses → End Turn (`e`) works immediately, `waitIdle` confirms the gate is the game's own.
+5. **`tour: the coach card parks and stays legible in the small bands`** — viewport 390×844 (portrait phone) and 700×440 (landscape phone): the card is bottom-parked, the union ring still frames hero+path, the card never covers the union anchor, and Escape still dismisses.
+6. **`tour: taking a boon under the open tour lands the map step anchored to the map`** — the player's bug, pinned: Next into the kindling step, take the boon, and the tour must land on "Step 3 of 6" over the map screen with a REAL ring (hole clear, corner shaded), not a parked ringless card.
+7. **`tour: Replay from the map lands on the map step`** — a veteran climbs to the map, replays from Help, and `startTour` resolves the standing phase to its OWN first step ("Step 3 of 6", `{ open: true, step: 2 }`), not a kindling lecture.
 
 Compatibility pin: with `dlb.helpSeen.v1` seeded (every existing walk), **zero** existing test may see a `.tour-card` — if one does, the §4 rule regressed. The help-sheet guard test (`e2e.browser.spec.js:1913`) must keep passing unchanged; its first-run `!helpSeen` branch is what §4.4 deleted.
 
 ## 12. Acceptance criteria
 
-- AC1: Fresh boot (no flags) shows the tour on the kindling screen; `.modal` count 0; five steps in the §3 order with the §3 anchors.
-- AC2: Every step advances by click (Next) and keyboard (Enter/→); back by ←; dismiss by Escape, Skip, or a shade click — dismissing anywhere writes both flags and never auto-opens again.
+- AC1: Fresh boot (no flags) shows the tour on the kindling screen at the heroes step; `.modal` count 0; six steps in the §3 order with the §3 anchors (the heroes step's ring is the union of both picks).
+- AC2: Navigation is phase-gated (§3): a Next/Back exists only where its destination shares the phase, an action step carries its hint line and is crossed by the player's act (the `tourSync` jump), and the keyboard obeys the same gate (Enter/→ and ← no-op across a boundary); dismiss by Escape, Skip, or a shade click — dismissing anywhere writes both flags and never auto-opens again.
 - AC3: `dlb.helpSeen.v1`-seeded boots (all existing tests, old veterans) never see the tour; the Help sheet's auto-open is retired for everyone; Help remains reachable by its button and gains the Replay entry.
 - AC4: The tour is presentation-only: it reads `snap` and localStorage, imports no kernel/rules module (gate stays green), mutates no state outside `tour.js` and `#tour-layer`, and the run underneath survives every tour key.
 - AC5: No hardcoded player-visible string; `t()` covers all copy in en and es; a mid-tour language switch repaints the card.
@@ -196,6 +230,8 @@ Compatibility pin: with `dlb.helpSeen.v1` seeded (every existing walk), **zero**
 - AC8: `npm run gate` green; `check-surface-art.mjs` green (every emitted class has a rule); the §10 token numbers annotated in this file are the MEASURED ones and the growth past the ~4,000 line is disclosed there with its follow-up (the nominal ≤3,000 ceiling never gated — it was exceeded by the spec's own first annotation).
 
 ## Appendix A — reference implementation
+
+**Round-0 reference only** — kept verbatim as the spec's starting point. The SHIPPED `src/web/tour.js` is the authority: review round 1 added the resting-geometry parking and the shade-click dismissal, and review round 2 reworked it to six steps, phase-gated navigation (§3), the union ring (§5.2) and the hint lines. Do not transcribe this appendix into the tree.
 
 `src/web/tour.js`, transcribable as-is (2392 tokens worst-of-both as measured in §10):
 

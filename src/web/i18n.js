@@ -415,9 +415,9 @@ const STRINGS = {
 
   /* ---- product tour (ONBOARDING-TOUR) ---------------------------------- */
   // While the tour is open the surface's keyboard guard swallows every game shortcut
-  // (app.js's tour guard, ONBOARDING-TOUR §5.4), so steps 3-5 name the CLICK path and
-  // say the keys come back when the tour ends — teaching a swallowed shortcut on the
-  // exact screen it is swallowed on teaches nothing.
+  // (app.js's tour guard, ONBOARDING-TOUR §5.4), so the combat steps (4-6 of 6) name
+  // the CLICK path and say the keys come back when the tour ends — teaching a swallowed
+  // shortcut on the exact screen it is swallowed on teaches nothing.
   'tour.title': { en: 'First steps at the forge', es: 'Primeros pasos en la forja' },
   'tour.stepOf': { en: 'Step {n} of {m}', es: 'Paso {n} de {m}' },
   'tour.next': { en: 'Next', es: 'Siguiente' },
@@ -425,9 +425,19 @@ const STRINGS = {
   'tour.done': { en: 'Done — climb', es: 'Listo — a escalar' },
   'tour.skip': { en: 'Skip the tour  (Esc)', es: 'Saltar el recorrido  (Esc)' },
   'tour.replay': { en: 'Replay the guided tour', es: 'Repetir el recorrido guiado' },
-  'tour.replay.title': { en: 'Five short steps over the real screens', es: 'Cinco pasos cortos sobre las pantallas reales' },
-  'tour.step.kindling.title': { en: 'The kindling: hero, path, boon', es: 'El rescoldo: héroe, camino, rescoldo' },
-  'tour.step.kindling.body': { en: 'Pick a hero and a path above — the arrows switch them, and the choice rebuilds the run. Take exactly one boon below: each gift has a price, and taking one starts the climb.', es: 'Elige héroe y camino arriba — las flechas los cambian, y la elección reconstruye la partida. Toma exactamente un rescoldo abajo: cada regalo tiene un precio, y tomarlo empieza el ascenso.' },
+  'tour.replay.title': { en: 'Six short steps over the real screens', es: 'Seis pasos cortos sobre las pantallas reales' },
+  // Review round 2: the hero/path pick got its OWN step, so the kindling step's copy is
+  // the boon alone. The heroes body leads with the click and then names the arrows —
+  // which DO teach under the open tour: kindling-view's radiogroup keydown stops
+  // propagation for the keys it handles, so an arrow on a focused pick switches it
+  // WITHOUT reaching the tour guard's ←/→ (app.js) and never steps the tour off its own
+  // subject (its review round 1 measured the double action and this is its fix).
+  'tour.hint.kindling': { en: 'Take a boon to continue — the tour follows.', es: 'Toma un rescoldo para continuar — el recorrido te sigue.' },
+  'tour.hint.map': { en: 'Travel to a glowing node to continue — the tour follows.', es: 'Viaja a un nodo brillante para continuar — el recorrido te sigue.' },
+  'tour.step.heroes.title': { en: 'Your hero and your path', es: 'Tu héroe y tu camino' },
+  'tour.step.heroes.body': { en: 'Choose a hero and a path: click a portrait or a path name — the arrows switch them too, once a pick has focus. The choice rebuilds the run.', es: 'Elige un héroe y un camino: haz clic en un retrato o en el nombre de un camino — las flechas también los cambian, cuando una opción tiene el foco. La elección reconstruye la partida.' },
+  'tour.step.kindling.title': { en: 'The kindling', es: 'El rescoldo' },
+  'tour.step.kindling.body': { en: 'Take exactly one below: each gift has a price, and taking it starts the ascent.', es: 'Toma exactamente uno abajo: cada regalo tiene un precio, y tomarlo inicia el ascenso.' },
   'tour.step.map.title': { en: 'The ascent map', es: 'El mapa del ascenso' },
   'tour.step.map.body': { en: 'You climb floor by floor: click a glowing node to travel. Fights pay cards, the campfire heals, the Slag Warden waits at the top — you can only reach the nodes linked to your floor.', es: 'Subes piso a piso: haz clic en un nodo brillante para viajar. Las peleas pagan cartas, la hoguera cura, y el Guardián de Escoria espera arriba — solo puedes alcanzar los nodos enlazados a tu piso.' },
   'tour.step.hand.title': { en: 'Your hand and your Energy', es: 'Tu mano y tu Energía' },

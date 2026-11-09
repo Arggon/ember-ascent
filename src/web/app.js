@@ -65,8 +65,15 @@ document.addEventListener('keydown', (ev) => {
   // the same way the Help guard swallows — native Tab still moves focus. Space is
   // deliberately NOT bound: it is End Turn muscle memory, and training a conflict here
   // would hurt more than the shortcut helps.
+  // ONE exception (review round 1 of the six-step rework): Enter on a focused card
+  // BUTTON activates that button natively — the guard's preventDefault used to cancel
+  // the activation, so Enter on Back/Skip ran tourNext instead of the focused control.
+  // Enter anywhere else in the card (the card div an action step takes the caret with)
+  // still advances.
   if (tourOpen || freshOnboarding()) {
     if (k === 'Escape' || k === 'Esc') { ev.preventDefault(); dismissTour(); return; }
+    if (k === 'Enter' && document.activeElement?.tagName === 'BUTTON'
+      && document.activeElement.closest('#tour-layer')) return;
     if (k === 'Enter' || k === 'ArrowRight') { ev.preventDefault(); tourNext(); return; }
     if (k === 'ArrowLeft') { ev.preventDefault(); tourBack(); return; }
     return;

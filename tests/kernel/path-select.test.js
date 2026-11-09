@@ -55,13 +55,22 @@ class N {
   remove() { if (this.parent) { this.parent.kids = this.parent.kids.filter((k) => k !== this); this.parent = null; } }
   get firstElementChild() { return this.kids.find((k) => k.tag !== '#text') ?? null; }
   dispatch(type, extra = {}) {
-    const ev = { type, target: this, preventDefault() { this.defaultPrevented = true; }, ...extra };
+    // stopPropagation is part of the event API the views rely on (kindling-view's
+    // radiogroups stop the bubble so the document guard never sees a handled arrow),
+    // so the shim models it: the walk ends after the node that stopped it.
+    const ev = {
+      type, target: this,
+      preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { this.stopped = true; },
+      ...extra,
+    };
     let n = this;
     const chain = [];
     while (n) { chain.push(n); n = n.parent; }
     for (const node of chain) {
       ev.currentTarget = node;
       for (const fn of node._ls[type] || []) fn(ev);
+      if (ev.stopped) break;
     }
   }
 }
