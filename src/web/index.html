@@ -41,6 +41,10 @@
     <!-- Announcements for players who cannot see the targeting step. `polite` so a
          message never interrupts the enemy's own intent being read out. -->
     <div id="live" role="status" aria-live="polite"></div>
+    <!-- The PRODUCT TOUR layer (ONBOARDING-TOUR spec): a PERSISTENT sibling of #stage that
+         render() never clears, exactly like #fx-layer — a coach-mark must survive the
+         repaint that the action it describes causes. Empty, it is display:none. -->
+    <div id="tour-layer"></div>
   </div>
   <noscript>This game needs JavaScript modules enabled.</noscript>
   <script type="module" src="./app.js"></script>

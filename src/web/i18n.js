@@ -412,6 +412,30 @@ const STRINGS = {
   'relicThreshold.verb': { en: 'crossed', es: 'cruzaron' },
   'relicThreshold.verb1': { en: 'crossed', es: 'cruzó' },
   'relicThreshold.marksClausePlural': { en: 'the', es: 'las marcas de' },
+
+  /* ---- product tour (ONBOARDING-TOUR) ---------------------------------- */
+  // While the tour is open the surface's keyboard guard swallows every game shortcut
+  // (app.js's tour guard, ONBOARDING-TOUR §5.4), so steps 3-5 name the CLICK path and
+  // say the keys come back when the tour ends — teaching a swallowed shortcut on the
+  // exact screen it is swallowed on teaches nothing.
+  'tour.title': { en: 'First steps at the forge', es: 'Primeros pasos en la forja' },
+  'tour.stepOf': { en: 'Step {n} of {m}', es: 'Paso {n} de {m}' },
+  'tour.next': { en: 'Next', es: 'Siguiente' },
+  'tour.back': { en: 'Back', es: 'Atrás' },
+  'tour.done': { en: 'Done — climb', es: 'Listo — a escalar' },
+  'tour.skip': { en: 'Skip the tour  (Esc)', es: 'Saltar el recorrido  (Esc)' },
+  'tour.replay': { en: 'Replay the guided tour', es: 'Repetir el recorrido guiado' },
+  'tour.replay.title': { en: 'Five short steps over the real screens', es: 'Cinco pasos cortos sobre las pantallas reales' },
+  'tour.step.kindling.title': { en: 'The kindling: hero, path, boon', es: 'El rescoldo: héroe, camino, rescoldo' },
+  'tour.step.kindling.body': { en: 'Pick a hero and a path above — the arrows switch them, and the choice rebuilds the run. Take exactly one boon below: each gift has a price, and taking one starts the climb.', es: 'Elige héroe y camino arriba — las flechas los cambian, y la elección reconstruye la partida. Toma exactamente un rescoldo abajo: cada regalo tiene un precio, y tomarlo empieza el ascenso.' },
+  'tour.step.map.title': { en: 'The ascent map', es: 'El mapa del ascenso' },
+  'tour.step.map.body': { en: 'You climb floor by floor: click a glowing node to travel. Fights pay cards, the campfire heals, the Slag Warden waits at the top — you can only reach the nodes linked to your floor.', es: 'Subes piso a piso: haz clic en un nodo brillante para viajar. Las peleas pagan cartas, la hoguera cura, y el Guardián de Escoria espera arriba — solo puedes alcanzar los nodos enlazados a tu piso.' },
+  'tour.step.hand.title': { en: 'Your hand and your Energy', es: 'Tu mano y tu Energía' },
+  'tour.step.hand.body': { en: 'Click a card to play it. The orb counts the Energy left this turn — every card costs its gem, and the hand refills each turn. (Number keys come back when the tour ends.)', es: 'Haz clic en una carta para jugarla. El orbe cuenta la Energía que queda este turno — cada carta cuesta su gema, y la mano se rellena cada turno. (Las teclas de número vuelven cuando termina el recorrido.)' },
+  'tour.step.intent.title': { en: 'What the enemy intends', es: 'Lo que el enemigo pretende' },
+  'tour.step.intent.body': { en: 'The row over each enemy announces its next move — a number is damage headed your way. Read it before you spend the turn: the enemy acts the moment you end the turn.', es: 'La fila sobre cada enemigo anuncia su próximo movimiento — un número es daño que viene hacia ti. Léelo antes de gastar el turno: el enemigo actúa en cuanto termines el turno.' },
+  'tour.step.endTurn.title': { en: 'End the turn', es: 'Termina el turno' },
+  'tour.step.endTurn.body': { en: 'When the Energy is spent or the plan is set, click End Turn. The enemies act, then a fresh hand is dealt. That is the whole loop: play, end, climb. (The e and Space keys come back when the tour ends.)', es: 'Cuando gastes la Energía o el plan esté listo, haz clic en Terminar turno. Los enemigos actúan y llega una mano nueva. Ese es todo el bucle: jugar, terminar, escalar. (Las teclas e y Espacio vuelven cuando termina el recorrido.)' },
 };
 
 /**

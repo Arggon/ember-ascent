@@ -15,13 +15,16 @@
 //   targeting.js     the aiming flow (pendingSlot/aimed live here)
 //   actions.js       act() — the ONE dispatch path — plus newGame and the hero/path switch
 //   run-history.js   localStorage ledger, scoring screens, unlock narration
-//   hud.js           the status bar and the help/glossary sheet
+//   hud.js           the status bar and the help/glossary sheet (the sheet's footer
+//                    carries the tour's Replay entry)
 //   floats.js        floating numbers, hit classes, dying-enemy ghosts
 //   fx.js            the FX queue and its dispatcher (the persistent #fx-layer)
 //   fx-signatures.js one function per per-card signature effect
 //   combat-view.js   the fight screen (hero, enemies, hand, controls)
 //   map-view.js      the ascent map
 //   reward-view.js / kindling-view.js / rest-view.js / end-view.js  the other screens
+//   tour.js          the first-run product tour (the persistent #tour-layer, the
+//                    onboarding flags, the keyboard guard's predicate)
 //   render.js        the one paint path (the page() frame lives in page-frame.js)
 //
 // All art is CSS or inline SVG built with DOM calls: no image files beyond the local
@@ -40,7 +43,8 @@
 import { ctl, snap, busyReason } from './runtime.js';
 import { biomeChoice, heroChoice, act, newGame } from './actions.js';
 import { cancelTargeting, clickCard, pendingSlot, pickTarget } from './targeting.js';
-import { deckOpen, toggleDeck, codexOpen, toggleCodex, beltOpenSlot, toggleBelt, helpOpen, toggleHelp, HELP_SEEN_KEY } from './hud.js';
+import { deckOpen, toggleDeck, codexOpen, toggleCodex, beltOpenSlot, toggleBelt, helpOpen, toggleHelp } from './hud.js';
+import { tourOpen, tourStep, freshOnboarding, tourNext, tourBack, dismissTour } from './tour.js';
 // Imported for its LOAD-BEARING side effect, not its export: render.js registers itself
 // as the paint sink (setRepaint) at load, and the boot's newGame() below repaints
 // through that hook. A tree-shake or a "cleanup" of this line blanks the first screen.
@@ -53,6 +57,21 @@ document.addEventListener('keydown', (ev) => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const k = ev.key;
 
+  // --- the product tour owns the keyboard while it shows (ONBOARDING-TOUR spec) ----
+  // It stands BEFORE the sheet guards: on a fresh boot the tour IS the first-run surface,
+  // and no sheet, no card, no turn and no run may be driven from behind its shades.
+  // freshOnboarding() covers the keystroke that races the boot paint. Escape dismisses
+  // (both flags, tour.js), Enter/→ advance, ← steps back; everything else is swallowed
+  // the same way the Help guard swallows — native Tab still moves focus. Space is
+  // deliberately NOT bound: it is End Turn muscle memory, and training a conflict here
+  // would hurt more than the shortcut helps.
+  if (tourOpen || freshOnboarding()) {
+    if (k === 'Escape' || k === 'Esc') { ev.preventDefault(); dismissTour(); return; }
+    if (k === 'Enter' || k === 'ArrowRight') { ev.preventDefault(); tourNext(); return; }
+    if (k === 'ArrowLeft') { ev.preventDefault(); tourBack(); return; }
+    return;
+  }
+
   // --- a sheet owns the keyboard while it is open -------------------------------------------
   // ONE contract for all three sheets: while a sheet is open every key is swallowed
   // except that sheet's own toggle (d for deck, k for codex) and Escape — so no OTHER
@@ -64,17 +83,13 @@ document.addEventListener('keydown', (ev) => {
   // The Help sheet is the strictest case (POLISH round, the E8b class one layer down):
   // it has no toggle key of its own, so Escape is its ONLY key — d/k would stack sheets
   // on it and `n` used to discard a run behind it (the footer's own New Run button is
-  // the deliberate way out). The guard covers the sheet however it came up: toggled
-  // open, OR the first-run paint that shows it while the seen-flag is unset. It stands
-  // FIRST: if Help is somehow open over another sheet, the topmost sheet is the one the
-  // keyboard talks to.
-  const helpSeen = (() => { try { return localStorage.getItem(HELP_SEEN_KEY) === '1'; } catch { return true; } })();
-  if (helpOpen || !helpSeen) {
-    if (k === 'Escape' || k === 'Esc') {
-      ev.preventDefault();
-      if (!helpSeen) { try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch { /* best effort */ } }
-      toggleHelp(false);
-    }
+  // the deliberate way out). The guard covers the sheet however it came up — always the
+  // player's own click now: the first-run paint it also covered is the TOUR's surface
+  // (ONBOARDING-TOUR spec §4.4), so the seen-flag read and the Escape write it carried
+  // live no more. It stands before the open-toggle lines: if Help is somehow open over
+  // another sheet, the topmost sheet is the one the keyboard talks to.
+  if (helpOpen) {
+    if (k === 'Escape' || k === 'Esc') { ev.preventDefault(); toggleHelp(false); }
     return;
   }
   if (deckOpen) {
@@ -158,7 +173,14 @@ document.addEventListener('keydown', (ev) => {
  *  `busy` publishes the UX-5 input gate's current reason (runtime.busyReason) — the same
  *  presentation truth the hand and End Turn paint — so tooling and the e2e walks can wait
  *  for the surface to take input again instead of guessing at animation lengths. */
-window.__dlb = { controller: () => ctl, snapshot: () => snap, busy: () => busyReason() };
+window.__dlb = {
+  controller: () => ctl,
+  snapshot: () => snap,
+  busy: () => busyReason(),
+  // The product tour's published truth (ONBOARDING-TOUR spec §5.4): walks wait on IT
+  // instead of querying the layer's CSS.
+  tour: () => ({ open: tourOpen, step: tourStep }),
+};
 
 // The first run of the page IS newGame() — the exact construction, not a copy of it.
 // The old inline build "minus the profile narrowing" was an honesty hole the S2 codex

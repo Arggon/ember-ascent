@@ -19,6 +19,7 @@ import { cardPool } from '../kernel/index.js';
 import { inDeckCounts } from './deck-counts.js';
 import { currentLang, t } from './i18n.js';
 import { switchLang } from './actions.js';
+import { startTour, HELP_SEEN_KEY } from './tour.js';
 
 /* ------------------------------------------------------------------------- HUD */
 
@@ -289,7 +290,10 @@ function ordinal(n) {
 /* ----------------------------------------------------------------- HELP / GLOSSARY */
 
 export let helpOpen = false;
-export const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
+// The key string itself lives in tour.js beside TOUR_SEEN_KEY — the coexistence rule
+// (§4 of ONBOARDING-TOUR) pairs the two flags, so one module owns both strings and this
+// one consumes it (the app-bundle harness allows no re-export lists, and no reader is
+// left importing it from here).
 
 export function toggleHelp(open) {
   helpOpen = open;
@@ -367,6 +371,15 @@ export function helpPanel() {
       text: t('help.gotIt'),
       attrs: { type: 'button' },
       on: { click: () => { try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch {} toggleHelp(false); } },
+    }),
+    // ONBOARDING-TOUR: the veteran's way back in. It reopens the tour at the step for
+    // the phase the player is standing on and writes no flag (only finishing or
+    // dismissing the tour does, tour.js).
+    el('button', {
+      cls: 'btn secondary',
+      text: t('tour.replay'),
+      attrs: { type: 'button', title: t('tour.replay.title') },
+      on: { click: () => { toggleHelp(false); startTour(); } },
     }),
     // New Run moved here from the HUD (UX rev 3): it is destructive — it discards the run —
     // and never belonged one tap from End Turn. The `n` hotkey still starts a new run.

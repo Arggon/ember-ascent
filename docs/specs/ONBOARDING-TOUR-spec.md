@@ -1,0 +1,487 @@
+# ONBOARDING-TOUR — the first-run Product Tour (five coach-marks over the real screens)
+
+**Owner:** Tech Lead → Frontend Engineer · 2026-11-09.
+**Ask:** "El juego puede ser un poco difícil de jugarlo por primera vez… agrega un Product Tour, User Onboarding o Guías dinámicas de interfaz para hacer más ameno el juego para usuarios primerizos."
+**Format:** tagged claims like `UX-9-enemy-action-fx-spec.md` — `[READ]` = re-verified in source or executed this run; `[INFERRED]` = this spec's design decision. Every decision the ask required is stated as a decision, not an option.
+**Sibling specs:** `UX-9-enemy-action-fx-spec.md` (spec format), `NAMES.md` (the proper nouns the tour copy uses: Ashwright, Slag Warden).
+
+---
+
+## 1. Context
+
+The boot lands on a **boon/kindling screen, not combat** `[READ, executed]`: the browser's boot is `newGame()`, which builds the controller with `kindling: true` (`src/web/actions.js:584`), and the kernel answers `phase: 'kindling'`, `stepIndex: 0` for a fresh run. Measured this run:
+
+```
+$ node -e "import('./src/kernel/index.js').then(k => console.log(k.newRun({ seed: 7, kindling: true, character: 'ironclad' }).phase))"
+phase: kindling
+```
+
+(without the `kindling` flag the raw kernel boots at `phase: 'map'` — the flag is what the page passes, so the page boots at kindling. The e2e boot walk agrees: `tests/web/e2e.browser.spec.js:272` "boot: kindling choice leads to the map".)
+
+Today a first-time player's only guidance is the **auto-opened Help sheet**: `render()` appends `helpPanel()` whenever `dlb.helpSeen.v1` is unset (`src/web/render.js:296-302`), a wall of kernel help topics plus a ~40-row glossary (`src/web/hud.js:317-383`). It explains vocabulary, not the loop, and it covers the screen the player must act on. This spec replaces that first-run surface with a **five-step contextual tour**: short coach-marks anchored to elements the views already paint, advanceable and dismissable by click and by keyboard, replayable by veterans, localized in both languages, presentation-only, zero dependencies.
+
+## 2. Current mechanism (real names)
+
+- **The one paint path:** `render()` rebuilds `#stage` after every action (`src/web/render.js:91-344`); `#stage`'s children never survive a paint. The persistent siblings that survive are `#hud`, `#fx-layer` (`z-index: 55`, fixed, `pointer-events: none` — `style.css:1734-1741`), `#toast` (60) and `#live` (`src/web/index.html:21-44`). Modal sheets paint INTO `#stage` per paint (`.modal-back`, `z-index: 70` — `style.css:1592-1603`).
+- **The Help flag:** `HELP_SEEN_KEY = 'dlb.helpSeen.v1'` (`hud.js:292`). Written by the sheet's "Got it" (`hud.js:369`) and by Escape on the first-run paint (`app.js:71-79`); read by the paint sink for the auto-open (`render.js:297-302`) and by the keyboard guard to mean "the sheet is open via first-run paint" (`app.js:71-79`).
+- **The keyboard contract:** one `keydown` listener whose guards run in order — Help sheet, deck (`d`), codex (`k`), belt popover, sheet toggles, targeting, the UX-5 busy gate, then the phase shortcuts (`app.js:52-155`). A guard `return`s without `preventDefault` for keys it only swallows from the game, so native Tab still moves focus — the accepted (unfixed) limitation shared by every sheet.
+- **Runtime handles:** `snap` (the kernel's value model), `repaint` (the registered paint hook, `runtime.js:507-509`), `reducedMotion` (`runtime.js:35-37`), `announce()` (`dom.js`), `el()` (`dom.js:9-18`). `#fx-layer` is null-guarded because narrow test harnesses build only `#hud/#stage/#toast/#live/#app` (`runtime.js:21-27`) — the tour layer must follow the same guard.
+- **Anchors the views already paint** `[READ]`: `.boon-list` (`kindling-view.js:105`; hero/path pickers at `:39`/`:76`), `.map` (`map-view.js:34`), `.hand` (`combat-view.js:458`), the energy orb `.energy-orb` (`combat-view.js:299-311`), the enemy intent row `.e-intent` (`combat-view.js:608,611`), the controls row `.controls` with the End Turn button (`combat-view.js:360-391`).
+- **Test harness:** every existing e2e walk seeds `localStorage.setItem('dlb.helpSeen.v1','1')` before goto (`e2e.browser.spec.js:116` and 10 more call sites — 11 in total; the twelfth `addInitScript` at `:1996` seeds the veteran ledger, not a flag). Any onboarding rule that keyed on `dlb.helpSeen.v1` **alone** would auto-open the tour in every existing test and break the suite — this fact drives the flag rule in §4.
+- **Gates:** `npm run gate` (`scripts/check-architecture.mjs`) — clean baseline this run ("scanned 67 files under src/, OK"); `scripts/check-surface-art.mjs` requires every class a `src/web` module emits to have a rule in `style.css` and top-level selectors to stay unique (`style.css:52-53` banner); `scripts/measure-tokens.mjs` exports `countWorst()` (worst of o200k_base / cl100k_base) and its CLI spike is dev-only, not a gate.
+
+## 3. The tour at a glance
+
+Five steps, in player order, each anchored to a real element:
+
+| # | id | fires when | anchor (live selector) | teaches |
+|---|----|-----------|------------------------|---------|
+| 1 | `kindling` | boot (`phase: 'kindling'`) | `.boon-list` | hero + path above, take exactly ONE boon — each gift has a price |
+| 2 | `map` | first arrival at `phase: 'map'` under an open tour | `.map` | click a glowing node to travel; fights pay cards, campfire heals, the Slag Warden is at the top |
+| 3 | `hand` | first arrival at `phase: 'combat'` under an open tour | `.hand` | click a card or press its number; the `.energy-orb` counts the turn's Energy |
+| 4 | `intent` | within the combat steps (Next/Enter) | first `.e-intent` | the enemy's row announces its next move; a number is damage headed your way |
+| 5 | `endTurn` | within the combat steps (Next/Enter) | `.controls` | End Turn (or `e`, or Space) passes; enemies act; a fresh hand is dealt — the whole loop |
+
+Steps 3→5 share the first combat and are walked with Next; steps 1→2 advance contextually when the player acts (the shade ring leaves the anchored element clickable, so taking the boon or clicking a node IS the way to step 2/3 — learn by doing). Five steps total, per the ask's ceiling.
+
+## 4. Decision — flags and coexistence with the Help sheet
+
+Two keys in the `dlb.*` family `[INFERRED]`:
+
+- **`dlb.tourSeen.v1`** (new, owned by `tour.js` as `TOUR_SEEN_KEY`): `'1'` once the tour is finished **or dismissed** — one flag, all-or-nothing. A player who closes a coach-mark says "not now"; re-prompting at the next screen is the classic onboarding failure, and the Help sheet's Replay entry (§6) is the way back.
+- **`dlb.helpSeen.v1`** (existing): keeps its key and its writer, and gains one new reader — see below. It is **not** retired.
+
+**The exact coexistence rule** `[INFERRED]`:
+
+1. **Fresh onboarding** = neither flag is set. On a fresh-onboarding boot the tour opens on the kindling screen and the Help sheet's auto-open is **retired**: `render()` drops the `!seen` half of its condition (`render.js:297-302` becomes `if (helpOpen) stageEl.append(helpPanel());`). Help is never auto-opened again by anything; it stays exactly where it is via its HUD button (`hud.js:103-110`).
+2. **Old-Help veterans** (helpSeen `'1'`, tourSeen unset) and **the e2e harness** (which seeds helpSeen) are treated as onboarded: nothing auto-opens, in either language, ever. This is what makes the feature a zero-churn landing for the existing 2,653-line suite.
+3. **Dismiss or finish writes BOTH flags** (`tourSeen` and `helpSeen`): the pair is monotone, every current reader of helpSeen stays truthful ("this player saw the first-run explanation" — the tour IS one), and no code path can fall back to the retired auto-Help.
+4. The tour guard owns the keyboard while it shows (`tourOpen` OR fresh onboarding — the second covers the keystroke that races the boot paint); it stands **before** the Help guard (`app.js:71-79`), whose `!helpSeen` half is **deleted** — a fresh boot means the tour owns the keys, not Help. Help's guard reduces to `if (helpOpen)` + Escape.
+
+## 5. Architecture
+
+### 5.1 The module — `src/web/tour.js`
+
+Exports `[INFERRED, reference implementation in Appendix A]`:
+
+| export | role |
+|---|---|
+| `TOUR_SEEN_KEY` | the localStorage key (`'dlb.tourSeen.v1'`) |
+| `tourOpen`, `tourStep` | module-owned presentation state (the `helpOpen` pattern, `hud.js:291`) |
+| `freshOnboarding()` | neither flag set — the guard's and the trigger's predicate |
+| `dismissTour()` | close + write both flags + `repaint()` (event handlers only) |
+| `tourNext()` / `tourBack()` | step navigation; `tourNext()` past the last step dismisses |
+| `startTour()` | the veteran entry: open at the step for the current phase, writes no flag |
+| `tourSync(phaseChanged)` | the paint-path hook render.js calls (§5.3) |
+
+Imports: `snap`, `repaint` from `./runtime.js`; `el`, `announce` from `./dom.js`; `t` from `./i18n.js`. Nothing else — no kernel import, no view import, **no cycle** (render.js may import tour.js; tour.js imports none of them back). Zero dependencies, no `node:*` (gate R1a/R3 rules, `scripts/check-architecture.mjs:111-118`).
+
+### 5.2 The persistent layer — outside `#stage`
+
+`index.html` gains one sibling after `#live`: `<div id="tour-layer"></div>` (the `#fx-layer` declaration convention, `index.html:39`; the null-guard convention for harnesses without it, `runtime.js:21-27`). `tour.js` grabs it per paint; `#tour-layer:empty { display: none }` makes the idle layer invisible and unhit. Per paint the layer holds: one `.tour-card` (`role="dialog"`) and, when the anchor exists, **four `.tour-shade` boxes around the anchor's measured rect** — a hole, not an outline.
+
+**The hole passes pointer events through** (`#tour-layer` is `pointer-events: none`; only the shades and the card opt back in): the anchored element stays visible AND clickable, so the boon click / node click that advances the run also advances the tour. Shades swallow clicks elsewhere; a shade click dismisses the tour (the `.modal-back` click-through convention, `hud.js:319`).
+
+Geometry is measured per paint with `getBoundingClientRect()` on the anchor and re-emitted as the shades' inline boxes — the `placeAt()` precedent (`dom.js`, fx positioning). No stage node is ever touched: the tour never adds classes to, or reads rules from, the views' DOM beyond the anchor rect.
+
+### 5.3 Integration into the paint path
+
+`render()` calls `tourSync(phaseChanged)` once per paint, after the phase view and the sheets are appended (after `render.js:317-320`, before the one-paint flag release). Contract:
+
+- `!tourOpen` + `freshOnboarding()` + `snap.phase === 'kindling'` → open at step 1 (the boot trigger — the auto-Help's replacement, per §4.1).
+- `tourOpen` + `phaseChanged` → jump to the new phase's first step; a phase with no step (`reward`, `ended`, `rest`, `shop`, `event`) → `closeTour()` **without repaint** (mid-paint rule; the deal-clock arming at `render.js:112-129` is the paint-sink precedent for mutating only its own presentation state). Auto-close on `reward`/`ended` exists so the shades can never block a spoils click or a summary button.
+- Every paint: re-measure the ring, rebuild the card (the stage rebuilds too — no stale nodes), and fire `announce()` + focus **only when the step changed** (a hover repaint must not steal the caret; `paintedAt` tracks it).
+- The `endHeld` early return (`render.js:219-275`) skips `tourSync` for that paint — irrelevant there; the next paint syncs.
+
+### 5.4 Integration into the keyboard guard chain
+
+New guard at the very top of the listener (`app.js:52`), before the Help guard:
+
+```
+tourOpen || freshOnboarding()  →
+  Escape (or Esc)  → dismissTour()      [preventDefault]
+  Enter, ArrowRight → tourNext()        [preventDefault]
+  ArrowLeft         → tourBack()        [preventDefault]
+  anything else     → return (swallowed: no sheet, no card, no turn, no run)
+```
+
+Everything else falls through untouched, so native Tab keeps working exactly as it does behind every existing sheet (§2). Space is deliberately NOT bound (it is End Turn muscle memory; unbound avoids training a conflict). After a dismiss both flags are set, so the guard's fresh-onboarding half goes false and the chain behaves as today. The Help guard that follows loses its `!helpSeen` half (§4.4); `window.__dlb` gains `tour: () => ({ open: tourOpen, step: tourStep })` beside `busy()` (`app.js:161`) so walks wait on the tour's own published truth instead of querying CSS.
+
+## 6. Veteran re-entry (rejugable)
+
+The Help sheet footer (`hud.js:364-379`) gains one button between "Got it" and "New Run": **"Replay the guided tour"** (`t('tour.replay')`, `.btn.secondary`), which closes the sheet and calls `startTour()`. It is visible to every veteran who opens Help, needs no new HUD chrome (the HUD row is already five buttons wide and the ≤620px band trims it), and reopens the tour at the step for the phase the player is standing on — a veteran in combat gets steps 3-5, not a kindling lecture. Escape still closes Help without starting anything.
+
+## 7. i18n (en/es) — no hardcoded strings
+
+All copy lives in `STRINGS` (`src/web/i18n.js`) under a `tour.*` group, verbatim (this exact block is what §10 measures; **review round 1** reworded the hand/endTurn bodies to the click path — the tour's own keyboard guard swallows those shortcuts while it shows, §5.4 — and dropped the unused `tour.aria`; `src/web/i18n.js` is the living copy):
+
+```js
+/* ---- product tour (ONBOARDING-TOUR) ---------------------------------- */
+'tour.title': { en: 'First steps at the forge', es: 'Primeros pasos en la forja' },
+'tour.aria': { en: 'Guided tour', es: 'Recorrido guiado' },
+'tour.stepOf': { en: 'Step {n} of {m}', es: 'Paso {n} de {m}' },
+'tour.next': { en: 'Next', es: 'Siguiente' },
+'tour.back': { en: 'Back', es: 'Atrás' },
+'tour.done': { en: 'Done — climb', es: 'Listo — a escalar' },
+'tour.skip': { en: 'Skip the tour  (Esc)', es: 'Saltar el recorrido  (Esc)' },
+'tour.replay': { en: 'Replay the guided tour', es: 'Repetir el recorrido guiado' },
+'tour.replay.title': { en: 'Five short steps over the real screens', es: 'Cinco pasos cortos sobre las pantallas reales' },
+'tour.step.kindling.title': { en: 'The kindling: hero, path, boon', es: 'El rescoldo: héroe, camino, rescoldo' },
+'tour.step.kindling.body': { en: 'Pick a hero and a path above — the arrows switch them, and the choice rebuilds the run. Take exactly one boon below: each gift has a price, and taking one starts the climb.', es: 'Elige héroe y camino arriba — las flechas los cambian, y la elección reconstruye la partida. Toma exactamente un rescoldo abajo: cada regalo tiene un precio, y tomarlo empieza el ascenso.' },
+'tour.step.map.title': { en: 'The ascent map', es: 'El mapa del ascenso' },
+'tour.step.map.body': { en: 'You climb floor by floor: click a glowing node to travel. Fights pay cards, the campfire heals, the Slag Warden waits at the top — you can only reach the nodes linked to your floor.', es: 'Subes piso a piso: haz clic en un nodo brillante para viajar. Las peleas pagan cartas, la hoguera cura, y el Guardián de Escoria espera arriba — solo puedes alcanzar los nodos enlazados a tu piso.' },
+'tour.step.hand.title': { en: 'Your hand and your Energy', es: 'Tu mano y tu Energía' },
+'tour.step.hand.body': { en: 'Click a card to play it, or press its number. The orb counts the Energy left this turn — every card costs its gem, and the hand refills each turn.', es: 'Haz clic en una carta para jugarla, o pulsa su número. El orbe cuenta la Energía que queda este turno — cada carta cuesta su gema, y la mano se rellena cada turno.' },
+'tour.step.intent.title': { en: 'What the enemy intends', es: 'Lo que el enemigo pretende' },
+'tour.step.intent.body': { en: 'The row over each enemy announces its next move — a number is damage headed your way. Read it before you spend the turn: the enemy acts the moment you end the turn.', es: 'La fila sobre cada enemigo anuncia su próximo movimiento — un número es daño que viene hacia ti. Léelo antes de gastar el turno: el enemigo actúa en cuanto termines el turno.' },
+'tour.step.endTurn.title': { en: 'End the turn', es: 'Termina el turno' },
+'tour.step.endTurn.body': { en: 'When the Energy is spent or the plan is set, press End Turn (or e, or Space). The enemies act, then a fresh hand is dealt. That is the whole loop: play, end, climb.', es: 'Cuando gastes la Energía o el plan esté listo, pulsa Terminar turno (o e, o Espacio). Los enemigos actúan y llega una mano nueva. Ese es todo el bucle: jugar, terminar, escalar.' },
+```
+
+Proper nouns follow `NAMES.md` (Ashwright is id-stable and renders identically; "Slag Warden" localizes as "El Guardián de Escoria", the enemy table's own twin — the same convention `map.node.boss` already uses, `i18n.js:234`). Step titles/bodies are resolved per paint via `t()`, so a language switch mid-tour repaints the card in the new language on the next render. The `i18n` unit test (`tests/web/i18n.test.js`) already fails a key missing its `en` row; it now also covers the `tour.*` rows automatically.
+
+## 8. Accessibility
+
+- The card is `role="dialog"` with `aria-label` = "`tour.title` — `tour.stepOf`" (the belt panel's pattern, `hud.js:218`). Step changes are announced through `announce()` into `#live` (the targeting-step channel) — the tour's meaning is never colour/motion alone.
+- On each step change focus moves to the card's primary button (best-effort `try/catch`, the `endFocusPending` pattern, `render.js:323-327`); `preventScroll: true` so a coach-mark never yanks the page. No focus trap — the same accepted limitation every sheet already ships (§2); Tab order inside the card is Back → Next → Skip.
+- Every control is a real `<button type="button">` wearing the shared `.btn` chrome. Keyboard parity is total: advance (Next / Enter / →), back (Back / ←), dismiss (Skip / Escape / shade click).
+- **Reduced motion:** the card's entrance animation is disabled in the `@media (prefers-reduced-motion: reduce)` block (the §10 convention, e.g. `style.css:7092`); the shade ring is static geometry in both paths — it is a colour fill, not a transition, and it carries no information the card text doesn't restate.
+
+## 9. Responsive
+
+Base rules keep the card at `width: min(320px, calc(100vw - 24px))`; **the small bands are handled in JS**, not CSS overrides: `paintTour()` parks the card bottom-centre full-width (`left: 8px; right: 8px; bottom: 8px`) when `innerWidth <= 620 || innerHeight <= 480` — the same thresholds the stylesheet's phone tier pairs on (`style.css:2479`, `@media (max-width: 620px), (max-height: 480px)`; the ≤700px-and-short rows at `style.css:3960`/`7293`/`7541`). There the hand and controls sit in the lower half of the stage, so a bottom-sheet card never covers its own anchor. CSS contributes only the cosmetic narrowings (`.tour-body` size at the 620px tier) inside a self-contained §10-style block appended at end of file with its own banner — never across a §9 theme boundary (`style.css:41-49`), and every new class name gets a rule for `check-surface-art.mjs`. New top-level selectors (`#tour-layer`, `.tour-card`, `.tour-shade`, `.tour-count`, `.tour-head`, `.tour-body`, `.tour-nav`) are unique today `[READ, grep]`.
+
+## 10. Budget — measured this run
+
+`node scripts/measure-tokens.mjs` (the CLI spike, run as-is; its own docblock calls it a spike, not a gate — the two FAIL rows are its documented stale samples, not this feature):
+
+```
+PASS  R4 state dump (prescribed shape)          worst=99   ceiling=250
+PASS  R4 --verbose dump (+pile list)            worst=131  ceiling=250
+PASS  R8 --help example block                   worst=42   ceiling=60
+```
+
+The tour's own payloads, measured with the script's exported `countWorst()` (worst of o200k_base/cl100k_base) over the SHIPPED sources (**review round 1** numbers; Appendix A's reference measured 2392/947):
+
+| payload | o200k | cl100k | **worst** |
+|---|---|---|---|
+| `src/web/tour.js` (shipped source) | 3113 | 3086 | **3113** |
+| `tour.*` i18n block in `i18n.js` (en+es source) | 976 | 1040 | **1040** |
+| player-visible strings, en only | 366 | 367 | **367** |
+| player-visible strings, es only | 416 | 479 | **479** |
+
+There is no pre-existing ceiling for UI module source (the frozen ones are engine-output payloads: dump ≤250, action line ≤8, `tests/budget.test.js:19`). History of the ceiling sentence: this spec first set **≤ 3,000 combined** and then annotated 2392 + 947 = 3339 against it — self-contradictory from the start, so that nominal line never operated as a gate. The operative rule is the growth limit: **past ~4,000 worst combined, split rather than grow.** Review round 1's own mandated fixes cost real tokens against Appendix A's reference — the §5.2/AC2 shade-click dismissal, the AC7 parking that decides on RESTING geometry and scores actionable coverage (the reference's XOR heuristic covered a travel node at 640x460 and grazed the map at 390x844), the shared flag constant, and the §5.4-honest click-path copy — shipping 3113 + 1040 = **4153**, 153 over the line. The prescribed remedy (split strings from code) does not map: no player string lives in `tour.js`; the mass is geometry code plus its evidence comments. The disclosed follow-up is the Tech Lead's call — raise the line for coach-mark geometry or split the parking math into its own module. Against the *player-visible* payload (367 en / 479 es) the feature still costs the reader ~one Help topic. Numbers measured 2026-11-09, review round 1, on this tree.
+
+## 11. Test plan — `tests/web/e2e.browser.spec.js`
+
+All new tests carry **`tour`** in the title, use the file's existing helpers (`freshPage`'s context shape, `waitIdle`, `readState`), real clicks only, and seed `dlb.tourSeen.v1`/`dlb.helpSeen.v1` explicitly where the flag state matters (the inverse of today's `addInitScript` contract):
+
+1. **`tour: a fresh boot opens the guided tour on the kindling screen instead of the auto-Help sheet`** — no seeded flags → goto → `#tour-layer .tour-card` exists with "Step 1 of 5", `.modal` count is 0 (the auto-Help is gone), the HUD Help button still renders, and no page errors.
+2. **`tour: the steps advance by click and keyboard, follow the phase, and Escape writes both flags`** — walk step 1 → click a real boon **through the step-1 hole** (the anchored `.boon-list` is the clickable region) → the card reads step 2 with the `.map` anchor ring; Enter advances, ArrowLeft steps back, `d`/`n` are swallowed mid-tour (no deck sheet, run intact); Escape dismisses; localStorage then holds `dlb.tourSeen.v1=1` AND `dlb.helpSeen.v1=1`; a `d` press afterwards opens the deck sheet again (guard released).
+3. **`tour: a dismissed tour never auto-opens again, and the Help sheet carries the Replay entry`** — seed both flags → reload → no `.tour-card`, no auto Help, two consecutive boots; open Help → the Replay button exists → clicking it opens the tour at the step for the current phase without changing the run snapshot; Escape closes the tour, flags unchanged.
+4. **`tour: the combat steps anchor the hand, the intent row and End Turn, and finishing releases the keyboard`** — fresh flags, fixed seed → kindling → travel to the first fight → steps 3/4/5 exist with anchors `.hand`, `.e-intent`, `.controls` (the ring's shades cover everything but the anchored element); Next through step 5 → "Done" dismisses → End Turn (`e`) works immediately, `waitIdle` confirms the gate is the game's own.
+5. **`tour: the coach card parks and stays legible in the small bands`** — viewport 390×844 (portrait phone) and 700×440 (landscape phone): the card is bottom-parked, the anchor ring still frames its element, the card never covers the anchor, and Escape still dismisses.
+
+Compatibility pin: with `dlb.helpSeen.v1` seeded (every existing walk), **zero** existing test may see a `.tour-card` — if one does, the §4 rule regressed. The help-sheet guard test (`e2e.browser.spec.js:1913`) must keep passing unchanged; its first-run `!helpSeen` branch is what §4.4 deleted.
+
+## 12. Acceptance criteria
+
+- AC1: Fresh boot (no flags) shows the tour on the kindling screen; `.modal` count 0; five steps in the §3 order with the §3 anchors.
+- AC2: Every step advances by click (Next) and keyboard (Enter/→); back by ←; dismiss by Escape, Skip, or a shade click — dismissing anywhere writes both flags and never auto-opens again.
+- AC3: `dlb.helpSeen.v1`-seeded boots (all existing tests, old veterans) never see the tour; the Help sheet's auto-open is retired for everyone; Help remains reachable by its button and gains the Replay entry.
+- AC4: The tour is presentation-only: it reads `snap` and localStorage, imports no kernel/rules module (gate stays green), mutates no state outside `tour.js` and `#tour-layer`, and the run underneath survives every tour key.
+- AC5: No hardcoded player-visible string; `t()` covers all copy in en and es; a mid-tour language switch repaints the card.
+- AC6: `role="dialog"`, aria-label, step announcements via `#live`, focus on the primary button per step change, Escape dismisses; reduced motion disables the entrance animation.
+- AC7: 390×844 and 700×440 both park the card legibly without covering the anchor.
+- AC8: `npm run gate` green; `check-surface-art.mjs` green (every emitted class has a rule); the §10 token numbers annotated in this file are the MEASURED ones and the growth past the ~4,000 line is disclosed there with its follow-up (the nominal ≤3,000 ceiling never gated — it was exceeded by the spec's own first annotation).
+
+## Appendix A — reference implementation
+
+`src/web/tour.js`, transcribable as-is (2392 tokens worst-of-both as measured in §10):
+
+```js
+// src/web/tour.js — the first-run product tour: five coach-marks over the REAL screens.
+//
+// ONBOARDING-TOUR spec (docs/specs/ONBOARDING-TOUR-spec.md). The tour is PRESENTATION
+// ONLY: it reads `snap` (the kernel's value model) and localStorage, never a rule. Its
+// layer is the PERSISTENT #tour-layer, a sibling of #stage declared in index.html, so
+// `render()` rebuilding #stage can never destroy a coach-mark mid-read.
+//
+// The five steps anchor to elements the views already paint:
+//   kindling → .boon-list   map → .map   hand → .hand   intent → .e-intent   endTurn → .controls
+// A step advances on its Next button (click) or Enter/→ (keyboard); ← goes back; Escape,
+// the Skip button and a shade click dismiss the whole tour. Dismissing or finishing
+// writes BOTH onboarding flags (TOUR_SEEN_KEY and hud.js's HELP_SEEN_KEY), which is what
+// keeps a fresh boot from ever falling back to the old auto-opened Help sheet.
+//
+// The first-run TRIGGER replaces render.js's auto-open of the Help sheet: a player with
+// NEITHER flag set is "fresh onboarding" — the tour opens on the boot's kindling screen
+// instead of Help, and Help stays reachable through its own HUD button. A player who
+// already saw the old first-run Help (helpSeen set, tourSeen unset) is treated as
+// onboarded: nothing auto-opens, and the Help sheet carries the Replay entry.
+//
+// The shade ring is four dim boxes AROUND the anchor's rect, so the marked element is
+// the one visible (and clickable) region — the tour teaches by doing; the coach card is
+// the explicit way forward.
+
+import { snap, repaint } from './runtime.js';
+import { el, announce } from './dom.js';
+import { t } from './i18n.js';
+
+export const TOUR_SEEN_KEY = 'dlb.tourSeen.v1';
+
+/** The five steps in player order. `phase` gates the contextual jump (a phase change
+ *  under an open tour lands on the new phase's first step); `sel` is the real anchor
+ *  the shade ring is measured against — a live element the views paint, nothing invented. */
+const STEPS = [
+  { id: 'kindling', phase: 'kindling', sel: '.boon-list' },
+  { id: 'map', phase: 'map', sel: '.map' },
+  { id: 'hand', phase: 'combat', sel: '.hand' },
+  { id: 'intent', phase: 'combat', sel: '.e-intent' },
+  { id: 'endTurn', phase: 'combat', sel: '.controls' },
+];
+
+export let tourOpen = false;
+export let tourStep = 0;
+/** The step the overlay last painted, so focus and the live announcement fire on a step
+ *  CHANGE only — tourSync runs on every repaint (a hover re-measures the ring), and
+ *  refocusing the card per hover would steal the caret from the player. */
+let paintedAt = -1;
+
+const read = (key) => { try { return localStorage.getItem(key) === '1'; } catch { return true; } };
+const write = (key) => { try { localStorage.setItem(key, '1'); } catch { /* private mode */ } };
+
+/** Fresh onboarding: neither onboarding flag is set. HELP_SEEN_KEY (hud.js) is read,
+ *  never written here — old-Help veterans and the e2e harness (which seeds that flag)
+ *  are onboarded as far as the tour is concerned. */
+export function freshOnboarding() {
+  return !read(TOUR_SEEN_KEY) && !read('dlb.helpSeen.v1');
+}
+
+function layer() {
+  const root = document.getElementById('tour-layer');
+  return root && root.isConnected ? root : null;
+}
+
+/** Close without repainting — the ONLY form tourSync may call (it runs mid-paint; a
+ *  repaint from inside the paint sink would recurse). Event handlers use dismissTour. */
+function closeTour() {
+  tourOpen = false;
+  write(TOUR_SEEN_KEY);
+  write('dlb.helpSeen.v1');
+  const root = layer();
+  if (root) root.replaceChildren();
+}
+
+/** Dismiss for good (Skip, Escape, Done, a shade click): both flags, then repaint so the
+ *  page shows the plain screens again. Never called mid-render. */
+export function dismissTour() {
+  closeTour();
+  repaint();
+}
+
+export function tourNext() {
+  if (!tourOpen) return;
+  if (tourStep >= STEPS.length - 1) { dismissTour(); return; }
+  tourStep += 1;
+  paintTour();
+}
+export function tourBack() {
+  if (!tourOpen || tourStep === 0) return;
+  tourStep -= 1;
+  paintTour();
+}
+
+/** Open the tour on demand (the Help sheet's Replay entry) at the step for the CURRENT
+ *  phase; an unknown phase parks on step 1. Opening writes no flag. */
+export function startTour() {
+  const at = STEPS.findIndex((s) => s.phase === snap.phase);
+  tourStep = at === -1 ? 0 : at;
+  tourOpen = true;
+  paintTour();
+}
+
+/** One coach-mark over the current anchor. Rebuilt wholesale per paint (the stage
+ *  repaints per action; this layer repaints with it), so no node of it can go stale. */
+function paintTour() {
+  const root = layer();
+  if (!root) return;
+  if (!tourOpen) { root.replaceChildren(); return; }
+  const step = STEPS[tourStep];
+  const count = t('tour.stepOf', { n: tourStep + 1, m: STEPS.length });
+  const title = t(`tour.step.${step.id}.title`);
+  const card = el('div', { cls: 'tour-card', attrs: { role: 'dialog', 'aria-label': `${t('tour.title')} — ${count}` } });
+  card.append(el('span', { cls: 'tour-count', text: count }));
+  card.append(el('h3', { cls: 'tour-head', text: title }));
+  card.append(el('p', { cls: 'tour-body', text: t(`tour.step.${step.id}.body`) }));
+  const nav = el('div', { cls: 'tour-nav' });
+  if (tourStep > 0) nav.append(el('button', {
+    cls: 'btn secondary tour-back', text: t('tour.back'), attrs: { type: 'button' }, on: { click: tourBack },
+  }));
+  nav.append(el('button', {
+    cls: 'btn tour-next',
+    text: tourStep >= STEPS.length - 1 ? t('tour.done') : t('tour.next'),
+    attrs: { type: 'button' },
+    on: { click: tourNext },
+  }));
+  nav.append(el('button', {
+    cls: 'btn ghost tour-skip', text: t('tour.skip'), attrs: { type: 'button' }, on: { click: dismissTour },
+  }));
+  card.append(nav);
+  root.replaceChildren(card);
+
+  // The ring: four shades AROUND the anchor's rect (a hole, not an outline), so the
+  // marked element stays the visible — and clickable — region while everything else
+  // dims behind the shades. A missing anchor (a kill-hold stage, a phase racing the
+  // views) parks the card bottom-centre with no ring: the copy still reads.
+  const W = window.innerWidth; const H = window.innerHeight;
+  const anchor = document.querySelector(step.sel);
+  if (anchor) {
+    const r = anchor.getBoundingClientRect();
+    const pad = 10;
+    const x0 = Math.max(0, r.left - pad); const y0 = Math.max(0, r.top - pad);
+    const x1 = Math.min(W, r.right + pad); const y1 = Math.min(H, r.bottom + pad);
+    const shade = (style) => root.append(el('div', { cls: 'tour-shade', attrs: { style } }));
+    shade(`left:0;top:0;width:${W}px;height:${y0}px`);
+    shade(`left:0;top:${y0}px;width:${x0}px;height:${y1 - y0}px`);
+    shade(`left:${x1}px;top:${y0}px;width:${W - x1}px;height:${y1 - y0}px`);
+    shade(`left:0;top:${y1}px;width:${W}px;height:${H - y1}px`);
+    const small = W <= 620 || H <= 480; // the phone / landscape-phone bands park the card
+    if (small) { card.style.left = '8px'; card.style.right = '8px'; card.style.bottom = '8px'; }
+    else {
+      const below = y1 + 12 + 230 < H;
+      card.style.top = below ? `${y1 + 12}px` : `${Math.max(8, y0 - 242)}px`;
+      card.style.left = `${Math.min(Math.max(8, x0), Math.max(8, W - 348))}px`;
+    }
+  } else {
+    card.style.left = '50%'; card.style.transform = 'translateX(-50%)'; card.style.bottom = '8px';
+  }
+  if (paintedAt !== tourStep) {
+    paintedAt = tourStep;
+    announce(`${title}. ${t(`tour.step.${step.id}.body`)}`); // the step is text, not colour
+    const primary = card.querySelector('.tour-next');
+    if (primary) { try { primary.focus({ preventScroll: true }); } catch { /* best effort */ } }
+  }
+}
+
+/** The paint-path hook, called by render() AFTER the stage and its sheets are painted,
+ *  with the paint's own `phaseChanged`. Opens the tour on a fresh-onboarding boot (the
+ *  auto-Help's replacement), jumps an open tour to the new phase's first step, parks it
+ *  (and flags it seen) when the run leaves the tour phases for good (reward/ended: the
+ *  shades must never block a spoils click), and re-measures the ring for this layout.
+ *  Mutates ONLY this module's state and #tour-layer — never repaints, never touches a
+ *  game rule (render.js's deal-clock arming is the paint-sink precedent). */
+export function tourSync(phaseChanged) {
+  if (!tourOpen) {
+    if (freshOnboarding() && snap.phase === 'kindling') tourOpen = true;
+  } else {
+    const at = STEPS.findIndex((s) => s.phase === snap.phase);
+    if (at === -1) { closeTour(); return; }
+    if (phaseChanged && STEPS[tourStep].phase !== snap.phase) tourStep = at;
+  }
+  paintTour();
+}
+```
+
+### Appendix A.1 — the four touchpoint diffs, in full
+
+**`src/web/index.html`** — one sibling after `#live` (line 43):
+
+```html
+<!-- The PRODUCT TOUR layer (ONBOARDING-TOUR spec): a PERSISTENT sibling of #stage that
+     render() never clears, exactly like #fx-layer — a coach-mark must survive the
+     repaint that the action it describes causes. Empty, it is display:none. -->
+<div id="tour-layer"></div>
+```
+
+**`src/web/render.js`** — two edits. (1) Replace the first-run auto-Help (`:296-302`):
+
+```js
+  // The first-run explanation is now the TOUR (tourSync below): a fresh boot paints the
+  // coach-marks on the kindling screen instead of the auto-opened Help sheet, and BOTH
+  // onboarding flags are written when the tour ends (tour.js closeTour). Help still
+  // opens through its own HUD button, exactly as before — never automatically.
+  if (helpOpen) stageEl.append(helpPanel());
+```
+
+(2) After the belt-popover block (`:317-320`), call the hook:
+
+```js
+  // The product tour's paint-path hook (ONBOARDING-TOUR spec): it may open on a fresh
+  // boot, follow a phase change, and re-measure its shade ring against THIS paint's
+  // layout. It repaints nothing and owns no rule (see tour.js tourSync).
+  tourSync(phaseChanged);
+```
+
+with `tourSync` added to the imports from `./tour.js` (new import line beside the hud.js one, `:52`).
+
+**`src/web/app.js`** — the guard chain. New first guard (before the Help guard at `:71`), and the Help guard loses its `!helpSeen` half:
+
+```js
+  // --- the product tour owns the keyboard while it shows (ONBOARDING-TOUR spec) ----
+  // It stands BEFORE the sheet guards: on a fresh boot the tour IS the first-run surface,
+  // and no sheet, no card, no turn and no run may be driven from behind its shades.
+  // freshOnboarding() covers the keystroke that races the boot paint. Escape dismisses
+  // (both flags, tour.js), Enter/→ advance, ← steps back; everything else is swallowed
+  // the same way the Help guard swallows — native Tab still moves focus.
+  if (tourOpen || freshOnboarding()) {
+    if (k === 'Escape' || k === 'Esc') { ev.preventDefault(); dismissTour(); return; }
+    if (k === 'Enter' || k === 'ArrowRight') { ev.preventDefault(); tourNext(); return; }
+    if (k === 'ArrowLeft') { ev.preventDefault(); tourBack(); return; }
+    return;
+  }
+  if (helpOpen) {
+    if (k === 'Escape' || k === 'Esc') { ev.preventDefault(); toggleHelp(false); }
+    return;
+  }
+```
+
+plus the import `{ tourOpen, freshOnboarding, tourNext, tourBack, dismissTour }` from `./tour.js`, and `window.__dlb` gains `tour: () => ({ open: tourOpen, step: tourStep })` (`:161`).
+
+**`src/web/hud.js`** — one button in `helpPanel()`'s footer (`:364-379`), between "Got it" and "New Run":
+
+```js
+    // ONBOARDING-TOUR: the veteran's way back in. It reopens the tour at the step for
+    // the phase the player is standing on and writes no flag (only finishing or
+    // dismissing the tour does, tour.js).
+    el('button', {
+      cls: 'btn secondary',
+      text: t('tour.replay'),
+      attrs: { type: 'button', title: t('tour.replay.title') },
+      on: { click: () => { toggleHelp(false); startTour(); } },
+    }),
+```
+
+with `startTour` imported from `./tour.js` (no cycle: `tour.js` imports only runtime/dom/i18n).
+
+### Appendix A.2 — `style.css` block (appended at end of file, own §10-style banner)
+
+```css
+/* ===================================================== ONBOARDING-TOUR: the product tour ==
+   One persistent overlay layer (#tour-layer, a sibling of #stage at z-index 80 — above
+   the sheets' 70) with a four-shade ring around the anchored element and one coach card.
+   No page box moves: the layer is fixed, its children absolute, and the stage never
+   learns the tour exists. The layer is pointer-events:none; the shades and the card opt
+   back in, so the hole over the anchor is CLICKABLE — the tour teaches by doing. */
+#tour-layer { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
+#tour-layer:empty { display: none; }
+.tour-shade { position: absolute; background: rgba(4, 7, 12, 0.78); pointer-events: auto; }
+.tour-card {
+  position: absolute; pointer-events: auto;
+  width: min(320px, calc(100vw - 24px));
+  background: linear-gradient(180deg, var(--raised) 0%, #10151f 100%);
+  border: 1px solid var(--edge); border-radius: var(--radius-lg);
+  padding: 14px 16px 12px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65);
+  animation: tour-in 0.24s ease-out both; /* screen-level arrival: base pace, not --pace */
+}
+@keyframes tour-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tour-count { display: block; font-size: var(--fs-1); letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; }
+.tour-head { margin: 4px 0 6px; font-size: var(--fs-4); color: var(--ink); }
+.tour-body { margin: 0 0 10px; font-size: var(--fs-2); color: var(--dim); line-height: 1.45; }
+.tour-nav { display: flex; gap: 8px; align-items: center; }
+.tour-skip { margin-left: auto; }
+@media (max-width: 620px) { .tour-body { font-size: var(--fs-1); } }
+@media (prefers-reduced-motion: reduce) { .tour-card { animation: none; } }
+```
+
+(The small bands need no further CSS: `paintTour()` parks the card itself at ≤620px/≤480px — §9.)

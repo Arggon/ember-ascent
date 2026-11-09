@@ -49,7 +49,8 @@ import { signatureFor } from './hero-moves.js';
 import { backdropMarkup } from './stage-art.js';
 import { dyingRow } from './floats.js';
 import { endTargeting, pendingCard, pendingSlot } from './targeting.js';
-import { renderHud, helpPanel, helpOpen, HELP_SEEN_KEY, deckPanel, deckOpen, codexPanel, codexOpen, beltOpenSlot, beltPanel, setBeltOpenSlot } from './hud.js';
+import { renderHud, helpPanel, helpOpen, deckPanel, deckOpen, codexPanel, codexOpen, beltOpenSlot, beltPanel, setBeltOpenSlot } from './hud.js';
+import { tourSync } from './tour.js';
 import { t } from './i18n.js';
 import { heroFigure, combatView } from './combat-view.js';
 import { mapView } from './map-view.js';
@@ -292,14 +293,11 @@ export function render() {
     sceneBeat(paintedPhase, snap.phase);
     setPaintedPhase(snap.phase);
   }
-  // The first-run explanation, shown once. A player who has never seen the game should
-  // not have to guess what "3 Energy" or an enemy's announced attack means.
-  let seen = false;
-  try { seen = localStorage.getItem(HELP_SEEN_KEY) === '1'; } catch { seen = true; }
-  // The battle moved on underneath a target step (the hand changed, the fight ended): the
-  // step is no longer about anything real, so it ends silently rather than aiming at a
-  // stale slot.
-  if (helpOpen || !seen) stageEl.append(helpPanel());
+  // The first-run explanation is now the TOUR (tourSync below): a fresh boot paints the
+  // coach-marks on the kindling screen instead of the auto-opened Help sheet, and BOTH
+  // onboarding flags are written when the tour ends (tour.js closeTour). Help still
+  // opens through its own HUD button, exactly as before — never automatically.
+  if (helpOpen) stageEl.append(helpPanel());
   // The S1 master-deck viewer, when the player opened it from the HUD. It paints AFTER the
   // phase view like the help sheet, and its `.modal-back` covers the stage, so the run
   // underneath stays untouched (and unclickable) while it is open.
@@ -318,6 +316,10 @@ export function render() {
     if ((snap.belt ?? []).some((r) => r.slot === beltOpenSlot)) stageEl.append(beltPanel());
     else setBeltOpenSlot(null);
   }
+  // The product tour's paint-path hook (ONBOARDING-TOUR spec): it may open on a fresh
+  // boot, follow a phase change, and re-measure its shade ring against THIS paint's
+  // layout. It repaints nothing and owns no rule (see tour.js tourSync).
+  tourSync(phaseChanged);
   // The arriving VICTORY or DEFEAT panel takes the caret, so a keyboard player lands on
   // Restart instead of at the top of the document. Best effort, and never a rule.
   if (endFocusPending) {

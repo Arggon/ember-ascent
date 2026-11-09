@@ -2651,3 +2651,243 @@ test('la pose melee no se repite tras el impacto (Hammerfall)', { timeout: 60000
   assert.deepEqual(ghosts, [],
     `nothing of the swing may replay after the impact: ${JSON.stringify(ghosts)}`);
 });
+
+// ---------------------------------------------------------------------------
+// 12. the ONBOARDING-TOUR product tour (docs/specs/ONBOARDING-TOUR-spec.md):
+//     five coach-marks over the REAL screens, anchored to elements the views
+//     already paint. The tour tests are the INVERSE of the mainline walks'
+//     addInitScript contract: they seed NO flag by default (fresh onboarding),
+//     and seed both explicitly only where the claim is about a veteran. Every
+//     title carries 'tour' so the suite runs isolated with
+//     --test-name-pattern=tour. Real clicks and real keys only; the tour's own
+//     published truth (window.__dlb.tour) is what the walks wait on.
+// ---------------------------------------------------------------------------
+/** A fresh page with NO onboarding flags seeded (or exactly the ones the test
+ *  names). Mirrors freshPage but does not seed dlb.helpSeen.v1 — seeding it
+ *  would hide the very surface these tests claim. */
+async function freshTourPage(t, { seed = 7, width = 1280, height = 800, flags = null } = {}) {
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({
+    viewport: { width, height },
+    reducedMotion: 'reduce', // the tour's claims are structural, not animated
+  });
+  t.after(() => { void browser.close(); });
+  const page = await ctx.newPage();
+  if (flags) {
+    await page.addInitScript((fs) => {
+      for (const [k, v] of Object.entries(fs)) { try { localStorage.setItem(k, v); } catch {} }
+    }, flags);
+  }
+  await page.goto(`${base}/src/web/index.html?seed=${seed}`);
+  await page.waitForLoadState('domcontentloaded');
+  return page;
+}
+
+/** The card and the anchor must not share a pixel (ONBOARDING-TOUR AC7). */
+const tourCardClearOfAnchor = (page, sel) => page.evaluate((anchorSel) => {
+  const card = document.querySelector('.tour-card').getBoundingClientRect();
+  const anchor = document.querySelector(anchorSel).getBoundingClientRect();
+  return card.right <= anchor.left || anchor.right <= card.left
+    || card.bottom <= anchor.top || anchor.bottom <= card.top;
+}, sel);
+
+/** The ring covers the viewport EXCEPT the anchor's hole: the anchor's centre is
+ *  not shaded, a far corner is. */
+const tourRing = (page, sel) => page.evaluate((anchorSel) => {
+  const at = (r) => {
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return hit ? hit.closest('.tour-shade') === null : false;
+  };
+  const corner = document.elementFromPoint(6, 6);
+  return {
+    anchorClear: at(document.querySelector(anchorSel).getBoundingClientRect()),
+    cornerShaded: corner ? corner.classList.contains('tour-shade') : false,
+  };
+}, sel);
+
+test('tour: a fresh boot opens the guided tour on the kindling screen instead of the auto-Help sheet', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshTourPage(t);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+
+  // The tour, not the sheet: the coach card is on the persistent layer with the
+  // kindling step up, and NO .modal is painted — the auto-Help is retired.
+  await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 5', 'the first step is the kindling one');
+  assert.equal(await page.locator('.modal').count(), 0, 'no auto-opened Help sheet');
+  assert.equal(await page.getByRole('button', { name: 'Help' }).count(), 1, 'the HUD Help button still renders');
+  const state = await page.evaluate(() => window.__dlb.tour());
+  assert.deepEqual(state, { open: true, step: 0 }, 'the surface publishes the tour truth');
+  assert.equal(await page.locator('.tour-shade').count(), 4, 'the shade ring is up around the kindling anchor');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+test('tour: the steps advance by click and keyboard, follow the phase, and a shade click writes both flags', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshTourPage(t);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+
+  // Step 1 → 2 BY DOING: the anchored .boon-list is the clickable region, so a real
+  // boon click through the hole both takes the gift and lands the tour on the map step.
+  await page.locator('button.boon').first().click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 2 of 5', 'the tour followed the phase to the map');
+  assert.ok(await page.evaluate(() => !!document.querySelector('.map')), 'the map is on stage');
+  assert.equal(await page.locator('.tour-shade').count(), 4, 'the ring re-anchored to the map');
+
+  // Keyboard: Enter advances past the map step (the hand step has no anchor yet —
+  // the card still reads), ← steps back to it.
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.__dlb.tour().step === 2, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 3 of 5', 'Enter advanced');
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 2 of 5', 'ArrowLeft stepped back');
+
+  // Mid-tour the keyboard is the tour's: d stacks no sheet, n discards no run.
+  const before = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return { seed: s.seed, step: s.stepIndex, phase: s.phase };
+  });
+  await page.keyboard.press('d');
+  await sleep(300);
+  assert.equal(await page.locator('.modal').count(), 0, 'd is swallowed mid-tour');
+  await page.keyboard.press('n');
+  await sleep(300);
+  const afterKeys = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return { seed: s.seed, step: s.stepIndex, phase: s.phase };
+  });
+  assert.deepEqual(afterKeys, before, 'n did not touch the run behind the shades');
+
+  // A SHADE CLICK dismisses for good (the .modal-back click-through convention): both
+  // onboarding flags, the layer empty, and the keyboard released (d opens the deck
+  // sheet again). The click goes to the viewport's bottom-right corner — the bottom
+  // shade's own ground, which no card placement reaches (desktop parks it left of
+  // W-28, the small bands bottom at H-8) — because the card deliberately sits ON a
+  // shade band and a shade element's centre can be under it. Escape's dismissal is
+  // test 5's; Skip's is test 3's; Done's is test 4's.
+  await page.mouse.click(1275, 795);
+  await page.waitForFunction(() => window.__dlb.tour().open === false, null, { timeout: 5000 });
+  assert.equal(await page.locator('.tour-card').count(), 0, 'the layer is empty after the shade click');
+  const flags = await page.evaluate(() => [localStorage.getItem('dlb.tourSeen.v1'), localStorage.getItem('dlb.helpSeen.v1')]);
+  assert.deepEqual(flags, ['1', '1'], 'dismissal wrote BOTH onboarding flags');
+  await page.keyboard.press('d');
+  await sleep(300);
+  assert.equal(await page.locator('.modal.deck-modal').count(), 1, 'the released d opens the deck sheet');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+test('tour: a dismissed tour never auto-opens again, and the Help sheet carries the Replay entry', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshTourPage(t, { flags: { 'dlb.tourSeen.v1': '1', 'dlb.helpSeen.v1': '1' } });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+
+  // A veteran boots twice: no tour card, and the retired auto-Help opens nothing.
+  assert.equal(await page.locator('.tour-card').count(), 0, 'no tour on a veteran boot');
+  assert.equal(await page.locator('.modal').count(), 0, 'no auto Help either');
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await sleep(300);
+  assert.equal(await page.locator('.tour-card').count(), 0, 'still no tour on the second boot');
+  assert.equal(await page.locator('.modal').count(), 0, 'and no auto Help on it');
+
+  // The way back in: the Help sheet footer's Replay entry.
+  await page.getByRole('button', { name: 'Help' }).click();
+  await page.waitForSelector('.modal', { timeout: 3000 });
+  const replay = page.getByRole('button', { name: 'Replay the guided tour' });
+  assert.equal(await replay.count(), 1, 'the Replay button is in the Help footer');
+  const before = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return { seed: s.seed, step: s.stepIndex, phase: s.phase };
+  });
+  await replay.click();
+  await page.waitForFunction(() => window.__dlb.tour().open === true, null, { timeout: 5000 });
+  assert.equal(await page.locator('.modal').count(), 0, 'the sheet closed behind the tour');
+  assert.deepEqual(await page.evaluate(() => window.__dlb.tour()), { open: true, step: 0 }, 'the tour opened at the step for the kindling phase');
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 5', 'the card reads the first step');
+  const afterReplay = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    return { seed: s.seed, step: s.stepIndex, phase: s.phase };
+  });
+  assert.deepEqual(afterReplay, before, 'replaying moved nothing in the run');
+
+  // SKIP dismisses the replayed tour; the flags it rewrites keep their value.
+  // (Escape's dismissal is test 5's; a shade click's is test 2's.)
+  await page.locator('.tour-skip').click();
+  await page.waitForFunction(() => window.__dlb.tour().open === false, null, { timeout: 5000 });
+  const flags = await page.evaluate(() => [localStorage.getItem('dlb.tourSeen.v1'), localStorage.getItem('dlb.helpSeen.v1')]);
+  assert.deepEqual(flags, ['1', '1'], 'the flags are unchanged');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+test('tour: the combat steps anchor the hand, the intent row and End Turn, and finishing releases the keyboard', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshTourPage(t);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+
+  // Kindling → map by doing (the boon click through the step-1 hole), then the map's
+  // own hole is the clickable region: travel to the first ordinary fight through it.
+  await page.locator('button.boon').first().click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
+  await travelToFight(page);
+
+  // The tour jumped to the combat's first step and rings the hand.
+  await page.waitForFunction(() => window.__dlb.tour().step === 2, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 3 of 5', 'the hand step is up');
+  assert.equal(await page.locator('.tour-shade').count(), 4, 'the ring is up');
+  let ring = await tourRing(page, '.hand');
+  assert.ok(ring.anchorClear, 'the hand sits in the ring hole');
+  assert.ok(ring.cornerShaded, 'everything outside the hole is dimmed by the shades');
+
+  // Next walks the two combat steps; each re-anchors to its element.
+  await page.locator('.tour-next').click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 3, null, { timeout: 5000 });
+  assert.ok(await page.evaluate(() => !!document.querySelector('.e-intent')), 'the intent row is painted');
+  ring = await tourRing(page, '.e-intent');
+  assert.ok(ring.anchorClear, 'the intent row sits in the ring hole');
+  await page.locator('.tour-next').click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 4, null, { timeout: 5000 });
+  const endTurnBtn = page.locator('.controls button', { hasText: 'End Turn' });
+  assert.equal(await endTurnBtn.count(), 1, 'End Turn is on stage');
+  ring = await tourRing(page, '.controls');
+  assert.ok(ring.anchorClear, 'the controls row sits in the ring hole');
+
+  // Done dismisses; End Turn by its own muscle-memory key works immediately.
+  await page.locator('.tour-next').click();
+  await page.waitForFunction(() => window.__dlb.tour().open === false, null, { timeout: 5000 });
+  const turnBefore = (await readState(page)).turn;
+  await page.keyboard.press('e');
+  await waitIdle(page);
+  const turnAfter = (await readState(page)).turn;
+  assert.equal(turnAfter, turnBefore + 1, 'End Turn passed the turn right after the tour closed');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+test('tour: the coach card parks and stays legible in the small bands', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const errors = [];
+  for (const [width, height] of [[390, 844], [700, 440]]) {
+    const page = await freshTourPage(t, { width, height });
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+    assert.equal(await page.locator('.tour-shade').count(), 4, `${width}x${height}: the ring is up`);
+    // AC7: parked, fully on screen, and never covering its own anchor — on a phone
+    // the boon list reaches into the bottom band, so the card takes the free band.
+    const parked = await page.evaluate(() => {
+      const r = document.querySelector('.tour-card').getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, vh: window.innerHeight };
+    });
+    assert.ok(parked.top >= 0 && parked.bottom <= parked.vh, `${width}x${height}: the card is fully on screen`);
+    assert.ok(await tourCardClearOfAnchor(page, '.boon-list'), `${width}x${height}: the card never covers the anchor`);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => window.__dlb.tour().open === false, null, { timeout: 5000 });
+  }
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
