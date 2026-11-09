@@ -7274,6 +7274,13 @@ html, body {
    at ≤700px-wide × ≤480px-tall it must win the overlap and suspend the taller-than
    contract (everything there, elite included, flattens to the same 64px). */
 .stage-combat .enemy.e-elite .fig { width: min(190px, 100%); height: min(270px, 48vh); }
+/* The box alone doesn't read as rank: the sprites are contain-fitted to the figure,
+   which width-limits sprites wider than they are tall (the nob draws 1.26 wide, the
+   hero 1.08), so a taller BOX draws a barely-taller sprite. The scale plants the
+   sprite's feet (origin at the floor) and swells the DRAWN figure — on the desktop the
+   nob draws ~184px against the hero's ~166 (+11%), the wraith ~219 (+32%), and both
+   stay inside the 270px box, clear of the intent row that sits above it. */
+.stage-combat .enemy.e-elite .spr { scale: 1.45; transform-origin: 50% 100%; }
 .stage-combat .enemy .fig.is-elite-variant .spr { filter: hue-rotate(-12deg) saturate(1.3) drop-shadow(0 0 12px rgba(190, 120, 255, 0.45)); transform-origin: 50% 100%; }
 /* Band rows, after the base rule on purpose (cascade = file order at equal
    specificity). */
@@ -7311,6 +7318,10 @@ html, body {
   /* The compact stage flattens EVERY fig to 64px, elite included — one uniform
      geometry. */
   .stage-combat .enemy.e-elite .fig { height: 64px; width: auto; }
+  /* The spr scale rides the same cascade lesson as the fig row: this reset sits after
+     it at equal specificity, or the flattened elite's sprite would swell past the
+     uniform 64px geometry. */
+  .stage-combat .enemy.e-elite .spr { scale: 1; }
 }
 .stage-combat .enemy .fig .spr-cinder_foreman { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
 .biome-select { display: flex; gap: 6px; justify-content: center; align-items: center; margin: -4px 0 8px; font-size: 0.78rem; }

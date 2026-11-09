@@ -2066,13 +2066,17 @@ test('relics: no HUD chip, the held count climbs on an elite drop, and the warde
         const sample = () => page.evaluate(() => {
           const eliteFig = document.querySelector('.enemy.e-elite .fig');
           const heroFig = document.querySelector('.fight .hero .fig');
+          const eliteSpr = document.querySelector('.enemy.e-elite .spr');
+          const heroSpr = document.querySelector('.fight .hero .fig .spr');
           const fight = document.querySelector('.fight');
-          if (!fight || !eliteFig || !heroFig) return null;
+          if (!fight || !eliteFig || !heroFig || !eliteSpr || !heroSpr) return null;
           const c = eliteFig.closest('.enemy').getBoundingClientRect();
           const f = fight.getBoundingClientRect();
           return {
             elite: eliteFig.getBoundingClientRect().height,
             hero: heroFig.getBoundingClientRect().height,
+            eliteSpr: eliteSpr.getBoundingClientRect().height,
+            heroSpr: heroSpr.getBoundingClientRect().height,
             cardTop: c.top, fightTop: f.top,
           };
         });
@@ -2081,12 +2085,16 @@ test('relics: no HUD chip, the held count climbs on an elite drop, and the warde
           eliteMeasured = true;
           assert.ok(tall.elite > tall.hero,
             `the elite must stand taller than the hero — .enemy.e-elite .fig = ${tall.elite}px vs .fight .hero .fig = ${tall.hero}px (1280x800)`);
+          assert.ok(tall.eliteSpr > tall.heroSpr,
+            `the elite's DRAWN sprite must stand taller than the hero's (the spr rect includes the scale) — .enemy.e-elite .spr = ${tall.eliteSpr}px vs .fight .hero .fig .spr = ${tall.heroSpr}px (1280x800)`);
           await page.setViewportSize({ width: 1280, height: 720 });
           await sleep(150);
           const capped = await sample();
           assert.ok(capped, 'the elite fight is still on stage at 1280x720');
           assert.ok(capped.elite > capped.hero,
             `the elite must stand taller than the hero in the laptop cap band — ${capped.elite}px vs ${capped.hero}px (1280x720)`);
+          assert.ok(capped.eliteSpr > capped.heroSpr,
+            `the elite's DRAWN sprite must stand taller than the hero's in the laptop cap band — ${capped.eliteSpr}px vs ${capped.heroSpr}px (1280x720)`);
           assert.ok(capped.cardTop >= capped.fightTop - 0.5,
             `the elite card must fit the capped fight at 1280x720 (the top clip eats the intent row) — card top ${capped.cardTop} vs fight top ${capped.fightTop}`);
           await page.setViewportSize({ width: 844, height: 390 });
