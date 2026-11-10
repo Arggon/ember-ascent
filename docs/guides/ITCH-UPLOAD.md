@@ -14,6 +14,16 @@ Work top to bottom. Checked boxes are things already done and verified in this r
 ## Before you start — the one upload file
 
 - [x] **`release.zip`** exists in this workspace root. That is the artifact.
+- [x] **SHIPPED 2026-11-10 as 0.4.2**: `butler push release.zip
+      arggondev/ember-ascent:html --userversion 0.4.2` → build `#2351423` on the
+      `html` channel. Zip SHA-256
+      `e9bad7a6d1faf0ca8c32a2baac8a13f1bb7f0ecc342a7489030d85f1a075747f`
+      — 95 entries, **3,722,079 bytes**; butler re-used 96.70% against 0.4.1
+      (patch 48.88 KiB). Content: the tour's step-zero language card — a fresh
+      boot asks Idioma — Language (Español / English) BEFORE the tour speaks,
+      the pick repaints the whole interface and persists `dlb.lang`; while no
+      explicit choice exists the browser's own language decides the default
+      without writing anything. Superseded by nothing — this is the live build.
 - [x] **SHIPPED 2026-11-10 as 0.4.1**: `butler push release.zip
       arggondev/ember-ascent:html --userversion 0.4.1` → build `#2350047` on the
       `html` channel. Zip SHA-256
@@ -24,7 +34,7 @@ Work top to bottom. Checked boxes are things already done and verified in this r
       from Help, i18n en/es) and the defeat hold — the killing enemy turn now plays
       on the retained stage (attack pose + damage float over the hero), the hero
       falls in its own ash dissolve, and the defeat panel arrives after; plus the
-      elite sprite scale fix. Superseded by nothing — this is the live build.
+      elite sprite scale fix. Superseded by 0.4.2 (2026-11-10).
 - [x] **SHIPPED 2026-10-30 as 0.4.0**: `butler push release.zip
       arggondev/ember-ascent:html --userversion 0.4.0` -> build `#2257168` on the
       `html` channel. Zip SHA-256
