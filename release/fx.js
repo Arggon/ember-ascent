@@ -228,6 +228,11 @@ export function dispatchFx() {
         // THIS action generation, so a newer action (or ») retires the rest of the turn.
         // Speed 0 skips the choreography entirely — the » fast form paints the named
         // floats statically in the hero's own effect box (floats.js heroEfx).
+        // A turn that KILLS the hero plays here too: render.js's defeat hold paints the
+        // fight as it stood and this same replay runs over it — the named floats land on
+        // the HELD hero (heroLane() measures whatever `.fight .hero` is painted), the
+        // poses on the held attackers — and the hero's death beat waits on the plan's
+        // own total (render.js). Nothing here knows which stage it is playing on.
         if (animSpeed === 0) break;
         const plan = strikeSeq;
         if (!plan) break;
@@ -365,6 +370,7 @@ export function dispatchFx() {
               hammer.style.left = `${lane.from.x - 27}px`;
               hammer.style.top = `${lane.from.y - 11}px`;
               hammer.style.setProperty('--fly-x', `${lane.x - lane.from.x}px`);
+              hammer.style.setProperty('--fly-y', `${lane.y - lane.from.y}px`);
             }
             fxAdd(hammer, animMs(flight) || flight);
             fire(() => {

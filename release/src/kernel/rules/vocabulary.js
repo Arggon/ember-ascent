@@ -83,13 +83,35 @@ export function playerStrike(base, player) {
 }
 
 /**
+ * The vulnerable amplification exactly as damageEnemy applies it — ONE fold, one home.
+ * describe.js reuses this so a card's preview number cannot disagree with the resolution.
+ * @param {number} amount pre-modifier damage
+ * @returns {number}
+ */
+export function vulnerableAmplify(amount) {
+  return Math.floor(amount * 3 / 2);
+}
+
+/**
+ * Block one block-granting effect lands: printed amount plus Dexterity, floored at 0 —
+ * the exact fold the `block` verb applies. Exported for the same reason as
+ * vulnerableAmplify: the card preview reads the resolver, never a re-derivation.
+ * @param {number} amount printed block
+ * @param {number} dexterity the combatant's Dexterity stacks
+ * @returns {number}
+ */
+export function blockGain(amount, dexterity = 0) {
+  return Math.max(0, amount + dexterity);
+}
+
+/**
  * Deal damage to one enemy: block absorbs first, then Vulnerable amplifies by 50%.
  * @param {any} enemy
  * @param {number} amount pre-modifier damage
  * @returns {{enemy: any, dealt: number, blocked: number, raw: number}}
  */
 export function damageEnemy(enemy, amount) {
-  const raw = (enemy.statuses?.vulnerable ?? 0) > 0 ? Math.floor(amount * 3 / 2) : amount;
+  const raw = (enemy.statuses?.vulnerable ?? 0) > 0 ? vulnerableAmplify(amount) : amount;
   const blocked = Math.min(enemy.block, raw);
   const dealt = raw - blocked;
   const hp = clamp(enemy.hp - dealt, enemy.maxHp);
@@ -103,7 +125,7 @@ export function damageEnemy(enemy, amount) {
  * @returns {{player: any, dealt: number, blocked: number}}
  */
 export function damagePlayer(player, amount) {
-  const raw = (player.statuses?.vulnerable ?? 0) > 0 ? Math.floor(amount * 3 / 2) : amount;
+  const raw = (player.statuses?.vulnerable ?? 0) > 0 ? vulnerableAmplify(amount) : amount;
   const blocked = Math.min(player.block, raw);
   const dealt = raw - blocked;
   return { player: { ...player, block: player.block - blocked, hp: clamp(player.hp - dealt, player.maxHp) }, dealt, blocked };
@@ -280,12 +302,18 @@ export const VOCABULARY = {
   },
 
   /**
-   * retain — a MARKER verb: it does nothing at play time and is instead consumed by the
-   * end-of-turn discard phase (rules/act.js endTurn), which keeps a hand card whose
-   * definition carries this verb in the hand instead of discarding it. The card keeps
-   * its decorated instance (cost included) and stays retained turn after turn — the
-   * check reads the definition, not a one-shot flag. Zero draws at play AND at the
-   * discard phase: nothing rolls, the card simply does not move.
+   * retain — a MARKER verb: it emits nothing here, and two phases consume the marker
+   * by reading the DEFINITION (never a one-shot flag, so a tempered copy keeps the
+   * behavior). (1) THE PLAY PATH (rules/steps.js playCard): a played retain card
+   * never moves to the discard pile — after its effects resolve, the played instance
+   * RETURNS to the hand as its decorated self (cost included, perPlay preserved, the
+   * same decorated-instance rule endTurn documents) and a `{ t: 'retain', uids }`
+   * event marks the return, keeping the stream honest beside the play it follows.
+   * Replaying it the same turn is legal whenever its cost is payable again. (2) THE
+   * END-OF-TURN DISCARD PHASE (rules/act.js endTurn): a hand card whose definition
+   * carries this verb stays in the hand instead of discarding, turn after turn.
+   * Zero draws at play, at the return, AND at the discard phase: nothing rolls, the
+   * card simply does not move.
    */
   retain(state, _ctx, _params) {
     return { state, events: [] };

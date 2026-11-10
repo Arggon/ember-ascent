@@ -12,7 +12,7 @@
 // through the seed stream with every draw counted into rngDraws.
 import { parsePlayId } from '../actions.js';
 import { VOCABULARY } from './vocabulary.js';
-import { startCombat, endTurn, resolveVictory, REST_HEAL, beginNextAct } from './act.js';
+import { startCombat, endTurn, resolveVictory, REST_HEAL, beginNextAct, retainsCard } from './act.js';
 import { fireHook } from './powers.js';
 import { applyBoon } from './kindling.js';
 import { offerTempers, temperEffects, temperHpCost } from './tempers.js';
@@ -95,9 +95,26 @@ function playCard(state, action, content) {
     events.push(...out.events);
   }
 
-  // Load the spent card into discard, unless it exhausted itself.
+  // Load the spent card into discard, unless it exhausted itself — or RETAINED: a
+  // definition carrying the `retain` marker verb (the SAME definition check the
+  // end-of-turn phase reads, rules/act.js retainsCard) never leaves the hand through
+  // play. The played instance RETURNS to the hand as-is — the decorated hand instance
+  // itself (cost included, perPlay preserved), the same decorated-instance rule
+  // endTurn documents — instead of moving to the discard pile; the `retain` event
+  // marks the return so the stream stays honest (the hand readout of later steps
+  // shows the card back). Exhaust wins if the card also exhausted (nothing shipped
+  // carries both; the exhaust branch keeps first claim). Two dormant shapes to know
+  // about, both unreachable today: a perPlay+retain card would return the hand copy
+  // with the perPlay it LEFT as (rampage's growth lives on the deck instance — refresh
+  // the returned instance from the deck if ever combined), and a card that reached
+  // combat.exhaust without a definition exhaust verb would vanish entirely (no hand,
+  // no discard). Zero draws either way: the card simply does not move, and replaying
+  // it the same turn is legal whenever its cost is payable again.
   const alreadyExhausted = next.combat.exhaust.some((e) => e.uid === card.uid);
-  if (!exhausted && !alreadyExhausted) {
+  if (!exhausted && !alreadyExhausted && retainsCard(content.cards, card)) {
+    next = { ...next, combat: { ...next.combat, hand: [...next.combat.hand, card] } };
+    events.push({ t: 'retain', uids: [card.uid] });
+  } else if (!exhausted && !alreadyExhausted) {
     next = {
       ...next,
       combat: { ...next.combat, discard: [...next.combat.discard, { uid: card.uid, cardId: card.cardId, perPlay: card.perPlay }] },

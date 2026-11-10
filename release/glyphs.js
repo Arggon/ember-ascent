@@ -10,9 +10,9 @@
 // Anything unknown falls back to a rune, so a new enemy or node type in the kernel
 // renders as a generic shape rather than an empty box.
 //
-// The table is named MARKS (not GLYPHS) because src/web/stage-art.js keeps its own
-// private intent-glyph table of that name — the two must stay distinct when tests
-// concatenate the web modules into one scope.
+// The table is named MARKS (not GLYPHS) — the retired stage-art intent table of
+// that name once made the two collide when tests concatenated the web modules
+// into one scope, and the distinct name outlived it.
 
 import { el } from './dom.js';
 
@@ -63,6 +63,19 @@ const MARKS = {
   // --- gold (S3): a struck coin, same woodcut stroke family as the marks above ---
   coin: { box: '0 0 20 20', body: '<circle class="m" cx="10" cy="10" r="6.6"/><path class="m" d="M10 6.7 V13.3"/>' },
   broken: { box: '0 0 26 26', body: '<path class="m" d="M12 3 L15 11"/><path class="m" d="M14 15 L8 23"/><path class="m" d="M18 5 L21 12"/>' },
+  // --- effect chips: the card face's icon row. New marks only where no existing one
+  //     reads honestly (see EFFECT_GLYPH below for the borrowings). ---
+  // Two fanned cards: the draw pile answering.
+  draw: { box: '0 0 20 20', body: '<path class="m" d="M7.5 3.5 H16.5 V15 H7.5 Z"/><path class="m" d="M3.5 6.5 V17 H12.5"/>' },
+  // A card released downward: away from the hand, into the discard.
+  discard: { box: '0 0 20 20', body: '<path class="m" d="M5 3.5 H15 V10.5 H5 Z"/><path class="m" d="M10 12.5 V17.5 M6.8 14.3 L10 17.7 L13.2 14.3"/>' },
+  // A crossed-out card: gone from the fight for good.
+  exhaust: { box: '0 0 20 20', body: '<path class="m" d="M5.5 3.5 H14.5 V16.5 H5.5 Z"/><path class="m" d="M7.5 6.5 L12.5 13.5 M12.5 6.5 L7.5 13.5"/>' },
+  // A kindled heart with its cross — distinct mark from the relic's, same shape language.
+  heal: { box: '0 0 20 20', body: '<path class="m" d="M10 17 C4.6 13.2 3 9.8 5.1 7.4 C6.9 5.5 9.2 6.3 10 8.1 C10.8 6.3 13.1 5.5 14.9 7.4 C17 9.8 15.4 13.2 10 17 Z"/><path class="m" d="M10 8.6 V12.6 M8 10.6 H12"/>' },
+  // The plain up-arrow: a Strength chip's "+2" sits under an arrow, not a buff chevron
+  // (the wide intent marks are sized for the enemy lane, not a 20-box chip).
+  strength: { box: '0 0 20 20', body: '<path class="m" d="M10 17 V5.5"/><path class="m" d="M5 10.5 L10 5 L15 10.5"/>' },
   // --- potions (S5): a stoppered flask and a drop, same woodcut stroke family. The belt
   //     reuses existing marks where the shape reads (flame for the draught, the ward for
   //     stone skin, the blade for the whetstone, the star for energy); an EMPTY slot and
@@ -74,6 +87,57 @@ const MARKS = {
   //     always rides beside the mark) — an unknown relic id falls back through the rune
   //     inside glyphBox, never an empty box. ---
   relic: { box: '0 0 20 20', body: '<path class="m" d="M10 16.5 C4.2 12.4 2.8 8.4 5.4 6 C7.4 4.2 9.4 5.1 10 6.8 C10.6 5.1 12.6 4.2 14.6 6 C17.2 8.4 15.8 12.4 10 16.5 Z"/><path class="m" d="M10 8.2 V12.4 M8 10.2 H12"/>' },
+
+  // --- relic art (per-id): forged-iron woodcut, the enemy-mark language in miniature —
+  //     `.b` iron body, `.r` rim light, `.g` ember glow, `.gr` ground stroke. One mark per
+  //     relic id; the boss offer tiles wear it LARGE (.boon-art) and the elite chip wears
+  //     the SAME mark restyled to strokes at chip size (.boon-glyph). The one cool accent
+  //     (`.cb` cold flame) is the Cyan Lantern's — the quenched-temper cold blue
+  //     precedent (the card temper class ships #8fd0f2). Constant
+  //     markup, no interpolation; an unknown relic id falls back per RELIC_GLYPH below. ---
+  'r-burning_blood': { box: '0 0 100 100', body: '<path class="b" d="M50 84 C22 62 15 40 29 28 C40 19 50 27 50 38 C50 27 60 19 71 28 C85 40 78 62 50 84 Z"/><path class="r" d="M50 84 C22 62 15 40 29 28 C40 19 50 27 50 38"/><path class="r" d="M50 44 L46 52 L53 59 L48 67"/><circle class="g" cx="44" cy="40" r="3.4"/><circle class="g" cx="57" cy="35" r="2.4"/><path class="g" d="M62 80 C65 84.5 66 87.5 64.6 89.8 C63.2 92 59.8 92 58.8 89.8 C57.8 87.5 59.4 84.5 62 80 Z"/><path class="gr" d="M8 95 H92"/>' },
+  'r-cyan_lantern': { box: '0 0 100 100', body: '<path class="b" d="M38 14 H62 L58 24 H42 Z"/><path class="b" d="M42 78 H58 V86 H42 Z"/><path class="cb" d="M50 32 C56 40 58.5 46 58.5 52 C58.5 58.5 54.8 62.5 50 62.5 C45.2 62.5 41.5 58.5 41.5 52 C41.5 46 44 40 50 32 Z"/><path class="r" d="M50 5 V14"/><path class="r" d="M42 24 L38.5 64 C38.5 73 43.5 78 50 78 C56.5 78 61.5 73 61.5 64 L58 24"/><path class="r" d="M45 26 L43.5 77 M55 26 L56.5 77 M39 34 H61"/>' },
+  'r-forge_iron': { box: '0 0 100 100', body: '<path class="b" d="M20 42 H80 L88 64 H12 Z"/><path class="r" d="M20 42 H80"/><path class="r" d="M12 64 L20 42"/><circle class="r" cx="30" cy="53" r="2.6"/><circle class="r" cx="50" cy="53" r="2.6"/><circle class="r" cx="70" cy="53" r="2.6"/><path class="g" d="M36 64 H64 L62 68 H38 Z"/><path class="gr" d="M8 92 H92"/>' },
+  'r-whetted_edge': { box: '0 0 100 100', body: '<path class="b" d="M14 62 H86 L80 82 H20 Z"/><path class="r" d="M14 62 H86"/><path class="b" d="M16 56 L82 22 L86 28 L22 62 Z"/><path class="r" d="M22 62 L86 28"/><path class="g" d="M88 14 l4 3 -4 2z"/><path class="g" d="M76 8 l3.5 2.5 -3.5 2z"/><path class="g" d="M92 34 l3 2 -3 2z"/><path class="gr" d="M8 90 H92"/>' },
+  'r-hearth_ash': { box: '0 0 100 100', body: '<path class="b" fill-rule="evenodd" d="M20 82 C18 52 32 32 50 32 C68 32 82 52 80 82 Z M30 82 C29 60 38 46 50 46 C62 46 71 60 70 82 Z"/><path class="r" d="M35 39 L38 52 M50 32 V45 M65 39 L62 52"/><path class="r" d="M20 82 H80"/><path class="g" d="M41 74 h6 l-2.5 4z"/><path class="g" d="M53 72 h7 l-2.5 5z"/><circle class="g" cx="48" cy="79" r="2.2"/><path class="gr" d="M10 92 H90"/>' },
+  'r-ember_heart': { box: '0 0 100 100', body: '<path class="b" d="M50 84 L22 62 L15 40 L30 27 L44 34 L50 26 L56 34 L70 27 L85 40 L78 62 Z"/><path class="r" d="M50 26 L44 34 L30 27 L15 40"/><path class="g" d="M49 36 L54 46 L47 56 L53 68 L48 78 L44 78 L49 67 L43 55 L50 45 L46 36 Z"/><circle class="g" cx="59" cy="47" r="2.4"/><circle class="g" cx="40" cy="58" r="2"/><path class="gr" d="M10 92 H90"/>' },
+  'r-gold_vein': { box: '0 0 100 100', body: '<path class="b" d="M22 80 L16 46 L34 20 L64 16 L84 40 L80 80 Z"/><path class="r" d="M34 20 L64 16"/><path class="r" d="M34 20 L46 46 M46 46 L64 16 M46 46 L80 40 M46 46 L22 80"/><path class="g" d="M44 46 H50 L48 57 L53 67 L49 80 H44 L48 68 L43 57 Z"/><path class="g" d="M72 19 L74 25 L80 26 L74 27 L72 33 L70 27 L64 26 L70 25 Z"/><path class="gr" d="M10 90 H90"/>' },
+  'r-flask_grip': { box: '0 0 100 100', body: '<path class="b" fill-rule="evenodd" d="M50 12 A38 38 0 1 0 50 88 A38 38 0 1 0 50 12 Z M50 25 A25 25 0 1 1 50 75 A25 25 0 1 1 50 25 Z"/><path class="b" d="M45 33 H55 V40 C60.5 45.5 63 51 63 56.5 C63 64.5 57.5 69.5 50 69.5 C42.5 69.5 37 64.5 37 56.5 C37 51 39.5 45.5 45 40 Z"/><path class="r" d="M44 27.5 H56 M45 27.5 V33 M55 27.5 V33"/><path class="r" d="M14.3 37 A38 38 0 0 1 37 14.3"/><path class="g" d="M44 57 C46 52.5 54 52.5 56 57 C58 61.5 54 65.5 50 65.5 C46 65.5 42 61.5 44 57 Z"/><path class="gr" d="M10 92 H90"/>' },
+  'r-deep_well': { box: '0 0 100 100', body: '<path class="b" fill-rule="evenodd" d="M12 58 A38 15 0 1 0 88 58 A38 15 0 1 0 12 58 Z M26 59 A24 9 0 1 1 74 59 A24 9 0 1 1 26 59 Z"/><path class="b" d="M18 60 L22 79 H78 L82 60 Z"/><path class="r" d="M14 55 A38 15 0 0 1 86 55"/><path class="r" d="M30 47 L31 55 M50 44 V53 M70 47 L69 55"/><path class="g" d="M46 18 C48 24 46.5 28 48 33 C42.5 29 43.5 23 46 18 Z"/><path class="g" d="M56 22 C58 27 56.5 31 57.5 36 C62 32 61 26 56 22 Z"/><circle class="g" cx="51" cy="38" r="2.4"/><path class="gr" d="M8 88 H92"/>' },
+  'r-ash_crown': { box: '0 0 100 100', body: '<path class="b" d="M24 62 L22 40 L35 58 L41 28 L52 56 L60 34 L70 58 L78 42 L76 62 Z"/><path class="b" d="M24 62 H76 L72 76 H28 Z"/><path class="r" d="M24 62 H76 M28 76 H72"/><path class="r" d="M41 28 L35 58 M60 34 L70 58"/><circle class="g" cx="41" cy="27" r="2.2"/><circle class="g" cx="60" cy="33" r="2"/><path class="g" d="M33 18 l4 2.5 -4 2.5z"/><path class="g" d="M70 20 l4 2 -4 3z"/><path class="r" d="M28 14 L30 17 M52 12 L53 15.5 M82 14 L80 17"/><path class="gr" d="M14 86 H86"/>' },
+  'r-slag_crown': { box: '0 0 100 100', body: '<path class="b" d="M22 64 V34 L35 50 L50 26 L65 50 L78 34 V64 Z"/><path class="b" d="M22 64 H78 L74 78 H26 Z"/><path class="r" d="M22 34 L35 50 L50 26 L65 50 L78 34"/><path class="r" d="M22 64 H78"/><path class="g" d="M22 64 H78 L77 68 H23 Z"/><path class="g" d="M34 68 C34 74 31.5 75 31.5 79 C31.5 83 37 83 37 79 C37 75 34 74 34 68 Z"/><path class="g" d="M50 68 C50 77 47 78 47 83 C47 87.5 53 87.5 53 83 C53 78 50 77 50 68 Z"/><path class="g" d="M65 68 C65 73 63 74 63 77.5 C63 81 68 81 68 77.5 C68 74 65 73 65 68 Z"/><path class="gr" d="M12 94 H88"/>' },
+  'r-cinder_ward': { box: '0 0 100 100', body: '<path class="b" d="M50 10 L84 22 C84 54 72 78 50 90 C28 78 16 54 16 22 Z"/><path class="r" d="M50 20 L75.5 29 C75.5 53 66 71 50 80 C34 71 24.5 53 24.5 29 Z"/><path class="g" d="M49 28 L54 38 L47 48 L55 60 L49 72 L45.5 72 L51.5 60 L44.5 48 L51 38 L46 28 Z"/><path class="g" d="M33 38 L39 46 L35 54 L41 61 L38 62.5 L32 54 L36 46 L30 38.5 Z"/>' },
+  'r-ash_ledger': { box: '0 0 100 100', body: '<path class="b" d="M62 24 L70 27 V75 L62 78 Z"/><path class="b" d="M28 20 H62 C70 20 74 25 74 32 V70 C74 77 70 82 62 82 H28 Z"/><path class="r" d="M34 20 V82"/><path class="r" d="M40 36 H60 M40 44 H60 M40 52 H56"/><path class="r" d="M58 44 H71 M58 56 H68"/><circle class="g" cx="71.5" cy="50" r="2.4"/><path class="g" d="M42 12 l4 2.5 -4 2.5z"/><path class="g" d="M56 14 l3.5 2 -3.5 2.5z"/><path class="gr" d="M18 90 H82"/>' },
+  'r-unknown': { box: '0 0 100 100', body: '<path class="b" d="M32 16 H68 C73 16 76 19 76 24 V72 C76 77 73 80 68 80 H32 C27 80 24 77 24 72 V24 C24 19 27 16 32 16 Z"/><path class="r" d="M31 25 H69 V71 H31 Z"/><circle class="r" cx="28.5" cy="20.5" r="1.8"/><circle class="r" cx="71.5" cy="20.5" r="1.8"/><circle class="r" cx="28.5" cy="75.5" r="1.8"/><circle class="r" cx="71.5" cy="75.5" r="1.8"/><path class="g" d="M50 36 L60 48 L50 60 L40 48 Z"/><path class="gr" d="M14 90 H86"/>' },
+
+  // --- kindling boon chips (b-*): the kindling buttons' small marks — single-stroke
+  //     `.m`/`.mf`, the coin/flask family. Constant markup, no interpolation. ---
+  'b-bellows': { box: '0 0 20 20', body: '<path class="m" d="M4 7.5 C2.3 9 2.3 11 4 12.5 L11.5 11.2 V8.8 Z"/><path class="m" d="M11.5 10 H14.8"/><circle class="mf" cx="16.8" cy="7.4" r="0.9"/><circle class="mf" cx="17.6" cy="10" r="1"/><circle class="mf" cx="16.6" cy="12.6" r="0.8"/>' },
+  'b-ironskin': { box: '0 0 20 20', body: '<path class="m" d="M10 3 L16.5 6 V11 C16.5 14.6 13.9 16.9 10 17.6 C6.1 16.9 3.5 14.6 3.5 11 V6 Z"/><path class="m" d="M7 5.8 L10 7.8 L13 5.8"/><circle class="mf" cx="6.3" cy="9.4" r="0.8"/><circle class="mf" cx="13.7" cy="9.4" r="0.8"/>' },
+  'b-sparkfall': { box: '0 0 20 20', body: '<path class="m" d="M5.5 13.5 L10 17.5 L14.5 13.5"/><path class="mf" d="M6 4.5 L7.2 6.1 L6 7.7 L4.8 6.1 Z"/><path class="mf" d="M11 7 L12.2 8.6 L11 10.2 L9.8 8.6 Z"/><path class="mf" d="M14.8 3 L15.9 4.5 L14.8 6 L13.7 4.5 Z"/>' },
+  'b-purge': { box: '0 0 20 20', body: '<path class="m" d="M5 3.5 H12.5 V8 H5 Z"/><path class="m" d="M8.75 8 V17"/><path class="m" d="M3.5 3.5 L16.5 16.5 M16.5 3.5 L3.5 16.5"/>' },
+  'b-stoke': { box: '0 0 20 20', body: '<path class="m" d="M10 17.5 C5.8 14.6 7.7 11.2 9.7 8.4 C10.3 10.8 12.9 10.6 12.1 7.6 C15.3 10.4 15.6 14.7 10 17.5 Z"/><circle class="mf" cx="12.4" cy="6.2" r="1.3"/><path class="m" d="M15.2 2.2 L12.8 5.4 M18.6 3.6 L13.9 6"/>' },
+
+  // --- event choice art (ev-*): the wayside's choice buttons wear their own mark, the
+  //     same forged-iron woodcut language as the relic art (`.b` iron body, `.r` rim
+  //     light = currentColor, `.g` ember glow, `.gr` ground stroke). One mark per
+  //     eventId+slug pair (the roster's own slugs, src/kernel/rules/events.js's
+  //     EVENT_ROSTER); the four no-op
+  //     beats (leave/wave/walk/move) share the ONE footprint-on-the-road mark. The
+  //     silhouettes echo the marks this surface already knows: the coin (ev-ember's
+  //     struck disc), the flask (ev-potion's stoppered bottle), the draw cards
+  //     (ev-sell's face-up card), r-deep_well's ellipse mouth (ev-climb), the flame
+  //     teardrop (ev-torch), r-forge_iron's riveted bench (ev-temper), the hearth's
+  //     warm coals (ev-stories). Constant markup, no interpolation. ---
+  'ev-stoke': { box: '0 0 100 100', body: '<path class="r" d="M30 8 C40 20 48 40 50 56"/><path class="r" d="M74 10 C62 24 54 40 52 56"/><circle class="r" cx="52" cy="26" r="3"/><path class="b" d="M20 68 C28 58 42 52 50 52 C58 52 72 58 80 68 L76 80 H24 Z"/><path class="g" d="M42 46 l5 4 -5 3z"/><path class="g" d="M58 42 l5 4 -5 3z"/><circle class="g" cx="50" cy="62" r="3.4"/><circle class="g" cx="64" cy="68" r="2.4"/><path class="gr" d="M10 90 H90"/>' },
+  'ev-ember': { box: '0 0 100 100', body: '<circle class="b" cx="50" cy="64" r="24"/><path class="r" d="M50 46 V82"/><path class="g" d="M40 26 L54 20 L62 30 L58 42 L44 42 L38 32 Z"/><path class="r" d="M40 26 L54 20 L62 30 L58 42"/><circle class="g" cx="68" cy="18" r="2.2"/><circle class="g" cx="31" cy="20" r="2"/><path class="gr" d="M12 92 H88"/>' },
+  'ev-road': { box: '0 0 100 100', body: '<ellipse class="b" cx="38" cy="50" rx="7.5" ry="12"/><ellipse class="b" cx="62" cy="68" rx="7.5" ry="12"/><path class="r" d="M33 64 L32 67 M38 65 L38 68 M43 64 L44 67"/><path class="r" d="M57 82 L56 85 M62 83 L62 86 M67 82 L68 85"/><path class="gr" d="M8 88 H92"/>' },
+  'ev-potion': { box: '0 0 100 100', body: '<path class="b" d="M37 10 H53 V20 H37 Z"/><path class="b" d="M39 20 H49 V34 L60 54 C64 63 60 76 50 78 H38 C28 76 24 63 28 54 L39 34 Z"/><path class="r" d="M33 56 H55"/><circle class="g" cx="44" cy="27" r="2.6"/><path class="r" d="M16 78 H84"/><circle class="r" cx="72" cy="78" r="8"/><path class="gr" d="M10 92 H90"/>' },
+  'ev-sell': { box: '0 0 100 100', body: '<path class="b" d="M33 18 H67 C70 18 72 20 72 23 V69 C72 72 70 74 67 74 H33 C30 74 28 72 28 69 V23 C28 20 30 18 33 18 Z"/><path class="r" d="M36 28 H64 V64 H36 Z"/><path class="b" d="M30 76 H70 L68 83 H32 Z"/><path class="b" d="M34 83 H66 L64 90 H36 Z"/><path class="r" d="M30 76 H70 M34 83 H66"/><circle class="g" cx="50" cy="46" r="3"/><path class="gr" d="M14 94 H86"/>' },
+  'ev-climb': { box: '0 0 100 100', body: '<path class="r" d="M38 8 L33 66"/><path class="r" d="M62 8 L67 66"/><path class="r" d="M36 22 H64 M34.5 40 H65.5 M33.5 58 H66.5"/><path class="b" fill-rule="evenodd" d="M18 68 A32 13 0 1 0 82 68 A32 13 0 1 0 18 68 Z M29 68 A21 8 0 1 1 71 68 A21 8 0 1 1 29 68 Z"/><circle class="g" cx="50" cy="69" r="3"/><path class="gr" d="M8 90 H92"/>' },
+  'ev-torch': { box: '0 0 100 100', body: '<path class="b" d="M46 36 L60 28 L68 40 L54 48 Z"/><path class="r" d="M46 36 L60 28"/><path class="b" d="M56 46 L76 72 L68 78 L48 52 Z"/><path class="r" d="M52 44 L58 48"/><path class="g" d="M36 10 C44 18 46 26 42 32 C38 28 32 20 32 14 C33 12 34.5 11 36 10 Z"/><circle class="g" cx="30" cy="30" r="2.2"/><circle class="g" cx="46" cy="18" r="1.8"/><path class="gr" d="M12 90 H88"/>' },
+  'ev-temper': { box: '0 0 100 100', body: '<path class="b" d="M46 8 L66 16 L61 30 L41 22 Z"/><path class="r" d="M46 8 L66 16"/><path class="r" d="M56 22 L46 50"/><path class="b" d="M22 58 H78 L84 76 H16 Z"/><path class="r" d="M22 58 H78"/><path class="r" d="M16 76 L22 58"/><circle class="r" cx="33" cy="67" r="2.4"/><circle class="r" cx="50" cy="67" r="2.4"/><circle class="r" cx="67" cy="67" r="2.4"/><path class="g" d="M38 76 H62 L60 80 H40 Z"/><path class="gr" d="M10 90 H90"/>' },
+  'ev-stories': { box: '0 0 100 100', body: '<path class="b" d="M26 56 C26 72 36 82 50 82 C64 82 74 72 74 56 Z"/><path class="r" d="M26 56 H74"/><path class="r" d="M42 46 C40 38 44 34 42 26"/><path class="r" d="M56 46 C54 38 58 34 56 26"/><path class="r" d="M80 22 C86 22 90 26 90 31 C90 36 86 40 81 40 L76 46 L77 40 C74 38 72 35 72 31 C72 26 75 22 80 22 Z"/><circle class="g" cx="50" cy="62" r="3.2"/><circle class="r" cx="59" cy="66" r="1.8"/><path class="gr" d="M12 92 H88"/>' },
 
   // --- enemy illustrations (art-direction rev): forged-iron woodcut. Three layers per
   //     creature: `.b` body (near-black iron), `.r` rim light (currentColor = the creature's
@@ -128,10 +192,89 @@ export const POTION_GLYPH = {
   purge_flask: 'flask',
 };
 
+/** Relic id -> its per-id mark (the r-* woodcut table above). Two surfaces share ONE mark
+ *  per relic, each styled by its own CSS context: the boss offer tile wears it large
+ *  (.boon-art, the full three-layer drawing) and the elite's spoils chip wears the same
+ *  silhouette restyled to strokes at chip size (.boon-glyph). The fallbacks differ by
+ *  surface and are the CALLER's (an unknown id must never render an empty box):
+ *    * offer tile  -> `r-unknown`, the generic riveted reliquary plate;
+ *    * spoils chip -> the generic `relic` heart (the pre-art chip mark, unchanged).
+ *  Both are the glyphBox/glyphMarkup rune-fallback model: unknown in, known shape out. */
+export const RELIC_GLYPH = {
+  burning_blood: 'r-burning_blood',
+  cyan_lantern: 'r-cyan_lantern',
+  forge_iron: 'r-forge_iron',
+  whetted_edge: 'r-whetted_edge',
+  hearth_ash: 'r-hearth_ash',
+  ember_heart: 'r-ember_heart',
+  gold_vein: 'r-gold_vein',
+  flask_grip: 'r-flask_grip',
+  deep_well: 'r-deep_well',
+  ash_crown: 'r-ash_crown',
+  slag_crown: 'r-slag_crown',
+  cinder_ward: 'r-cinder_ward',
+  ash_ledger: 'r-ash_ledger',
+};
+
+/** Kindling boon id -> its chip mark (the b-* table above). Presentation only: the kindling
+ *  buttons resolve it from the snapshot's own `boons[].id`; an unknown id falls back to the
+ *  rune inside glyphBox, never an empty box. */
+export const BOON_GLYPH = {
+  bellows: 'b-bellows',
+  ironskin: 'b-ironskin',
+  sparkfall: 'b-sparkfall',
+  purge: 'b-purge',
+  stoke: 'b-stoke',
+};
+
+/** Event choice -> its per-choice mark (the ev-* table above), keyed eventId THEN slug —
+ *  the same two-level keying the kernel itself uses (resolveChoice rejects a slug/index
+ *  mismatch, so the slug is kernel-verified identity; snapshotEvent publishes both on
+ *  every choice row). Presentation only: the event view resolves it from the snapshot's
+ *  own `eventId`/`slug`. The four no-op beats (leave/wave/walk/move — one per event, the
+ *  roster's shared "nothing happens" exit) share the ONE `ev-road` footprint mark, the
+ *  same way every relic chip shares one silhouette language. The fallback is the CALLER's
+ *  (an unknown eventId/slug must never render an empty box):
+ *    * event view -> `r-unknown`, the generic riveted plate — NEVER the small `rune`,
+ *      whose 20-box single-stroke `.m` layer set has no art context here.
+ *  NOTE: an event the kernel no longer knows (`ev.known === false`) renders NO choices at
+ *  all, so this table never meets a torn event id on a live screen — the `r-unknown` arm
+ *  is purely defensive (a roster slug renamed without its table row). Drift guard:
+ *  tests/web/event-art-surfaces.test.js drives real kernel snapshots for every roster
+ *  event, so a slug renamed without its row here fails a test, never ships a fallback. */
+export const EVENT_CHOICE_GLYPH = {
+  sleeping_forge: { stoke: 'ev-stoke', leave: 'ev-road', ember: 'ev-ember' },
+  ash_peddler: { potion: 'ev-potion', sell: 'ev-sell', wave: 'ev-road' },
+  collapsed_shaft: { climb: 'ev-climb', torch: 'ev-torch', walk: 'ev-road' },
+  wandering_smith: { temper: 'ev-temper', stories: 'ev-stories', move: 'ev-road' },
+};
+
 export const TYPE_GLYPH = { attack: 'blade', skill: 'shield', power: 'star', status: 'hourglass', curse: 'skull' };
 
-/** Intent kind -> its mark. */
-export const INTENT_GLYPH = { attack: 'strike', block: 'shieldWide', buff: 'chevUp', debuff: 'chevDown' };
+/** Effect chip -> its mark (the kernel publishes `{verb, status?}` chips; this table is
+ *  purely presentational). Existing marks are borrowed where the shape reads honestly —
+ *  the blade for damage, the shield for Block, the star for Energy (the energy potion
+ *  already wears it), the hourglass for Retain (the fact IS "never leaves your hand —
+ *  not at play, not at the end of the turn") and
+ *  the ward for Metallicize (its Block arrives as armour). The debuff chevron serves
+ *  Vulnerable and Weak: the enemy-side facts they are. The names must stay inside
+ *  MARKS — an unknown key falls back to the rune inside glyphBox, never an empty box. */
+export const EFFECT_GLYPH = {
+  damage: 'blade',
+  attack: 'blade',
+  block: 'shield',
+  draw: 'draw',
+  discard: 'discard',
+  energy: 'star',
+  heal: 'heal',
+  exhaust: 'exhaust',
+  retain: 'hourglass',
+  strength: 'strength',
+  vulnerable: 'chevDown',
+  weak: 'chevDown',
+  dexterity: 'chevUp',
+  metallicize: 'ward',
+};
 
 /** Node type (after stripping the `combat_` prefix) -> its silhouette. The shop (S4)
  *  wears the coin — it is the one node that never fights and only trades. The event

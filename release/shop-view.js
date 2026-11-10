@@ -67,6 +67,10 @@ export function shopView() {
       typeLabel: o.typeLabel,
       summary: o.summary,
       description: o.description,
+      // Kernel-published chips ride the offer row verbatim (snapshotShop words them off
+      // the same def) — the shelf face matches the hand's.
+      chips: o.chips ?? [],
+      chipsComplete: o.chipsComplete === true,
       playable: o.affordable,
       showSummary: false,
       // The tile carries no compact-code footer (reward-screen precedent), so the
@@ -147,6 +151,11 @@ function removalTile(d) {
     // The row's own tempered sentence when the kernel publishes one (deckInstances
     // does); cardDescribe stays the fallback for a caller that predates the field.
     description: d.description || fact.description || d.name,
+    // Same for the chip row: the instance row's tempered chips, the describe fact's as
+    // the fallback — a Red-hot copy's damage chip says the tempered 9 either way.
+    // Completeness follows the chips actually chosen, never an OR across the sources.
+    chips: d.chips ?? fact.chips ?? [],
+    chipsComplete: (d.chips ? d.chipsComplete : fact.chipsComplete) === true,
     // A pick is not a hand play: the tile is clickable through its own action id, and it
     // must never wear the hand's "not enough Energy" affordance for a service already
     // paid for. `playable: true` keeps the full-colour face; the pick verb lives in the

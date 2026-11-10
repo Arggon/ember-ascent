@@ -21,6 +21,7 @@ import { TEMPERS, temperEffects, temperHpCost } from './rules/tempers.js';
 import { QUESTS } from './rules/quests.js';
 import { REMOVAL_PRICE } from './rules/shop.js';
 import { POTION_SLOTS, potionDef } from './rules/potions.js';
+import { STATUS_KINDS } from './rules/vocabulary.js';
 import { eventDef, offerEventChoices, renderEventLines, temperOfferOpen } from './rules/events.js';
 // The plain-English layer. Declared AFTER the frozen compact one on purpose: the strings
 // in this file are the budgeted payload and may not move, so they stay the single source
@@ -31,6 +32,10 @@ import {
   describePlayability,
   describePower,
   describeStatus,
+  cardChips,
+  chipsCover,
+  chipVerbLabel,
+  statusName,
   glossary,
   glossarySections,
   helpTopics,
@@ -170,6 +175,47 @@ function defOf(cardOrId) {
 function defOrNull(cardOrId) {
   if (CARD_DEFS === null) CARD_DEFS = defaultContent().cards;
   return CARD_DEFS.get(cardIdOf(cardOrId)) ?? defaultContent().cards.get(cardIdOf(cardOrId)) ?? null;
+}
+
+/**
+ * ONE helper for "the card this temper lands on, as the TEMPERED copy plays": the
+ * synthetic def (rules/tempers.js temperEffects) rendered through the describe layer
+ * into the row shape every tempered tile consumes — the resolved beat's card refs
+ * (beatCards) and BOTH surfaces' temper OFFERS (the smith's event modal and the rest
+ * site's forge list). snapshotDeck's rows derive the same fields through temperedView
+ * (its own pre-existing path over the same synthetic def). Every number and word is
+ * kernel wording
+ * (B2: the tempered copy's own face, never the base card's); the temper's name and
+ * rules sentence ride beside them. Tolerant like defOrNull: an id the content no longer
+ * knows (or a temper the table lost) yields the identity fields WITHOUT a face —
+ * callers degrade to their raw-id shapes, never a throw.
+ * @param {string} cardId
+ * @param {string} temper a TEMPERS key (callers gate on TEMPERS[temper] where it matters)
+ * @param {string} lang
+ * @returns {{cardId: string, temper: string, temperName: string, temperText: string,
+ *            name?: string, cost?: number, type?: string, typeLabel?: string,
+ *            description?: string, chips?: any[], chipsComplete?: boolean}}
+ */
+function temperedCardRow(cardId, temper, lang) {
+  const def = defOrNull(cardId);
+  const row = {
+    cardId,
+    temper,
+    temperName: fieldFor(TEMPERS[temper], 'name', lang) || temper,
+    temperText: fieldFor(TEMPERS[temper], 'text', lang),
+  };
+  if (!def) return row;
+  const temperedDef = { ...def, effects: temperEffects(def.effects, temper) };
+  return {
+    ...row,
+    name: fieldFor(def, 'name', lang),
+    cost: def.cost,
+    type: def.type,
+    typeLabel: typeLabel(def.type, lang),
+    description: describeCard(temperedDef, {}, lang),
+    chips: cardChips(temperedDef, lang),
+    chipsComplete: chipsCover(temperedDef),
+  };
 }
 
 /**
@@ -597,6 +643,13 @@ export function observeActions(state) {
  * N more damage", an ENEMY's says "its attacks deal N more damage" — the same counters
  * mean different things per side, and a chip that borrowed the player's wording on an
  * enemy told the reader the buff was theirs.
+ *
+ * Each row also carries `kind` — the buff/debuff classification PUBLISHED from the
+ * kernel's one such table (rules/vocabulary.js STATUS_KINDS, the same single source
+ * rules/potions.js derives its Purge list from), so a surface can split an enemy's own
+ * buffs from hero-applied debuffs without string-matching keys. Additive metadata only:
+ * the compact dump reads statuses through statusLine (plain "PWR2 VULN1" tokens) and the
+ * run hash reads canonical(state), so no dump byte and no hash can move because of it.
  * @param {any} statuses
  * @param {string} [lang]
  * @param {'player'|'enemy'} [side]
@@ -607,8 +660,16 @@ function statusPairs(statuses, lang = 'en', side = 'player') {
     .map(([key, stacks]) => ({
       key,
       stacks,
+      // 'buff' (helps its holder: strength, dexterity, metallicize) or 'debuff'
+      // (hurts it: vulnerable, weak). The `?? 'debuff'` is a fallback for a key the
+      // table somehow does not know — unreachable through addStatus's validation —
+      // and it keeps such a row in the BOTTOM status group it always rendered in.
+      kind: STATUS_KINDS[key] ?? 'debuff',
       // Compact form for the CLI and for anyone who has read the glossary.
       label: `${STATUS_ABBREV[key] ?? key.toUpperCase()}${stacks}`,
+      // The human word for the status ("Strength"), for the chip popovers: the compact
+      // `label` is the agent-facing token, never a popover title.
+      name: statusName(key, lang),
       // The same fact in words, for a reader meeting it for the first time. Derived
       // here, in the kernel, so no surface can invent its own wording.
       text: `${describeStatus(key, stacks, side, lang).replace(/\.$/, '')}`,
@@ -686,12 +747,65 @@ function playTargets(legal) {
 /** The hand section of a snapshot: one tile's worth of facts per card. */
 function snapshotHand(state, legal, lang = 'en') {
   const { playableSlots, targetsBySlot } = playTargets(legal);
+  // PARITY: the hand tile speaks the numbers the engine will actually land, not the
+  // printed ones. The fold context reads the LIVE combat state and its math goes through
+  // the SAME resolvers the rules use (playerStrike / vulnerableAmplify / blockGain), so
+  // a card face cannot disagree with what playing it will do. `vuln` is resolved PER
+  // TARGET: with exactly one enemy alive the aimed card's target is unambiguous and its
+  // Vulnerable folds straight into `description`; with several alive the top-level
+  // sentence keeps the honest no-vuln print (the target is the player's choice) and each
+  // living enemy's variant rides in `descriptionsByTarget` for the aiming UI to swap in
+  // live. AOE folds Vulnerable only when it is unambiguous — exactly one alive body and
+  // it is Vulnerable (every hit lands on the same ×3/2); over a mixed field it never
+  // claims it, the amplification is not one number.
+  // Collection surfaces (codex, deck sheet, shop, reward) call describeCard WITHOUT the
+  // fold and keep the printed card: with no combat to read, there is nothing to fold.
+  const inCombat = state.phase === 'combat' && state.combat?.active;
+  const alive = inCombat ? state.combat.enemies.filter((e) => !e.dead) : [];
+  const foldBase = inCombat ? {
+    strength: state.player.statuses?.strength ?? 0,
+    weak: state.player.statuses?.weak ?? 0,
+    dexterity: state.player.statuses?.dexterity ?? 0,
+  } : null;
+  const fold = foldBase ? { ...foldBase, vuln: alive.length === 1 && (alive[0].statuses?.vulnerable ?? 0) > 0 } : null;
   return (state.combat?.hand ?? []).map((card, i) => {
     const { def, temper } = temperedView(state, card, defOf(card));
     const hpCost = temperHpCost(temper);
     const slot = `p${i + 1}`;
     const playable = playableSlots.has(slot);
     const targets = targetsBySlot.get(slot) ?? [];
+    // PARITY-2: one sentence variant per LIVING enemy, keyed by the SAME 1-based
+    // living-enemy slot the `targets` aim actions use. Only target-needing cards in a
+    // multi-enemy field carry it; null when no variant differs from `description`, so a
+    // clean field adds zero payload and the renderer falls back to the resting face.
+    let descriptionsByTarget = null;
+    // PARITY-2b: the same swap for the CHIP ROW. On a fully chip-covered card the
+    // sentence is hidden, so the folded number would be invisible exactly when aiming —
+    // the crosshair's whole point. Each living enemy gets its chips re-derived through
+    // the fold with ITS OWN Vulnerable (the same resolvers the sentence rider runs), and
+    // a key is published ONLY when that enemy's variant actually differs from the base
+    // row — a clean field adds zero payload, like the sentence variants above.
+    let chipsByTarget = null;
+    if (foldBase && targets.length > 0) {
+      const restingChips = cardChips(def, lang, { ...foldBase, vuln: false });
+      const chipVariants = alive.map((enemy, j) => cardChips(def, lang, { ...foldBase, vuln: (enemy.statuses?.vulnerable ?? 0) > 0 }));
+      chipVariants.forEach((v, j) => {
+        if (JSON.stringify(v) !== JSON.stringify(restingChips)) {
+          chipsByTarget ??= {};
+          chipsByTarget[j + 1] = v;
+        }
+      });
+    }
+    if (foldBase && targets.length > 0) {
+      const variants = alive.map((enemy, j) => describeCard(def, card, lang, { ...foldBase, vuln: (enemy.statuses?.vulnerable ?? 0) > 0 })
+        + (hpCost > 0 ? (lang === 'es' ? ` Pierdes ${hpCost} HP al jugarla.` : ` Lose ${hpCost} HP when played.`) : ''));
+      const resting = describeCard(def, card, lang, { ...foldBase, vuln: false })
+        + (hpCost > 0 ? (lang === 'es' ? ` Pierdes ${hpCost} HP al jugarla.` : ` Lose ${hpCost} HP when played.`) : '');
+      if (variants.some((s) => s !== resting)) {
+        descriptionsByTarget = {};
+        variants.forEach((s, j) => { descriptionsByTarget[j + 1] = s; });
+      }
+    }
     return {
       slot,
       cardId: card.cardId,
@@ -710,9 +824,29 @@ function snapshotHand(state, legal, lang = 'en') {
       // tests/budget.test.js); `description` is the sentence a human reads instead.
       typeLabel: typeLabel(def.type, lang),
       // Both read the TEMPERED definition, so a Red-hot Hammerfall says "Deal 9 damage."
+      // In combat the hand's sentence carries the status fold (PARITY above); the other
+      // surfaces read the same builder WITHOUT the fold — the printed card.
       summary: effectSummary(def),
-      description: describeCard(def, card, lang)
+      description: describeCard(def, card, lang, fold)
         + (hpCost > 0 ? (lang === 'es' ? ` Pierdes ${hpCost} HP al jugarla.` : ` Lose ${hpCost} HP when played.`) : ''),
+      // PARITY-2 per-target variants (null when none differs), keyed by the 1-based
+      // living-enemy slot — the same k the aim actions and the GUI's `aimed` use.
+      descriptionsByTarget,
+      // The EFFECT CHIPS (the tile's icon row): one `{verb, status?, amount, num, label,
+      // explain}` per effect, worded kernel-side so a tile prints and never derives. Read
+      // off the TEMPERED definition, like `summary`/`description` above, so a Red-hot
+      // Hammerfall's chip says 9×1 — and through the SAME live fold the sentence rides,
+      // so the icon's number is the number the play lands. `chipsComplete` is the tile's
+      // licence to drop the visible sentence: true only when every effect carries a chip
+      // (a `custom` verb keeps the sentence — its meaning is bespoke and no icon claims
+      // it) AND the tempered play carries no HP rider — a "Lose 2 HP when played." tail
+      // has no chip to speak for it, so the sentence STAYS on the face beside the icons.
+      chips: cardChips(def, lang, fold),
+      chipsComplete: chipsCover(def) && hpCost === 0,
+      // PARITY-2b per-target chip variants (null when none differs from the base row),
+      // keyed by the 1-based living-enemy slot — the same k `descriptionsByTarget` and
+      // the aim actions use, so the renderer swaps both faces with one lookup.
+      chipsByTarget,
       playable,
       // The engine's own answer to "may this card be aimed?" — so a renderer never has to
       // infer it from the card type (Defend is type 'skill', Bash is 'attack', but the
@@ -748,6 +882,17 @@ function snapshotEnemies(state, lang = 'en') {
           kind: move.kind,
           damage: intentDamage(e),
           hits: move.hits ?? 1,
+          // The STRUCTURED chip facts (feature: enemies speak in chips): what the move
+          // does, as data, so a renderer never parses the label string to build a chip.
+          // `block` when the move guards (an attack-and-block move carries both), and
+          // every status the move applies — debuff stacks onto the player, a buff's
+          // Strength onto itself (`to: 'self'`), the same split the status pills keep.
+          block: move.block ?? null,
+          statuses: [
+            ...(move.vulnerable ? [{ status: 'vulnerable', stacks: move.vulnerable }] : []),
+            ...(move.weak ? [{ status: 'weak', stacks: move.weak }] : []),
+            ...(move.kind === 'buff' && move.strength ? [{ status: 'strength', stacks: move.strength, to: 'self' }] : []),
+          ],
           // The sentence for the SAME intent, from the same rules, so the compact number
           // and the readable line can never disagree. The enemy NAME stays English until
           // I18N-2 sweeps the encounter tables.
@@ -755,6 +900,55 @@ function snapshotEnemies(state, lang = 'en') {
         },
       };
     });
+}
+
+/**
+ * The INTENT CHIP row of one snapshot enemy row (feature: enemies speak in chips): what
+ * the announced move does, as the same chip shape a card face carries — an attack chip,
+ * a block chip when the move guards, and one chip per status the move applies (debuffs
+ * onto the player, a buff's Strength onto itself). Every chip's `explain` is the
+ * intent's OWN describeIntent sentence, so clicking any of them explains the whole move
+ * in kernel wording, and no renderer parses the label string to learn any of it.
+ *
+ * Numbers come from the snapshot's own facts (`intent.damage` is the engine's
+ * intentDamage — Strength already added, Weak already applied; `hits` the move's), so the
+ * row and the intent label can never disagree. A move kind the shape does not cover
+ * yields no chips and the renderer falls back to the sentence — never a guess.
+ * @param {any} enemy a snapshot enemy row (its `intent` carries the facts)
+ * @param {string} [lang] 'en' (default) or 'es'
+ * @returns {Array<object>} chips of `{verb, amount?, hits?, status?, num, label, explain}`
+ */
+export function intentChips(enemy, lang = 'en') {
+  const intent = enemy?.intent ?? {};
+  const explain = intent.text || intent.label || '';
+  const out = [];
+  const push = (chip) => out.push({ ...chip, explain });
+  if (intent.kind === 'attack' && typeof intent.damage === 'number' && intent.damage > 0) {
+    const hits = intent.hits ?? 1;
+    // The row's own convention: the per-hit number × hits (intent.damage is the TOTAL).
+    push({
+      verb: 'attack',
+      amount: intent.damage,
+      ...(hits > 1 ? { hits } : {}),
+      num: hits > 1 ? `${Math.round(intent.damage / hits)}×${hits}` : String(intent.damage),
+      label: chipVerbLabel('attack', lang),
+    });
+  }
+  // Statuses before the block chip, so each move's chip order mirrors its sentence's
+  // clause order: "attack for 7 and block 5", "power up: +3 Strength and gain 6 Block".
+  for (const s of intent.statuses ?? []) {
+    push({
+      verb: 'status',
+      status: s.status,
+      amount: s.stacks,
+      num: `+${s.stacks}`,
+      label: statusName(s.status, lang),
+    });
+  }
+  if ((intent.block ?? 0) > 0) {
+    push({ verb: 'block', amount: intent.block, num: String(intent.block), label: chipVerbLabel('block', lang) });
+  }
+  return out;
 }
 
 /** The map section of a snapshot: every node, with availability decided here. */
@@ -843,6 +1037,10 @@ function snapshotReward(state, legal, lang = 'en') {
         typeLabel: def ? typeLabel(def.type, lang) : 'unknown',
         summary: def ? effectSummary(def) : '',
         description: def ? describeCard(def, {}, lang) : '',
+        // The reward tiles render the same chip row as the hand (kernel-worded, so a
+        // card picked from a reward and the same card drawn in a fight cannot disagree).
+        chips: def ? cardChips(def, lang) : [],
+        chipsComplete: def ? chipsCover(def) : false,
         actionId: pick.get(id) ?? null,
       };
     }),
@@ -858,8 +1056,13 @@ function snapshotRest(state, legal, lang = 'en') {
     heal: REST_HEAL,
     tempers: (state.temperOffers ?? []).map((o, i) => ({
       // Tolerant like rewardBody (defOrNull): an unknown offer id shows its raw id.
-      actionId: `t${i + 1}`, cardId: o.cardId, cardName: fieldFor(defOrNull(o.cardId), 'name', lang) || o.cardId,
-      temper: o.temper, temperName: fieldFor(TEMPERS[o.temper], 'name', lang) || o.temper, text: fieldFor(TEMPERS[o.temper], 'text', lang),
+      // The TEMPERED FACE rides the offer (temperedCardRow — the same helper the smith's
+      // event modal and the resolved beat's refs publish), so the forge's pick tiles show
+      // the numbers the tempered copy will actually play. Both surfaces read ONE publisher.
+      actionId: `t${i + 1}`,
+      ...temperedCardRow(o.cardId, o.temper, lang),
+      cardName: fieldFor(defOrNull(o.cardId), 'name', lang) || o.cardId,
+      text: fieldFor(TEMPERS[o.temper], 'text', lang),
     })),
   };
 }
@@ -978,6 +1181,9 @@ function snapshotShop(state, legal, lang = 'en') {
       // The TEMPERED describe sentence, the deck sheet's own new rule: the removal
       // modal's tile must not print the base number under a temper stamp either.
       description: def ? describeCard(temperedDef, inst, lang) : '',
+      // The TEMPERED chip list, same rule: a Red-hot Hammerfall's damage chip says 9.
+      chips: temperedDef ? cardChips(temperedDef, lang) : [],
+      chipsComplete: temperedDef ? chipsCover(temperedDef) : false,
       copy,
       copies: census.get(key) ?? 1,
     };
@@ -1002,6 +1208,9 @@ function snapshotShop(state, legal, lang = 'en') {
         rarity: def?.rarity ?? 'unknown',
         summary: def ? effectSummary(def) : '',
         description: def ? describeCard(def, {}, lang) : '',
+        // Shop shelves wear the same chips as every other tile (kernel-worded).
+        chips: def ? cardChips(def, lang) : [],
+        chipsComplete: def ? chipsCover(def) : false,
         price: o.price,
         sold: Boolean(o.sold),
         affordable: actionId !== null,
@@ -1024,15 +1233,46 @@ function snapshotShop(state, legal, lang = 'en') {
 }
 
 /**
+ * The resolved beat's CARD REFS, one entry per line and null when the line names no
+ * card — the parallel array the event screen renders its card tiles from. The refs are
+ * the KERNEL's own: the stored beat lines carry `cardId` (card_joined, card_bought,
+ * card_sold) and, for the smith's temper beat, the temper id beside it, and a surface
+ * never derives a card from a sentence. A temper entry is a deck-sheet row in miniature
+ * (snapshotDeck's shape): the temper's own name and rules sentence, PLUS the TEMPERED
+ * face — synthetic def, describeCard/cardChips off it — so the event tile shows the
+ * numbers the tempered copy actually plays (B2's "every rendering shows the tempered
+ * numbers"; a Quenched Bulwark says Gain 5 Block. Gain 3 Block. here too). A plain card
+ * line publishes just the ref: the tile's resting face comes from the describe layer,
+ * which reads the plain definition. A legacy save's plain-string lines, an unknown
+ * temper id or card id, and every non-card beat degrade — null, or a bare ref with no
+ * face — never a throw, and the sentence still carries the whole story.
+ * @param {any} lines the stored `resolved.lines`
+ * @param {string} lang
+ * @returns {Array<object|null>}
+ */
+function beatCards(lines, lang) {
+  if (!Array.isArray(lines)) return [];
+  return lines.map((line) => {
+    if (!line || typeof line !== 'object' || typeof line.cardId !== 'string') return null;
+    const temper = typeof line.temper === 'string' && TEMPERS[line.temper] ? line.temper : null;
+    // The tempered face is the ONE helper's row (temperedCardRow above) — the same
+    // shape the smith's offers and the rest site's forge list publish, so the resolved
+    // tile can never disagree with the offer tile it came from.
+    return temper ? temperedCardRow(line.cardId, temper, lang) : { cardId: line.cardId };
+  });
+}
+
+/**
  * S6: the event section of a snapshot, or null outside the event phase.
  *
  * The ONE offer table (rules/events.js offerEventChoices) decides everything a choice
  * button needs: `actionId` is null exactly when the kernel offers no action (an unmet
  * requirement — the same afford-filter contract as a shop shelf), `reason` is the
  * WHY the dimmed button shows, and `cost`/`hpLoss` are the price chips' facts. The
- * resolved beat carries the kernel's own result lines; the temper modal's offers ride
- * beside them. A torn save (unknown story id, or the field null) degrades: `known`
- * is false, the story is empty, no choices, and `continueId` is still the way out.
+ * resolved beat carries the kernel's own result lines with their card refs beside them
+ * (beatCards above); the temper modal's offers ride beside them. A torn save (unknown
+ * story id, or the field null) degrades: `known` is false, the story is empty, no
+ * choices, and `continueId` is still the way out.
  * @param {any} state
  * @param {any[]} legal
  * @param {string} [lang]
@@ -1061,14 +1301,17 @@ function snapshotEvent(state, legal, lang = 'en') {
     // same number actions() enumerates — and a refused element emits no row at all:
     // the view renders only picks the kernel actually offers (S4.1/S5 ruling).
     offers: (Array.isArray(ev?.offers) ? ev.offers : [])
-      .map((o, i) => (temperOfferOpen(o, state) ? {
+      .map((o, i) => (temperOfferOpen(o, state) ? ({
         actionId: temperPicks.get(i) ?? null,
-        cardId: o.cardId,
+        // The TEMPERED FACE rides the offer (temperedCardRow — the same helper the
+        // resolved beat's refs and the rest site's forge list use): the pick tile shows
+        // the numbers the tempered copy will actually play, never the base card's.
+        ...temperedCardRow(o.cardId, o.temper, lang),
+        // The pre-face fields keep their names: `cardName` is the aria contract's card
+        // word, `text` the temper's own sentence ("Quenched: also gain 3 Block.").
         cardName: fieldFor(defOrNull(o.cardId), 'name', lang) || o.cardId,
-        temper: o.temper,
-        temperName: fieldFor(TEMPERS[o.temper], 'name', lang) || o.temper,
         text: fieldFor(TEMPERS[o.temper], 'text', lang),
-      } : null))
+      }) : null))
       .filter(Boolean),
     choices: evald.map((c) => ({
       index: c.index,
@@ -1087,10 +1330,14 @@ function snapshotEvent(state, legal, lang = 'en') {
     // I18N-2: the beat renders in the snapshot's language from its structured slugs
     // (rules/events.js renderEventLines); a legacy save's baked English sentence
     // strings pass through verbatim — the honest degrade, documented in PLAYING.md.
+    // `cards` runs PARALLEL to `lines` (same index, null where the line names no card):
+    // the beat's own card refs, so the event screen can show the card instead of only
+    // naming it — the same kernel-publishes / surface-sinks ruling as every tile.
     resolved: ev?.resolved
       ? {
           choice: ev.resolved.choice,
           lines: renderEventLines(ev.resolved?.lines, lang, CARD_DEFS ?? defaultContent().cards),
+          cards: beatCards(ev.resolved?.lines, lang),
         }
       : null,
     continueId: legal.find((a) => a.kind === 'event_continue')?.id ?? null,
@@ -1172,6 +1419,10 @@ function snapshotDeck(state, lang = 'en') {
       // with the hand about one card. The hand adds its HP-cost rider on top; the deck
       // sheet's row carries the plain sentence (the stamp's tooltip has the temper's).
       description: def ? describeCard(temperedDef, inst, lang) : '',
+      // The TEMPERED chip list, same rule: the deck sheet's tiles paint the icons the
+      // hand would.
+      chips: cardChips(temperedDef, lang),
+      chipsComplete: chipsCover(temperedDef),
       count: 1,
     });
   }
@@ -1228,9 +1479,12 @@ export function cardPool(opts = {}) {
       type: def.type,
       typeLabel: typeLabel(def.type, lang),
       // Both renderings, as on the hand tiles: `summary` is the CLI's compact form,
-      // `description` the sentence a human reads.
+      // `description` the sentence a human reads — and the chip list the codex gallery's
+      // tiles paint, worded exactly as a hand tile's would be.
       summary: effectSummary(def),
       description: describeCard(def, {}, lang),
+      chips: cardChips(def, lang),
+      chipsComplete: chipsCover(def),
     }));
 }
 

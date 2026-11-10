@@ -19,6 +19,7 @@
 // at 1) and never "heal".
 import { ENEMIES } from './rules/encounters.js';
 import { intentDamage } from './rules/act.js';
+import { blockGain, playerStrike, vulnerableAmplify } from './rules/vocabulary.js';
 import { defaultContent } from './content.js';
 import { effectSummary, CUSTOM_SUMMARY, STATUS_ABBREV } from './observe.js';
 
@@ -270,6 +271,218 @@ export const statusName = (key, lang = 'en') => {
     ?? String(key).replace(/_/g, ' ');
 };
 
+/* ------------------------------------------------------- effect chips (the icons) */
+//
+// The card face's SECOND reading: an icon and a number instead of a sentence. A player
+// who has met the marks reads "arrow-up +2" faster than "Gain 2 Strength — your attacks
+// deal 2 more damage…", so every tile renders one chip per effect (`.cfx` in the web
+// layer) and, when a chip is clicked, the sentence below. The words stay HERE for the
+// same reason describeCard does: a browser that could explain a verb the CLI cannot
+// would be a second engine (R1). Statuses do not get their own wording — they borrow
+// STATUS_MEANING's label, player clause and detail verbatim, so a chip popover and a
+// status pill can never disagree about what Strength does.
+//
+// `custom`-verb effects take NO chip on purpose: their meaning is bespoke (Bloodletting
+// pays HP, Rampage grows), and a generic icon would claim a rule the handler does not
+// have. A card whose effects are not fully chip-expressible therefore KEEPS its visible
+// sentence beside its chips — `chipsCover(def)` is the flag the renderer reads.
+
+/** The number a chip prints, mirroring the compact summary's own conventions where they
+ *  exist (STATUS_ABBREV's "+" means GAIN/apply; `A2x4` means 2 damage 4 times) and the
+ *  player-facing gains spelled with a "+" where a bare number would read as a cost
+ *  (draw, energy, heal). Damage, Block and Discard are printed plain: the number IS the
+ *  whole fact, and a "+" on a cost would lie. Exhaust and Retain print no number —
+ *  their fact is the icon. */
+const CHIP_NUMBER = {
+  damage: (e) => (e.hits && e.hits > 1 ? `${e.amount}×${e.hits}` : String(e.amount)),
+  block: (e) => String(e.amount),
+  draw: (e) => `+${e.amount}`,
+  energy: (e) => `+${e.amount}`,
+  heal: (e) => `+${e.amount}`,
+  discard: (e) => String(e.amount),
+  exhaust: () => '',
+  retain: () => '',
+};
+
+/** The target phrase a SCOPED chip carries, mirroring TEMPLATES' own who-derivation
+ *  word for word. AOE and random-target chips MUST name their scope: when the covered
+ *  card's sentence ("Deal 4 damage to ALL enemies") leaves the face, the chip explain is
+ *  the only rules text left, and "Deal 4 damage." would quietly narrow an AOE. `bare`
+ *  drops the Spanish preposition — the status composition supplies its own ("sobre"),
+ *  and "sobre a TODOS" would be a grammar error. */
+function chipWho(who, lang, bare = false) {
+  const es = langOf(lang) === 'es';
+  if (who === 'all_enemies') return es ? (bare ? 'TODOS los enemigos' : 'a TODOS los enemigos') : 'ALL enemies';
+  if (who === 'random_enemy') return es ? (bare ? 'un enemigo al azar' : 'a un enemigo al azar') : 'a random enemy';
+  return '';
+}
+
+/** The one-sentence explainer per plain verb, in the glossary's own words (the D/B/E/H
+ *  rows), per language. `n` is the printed amount, `hits` the folded hit count, `who`
+ *  the effect's target scope ('all_enemies' | 'random_enemy' | null) — only damage has
+ *  a scope to name. */
+const VERB_MEANING = {
+  en: {
+    damage: (n, hits, who) => `Deal ${n} damage${who ? ` to ${chipWho(who, 'en')}` : ''}${hits > 1 ? ` ${hits} times` : ''}.`,
+    block: (n) => `Gain ${n} Block — it soaks damage and is spent at the start of your next turn.`,
+    draw: (n) => `Draw ${plural(n, 'card', 'cards')} from your draw pile.`,
+    discard: (n) => `Discard ${plural(n, 'card', 'cards')} from your hand, picked at random.`,
+    energy: (n) => `Gain ${n} Energy — it pays for cards; you get 3 each turn.`,
+    heal: (n) => `Restore up to ${n} HP — never past your maximum.`,
+    exhaust: () => 'Exhaust: this card leaves the fight for good — it does not come back in a reshuffle.',
+    retain: () => 'Retain: playing this card returns it to your hand after its effects resolve — it never moves to the discard pile, and it stays in your hand when your turn ends too.',
+  },
+  es: {
+    damage: (n, hits, who) => `Infliges ${n} de daño${who ? ` ${chipWho(who, 'es')}` : ''}${hits > 1 ? ` ${hits} veces` : ''}.`,
+    block: (n) => `Ganas ${n} de Bloqueo: absorbe daño y se consume al inicio de tu siguiente turno.`,
+    draw: (n) => `Robas ${pluralEs(n, 'carta', 'cartas')} de tu pila de robo.`,
+    discard: (n) => `Descartas ${pluralEs(n, 'carta', 'cartas')} de tu mano, elegidas al azar.`,
+    energy: (n) => `Ganas ${n} de Energía: paga las cartas; recibes 3 cada turno.`,
+    heal: (n) => `Restauras hasta ${n} HP, nunca más allá de tu máximo.`,
+    exhaust: () => 'Agotar: la carta sale del combate para siempre — no vuelve en un rebarajado.',
+    retain: () => 'Retener: al jugarla, la carta vuelve a tu mano tras resolver sus efectos — nunca va al descarte, y también se queda en tu mano cuando termina tu turno.',
+  },
+};
+
+/**
+ * The explainer sentence one chip shows when clicked, in the requested language.
+ * Statuses delegate to STATUS_MEANING so a chip and a status pill share one wording;
+ * `side` picks whose clause (a card that GRANTS Strength speaks "your attacks…", one
+ * that APPLIES Vulnerable speaks "it takes…"), and `who` names the scope when the
+ * effect hits beyond the one enemy ("on ALL enemies") — the applicator's own words.
+ * @param {string} verb the effect verb (closed vocabulary, src/kernel/rules/vocabulary.js)
+ * @param {string|null} statusKey the status key when verb is 'status', else null
+ * @param {number} amount the effect's printed amount
+ * @param {string} [lang] 'en' (default) or 'es'
+ * @param {'player'|'enemy'} [side] whose clause a status chip speaks
+ * @param {number} [hits] folded hit count for a damage chip
+ * @param {string|null} [who] target scope: 'all_enemies' | 'random_enemy' | null
+ * @returns {string} a complete sentence; an uncovered verb degrades honestly, never empty
+ */
+export function describeVerbChip(verb, statusKey, amount, lang = 'en', side = 'player', hits = 1, who = null) {
+  const es = langOf(lang) === 'es';
+  const n = amount ?? 0;
+  if (verb === 'status' && statusKey) {
+    const esTable = es ? STATUS_MEANING_ES[statusKey] : null;
+    const m = esTable ?? STATUS_MEANING[statusKey];
+    if (!m) return `${String(statusKey).replace(/_/g, ' ')} ${n}.`;
+    const scope = who ? (es ? ` sobre ${chipWho(who, 'es', true)}` : ` on ${chipWho(who, 'en')}`) : '';
+    return `${m.label}${scope} — ${m[side === 'enemy' ? 'enemy' : 'player'](n)}. ${m.detail}`;
+  }
+  const fn = (es ? VERB_MEANING.es : VERB_MEANING.en)[verb];
+  // The uncovered fallback mirrors describeEffect's own shape ("Unknown effect (x)."),
+  // so a verb that slips the vocabulary reads as a hole, never as a rule.
+  return fn ? fn(n, hits, who) : `Unknown effect (${String(verb)}).`;
+}
+
+/** The word a chip's popover titles itself with, e.g. "Strength" / "Fuerza". */
+const CHIP_LABEL_VERB = {
+  en: { damage: 'Damage', block: 'Block', draw: 'Draw', discard: 'Discard', energy: 'Energy', heal: 'Heal', exhaust: 'Exhaust', retain: 'Retain', attack: 'Attack' },
+  es: { damage: 'Daño', block: 'Bloqueo', draw: 'Robo', discard: 'Descarte', energy: 'Energía', heal: 'Curación', exhaust: 'Agotar', retain: 'Retener', attack: 'Ataque' },
+};
+
+/** The chip label for one verb in one language — shared by cardChips and by the intent
+ *  chip builder, so an enemy's attack chip and a card's damage chip title alike. */
+export function chipVerbLabel(verb, lang = 'en') {
+  const es = langOf(lang) === 'es';
+  return (es ? CHIP_LABEL_VERB.es : CHIP_LABEL_VERB.en)[verb] ?? String(verb);
+}
+
+/**
+ * The chip list of one card definition — one row per effect, in effect order, with the
+ * number and the explainer already worded so a renderer prints and never derives. Rows
+ * are plain data (`{verb, status?, amount, num, label, explain}` plus `hits` on a folded
+ * multi-hit damage run): JSON-safe, publishable in any snapshot.
+ *
+ * Repeated identical damage effects are folded onto `hits` (Pummel's four `{damage,2}`
+ * entries read as ONE "2×4" chip, the same fold describeCard applies to its sentence), and
+ * `custom` verbs emit NO row — their meaning is bespoke, so the card's own sentence speaks
+ * for them (see chipsCover).
+ *
+ * `fold` is the live-combat context (snapshotHand's PARITY numbers): a damage chip's
+ * number goes through the SAME resolvers the sentence fold uses (playerStrike for
+ * Strength/Weak, then vulnerableAmplify when `fold.vuln`), a block chip through
+ * blockGain, and both explain re-worded with the landed number — so a chip can never
+ * promise a number the play will not land. A clean fold leaves every chip byte-identical
+ * to the printed one.
+ * @param {any} def card definition from content (cards.json shape)
+ * @param {string} [lang] 'en' (default) or 'es'
+ * @param {{strength?: number, weak?: number, dexterity?: number, vuln?: boolean}} [fold]
+ *        live-combat fold numbers, or null for the printed card
+ * @returns {Array<object>} one chip per chip-expressible effect
+ */
+export function cardChips(def, lang = 'en', fold = null) {
+  if (!def || !Array.isArray(def.effects)) return [];
+  // The effect's target scope, resolved the SAME way TEMPLATES resolves its `who` (the
+  // effect's own `target` first, the definition's for an unset one), so a chip's words
+  // and the dropped sentence can never disagree about who is hit. `custom` effects skip
+  // all of this — they take no chip at all.
+  const scopeOf = (e) => (e.target === 'all_enemies' ? 'all_enemies'
+    : (e.target === 'random_enemy' || (!e.target && def.target === 'random_enemy')) ? 'random_enemy' : null);
+  const out = [];
+  for (const e of foldRepeatedDamage(def.effects)) {
+    if (e.verb === 'status' && e.status) {
+      const self = e.to === 'self' || e.to === 'player';
+      const side = self ? 'player' : 'enemy';
+      // The scope rides only on an APPLIED status (the applicator's "to ALL enemies");
+      // a granted one speaks in the player's own voice and has no target to name.
+      const who = self ? null : (e.target === 'all_enemies' ? 'all_enemies' : null);
+      out.push({
+        verb: 'status',
+        status: e.status,
+        amount: e.amount,
+        num: `+${e.amount}`,
+        label: statusName(e.status, lang),
+        explain: describeVerbChip('status', e.status, e.amount, lang, side, 1, who),
+      });
+    } else if (CHIP_NUMBER[e.verb]) {
+      const hits = e.hits ?? 1;
+      // The printed chip number (the compact conventions: +N for gains, N×hits) and the
+      // number the explain words. The PARITY fold — the same math the sentence's rider
+      // runs — moves BOTH only for the verbs a live state can move (damage, block), so
+      // the icon's number and the hidden-or-shown sentence never disagree about what
+      // lands; a clean fold leaves both byte-identical to the printed card.
+      let n = e.amount;
+      let num = CHIP_NUMBER[e.verb](e);
+      if (fold) {
+        if (e.verb === 'damage') {
+          n = playerStrike(e.amount, { statuses: { strength: fold.strength ?? 0, weak: fold.weak ?? 0 } });
+          if (fold.vuln) n = vulnerableAmplify(n);
+          num = hits > 1 ? `${n}×${hits}` : String(n);
+        } else if (e.verb === 'block') {
+          n = blockGain(e.amount, fold.dexterity ?? 0);
+          num = String(n);
+        }
+      }
+      out.push({
+        verb: e.verb,
+        amount: e.amount,
+        ...(hits > 1 ? { hits } : {}),
+        num,
+        label: chipVerbLabel(e.verb, lang),
+        explain: describeVerbChip(e.verb, null, n, lang, 'player', hits, scopeOf(e)),
+      });
+    }
+    // Unknown verbs fall out silently here — chipsCover below is what reports the gap,
+    // so the renderer keeps the sentence instead of guessing an icon.
+  }
+  return out;
+}
+
+/**
+ * Whether EVERY effect of a card is chip-expressible: the flag that lets a tile drop the
+ * visible sentence without losing information (the chips + popovers say it all, and the
+ * full sentence stays in the tile's title and aria-label). A `custom` verb, an unknown
+ * verb, or an empty effect list keeps the sentence — nothing is ever lost to the icons.
+ * @param {any} def card definition
+ * @returns {boolean}
+ */
+export function chipsCover(def) {
+  if (!def || !Array.isArray(def.effects) || def.effects.length === 0) return false;
+  return foldRepeatedDamage(def.effects).every((e) => e.verb === 'status'
+    || (Object.prototype.hasOwnProperty.call(CHIP_NUMBER, e.verb)));
+}
+
 /** One-line description of a card type, for tiles and the help panel. */
 export function describeCardType(type, lang = 'en') {
   if (langOf(lang) === 'es') {
@@ -342,25 +555,69 @@ const CUSTOM_SENTENCE_ES = {
  * (src/kernel/rules/vocabulary.js: damage, block, draw, energy, status, discard,
  * exhaust, custom) — one template TABLE per language, keyed by the same verb.
  *
- * `amount` is the printed card number; Strength and Dexterity are added at play time and
- * are deliberately NOT folded in here (the card cannot know your counters, and the status
- * pills already explain those).
+ * `amount` is the printed card number. Strength, Weak, Dexterity and the target's
+ * Vulnerable ARE folded in — but never silently: a combat-phase caller (snapshotHand)
+ * passes a `fold` context derived from the LIVE state through the SAME resolver helpers
+ * the rules use (`playerStrike`, `vulnerableAmplify`, `blockGain`), and the template
+ * prints the folded number as an explicit rider after the printed one, so the card can
+ * never disagree with what the engine will land. A collection surface (codex, deck
+ * sheet, shop, reward) passes no context and keeps the printed card. The status pills
+ * still explain WHY the number moved.
  * @param {any} effect one entry of a card definition's `effects` array
  * @param {any} def the card definition the effect belongs to
  * @param {string} [lang] 'en' (default) or 'es'
+ * @param {{strength: number, weak: number, dexterity: number, vuln: boolean}} [fold]
+ *        live-combat fold numbers, or null for the printed card
  * @returns {string} a complete sentence
  */
+/**
+ * The em-dash clause a folded damage sentence carries — the SAME per-hit number the
+ * resolution will land, spelled with its reason. The per-hit fold goes through
+ * `playerStrike` itself (add Strength, then Weak ×3/4 floored), so the preview number
+ * has exactly one source. `allowVuln` is the unambiguity gate: the ×3/2 folds into ONE
+ * number only when every hit lands on the same vulnerable body — a single target, or an
+ * AOE whose fold context says exactly one enemy is alive and Vulnerable (`fold.vuln`).
+ * A mixed target set (Reaper over healthy neighbours) still refuses the clause.
+ * @param {any} fold live-combat fold context (plain numbers)
+ * @param {number} printed the effect's printed amount
+ * @param {string} lang
+ * @param {boolean} [allowVuln]
+ * @returns {string} '' when nothing would change
+ */
+function damageRider(fold, printed, lang, allowVuln = true) {
+  const es = langOf(lang) === 'es';
+  const per = playerStrike(printed, { statuses: { strength: fold.strength, weak: fold.weak } });
+  const parts = [];
+  if (fold.strength > 0 && fold.weak > 0) parts.push(es ? `${per} con Fuerza ${fold.strength} y Débil` : `${per} with Strength ${fold.strength} and Weak`);
+  else if (fold.strength > 0) parts.push(es ? `${per} con Fuerza ${fold.strength}` : `${per} with Strength ${fold.strength}`);
+  else if (fold.weak > 0) parts.push(es ? `${per} con Débil` : `${per} with Weak`);
+  if (allowVuln && fold.vuln) parts.push(es ? `${vulnerableAmplify(per)} contra Vulnerable` : `${vulnerableAmplify(per)} against Vulnerable`);
+  return parts.join(', ');
+}
+
 const TEMPLATES = {
   en: {
-    damage: (e, def) => {
+    damage: (e, def, f) => {
       const hits = e.hits ?? 1;
       const who = e.target === 'all_enemies'
         ? 'ALL enemies'
         : def.target === 'random_enemy' ? 'a random enemy' : 'the enemy';
-      if (hits > 1) return `Deal ${e.amount} damage to ${who} ${hits} times.`;
-      return `Deal ${e.amount} damage to ${who}.`;
+      const core = hits > 1 ? `Deal ${e.amount} damage to ${who} ${hits} times` : `Deal ${e.amount} damage to ${who}`;
+      if (f) {
+        // Unambiguous amplification only: a single target, or the fold's word that every
+        // hit lands on the one vulnerable body (`fold.vuln`); a mixed set stays silent.
+        const rider = damageRider(f, e.amount, 'en', e.target !== 'all_enemies' || f.vuln);
+        if (rider) return `${core} — ${rider}${hits > 1 ? ' per hit' : ''}.`;
+      }
+      return `${core}.`;
     },
-    block: (e) => `Gain ${e.amount} Block.`,
+    block: (e, _def, f) => {
+      if (f) {
+        const n = blockGain(e.amount, f.dexterity);
+        if (n !== e.amount) return `Gain ${e.amount} (${n}) Block.`;
+      }
+      return `Gain ${e.amount} Block.`;
+    },
     draw: (e) => `Draw ${plural(e.amount, 'card', 'cards')}.`,
     energy: (e) => `Gain ${e.amount} Energy.`,
     status: (e) => {
@@ -383,21 +640,32 @@ const TEMPLATES = {
     // The engine caps the restore at maxHp (rules/vocabulary.js), so "up to" is the
     // honest wording — a full-HP play restores nothing.
     heal: (e) => `Restore up to ${e.amount} HP.`,
-    retain: () => 'Retain this card — it stays in your hand when your turn ends.',
+    retain: () => 'Retain this card — playing it returns it to your hand after its effects resolve, and it stays in your hand when your turn ends.',
     custom: (e) => CUSTOM_SENTENCE[e.handler] ?? `Special effect (${e.handler}).`,
   },
   es: {
-    damage: (e, def) => {
+    damage: (e, def, f) => {
       const hits = e.hits ?? 1;
       // The target phrase carries its own preposition: Spanish contracts "a el" into
       // "al", so each form is written whole ("al enemigo", "a TODOS los enemigos").
       const who = e.target === 'all_enemies'
         ? 'a TODOS los enemigos'
         : def.target === 'random_enemy' ? 'a un enemigo al azar' : 'al enemigo';
-      if (hits > 1) return `Infliges ${e.amount} de daño ${who} ${hits} veces.`;
-      return `Infliges ${e.amount} de daño ${who}.`;
+      const core = hits > 1 ? `Infliges ${e.amount} de daño ${who} ${hits} veces` : `Infliges ${e.amount} de daño ${who}`;
+      if (f) {
+        // Misma regla de no ambigüedad que la plantilla inglesa (ver su comentario).
+        const rider = damageRider(f, e.amount, 'es', e.target !== 'all_enemies' || f.vuln);
+        if (rider) return `${core} — ${rider}${hits > 1 ? ' por golpe' : ''}.`;
+      }
+      return `${core}.`;
     },
-    block: (e) => `Ganas ${e.amount} de Bloqueo.`,
+    block: (e, _def, f) => {
+      if (f) {
+        const n = blockGain(e.amount, f.dexterity);
+        if (n !== e.amount) return `Ganas ${e.amount} (${n}) de Bloqueo.`;
+      }
+      return `Ganas ${e.amount} de Bloqueo.`;
+    },
     draw: (e) => `Robas ${pluralEs(e.amount, 'carta', 'cartas')}.`,
     energy: (e) => `Ganas ${e.amount} de Energía.`,
     status: (e) => {
@@ -416,16 +684,16 @@ const TEMPLATES = {
     discard: (e) => `Descartas ${pluralEs(e.amount, 'carta', 'cartas')} al azar.`,
     exhaust: () => 'Agotas esta carta por el resto del combate.',
     heal: (e) => `Restauras hasta ${e.amount} HP.`,
-    retain: () => 'Retienes esta carta: se queda en tu mano cuando termina tu turno.',
+    retain: () => 'Retienes esta carta: al jugarla vuelve a tu mano tras resolver sus efectos, y se queda en tu mano cuando termina tu turno.',
     custom: (e) => CUSTOM_SENTENCE_ES[e.handler] ?? CUSTOM_SENTENCE[e.handler] ?? `Special effect (${e.handler}).`,
   },
 };
 
-export function describeEffect(effect, def = {}, lang = 'en') {
+export function describeEffect(effect, def = {}, lang = 'en', fold = null) {
   const table = TEMPLATES[langOf(lang)] ?? TEMPLATES.en;
   const fn = table[effect.verb];
   if (!fn) return `Unknown effect (${effect.verb}).`;
-  return fn(effect, def);
+  return fn(effect, def, fold);
 }
 
 /* ------------------------------------------------------------------ card describe */
@@ -456,6 +724,43 @@ function foldRepeatedDamage(effects) {
 }
 
 /**
+ * Folded sentences for the `custom` handlers whose engine bodies fold player Strength
+ * (and the target's Vulnerable) through playerStrike/damageEnemy — rules/effects/index.js.
+ * Each returns null when no number would move, so the static CUSTOM_SENTENCE keeps
+ * rendering byte-identically for a clean state.
+ * @param {any} e the custom effect entry
+ * @param {any} instance the hand instance (Rampage's perPlay bonus)
+ * @param {{strength: number, weak: number, dexterity: number, vuln: boolean}} fold
+ * @param {string} lang
+ * @returns {string|null}
+ */
+function customFold(e, instance, fold, lang) {
+  const es = langOf(lang) === 'es';
+  switch (e.handler) {
+    case 'hemokinesis': {
+      const rider = damageRider(fold, 15, lang, true);
+      return rider ? (es ? `Pierdes 2 HP. Infliges 15 de daño — ${rider}.` : `Lose 2 HP. Deal 15 damage — ${rider}.`) : null;
+    }
+    case 'reaper': {
+      // AOE obeys the same unambiguity gate as the plain verbs: the Vulnerable clause
+      // speaks only when the fold says every hit lands on the one vulnerable body
+      // (`fold.vuln`); over a mixed set the amplification is not one number, so it drops.
+      const rider = damageRider(fold, 4, lang, fold.vuln);
+      return rider ? (es ? `Infliges 4 de daño a TODOS los enemigos — ${rider} a cada uno.` : `Deal 4 damage to ALL enemies — ${rider} each.`) : null;
+    }
+    case 'rampage': {
+      const base = 8 + (instance?.perPlay ?? 0);
+      const rider = damageRider(fold, base, lang, true);
+      if (!rider) return null;
+      const growth = instance?.perPlay ? (es ? ' (+5 más cada vez que la juegas)' : ' (+5 more each time you play it)') : '';
+      return es ? `Infliges ${base} de daño${growth} — ${rider}.` : `Deal ${base} damage${growth} — ${rider}.`;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
  * Plain-language description of a card, as a human would read it aloud.
  *
  * `Hammerfall` -> "Deal 6 damage to the enemy." / "Infliges 6 de daño al enemigo."
@@ -465,21 +770,34 @@ function foldRepeatedDamage(effects) {
  * @param {{perPlay?: number}} [instance] runtime instance, when one is available:
  *   Rampage's damage depends on how often it has been played this run.
  * @param {string} [lang] 'en' (default) or 'es'
+ * @param {{strength: number, weak: number, dexterity: number, vuln: boolean}} [fold]
+ *        live-combat fold numbers (snapshotHand only); omitted/null keeps the printed card
  * @returns {string} at least one complete sentence, never empty
  */
-export function describeCard(def, instance = {}, lang = 'en') {
+export function describeCard(def, instance = {}, lang = 'en', fold = null) {
   if (!def || !Array.isArray(def.effects)) {
     return langOf(lang) === 'es' ? 'Sin descripción disponible.' : 'No description available.';
   }
   const effects = foldRepeatedDamage(def.effects);
   const parts = effects.map((e) => {
-    // Rampage is the one handler whose numbers move with the instance.
+    // Live-combat fold for the Strength-folding custom handlers; null keeps the static
+    // sentence so a clean state renders byte-identically to the printed card. This runs
+    // BEFORE Rampage's instance early return below: once its first play moves the number,
+    // the grown sentence must still carry the same Strength/Weak/Vulnerable rider as the
+    // plain verbs — returning early would drop the fold the moment it had something to say.
+    if (e.verb === 'custom' && fold) {
+      const folded = customFold(e, instance, fold, lang);
+      if (folded) return folded;
+    }
+    // Rampage is the one handler whose numbers move with the instance. Without a fold
+    // (collection surfaces — codex, deck sheet) there is no combat to read, but the
+    // grown base is still the card's true number, so it prints the moved sentence.
     if (e.verb === 'custom' && e.handler === 'rampage' && instance.perPlay) {
       return langOf(lang) === 'es'
         ? `Infliges ${8 + instance.perPlay} de daño (+5 más cada vez que la juegas).`
         : `Deal ${8 + instance.perPlay} damage (+5 more each time you play it).`;
     }
-    return describeEffect(e, def, lang);
+    return describeEffect(e, def, lang, fold);
   });
   return parts.map(sentence).join(' ');
 }
@@ -694,7 +1012,7 @@ const GLOSSARY_CORE = {
     glossRow('d', 'Discard', 'Discard that many cards from your hand (lower case d, to keep it apart from Draw).'),
     glossRow('EXH', 'Exhaust', 'The card leaves the fight for good — it does not come back in a reshuffle.'),
     glossRow('H', 'Heal', 'Restore that much HP, never past your maximum. A card played at full HP restores nothing.'),
-    glossRow('RTN', 'Retain', 'The card stays in your hand when your turn ends, instead of being discarded. It keeps staying until you play or discard it.'),
+    glossRow('RTN', 'Retain', 'The card stays in your hand when your turn ends, instead of being discarded — and playing it returns it to your hand after its effects resolve.'),
     glossRow('+', 'grows', 'A plus after an ATTACK or BLOCK value means the number grows: each time you play the card, or each turn while a power lasts.'),
     // Status and power names: the B group.
     glossRow('HP', 'Your HP', 'Lose that much HP. This is a COST you pay, not healing: it ignores Block and never drops you below 1 HP.', 'B'),
@@ -712,7 +1030,7 @@ const GLOSSARY_CORE = {
     glossRow('d', 'Descarte', 'Descartas esa cantidad de cartas de tu mano (d minúscula, para no confundirla con Robo).'),
     glossRow('EXH', 'Agotar', 'La carta sale del combate para siempre: no vuelve en un rebarajado.'),
     glossRow('H', 'Curar', 'Recuperas esa cantidad de HP, nunca más allá de tu máximo. Una carta jugada con todo el HP no recupera nada.'),
-    glossRow('RTN', 'Retener', 'La carta se queda en tu mano cuando termina tu turno, en vez de descartarse. Sigue ahí hasta que la juegues o la descartes.'),
+    glossRow('RTN', 'Retener', 'La carta se queda en tu mano cuando termina tu turno, en vez de descartarse — y al jugarla vuelve a tu mano tras resolver sus efectos.'),
     glossRow('+', 'crece', 'Un signo + tras un valor de ATAQUE o BLOQUEO significa que el número crece: cada vez que juegas la carta, o cada turno mientras dure un poder.'),
     // Status and power names: the B group.
     glossRow('HP', 'Tu HP', 'Pierdes esa cantidad de HP. Es un COSTE que pagas, no curación: ignora el Bloqueo y nunca te deja por debajo de 1 HP.', 'B'),
@@ -808,7 +1126,7 @@ export function helpTopics(lang = 'en') {
  * @param {{cost?: number, perPlay?: number, playable?: boolean}} [instance]
  * @param {number} [energy]
  * @param {string} [lang]
- * @returns {{name: string, cost: number, type: string, typeLabel: string, blurb: string, description: string, compact: string, compactLabel: string, hint: string}}
+ * @returns {{name: string, cost: number, type: string, typeLabel: string, blurb: string, description: string, compact: string, compactLabel: string, hint: string, chips: Array<object>, chipsComplete: boolean}}
  */
 export function describeTile(def, instance = {}, energy = 0, lang = 'en') {
   const es = langOf(lang) === 'es';
@@ -823,5 +1141,12 @@ export function describeTile(def, instance = {}, energy = 0, lang = 'en') {
     compact: effectSummary(def),
     compactLabel: es ? 'Forma compacta (lo que imprime el CLI)' : 'Compact form (what the CLI prints)',
     hint: describePlayability({ cost, playable: instance.playable ?? true }, energy, lang),
+    // The effect-chip row rides the same fact bundle, so a surface that builds tiles from
+    // describeTile alone (the cardDescribe read-only fact layer) gets the same kernel-
+    // worded icons the snapshot rows carry. The chips read the PLAIN definition: this
+    // bundle has no temper view — a tempered tile's row comes from snapshotDeck, whose
+    // builder does the tempering and words its own chips.
+    chips: cardChips(def, lang),
+    chipsComplete: chipsCover(def),
   };
 }

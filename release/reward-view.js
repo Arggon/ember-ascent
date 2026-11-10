@@ -8,7 +8,7 @@ import { cardTile } from './combat-view.js';
 import { consumeClick } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
-import { glyphBox } from './glyphs.js';
+import { glyphBox, RELIC_GLYPH } from './glyphs.js';
 import { t } from './i18n.js';
 
 export function rewardView() {
@@ -45,7 +45,10 @@ export function rewardView() {
   const gained = snap.reward.relicGained;
   if (gained) {
     head.append(el('span', { cls: 'reward-relic', attrs: { title: t('reward.relic.title', { name: gained.name, text: gained.text || t('relics.unknown') }) } },
-      glyphBox('relic', 'coin-glyph'),
+      // The chip wears the relic's OWN mark (the small chip restyling of the same art the
+      // offer tiles draw); an unknown id keeps the generic `relic` heart. Decorative: the
+      // relic's name and the kernel sentence ride beside it / in the title.
+      glyphBox(RELIC_GLYPH[gained.relicId] || 'relic', 'coin-glyph boon-glyph'),
       el('span', { text: gained.name }),
     ));
   }
@@ -96,9 +99,16 @@ export function rewardView() {
     // an already-held relic), and a null-id offer renders INERT with its raw name rather
     // than promising a click the engine would reject.
     const list = el('div', { cls: 'boon-list' + (arriving.reward ? ' reveal' : '') });
+    // The tier hue lives on the FRAME only (style.css .tier-*): the offer's own snapshot
+    // `tier` colours the border; the art inside stays the one forged-iron palette. An
+    // unknown tier (a torn id) matches no row and takes the neutral frame. The classes are
+    // simple literals in this table rather than an inline ternary in the cls value — the
+    // surface-art checker reads EVERY quoted fragment of a cls value, so the comparison
+    // operands ('common', 'rare', …) would be miscounted as class names there.
+    const TIER_CLASSES = { common: ' tier-common', uncommon: ' tier-uncommon', rare: ' tier-rare' };
     for (const o of snap.reward.relicOffers) {
       list.append(el('button', {
-        cls: 'boon relic-offer' + (o.actionId ? '' : ' inert'),
+        cls: 'boon relic-offer' + (o.actionId ? '' : ' inert') + (TIER_CLASSES[o.tier] ?? ''),
         attrs: {
           type: 'button',
           ...(o.actionId ? { 'data-action': o.actionId } : {}),
@@ -107,6 +117,9 @@ export function rewardView() {
         },
         ...(o.actionId ? { on: { click: (ev) => { consumeClick(ev); act(o.actionId); } } } : {}),
       },
+      // The relic's own large art (RELIC_GLYPH), decorative — the name and the kernel
+      // sentence carry the meaning. An unknown id degrades to the generic plate.
+      glyphBox(RELIC_GLYPH[o.relicId] || 'r-unknown', 'boon-art'),
       el('span', { cls: 'boon-name', text: o.name }),
       keywordText(el('span', { cls: 'boon-text' }), o.text || t('reward.unknownRelic')),
       ));
@@ -134,7 +147,9 @@ export function rewardView() {
     // The reward tile's own action: taking a card, not playing one. Marked with `data-action`
     // so the hotkey handler can also reach it.
     const tile = cardTile(
-      { slot: c.actionId, cardId: c.cardId, name: c.name, flavor: c.flavor, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, playable: true, showSummary: false },
+      // `chips` rides the reward row verbatim (snapshotReward words it off the same def
+      // the hand would) — a card picked from a reward wears the icons it will wear in hand.
+      { slot: c.actionId, cardId: c.cardId, name: c.name, flavor: c.flavor, cost: c.cost, type: c.type, typeLabel: c.typeLabel, summary: c.summary, description: c.description, hint: c.hint, chips: c.chips ?? [], chipsComplete: c.chipsComplete === true, playable: true, showSummary: false },
       { actionId: c.actionId, onClick: (ev) => { consumeClick(ev); act(c.actionId); } },
     );
     row.append(tile);

@@ -1,8 +1,9 @@
 // src/web/rest-view.js — the rest site: heal, move on, or temper a card at the forge.
 
 import { arriving, snap } from './runtime.js';
-import { el, keywordText, sceneIllus } from './dom.js';
+import { el, sceneIllus } from './dom.js';
 import { act } from './actions.js';
+import { temperPickTile } from './event-view.js';
 import { page } from './page-frame.js';
 import { t } from './i18n.js';
 
@@ -26,21 +27,17 @@ export function restView() {
     el('button', { cls: 'btn', text: t('rest.heal', { n: snap.rest.heal }), attrs: { type: 'button' }, on: { click: () => act(snap.rest.healId) } }),
     el('button', { cls: 'btn secondary', text: t('rest.moveOn'), attrs: { type: 'button' }, on: { click: () => act(snap.rest.leaveId) } }),
   ));
-  // B2: or temper one card instead of healing. Offers and sentences come from the kernel.
+  // B2: or temper one card instead of healing. The offers render as the GAME'S tempered
+  // card tiles — the smith's event modal shares this exact builder (event-view's
+  // temperPickTile; the comment there carries the reward-pick wiring) — and the faces
+  // come from the ONE kernel publisher (observe.js temperedCardRow), so the forge can
+  // never disagree with the wayside about what a temper produces.
   const tempers = snap.rest.tempers || [];
   if (tempers.length > 0) {
     wrap.classList.add('has-tempers');
     wrap.append(el('p', { cls: 'temper-head', text: t('rest.temperHead') }));
-    const list = el('div', { cls: 'boon-list temper-list' });
-    for (const offer of tempers) {
-      list.append(el('button', {
-        cls: `boon temper-offer temper-${offer.temper}`,
-        attrs: { type: 'button', 'data-action': offer.actionId, 'aria-label': t('rest.temper.aria', { name: offer.cardName, text: offer.text }) },
-        on: { click: () => act(offer.actionId) },
-      },
-      el('span', { cls: 'boon-name', text: `${offer.cardName} · ${offer.temperName}` }),
-      keywordText(el('span', { cls: 'boon-text' }), offer.text.split(': ').slice(1).join(': '))));
-    }
+    const list = el('div', { cls: 'event-cards temper-list' });
+    for (const offer of tempers) list.append(temperPickTile(offer));
     wrap.append(list);
   }
   return page('rest', t('page.rest'), 'flame', 'panel', [wrap]);

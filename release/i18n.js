@@ -7,11 +7,13 @@
 // through `ctl.snapshot({ lang })` — this module only decides WHICH language that is and
 // stores it. A game rule never lives here.
 //
-// THE LANGUAGE IS A SURFACE CHOICE: it persists in localStorage (`dlb.lang`, 'en'
-// default) and switches `document.documentElement.lang` with it. It never enters run
-// state, the save format or the action log — a save loads in either language, and the
-// kernel's compact dump stays English-only in both (the agent-facing contract, pinned
-// by the goldens).
+// THE LANGUAGE IS A SURFACE CHOICE: an explicit choice persists in localStorage
+// (`dlb.lang`, written ONLY by setLang) and switches `document.documentElement.lang`
+// with it. Until then the browser's own locale decides the in-memory default and
+// NOTHING is written (readLang below) — the tour's language pre-step and the HUD toggle
+// are the only writers. It never enters run state, the save format or the action log —
+// a save loads in either language, and the kernel's compact dump stays English-only in
+// both (the agent-facing contract, pinned by the goldens).
 //
 // FALLBACK HONESTY: `t()` resolves es -> en per key, so a missing Spanish string
 // renders its English twin — never a key name, never an empty node. The `i18n` unit
@@ -28,10 +30,26 @@ export const LANG_KEY = 'dlb.lang';
 /** The languages the surface offers, in display order (the toggle walks this list). */
 export const LANGUAGES = Object.freeze(['en', 'es']);
 
-function readLang() {
+/** The BROWSER decides the default while no explicit choice exists: a navigator whose
+ *  primary language starts with 'es' reads Spanish, anything else English. Guarded for
+ *  hosts without a navigator (the unit harness — undefined reads 'en', the historic
+ *  default), and case-insensitive ('es-ES', 'es-MX', 'ES' all match). */
+function browserLang() {
   try {
-    return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en';
-  } catch { /* private mode */ return 'en'; }
+    return String(navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+  } catch { /* no navigator in a narrow host */ return 'en'; }
+}
+
+function readLang() {
+  let stored = null;
+  try { stored = localStorage.getItem(LANG_KEY); } catch { /* private mode */ }
+  // An EXPLICIT choice (either value; only setLang writes here) always wins — a Spanish
+  // browser that picked English stays English on every boot.
+  if (stored === 'es' || stored === 'en') return stored;
+  // Nothing chosen yet: the browser's locale decides the IN-MEMORY default and nothing
+  // is written — the explicit choice (the tour's language step, or the HUD toggle) is
+  // the only writer, so an un-chosen browser can still be asked (ONBOARDING-TOUR).
+  return browserLang();
 }
 
 let lang = readLang();
@@ -60,6 +78,21 @@ export function setLang(next) {
     localStorage.setItem(LANG_KEY, lang);
   } catch { /* private mode */ }
   applyDocumentLang();
+}
+
+/**
+ * Whether the player has made an EXPLICIT language choice (the key holds a value this
+ * module writes). The tour's language pre-step shows only while this is false — a
+ * replaying veteran or a toggle user never sees it (ONBOARDING-TOUR spec). A host whose
+ * storage refuses reads reads CHOSEN, the tour.js read() convention: an un-persistable
+ * choice must not re-ask on every boot.
+ * @returns {boolean}
+ */
+export function langChosen() {
+  try {
+    const stored = localStorage.getItem(LANG_KEY);
+    return stored === 'es' || stored === 'en';
+  } catch { /* private mode */ return true; }
 }
 
 /* ------------------------------------------------------------------ the dictionary
@@ -92,21 +125,21 @@ const STRINGS = {
   'lang.toggle.title': { en: 'Switch the interface to Spanish', es: 'Cambiar la interfaz al inglés' },
   'lang.toggle.aria': { en: 'Language / Idioma', es: 'Language / Idioma' },
 
-  /* ---- relics chip ----------------------------------------------------- */
-  'relics.none': { en: 'Relics: none held yet — elites always drop one, and the warden offers three.', es: 'Reliquias: aún no llevas ninguna — un élite siempre suelta una, y el guardián ofrece tres.' },
+  /* ---- relics ---------------------------------------------------------- */
+  // The HUD's relic chip is gone (relics act through hooks, never clicks); these two
+  // survive because the reward heads still speak them for a torn save's unknown id.
   'relics.unknown': { en: 'unknown relic', es: 'reliquia desconocida' },
   'relics.unknownId': { en: ' (unknown relic id in this save)', es: ' (id de reliquia desconocido en esta partida)' },
-  'relics.aria': { en: 'Relics: {n} held: {names}', es: 'Reliquias: {n} en tu poder: {names}' },
 
   /* ---- potion belt ----------------------------------------------------- */
+  // The belt paints in combat only (renderHud's phase guard), so every slot row is the
+  // quaff/discard button shape — no inert-readout strings exist.
   'belt.aria': { en: 'Potion belt: {n} of {m}', es: 'Cinturón de pociones: {n} de {m}' },
   'belt.slot.empty': { en: 'Potion slot {n}: empty', es: 'Espacio de poción {n}: vacío' },
   'belt.unknown': { en: 'unknown potion', es: 'poción desconocida' },
   'belt.unknownId': { en: ' (unknown potion id in this save)', es: ' (id de poción desconocido en esta partida)' },
   'belt.click': { en: ' — click for quaff / discard', es: ' — haz clic para beber o descartar' },
-  'belt.combatOnly': { en: ' — quaff and discard work in combat only', es: ' — beber y descartar funcionan solo en combate' },
   'belt.slot.aria': { en: 'Potion slot {n}: {name}. Open quaff or discard.', es: 'Espacio de poción {n}: {name}. Abre beber o descartar.' },
-  'belt.slot.inert.aria': { en: 'Potion slot {n}: {name}', es: 'Espacio de poción {n}: {name}' },
   'belt.panel.aria': { en: 'Potion', es: 'Poción' },
   'belt.panel.title': { en: '{name}: quaff or discard', es: '{name}: beber o descartar' },
   'belt.panel.unknownText': { en: 'An unknown potion — its id is not in this build’s table. Discard it to free the slot.', es: 'Una poción desconocida: su id no está en la tabla de esta versión. Descártala para liberar el espacio.' },
@@ -160,6 +193,8 @@ const STRINGS = {
   'card.needsEnergy': { en: 'needs more Energy', es: 'falta Energía' },
   'card.notPlayable': { en: 'Not playable: not enough Energy.', es: 'No jugable: no hay Energía suficiente.' },
   'card.costs': { en: 'Costs {n} Energy.', es: 'Cuesta {n} de Energía.' },
+  // The effect-chip row's group label (each chip's own sentence is kernel copy).
+  'card.effects': { en: 'Card effects', es: 'Efectos de la carta' },
 
   /* ---- combat --------------------------------------------------------------- */
   'busy.play.tile': { en: 'the last card is landing', es: 'la última carta está cayendo' },
@@ -410,6 +445,40 @@ const STRINGS = {
   'relicThreshold.verb': { en: 'crossed', es: 'cruzaron' },
   'relicThreshold.verb1': { en: 'crossed', es: 'cruzó' },
   'relicThreshold.marksClausePlural': { en: 'the', es: 'las marcas de' },
+
+  /* ---- product tour (ONBOARDING-TOUR) ---------------------------------- */
+  // While the tour is open the surface's keyboard guard swallows every game shortcut
+  // (app.js's tour guard, ONBOARDING-TOUR §5.4), so the combat steps (4-6 of 6) name
+  // the CLICK path and say the keys come back when the tour ends — teaching a swallowed
+  // shortcut on the exact screen it is swallowed on teaches nothing.
+  'tour.title': { en: 'First steps at the forge', es: 'Primeros pasos en la forja' },
+  'tour.stepOf': { en: 'Step {n} of {m}', es: 'Paso {n} de {m}' },
+  'tour.next': { en: 'Next', es: 'Siguiente' },
+  'tour.back': { en: 'Back', es: 'Atrás' },
+  'tour.done': { en: 'Done — climb', es: 'Listo — a escalar' },
+  'tour.skip': { en: 'Skip the tour  (Esc)', es: 'Saltar el recorrido  (Esc)' },
+  'tour.replay': { en: 'Replay the guided tour', es: 'Repetir el recorrido guiado' },
+  'tour.replay.title': { en: 'Six short steps over the real screens', es: 'Seis pasos cortos sobre las pantallas reales' },
+  // Review round 2: the hero/path pick got its OWN step, so the kindling step's copy is
+  // the boon alone. The heroes body leads with the click and then names the arrows —
+  // which DO teach under the open tour: kindling-view's radiogroup keydown stops
+  // propagation for the keys it handles, so an arrow on a focused pick switches it
+  // WITHOUT reaching the tour guard's ←/→ (app.js) and never steps the tour off its own
+  // subject (its review round 1 measured the double action and this is its fix).
+  'tour.hint.kindling': { en: 'Take a boon to continue — the tour follows.', es: 'Toma un rescoldo para continuar — el recorrido te sigue.' },
+  'tour.hint.map': { en: 'Travel to a glowing node to continue — the tour follows.', es: 'Viaja a un nodo brillante para continuar — el recorrido te sigue.' },
+  'tour.step.heroes.title': { en: 'Your hero and your path', es: 'Tu héroe y tu camino' },
+  'tour.step.heroes.body': { en: 'Choose a hero and a path: click a portrait or a path name — the arrows switch them too, once a pick has focus. The choice rebuilds the run.', es: 'Elige un héroe y un camino: haz clic en un retrato o en el nombre de un camino — las flechas también los cambian, cuando una opción tiene el foco. La elección reconstruye la partida.' },
+  'tour.step.kindling.title': { en: 'The kindling', es: 'El rescoldo' },
+  'tour.step.kindling.body': { en: 'Take exactly one below: each gift has a price, and taking it starts the ascent.', es: 'Toma exactamente uno abajo: cada regalo tiene un precio, y tomarlo inicia el ascenso.' },
+  'tour.step.map.title': { en: 'The ascent map', es: 'El mapa del ascenso' },
+  'tour.step.map.body': { en: 'You climb floor by floor: click a glowing node to travel. Fights pay cards, the campfire heals, the Slag Warden waits at the top — you can only reach the nodes linked to your floor.', es: 'Subes piso a piso: haz clic en un nodo brillante para viajar. Las peleas pagan cartas, la hoguera cura, y el Guardián de Escoria espera arriba — solo puedes alcanzar los nodos enlazados a tu piso.' },
+  'tour.step.hand.title': { en: 'Your hand and your Energy', es: 'Tu mano y tu Energía' },
+  'tour.step.hand.body': { en: 'Click a card to play it. The orb counts the Energy left this turn — every card costs its gem, and the hand refills each turn. (Number keys come back when the tour ends.)', es: 'Haz clic en una carta para jugarla. El orbe cuenta la Energía que queda este turno — cada carta cuesta su gema, y la mano se rellena cada turno. (Las teclas de número vuelven cuando termina el recorrido.)' },
+  'tour.step.intent.title': { en: 'What the enemy intends', es: 'Lo que el enemigo pretende' },
+  'tour.step.intent.body': { en: 'The row over each enemy announces its next move — a number is damage headed your way. Read it before you spend the turn: the enemy acts the moment you end the turn.', es: 'La fila sobre cada enemigo anuncia su próximo movimiento — un número es daño que viene hacia ti. Léelo antes de gastar el turno: el enemigo actúa en cuanto termines el turno.' },
+  'tour.step.endTurn.title': { en: 'End the turn', es: 'Termina el turno' },
+  'tour.step.endTurn.body': { en: 'When the Energy is spent or the plan is set, click End Turn. The enemies act, then a fresh hand is dealt. That is the whole loop: play, end, climb. (The e and Space keys come back when the tour ends.)', es: 'Cuando gastes la Energía o el plan esté listo, haz clic en Terminar turno. Los enemigos actúan y llega una mano nueva. Ese es todo el bucle: jugar, terminar, escalar. (Las teclas e y Espacio vuelven cuando termina el recorrido.)' },
 };
 
 /**

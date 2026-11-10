@@ -19,6 +19,7 @@ import { cardPool } from './src/kernel/index.js';
 import { inDeckCounts } from './deck-counts.js';
 import { currentLang, t } from './i18n.js';
 import { switchLang } from './actions.js';
+import { startTour, HELP_SEEN_KEY } from './tour.js';
 
 /* ------------------------------------------------------------------------- HUD */
 
@@ -47,17 +48,22 @@ export function renderHud() {
   // the browser can never disagree with the engine about how rich you are.
   const purse = p.gold ?? 0;
   hudEl.append(stat('gold', '◉', String(purse), false, t('hud.gold.title', { n: purse })));
-  hudEl.append(renderBelt());
-  hudEl.append(renderRelics());
+  // The belt renders in COMBAT only (renderBelt's own why): potions are combat items,
+  // and the kernel offers their actions there alone — anywhere else the row was pure
+  // duplicate chrome. The relic readout is gone outright: relics act through hooks,
+  // never through a click, so the chip offered nothing a click could do and the run's
+  // relic list still names itself where it matters (the kindling screen, the reward
+  // heads, the run summary).
+  if (snap.phase === 'combat') hudEl.append(renderBelt());
   hudEl.append(el('span', { cls: 'hud-step', text: t('hud.step', { n: snap.stepIndex }) }));
 
-  // A status that just landed on the PLAYER gets the same by-kind treatment as an enemy's.
-  const freshSelf = freshStatusKeys([...(p.statuses || []), ...(p.powers || [])]);
-  for (const s of p.statuses) hudEl.append(el('span', {
-    cls: `pill ${s.key}` + (freshSelf.has(s.key) ? ' juice-in' : ''),
-    text: s.text || `${s.label} ${s.stacks}`,
-    attrs: { title: s.explain || '' },
-  }));
+  // PARITY: combat statuses (Vulnerable, Weak, …) moved DOWN to the hero's own card
+  // (combat-view heroFigure) — the same place an enemy's statuses sit — because up here
+  // a landing debuff read as faint legend chrome. The HUD keeps only the POWERS:
+  // run-long counters (Combust, Rupture, …) that outlive the fight, which the combat
+  // card never shows. The juice diff is powers-only now, against the same previous-paint
+  // record render.js keeps.
+  const freshSelf = freshStatusKeys(p.powers || []);
   for (const pw of p.powers) hudEl.append(el('span', {
     cls: 'pill power' + (freshSelf.has(pw.key) ? ' juice-in' : ''),
     text: pw.text || `${pw.label || pw.key} ${pw.stacks}`,
@@ -125,44 +131,19 @@ export function renderHud() {
   }));
 }
 
-/* ------------------------------------------------------------------ RELICS (S7) */
-
-/**
- * The relic readout: ONE chip beside the belt — the kindled-heart glyph and the held
- * count, with the full list (name + the kernel's own effect sentence, one per relic)
- * in the tooltip, exactly the belt's readout contract. A READOUT, not a control: no
- * button, no flash — relics act through hooks, never through a click. A torn save's
- * unknown id still counts (the kernel lists it) and shows itself as "(unknown relic)".
- * @returns {HTMLElement} the `.relics` group
- */
-function renderRelics() {
-  const rows = snap.relics ?? [];
-  const tip = rows.length === 0
-    ? t('relics.none')
-    : rows.map((r) => `${r.name} — ${r.text || t('relics.unknown')}${r.known ? '' : t('relics.unknownId')}`).join('\n');
-  return el('span', {
-    cls: 'relics' + (rows.length === 0 ? ' none' : ''),
-    attrs: {
-      title: tip,
-      // The announced form carries the same list the tooltip shows, so a screen reader
-      // hears exactly what a sighted reader hovers.
-      'aria-label': t('relics.aria', { n: rows.length, names: rows.map((r) => r.name).join(', ') }),
-    },
-  },
-  glyphBox('relic', 'relic-glyph'),
-  el('span', { cls: 'relic-count', text: String(rows.length) }));
-}
-
 /* --------------------------------------------------------------------- BELT (S5) */
 
 /**
- * The potion belt: exactly `snap.beltSlots` slots beside the gold readout, in every
- * phase. A FILLED slot is a named glyph chip (mark + name, tooltip = the kernel's own
- * effect sentence); an EMPTY slot is a dim flask. In combat a filled slot is a BUTTON
- * that opens the quaff/discard popover (beltPanel below); anywhere else the belt is a
- * readout — the kernel offers belt actions in `phase === 'combat'` only, so a button
- * would promise an action the engine would reject. A stale belt id (a torn save)
- * renders under its raw id with the flask's rune fallback, exactly like the snapshot's
+ * The potion belt: exactly `snap.beltSlots` slots beside the gold readout — rendered in
+ * COMBAT ONLY (the renderHud call site guards on `snap.phase === 'combat'`), so every
+ * row here IS the combat shape: a FILLED slot is a named glyph chip (mark + name,
+ * tooltip = the kernel's own effect sentence) that is a BUTTON opening the quaff/discard
+ * popover (beltPanel below); an EMPTY slot is a dim flask. Combat is the belt's whole
+ * home — the kernel offers belt actions in `phase === 'combat'` alone, and potions are
+ * combat items — so there is no off-combat shape to keep: elsewhere the belt does not
+ * render at all (the elite's spoils chip, the reward heads and the run summary still
+ * name what the run carries where it matters). A stale belt id (a torn save) renders
+ * under its raw id with the flask's rune fallback, exactly like the snapshot's
  * `known: false` row: it stays VISIBLE, never thrown away.
  * @returns {HTMLElement} the `.belt` group
  */
@@ -182,31 +163,23 @@ function renderBelt() {
       }, glyphBox('flask', 'belt-glyph')));
       continue;
     }
+    // The belt only paints in combat (the call-site guard), so a filled slot is always
+    // the quaff/discard button — no inert readout shape exists any more.
     const tip = `${row.name} — ${row.text || t('belt.unknown')}${row.known ? '' : t('belt.unknownId')}`;
-    if (snap.phase === 'combat') {
-      belt.append(el('button', {
-        cls: 'belt-slot filled',
-        attrs: {
-          type: 'button',
-          title: `${tip}${t('belt.click')}`,
-          'aria-label': t('belt.slot.aria', { n: i + 1, name: row.name }),
-          'aria-haspopup': 'dialog',
-          'aria-expanded': String(beltOpenSlot === row.slot),
-        },
-        on: { click: (ev) => { ev.__dlbHandled = true; toggleBelt(row.slot); } },
+    belt.append(el('button', {
+      cls: 'belt-slot filled',
+      attrs: {
+        type: 'button',
+        title: `${tip}${t('belt.click')}`,
+        'aria-label': t('belt.slot.aria', { n: i + 1, name: row.name }),
+        'aria-haspopup': 'dialog',
+        'aria-expanded': String(beltOpenSlot === row.slot),
       },
-        glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
-        el('span', { cls: 'belt-name', text: row.name }),
-      ));
-    } else {
-      belt.append(el('span', {
-        cls: 'belt-slot filled inert',
-        attrs: { title: `${tip}${t('belt.combatOnly')}`, 'aria-label': t('belt.slot.inert.aria', { n: i + 1, name: row.name }) },
-      },
-        glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
-        el('span', { cls: 'belt-name', text: row.name }),
-      ));
-    }
+      on: { click: (ev) => { ev.__dlbHandled = true; toggleBelt(row.slot); } },
+    },
+      glyphBox(POTION_GLYPH[row.potionId] || 'flask', 'belt-glyph'),
+      el('span', { cls: 'belt-name', text: row.name }),
+    ));
   }
   return belt;
 }
@@ -317,7 +290,10 @@ function ordinal(n) {
 /* ----------------------------------------------------------------- HELP / GLOSSARY */
 
 export let helpOpen = false;
-export const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
+// The key string itself lives in tour.js beside TOUR_SEEN_KEY — the coexistence rule
+// (§4 of ONBOARDING-TOUR) pairs the two flags, so one module owns both strings and this
+// one consumes it (the app-bundle harness allows no re-export lists, and no reader is
+// left importing it from here).
 
 export function toggleHelp(open) {
   helpOpen = open;
@@ -395,6 +371,15 @@ export function helpPanel() {
       text: t('help.gotIt'),
       attrs: { type: 'button' },
       on: { click: () => { try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch {} toggleHelp(false); } },
+    }),
+    // ONBOARDING-TOUR: the veteran's way back in. It reopens the tour at the step for
+    // the phase the player is standing on and writes no flag (only finishing or
+    // dismissing the tour does, tour.js).
+    el('button', {
+      cls: 'btn secondary',
+      text: t('tour.replay'),
+      attrs: { type: 'button', title: t('tour.replay.title') },
+      on: { click: () => { toggleHelp(false); startTour(); } },
     }),
     // New Run moved here from the HUD (UX rev 3): it is destructive — it discards the run —
     // and never belonged one tap from End Turn. The `n` hotkey still starts a new run.
@@ -485,6 +470,10 @@ function deckTile(c) {
     type: c.type,
     typeLabel: c.typeLabel,
     description: c.description || c.name,
+    // The row's own kernel-published chip list — already read off the TEMPERED
+    // definition by snapshotDeck, so a Red-hot row's damage chip says the tempered 9.
+    chips: c.chips ?? [],
+    chipsComplete: c.chipsComplete === true,
     playable: false,
     showSummary: false,
     temper: c.temper,
@@ -613,6 +602,11 @@ export function codexPanel() {
 function codexTile(c, inDeck) {
   const fact = cardDescribe(c.cardId);
   const rarity = t(`codex.${c.rarity}`) || c.rarity;
+  // Completeness follows the chips ACTUALLY chosen (the row's when it carries one, the
+  // fact's otherwise) — ORing the two flags could claim coverage the printed chips
+  // don't hold and drop a sentence those chips don't restate.
+  const chips = c.chips ?? fact.chips ?? [];
+  const chipsComplete = (c.chips ? c.chipsComplete : fact.chipsComplete) === true;
   const tile = cardTile({
     slot: c.cardId,
     cardId: c.cardId,
@@ -622,6 +616,11 @@ function codexTile(c, inDeck) {
     type: c.type,
     typeLabel: c.typeLabel,
     description: c.description,
+    // The chip row: the lookup-table row's own kernel-published list (cardPool words it
+    // exactly as the hand's snapshot rows do); the describe fact is the fallback for a
+    // caller whose row predates the field. Same chips everywhere, or none anywhere.
+    chips,
+    chipsComplete,
     playable: false,
     showSummary: false,
   }, { readOnly: true });

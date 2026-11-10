@@ -11,6 +11,7 @@ import { el, keywordText, sceneIllus } from './dom.js';
 import { heroMarkup } from './stage-art.js';
 import { HEROES, act, switchHero, switchPath } from './actions.js';
 import { page } from './page-frame.js';
+import { glyphBox, BOON_GLYPH } from './glyphs.js';
 import { t } from './i18n.js';
 
 /* ------------------------------------------------------------------ KINDLING */
@@ -47,6 +48,12 @@ export function kindlingView() {
           else if (ev.key === 'End') to = HEROES.length - 1;
           if (to === null) return;
           ev.preventDefault();
+          // The handled key never reaches the document keydown guard (app.js): that guard
+          // runs later in the bubble and would ALSO act on ←/→ (tourBack/tourNext), so an
+          // arrow on a focused pick under the open tour switched it AND stepped the tour
+          // off its own subject (review round 1 of the six-step rework). Unhandled keys
+          // still bubble, so the tour guard keeps owning everything else.
+          ev.stopPropagation();
           switchHero(HEROES[to].id);
         },
       },
@@ -84,6 +91,9 @@ export function kindlingView() {
           else if (ev.key === 'End') to = biomes.length - 1;
           if (to === null || biomes.length === 0) return;
           ev.preventDefault();
+          // Same stop as the hero group's: a handled arrow on a focused path must not
+          // bubble into the tour guard's ←/→ while the tour is open.
+          ev.stopPropagation();
           switchPath(biomes[to].id);
         },
       },
@@ -107,6 +117,9 @@ export function kindlingView() {
       cls: 'boon', attrs: { type: 'button', 'data-action': b.actionId, 'aria-label': `${b.name}: ${b.text}` },
       on: { click: () => act(b.actionId) },
     },
+    // The boon's own small mark (BOON_GLYPH), decorative — the name and the kernel
+    // sentence carry the meaning. An unknown id degrades to the rune, never an empty box.
+    glyphBox(BOON_GLYPH[b.id] || 'rune', 'boon-glyph'),
     el('span', { cls: 'boon-name', text: b.name }),
     keywordText(el('span', { cls: 'boon-text' }), b.text)));
   }

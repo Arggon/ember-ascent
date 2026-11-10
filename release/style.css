@@ -406,8 +406,8 @@ html, body {
 
 /* ---------- Intent banner ----------
    Four visually distinct treatments. Each carries a glyph AND a label, so the kind is
-   never communicated by colour alone. (The telegraph itself is the scaled
-   `.intent-badge` token on the combat stage; this banner is the sentence row.) */
+   never communicated by colour alone. (On the combat stage the stage override below
+   strips this chrome; the row there reads as plain centered chips.) */
 
 .e-intent {
   margin-top: 10px;
@@ -746,6 +746,103 @@ html, body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* ---------- Effect chips: the card face's icon row ----------
+   One glyph + number per kernel-published effect (`.cfx-chip` rows published by
+   snapshot()/cardPool(), never derived here). The marks are the woodcut stroke family;
+   a chip reads at card size, so the stroke stays fat and the number stays tabular. */
+.card .cfx {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cfx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--card-hue) 42%, transparent);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--ink);
+  line-height: 1.25;
+  min-width: 0;
+}
+/* On a read-only tile the chip is a real control (the hand's spans carry the same look
+   but live inside the play button, where a nested control would be invalid HTML). */
+.cfx-chip[role='button'] { cursor: pointer; }
+.cfx-chip[role='button']:hover { border-color: var(--gold); }
+.cfx-chip[role='button']:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.cfx-mark { flex: 0 0 auto; width: 14px; height: 14px; opacity: 0.94; }
+.cfx-mark svg { display: block; width: 100%; height: 100%; }
+/* The woodcut stroke, scoped to the chip marks — same recipe the type/node marks use.
+   The borrowed wide intent marks keep their own class (`chev`), stroked here too. */
+.cfx-mark .m,
+.cfx-mark .chev {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cfx-mark .mf { fill: currentColor; stroke: none; }
+.cfx-num {
+  font-family: var(--num);
+  font-weight: 700;
+  font-size: var(--fs-2);
+  line-height: 1;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.02em;
+}
+.card.disabled .cfx-chip { border-color: var(--edge); background: rgba(0, 0, 0, 0.18); }
+.card.disabled .cfx-num { color: var(--faint); }
+
+/* The chip explainer's OWN layer. NOT #fx-layer: that layer is switched off wholesale
+   for reduced-motion users (`#fx-layer { display: none }` in the reduce block), and a
+   descendant rule cannot un-hide it — the popover must stay visible for exactly the
+   users who most need the static reveal, so it hosts in a sibling the reduce block
+   never names. Fixed + inset 0 like its sibling, pointer-events transparent so taps
+   pass through to the page (the dismissal swallow lives in the capture listeners). */
+#pop-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 60;
+}
+
+/* The chip explainer popover, hosted on #pop-layer (above every clip box) and anchored
+   to its chip when the host can measure one — flipped above the chip by the
+   `.cfx-pop-above` class when it would cross the viewport floor. Static reveal only —
+   no motion, and it lives OUTSIDE the reduced-motion block, so it needs no exception
+   there: the sheet is the interaction, not decoration. */
+.cfx-pop {
+  position: absolute;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  max-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #1c2333 0%, #10141d 100%);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+  color: var(--ink);
+  text-align: left;
+}
+/* The above-the-chip flip: same anchor point, hung from its bottom edge instead. */
+.cfx-pop.cfx-pop-above { transform: translate(-50%, -100%); }
+.cfx-pop .cfx-pop-label {
+  display: block;
+  font-weight: 800;
+  font-size: var(--fs-3);
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+.cfx-pop .cfx-pop-body { margin: 3px 0 6px; font-size: var(--fs-2); line-height: 1.35; }
+.cfx-pop .cfx-pop-close { width: 100%; padding: 3px 8px; font-size: var(--fs-1); }
 
 /* Not enough Energy: unmistakable, and it says why rather than just going grey. */
 .card.disabled {
@@ -1172,6 +1269,26 @@ html, body {
   border: 1px solid rgba(157, 134, 201, 0.3); border-radius: var(--radius-lg);
   background: linear-gradient(180deg, rgba(157, 134, 201, 0.08) 0%, rgba(0, 0, 0, 0) 45%); }
 .event-result li { color: var(--ink); font-size: var(--fs-3); line-height: 1.5; }
+
+/* The resolved beat's card reveal: the beat sentence stays as the caption (the
+   narrative), and the card it gave shows as the game's own tile — the deck sheet's
+   measured 172px face, read-only (a fact, not a control: no pointer, no hover lift). */
+.event-result li.has-card { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.event-card-caption { margin: 0; width: 100%; text-align: center; }
+.event-cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: stretch; }
+.event-cards .card {
+  width: 172px;
+  min-height: 236px;
+  cursor: default;
+  transition: border-color var(--dur) ease;
+}
+/* The tempered stamp rides the tile's last strip here, like on the deck sheet's
+   footer-less tiles — never over the rules text. */
+.event-cards .card > .ctemper { position: relative; justify-self: center; }
+/* Phones: two tiles across, the same faces the deck sheet keeps at this tier. */
+@media (max-width: 640px) {
+  .event-cards .card { width: calc(50% - 4px); max-width: none; min-height: 200px; }
+}
 
 .event .event-story,
 .event .event-choices { animation: fade-up var(--dur-slow) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
@@ -1816,6 +1933,10 @@ html, body {
 /* Vulnerable = fracture, Weak = droop, Strength/Dexterity = lift. Each is a different
    SHAPE as well as a different colour, so the kind is never carried by colour alone. */
 .pill.juice-in { animation: juice-status-in calc(0.42s * var(--pace, 1)) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
+/* The status CHIPS (the enemy/hero readouts' replacement for sentence pills) ride the
+   same entrance: same clock, generic keyframe — the per-kind shapes stay pill-only, the
+   chip's mark already carries the kind. Neutralized in the reduce block like the pills. */
+.cfx-chip.juice-in { animation: juice-status-in calc(0.42s * var(--pace, 1)) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
 .pill.vulnerable.juice-in { animation-name: juice-fracture; }
 .pill.weak.juice-in { animation-name: juice-droop; }
 .pill.strength.juice-in,
@@ -2111,7 +2232,8 @@ html, body {
   .pill.vulnerable.juice-in,
   .pill.weak.juice-in,
   .pill.strength.juice-in,
-  .pill.dexterity.juice-in { transform: none !important; opacity: 1 !important; }
+  .pill.dexterity.juice-in,
+  .cfx-chip.juice-in { transform: none !important; opacity: 1 !important; }
 
   /* Targeting: keep every cue that CARRIES information (the ring, the chosen crosshair,
      the card badge, the dimmed hand) and drop only the movement. The selected target is
@@ -2120,6 +2242,14 @@ html, body {
   .enemy.targeting:hover,
   .card-wrap.is-pending { transform: none; }
   .enemy.aimed .target-mark { animation: none !important; }
+
+  /* The defeat hold never paints on this path (act() arms no strike plan under reduced
+     motion, so render.js falls straight through to the panel), which is the contract:
+     the run's ending is static information on the panel. These two are named anyway, so
+     the death beat and its ash motes can never half-run if a future caller ever paints
+     them on this path. */
+  .stage-combat .hero .fig.is-hero-death,
+  .hero-ash i { animation: none !important; }
 }
 
 /* ============================================================ P3 — run-level beats ==
@@ -3361,6 +3491,16 @@ html, body {
 .page-combat .speed-btn.is-on { color: var(--gold); border-color: var(--gold); }
 .page-combat .is-on { color: var(--gold); }
 
+/* The enemy row's floor pad was 6% of the fight's width (74px at 1280) and it pinned
+   the elite card's ceiling BELOW the hero: 270px figure + ~70px of intent/name/HP rows
+   + 74px of pad = 414px against a 344px capped fight interior (measured: the band
+   clipped 30px of a chipless elite card). A card-side percentage margin cannot cancel
+   that pad — it resolves against the FIGHT's width while a card margin resolves
+   against the ROW's width, narrower by the hero column (-57.7 vs 73.1 at 1280x720,
+   measured) — so the pad is gone: every enemy card stands on the fight's floor line,
+   the elite fits, and the plain cards' pre-existing 6px top clip at 768-tall laptops
+   heals. The fight's height is hero-driven at ≥700 (the hero column's own overhang
+   out-sizes the row), so the fight, the hand and End Turn do not move. */
 .stage-combat .enemies {
   position: relative;
   z-index: 2;
@@ -3368,7 +3508,7 @@ html, body {
   max-height: none;
   max-width: none;
   margin: 0;
-  padding: 0 2% 6% 0;
+  padding: 0 2% 0 0;
   gap: 4px;
   flex-wrap: nowrap;
   align-items: flex-end;
@@ -3410,10 +3550,32 @@ html, body {
 .stage-combat .enemy .hpbar { width: 80%; margin: 2px 0; }
 .stage-combat .enemy .eblock { font-size: 0.72rem; }
 .stage-combat .e-statuses { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+/* The enemy's own BUFFS ride ABOVE the figure, under the intent row — the retired
+   intent badge's slot (the user's ask: the enemy's actions and its own buffs float over
+   it, the debuff rows stay at the foot). The row reuses the `.e-statuses` chip sizing
+   above and adds nothing of its own but its place: chrome-less, centered. No reserve is
+   needed for buffless neighbours — they grow no `.e-buffs` element at all, and fig tops
+   level themselves because the enemies row is bottom-anchored on the ground line
+   (`align-items: flex-end`): everything above the fig is overhang. */
+.stage-combat .e-buffs { margin: 0 0 2px; }
+/* The status CHIPS: the same component the card faces carry, on the readouts. The rows
+   are narrower than a card tile and sit on tinted ground, so the chip tightens its pad
+   and darkens its well; the mark and number do the talking, the sentence is the title. */
+.stage-combat .e-statuses .cfx-chip,
+.stage-combat .e-intent .cfx-chip { padding: 0 6px 0 3px; background: rgba(0, 0, 0, 0.34); }
+.stage-combat .e-statuses .cfx-mark,
+.stage-combat .e-intent .cfx-mark { width: 12px; height: 12px; }
+/* PARITY: the hero's own status pills sit under her HP bar, mirroring the enemy card.
+   `.page-combat .hero` carries pointer-events:none (the hero lane is click-through),
+   so the pill row must re-enable it or the pills' cursor:help + title tooltips die
+   silently — the enemy card already does the same via `.stage-combat .enemy`. */
+.stage-combat .hero .e-statuses { pointer-events: auto; max-width: 96%; }
 .stage-combat .e-intent {
   margin: 2px 0 0;
   padding: 0;
-  border: none;
+  /* The transparent ring the UX-2 intent-strike keyframes light (the badge that used to
+     carry that animation is gone; see the keyframes below). Invisible at rest. */
+  border: 1px solid transparent;
   background: none;
   display: block;
   text-align: center;
@@ -3429,54 +3591,22 @@ html, body {
   font-weight: 700;
   color: #e7d2c0;
 }
-.stage-combat .intent-badge {
-  width: 40px;
-  height: 48px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  color: #ff9d3a;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
-  /* A carved iron token instead of a bare glyph floating in the air. */
-  border-radius: 12px 12px 14px 14px;
-  background: radial-gradient(circle at 50% 35%, #2e1b11, #120a06 70%);
-  border: 1px solid #5a3420;
-  box-shadow: inset 0 1px 0 rgba(255, 190, 120, 0.18), 0 3px 8px rgba(0, 0, 0, 0.6);
-  padding: 3px 0 2px;
-}
-.stage-combat .intent-badge svg { width: 100%; height: 58%; display: block; }
-.stage-combat .intent-badge .b { fill: #1a100c; }
-.stage-combat .intent-badge .r { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
-.stage-combat .intent-badge .g { fill: none; stroke: #ff9d3a; stroke-width: 1.5; }
-.stage-combat .intent-badge.kind-block { color: #8fd0f2; }
-.stage-combat .intent-badge.kind-buff { color: #f5c542; }
-.stage-combat .intent-badge.kind-debuff { color: #c9a6ee; }
-.stage-combat .tier-1 { transform: scale(0.9); }
-.stage-combat .tier-2 { transform: scale(1.15); }
-.stage-combat .tier-3 { transform: scale(1.45); }
-.stage-combat .intent-num {
-  font-family: var(--num);
-  font-size: 0.95rem;
-  font-weight: 700;
-  line-height: 1;
-  color: #ffe6c8;
-  text-shadow: 0 1px 0 #000, 0 0 6px rgba(255, 120, 40, 0.6);
-}
-/* UX-2: the CURRENT attacker's intent badge lights while its own slam plays. The class
-   is painted on every attacker of the playing sequence; the CSS variable pair written by
-   enemyCard (--seq-delay / --seq-dur, from the same clock as the slam delays) spaces the
-   highlights one attacker apart, so "who is striking" reads without measuring anything.
-   `both` holds the unlit 0% frame while an attacker waits for its beat and returns to it
-   after, so the badge is lit exactly for its own attack. */
+/* UX-2: the CURRENT attacker's intent row (its `.e-intent` chips) lights while its own
+   slam plays. The class is painted on every attacker of the playing sequence; the CSS
+   variable pair written by enemyCard (--seq-delay / --seq-dur, from the same clock as
+   the slam delays) spaces the highlights one attacker apart, so "who is striking" reads
+   without measuring anything. `both` holds the unlit 0% frame while an attacker waits
+   for its beat and returns to it after, so the row is lit exactly for its own attack.
+   The stage row itself is chrome-less (the override above), so the keyframes light a
+   transparent ring around it plus an ember glow — invisible at rest, unmistakable lit. */
 @keyframes intent-strike {
-  0%, 100% { border-color: #5a3420; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7)); }
+  0%, 100% { border-color: transparent; filter: none; }
   30%, 70% {
     border-color: #ffb45e;
     filter: drop-shadow(0 0 10px rgba(255, 150, 50, 0.95)) brightness(1.45);
   }
 }
-.stage-combat .enemy.is-striking .intent-badge {
+.stage-combat .enemy.is-striking .e-intent {
   animation: intent-strike var(--seq-dur, calc(640ms * var(--pace, 1))) ease-in-out both;
   animation-delay: var(--seq-delay, calc(0ms * var(--pace, 1)));
 }
@@ -3764,6 +3894,66 @@ html, body {
 .stage-combat .hero .fig.pose-guard { animation: hero-guard calc(0.5s * var(--pace, 1)) ease-out; }
 .stage-combat .hero .fig.pose-channel { animation: hero-channel calc(0.6s * var(--pace, 1)) ease-in-out; }
 
+/* ---- The hero's DEATH beat (the defeat hold, render.js) --------------------------
+   After the killing turn has played out on the held stage, the hero's own figure
+   collapses and dissolves into embers and ash — the same vocabulary the enemy ghosts'
+   `ash-fall` already speaks, in CSS only (no image assets). Two animations share one
+   figure: the hurt flinch the action already carries, then `hero-death`, delayed by the
+   strike plan's own total (`--death-delay`, written by the defeat hold) so the collapse
+   starts when the last slam has landed. `both` holds the standing 0% frame through the
+   delay and the dissolved 100% after it, so no repaint can resurrect her before the
+   panel replaces the stage. The motes of `.hero-ash` rise on the same clock, each
+   staggered a small base step past the plan total; `--pace` paces the whole tail like
+   every other beat. Reduced motion never paints the hold at all (act() arms no plan
+   there), so this rule set is inert on that path. */
+.stage-combat .hero .fig.is-hero-death.pose-hurt {
+  animation:
+    hero-hurt calc(0.44s * var(--pace, 1)) ease-out,
+    hero-death calc(0.45s * var(--pace, 1)) ease-in var(--death-delay, 0ms) both;
+}
+.stage-combat .hero .fig.is-hero-death {
+  animation: hero-death calc(0.45s * var(--pace, 1)) ease-in var(--death-delay, 0ms) both;
+}
+.hero-ash {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12%;
+  height: 55%;
+  pointer-events: none;
+  z-index: 3;
+}
+.hero-ash i {
+  position: absolute;
+  bottom: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  opacity: 0;
+  left: 26%;
+  background: radial-gradient(circle, #ffd9a0, #ff9d3a 60%, rgba(154, 62, 16, 0));
+  box-shadow: 0 0 10px rgba(255, 157, 58, 0.9);
+  animation: hero-ember-up calc(0.45s * var(--pace, 1)) ease-out var(--death-delay, 0ms) both;
+}
+.hero-ash i:nth-child(2) {
+  left: 46%;
+  background: radial-gradient(circle, #efe6dc, #98a2bd 62%, rgba(70, 76, 96, 0));
+  box-shadow: 0 0 8px rgba(152, 162, 189, 0.7);
+  animation-delay: calc(var(--death-delay, 0ms) + 0.06s * var(--pace, 1));
+}
+.hero-ash i:nth-child(3) { left: 68%; animation-delay: calc(var(--death-delay, 0ms) + 0.12s * var(--pace, 1)); }
+
+@keyframes hero-death {
+  0% { opacity: 1; transform: none; filter: none; }
+  34% { transform: translateY(6px) scale(1.02, 0.9) rotate(-2deg); filter: brightness(1.35) saturate(1.1); }
+  100% { opacity: 0; transform: translateY(18px) scale(0.86, 0.6) rotate(-6deg); filter: brightness(0.5) saturate(0.4) blur(2px); }
+}
+@keyframes hero-ember-up {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
+  30% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(7px, -64px) scale(1.15); }
+}
+
 @media (max-width: 760px) {
   .page-combat .dock {
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -3795,9 +3985,6 @@ html, body {
   .stage-combat .enemy .eblock { font-size: 0.62rem; line-height: 1; }
   .stage-combat .e-intent { margin: 0; }
   .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; font-size: 0.6rem; }
-  .stage-combat .intent-badge { width: 22px; height: 26px; }
-  .stage-combat .tier-2,
-  .stage-combat .tier-3 { transform: none; }
   .page-combat .energy-orb { width: 48px; height: 48px; }
   .page-combat .orb-num { font-size: 1.2rem; }
   .page-combat .pile { width: 46px; min-height: 48px; box-shadow: 3px 3px 0 #0c0806; }
@@ -3841,7 +4028,6 @@ html, body {
 @media (max-width: 700px) and (max-height: 760px) {
   .stage-combat .hero .fig,
   .stage-combat .fig { height: 100px; }
-  .stage-combat .intent-badge { width: 26px; height: 28px; }
   .stage-combat .enemy .ename,
   .stage-combat .enemy .ehp { font-size: 0.68rem; line-height: 1.05; }
   .stage-combat .card { height: 100px; }
@@ -3887,9 +4073,6 @@ html, body {
   .hint { display: none; }
   .stage-combat .hero .fig { height: min(140px, 24vh); }
   .stage-combat .fig { height: min(140px, 22vh); }
-  /* The enemy row's 6%-of-width floor pad is ~48px at 800px wide (measured); 2% keeps the
-     sprites clear of the dock and gives the band's short end (~481px) its last ~20px. */
-  .stage-combat .enemies { padding-bottom: 2%; }
   .stage-combat .e-intent { margin-top: 2px; padding: 3px 7px; }
   .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; }
   .stage-combat .card {
@@ -3930,7 +4113,6 @@ html, body {
   .hint { display: none; }
   .stage-combat .hero .fig,
   .stage-combat .fig { height: 100px; }
-  .stage-combat .enemies { padding-bottom: 2%; }
   .stage-combat .e-intent { margin-top: 2px; padding: 3px 7px; }
   .stage-combat .e-intent .ilabel { -webkit-line-clamp: 1; }
   .stage-combat .card { height: 100px; padding: 6px 6px 4px; gap: 1px; }
@@ -4008,7 +4190,6 @@ html, body {
     radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55));
 }
 
-/* Intent token and number styles live with the base .intent-badge / .intent-num rules. */
 /* HP plates: framed iron troughs with molten fill. */
 .stage-combat .hpbar { background: #0a0605; border: 1px solid #4e2e1c; box-shadow: inset 0 1px 2px #000; border-radius: 3px; }
 .stage-combat .hpbar i { background: linear-gradient(180deg, #ff8a4a, #c0301c 60%, #8a1c12); box-shadow: 0 0 6px rgba(255, 90, 40, 0.45); }
@@ -6748,14 +6929,17 @@ html, body {
 }
 /* The arc: rise from the hero's shoulder to the enemy row, with the whole hammer
    spinning around its own centre (the head leads on the way out). The horizontal
-   travel is the lane's --fly-x, so every keyframe lands where the aimed enemy is. */
+   travel is the lane's --fly-x and the landing drop is the lane's --fly-y, so every
+   keyframe lands where the aimed enemy is; callers that don't feed --fly-y keep the
+   historical 16px shoulder drop. (The enemies row's floor pad was removed for the
+   elite's card — with the row lower, a fixed 16px drop measured 123px off the aim.) */
 @keyframes hammer-fly {
   0% { transform: translate(0, 0) rotate(0deg) scale(0.7); opacity: 0; }
   8% { opacity: 1; }
   50% { transform: translate(calc(var(--fly-x) * 0.56), -90px) rotate(540deg) scale(1); opacity: 1; }
-  78% { transform: translate(calc(var(--fly-x) * 0.96), 10px) rotate(900deg) scale(1); opacity: 1; }
-  84% { transform: translate(var(--fly-x), 16px) rotate(960deg) scale(1.25); opacity: 1; }
-  92%, 100% { transform: translate(var(--fly-x), 16px) rotate(960deg) scale(0); opacity: 0; }
+  78% { transform: translate(calc(var(--fly-x) * 0.96), calc(var(--fly-y, 16px) - 6px)) rotate(900deg) scale(1); opacity: 1; }
+  84% { transform: translate(var(--fly-x), var(--fly-y, 16px)) rotate(960deg) scale(1.25); opacity: 1; }
+  92%, 100% { transform: translate(var(--fly-x), var(--fly-y, 16px)) rotate(960deg) scale(0); opacity: 0; }
 }
 /* Returning Brand: out to the lane, then all the way back to the hero. */
 .fx-hammer.fx-hammer-returns { animation-name: hammer-return; animation-duration: calc(1.25s * var(--pace, 1)); }
@@ -7016,20 +7200,18 @@ html, body {
    branch — so this longer form matches exactly the same elements. */
 .card.tempered.temper-redhot .ctemper { box-shadow: inset 0 0 0 1px rgba(185, 138, 82, 0.55), 0 0 8px rgba(255, 106, 42, 0.55); }
 .temper-head { margin: 6px 0 0; color: #cbb59e; font-size: 0.85rem; }
-.temper-list .boon { min-height: 64px; }
-.temper-offer.temper-quenched { border-color: #4f7f99; }
-.temper-offer.temper-redhot { border-color: #9a3a1a; }
-.temper-offer.temper-balanced { border-color: #8a7330; }
+/* The forge offers render as the GAME'S tempered card tiles now (temperPickTile — the
+   smith's modal and this forge share it): the per-temper trim and stamp come from the
+   card layer's own .card.temper-* rules above, and the row sizing from .event-cards —
+   so only the short-window fit lives here. */
 @media (max-height: 480px) {
   .rest .rest-calm { display: none; }
   .temper-head { margin: 2px 0 0; font-size: 0.72rem; }
-  /* Short windows: the three offers sit in ONE row, and each keeps its effect AND cost
-     (Red-hot's HP, Balanced's exhaust) in small type instead of hiding them. One row of
-     three is shorter than the two-row wrap of names alone, so nothing is pushed down. */
+  /* Short windows: the three offers sit in ONE row of narrower tiles instead of
+     wrapping — three across still shows every face's chips, and nothing is pushed
+     below the fold. */
   .temper-list { flex-wrap: nowrap; gap: 6px; }
-  .temper-list .boon { flex: 1 1 0; min-width: 0; min-height: 0; padding: 3px 6px; gap: 1px; }
-  .temper-list .boon-text { display: block; font-size: 0.64rem; line-height: 1.2; }
-  .temper-list .boon-name { font-size: 0.66rem; letter-spacing: 0.01em; white-space: nowrap; }
+  .temper-list .card { flex: 1 1 0; width: auto; min-width: 0; min-height: 0; }
 }
 /* Phones in portrait: with forge offers on the screen, the calm line is the one thing that
    can go (the heading already says it) so the last offer is not pushed below the fold. */
@@ -7147,7 +7329,68 @@ html, body {
   background: linear-gradient(90deg, transparent, rgba(255, 120, 50, 0.55) 30%, rgba(255, 150, 70, 0.6) 70%, transparent);
   filter: blur(1px);
 }
-.stage-combat .enemy .fig.is-elite-variant .spr { filter: hue-rotate(-12deg) saturate(1.3) drop-shadow(0 0 12px rgba(190, 120, 255, 0.45)); scale: 1.12; transform-origin: 50% 100%; }
+/* The elite's mark of rank is SIZE, not just the purple border (.enemy.e-elite,
+   combat-view.js:502). The base rule covers the uncompressed desktop band: 270 stands
+   over the hero's 250-260 at every height the fight serves (measured fightClient 346
+   capped, 407-417 uncapped). Taller figures also grow the fight's content basis and
+   scrolled the page at 1280x800 (measured docH 826 at 300px) — 270 is the largest
+   figure whose whole card (figure + ~70px of intent/name/HP rows, measured) fits the
+   capped 348px fight with the intent row painted.
+   Every compressed band owns its own elite row BELOW this rule: equal specificity
+   (0,4,0) resolves by file order, so a band row placed earlier would lose to this
+   rule exactly the way the first 480px row did. The compact stage is LAST on purpose:
+   at ≤700px-wide × ≤480px-tall it must win the overlap and suspend the taller-than
+   contract (everything there, elite included, flattens to the same 64px). */
+.stage-combat .enemy.e-elite .fig { width: min(190px, 100%); height: min(270px, 48vh); }
+/* The box alone doesn't read as rank: the sprites are contain-fitted to the figure,
+   which width-limits sprites wider than they are tall (the nob draws 1.26 wide, the
+   hero 1.08), so a taller BOX draws a barely-taller sprite. The scale plants the
+   sprite's feet (origin at the floor) and swells the DRAWN figure — on the desktop the
+   nob draws ~184px against the hero's ~166 (+11%), the wraith ~219 (+32%), and both
+   stay inside the 270px box, clear of the intent row that sits above it. */
+.stage-combat .enemy.e-elite .spr { scale: 1.45; transform-origin: 50% 100%; }
+.stage-combat .enemy .fig.is-elite-variant .spr { filter: hue-rotate(-12deg) saturate(1.3) drop-shadow(0 0 12px rgba(190, 120, 255, 0.45)); transform-origin: 50% 100%; }
+/* Band rows, after the base rule on purpose (cascade = file order at equal
+   specificity). */
+@media (min-width: 761px) and (min-height: 481px) and (max-height: 699px) {
+  /* The short-wide arm compresses figs to min(140px, 22vh) and the hero to 24vh — the
+     elite rides 30vh, over the hero at every height in the band, inside the fight
+     (measured 800x600: card 256 in a 334px fight; 800x481: card 220 in 239). */
+  .stage-combat .enemy.e-elite .fig { height: min(190px, 30vh); }
+}
+@media (max-width: 700px) and (max-height: 760px) {
+  /* Portrait phones compress figs to 100px; the elite rides 23vh — 130 at the band's
+     tall end, over the hero's 100 down to ~435px of height, then the fold wins (the
+     band's own 390x481 row scrolls with plain cards already). */
+  .stage-combat .enemy.e-elite .fig { height: min(130px, 23vh); }
+}
+@media (min-width: 621px) and (max-width: 760px) and (min-height: 481px) and (max-height: 699px) {
+  /* The narrow arm restates the portrait tier's 100px figs — the elite shadows them
+     at 130 (measured 640x600: card 193 in a 297px fight). */
+  .stage-combat .enemy.e-elite .fig { height: 130px; }
+}
+@media (min-width: 621px) and (max-width: 760px) and (min-height: 481px) and (max-height: 601px) {
+  /* The deep sub-arm compresses further (min(100px, 15vh), hero the same) — the elite
+     rides 22vh, over the hero at every height in the arm (measured 640x481: card 168
+     in a 196px fight). */
+  .stage-combat .enemy.e-elite .fig { height: min(150px, 22vh); }
+}
+@media (max-width: 620px) and (min-height: 700px) and (max-height: 780px) {
+  /* The tall-narrow large-text band (the min(160px, 26vh) rule late in this file)
+     shrinks the hero to 160-26vh inside this overlap of the portrait tier — the elite
+     rides 30vh over it, inside the capped fight (344px interior − 59px of rows holds a
+     190px figure with room). After the portrait row so it wins their 700-760 overlap. */
+  .stage-combat .enemy.e-elite .fig { height: min(190px, 30vh); }
+}
+@media (max-height: 480px) {
+  /* The compact stage flattens EVERY fig to 64px, elite included — one uniform
+     geometry. */
+  .stage-combat .enemy.e-elite .fig { height: 64px; width: auto; }
+  /* The spr scale rides the same cascade lesson as the fig row: this reset sits after
+     it at equal specificity, or the flattened elite's sprite would swell past the
+     uniform 64px geometry. */
+  .stage-combat .enemy.e-elite .spr { scale: 1; }
+}
 .stage-combat .enemy .fig .spr-cinder_foreman { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
 .biome-select { display: flex; gap: 6px; justify-content: center; align-items: center; margin: -4px 0 8px; font-size: 0.78rem; }
 .biome-select .bs-label { color: #b9a28c; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.66rem; }
@@ -7158,8 +7401,6 @@ html, body {
   .biome-select { margin: -2px 0 4px; font-size: 0.66rem; }
   .biome-pick { padding: 1px 8px; }
 }
-@media (max-height: 480px) { .stage-combat .enemy .fig.is-elite-variant .spr { scale: 1; } }
-
 /* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
    than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at
    768x1024. UX-1: the hand card is a FIXED-height uniform face now, so the row cannot
@@ -7675,6 +7916,61 @@ html, body {
 .relic-offer { border-color: rgba(255, 130, 40, 0.4); }
 .relic-offer.inert { opacity: 0.55; cursor: not-allowed; border-style: dashed; }
 .relic-offer.inert:hover, .relic-offer.inert:focus-visible { border-color: rgba(255, 130, 40, 0.4); transform: none; box-shadow: none; }
+
+/* ---------- Per-relic art: every relic surface wears its own inline-SVG mark ---------- */
+/* LARGE offer art (.boon-art, on the warden's offer tiles): the three-layer woodcut —
+   `.b` iron body, `.r` rim light (currentColor = the tile's parchment), `.g` ember glow,
+   `.gr` ground stroke — the enemy-mark language in miniature. The Cyan Lantern's flame is
+   the one cool accent (`.cb`), the quenched-temper cold blue precedent (the card
+   temper class ships #8fd0f2). */
+.boon-art { --glow-base: drop-shadow(0 0 3px rgba(255, 122, 90, 0.85)); display: block; align-self: center; width: 48px; height: 48px; margin-bottom: 2px; }
+.boon-art svg { display: block; width: 100%; height: 100%; }
+.boon-art .b { fill: #0b0705; }
+.boon-art .r { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.boon-art .g { fill: #ff9d3a; filter: var(--glow-base); transition: filter 0.15s; }
+.boon-art .cb { fill: #8fd0f2; filter: drop-shadow(0 0 3px rgba(111, 182, 228, 0.85)); transition: filter 0.15s; }
+.boon-art .gr { fill: none; stroke: #2a1810; stroke-width: 2.8; stroke-linecap: round; }
+.boon:hover .boon-art .g, .boon:hover .boon-art .cb,
+.boon:focus-visible .boon-art .g, .boon:focus-visible .boon-art .cb { filter: drop-shadow(0 0 5px rgba(255, 122, 90, 0.95)); }
+/* The event's dimmed choices share the boon shell, so its hover glow would brighten the
+   art of a choice the kernel refused; this pins the glow at its BASE value on a dim
+   hover (the shell's own `.event-choice.dim:hover` already holds the lift). `--glow-base`
+   is the one copy of that value. The `.cb` arm is defensive: no event mark wears the
+   cool accent yet. */
+.event-choice.dim:hover .boon-art .g, .event-choice.dim:hover .boon-art .cb { filter: var(--glow-base); }
+/* SMALL chip mark (.boon-glyph): the SAME mark, restyled to strokes at chip size — the
+   `.b` silhouette draws as its outline, the glow dots fill. Stroke widths are in the
+   100-box viewBox units, so 8-9 units ≈ the 14px chip's ~1.2px line (the .m family's 2.1
+   in a 20-box reads the same weight). */
+.boon-glyph { display: inline-flex; width: 14px; height: 14px; }
+.boon-glyph svg { display: block; width: 100%; height: 100%; }
+.boon-glyph .m { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.boon-glyph .mf { fill: currentColor; stroke: none; }
+.boon-glyph .b { fill: none; stroke: currentColor; stroke-width: 9; stroke-linejoin: round; }
+.boon-glyph .r { fill: none; stroke: currentColor; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+.boon-glyph .g, .boon-glyph .cb { fill: currentColor; stroke: none; }
+.boon-glyph .gr { fill: none; stroke: currentColor; stroke-width: 9; stroke-linecap: round; }
+/* The kindling boon button has room for a slightly larger chip; the reward chip keeps the
+   coin-glyph 14px (the .reward-relic .coin-glyph rule above sizes that one). */
+.boon .boon-glyph { width: 20px; height: 20px; }
+/* Tier hue on the OFFER FRAME ONLY: the snapshot's own tier colours the tile's border
+   (common ember / uncommon gold / rare hot); the art inside stays one palette. Higher
+   specificity than `.boon:hover`, so hover keeps the tier hue — it lifts with the tile. */
+.boon.relic-offer.tier-common { border-color: rgba(255, 157, 58, 0.66); }
+.boon.relic-offer.tier-uncommon { border-color: rgba(255, 210, 122, 0.62); }
+.boon.relic-offer.tier-rare { border-color: rgba(255, 122, 90, 0.72); }
+/* Compact windows: shrink the art and the chip so the offer text never clips. */
+@media (max-height: 480px) {
+  .boon-art { width: 34px; height: 34px; margin-bottom: 0; }
+  .boon .boon-glyph { width: 16px; height: 16px; }
+}
+/* Reduced motion: the glow's hover transition is killed and the glow rests at its base —
+   the same kill the `.boon` shell gets in the kindling block. */
+@media (prefers-reduced-motion: reduce) {
+  .boon-art .g, .boon-art .cb { transition: none; }
+  .boon:hover .boon-art .g, .boon:hover .boon-art .cb,
+  .boon:focus-visible .boon-art .g, .boon:focus-visible .boon-art .cb { filter: var(--glow-base); }
+}
 
 /* ==========================================================================================
    POTION BELT (S5) — the three belt slots beside the gold readout, and the quaff/discard
@@ -8333,3 +8629,43 @@ button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
   opacity: 0.4;
   animation: none;
 }
+
+/* ===================================================== ONBOARDING-TOUR: the product tour ==
+   One persistent overlay layer (#tour-layer, a sibling of #stage at z-index 80 — above
+   the sheets' 70) with a four-shade ring around the anchored element and one coach card.
+   No page box moves: the layer is fixed, its children absolute, and the stage never
+   learns the tour exists. The layer is pointer-events:none; the shades and the card opt
+   back in, so the hole over the anchor is CLICKABLE — the tour teaches by doing. */
+#tour-layer { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
+#tour-layer:empty { display: none; }
+.tour-shade { position: absolute; background: rgba(4, 7, 12, 0.78); pointer-events: auto; }
+.tour-card {
+  position: absolute; pointer-events: auto;
+  width: min(320px, calc(100vw - 24px));
+  background: linear-gradient(180deg, var(--raised) 0%, #10151f 100%);
+  border: 1px solid var(--edge); border-radius: var(--radius-lg);
+  padding: 14px 16px 12px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65);
+  animation: tour-in 0.24s ease-out both; /* screen-level arrival: base pace, not --pace */
+}
+@keyframes tour-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tour-count { display: block; font-size: var(--fs-1); letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; }
+.tour-head { margin: 4px 0 6px; font-size: var(--fs-4); color: var(--ink); }
+.tour-body { margin: 0 0 10px; font-size: var(--fs-2); color: var(--dim); line-height: 1.45; }
+/* The action hint (review round 2): on a step whose way forward is the player's own act
+   (take the boon, travel a node) this line stands where a Next would mis-teach. */
+.tour-hint { margin: -4px 0 10px; font-size: var(--fs-2); color: var(--accent); }
+.tour-nav { display: flex; gap: 8px; align-items: center; }
+/* The language pre-step's button row (the language ask): two native-named choices side
+   by side, the current default marked by aria-pressed. The buttons wear the shared .btn
+   chrome; these rules keep the pair even on the narrow card. */
+.tour-langs { display: flex; gap: 8px; margin: 0 0 10px; }
+.tour-langs .tour-lang { flex: 1; }
+.tour-lang[aria-pressed='true'] { border-color: var(--accent); color: var(--ink); }
+/* The nav buttons wear the shared .btn chrome; these rules exist so the checker's class
+   coverage is truthful (each emitted class has a rule) and to keep the row from wrapping
+   apart on the narrow card. */
+.tour-nav .tour-next { flex: none; }
+.tour-nav .tour-back { flex: none; }
+.tour-skip { margin-left: auto; font-size: var(--fs-1); }
+@media (max-width: 620px) { .tour-body { font-size: var(--fs-1); } }
+@media (prefers-reduced-motion: reduce) { .tour-card { animation: none; } }

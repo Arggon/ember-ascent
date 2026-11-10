@@ -116,6 +116,11 @@ export function act(actionId, targetK = null) {
   // the kernel re-derives its sentences in it. The language rides the OPTS only: run
   // state, hashes and the log are untouched.
   const after = ctl.snapshot({ lang: currentLang() });
+  // A flip that ends the run in DEFEAT (outcome loss): the killing turn. The kernel's
+  // endTurn returns at the death WITHOUT beginTurn (rules/act.js), so `combat.turn`
+  // never increments on it — both the beat grouping and the plan arming below must
+  // recognize the defeat by the phase/outcome pair, not by the turn counter.
+  const defeatFlip = after.phase === 'ended' && after.outcome !== 'win';
   // The kernel's event stream for this step, kept for the run record. `submit()` inside the
   // controller accumulates the same events on the session; the renderer accumulates them
   // here because it builds the record at the end, and a record built from a dropped stream
@@ -167,7 +172,13 @@ export function act(actionId, targetK = null) {
     let turnPlans = null;
     let turnBeats = null;
     let turnStrikes = null;
-    if (before.phase === 'combat' && after.turn !== before.turn) {
+    // The killing turn is grouped TOO (see `defeatFlip` above): the old turn-flip probe
+    // (`after.turn !== before.turn`) missed the whole sequence — the turn that killed
+    // the hero produced no beats, no plan and no animation at all (owner report: "you
+    // don't see the attack animation, it just shows the defeat screen"). A death by the
+    // player's own card (an HP cost) carries no enemy events, so the grouping yields
+    // nothing and stays silent, as before.
+    if (before.phase === 'combat' && (after.turn !== before.turn || defeatFlip)) {
       const attacks = [];
       const plans = new Map();
       const beats = [];
@@ -391,9 +402,11 @@ export function act(actionId, targetK = null) {
   }
 
   const dying = before.enemies
-    .filter((e) => !after.enemies.some((a) => a.index === e.index))
-    .map((e) => ({
+    .map((e, slot) => ({ e, slot }))
+    .filter(({ e }) => !after.enemies.some((a) => a.index === e.index))
+    .map(({ e, slot }) => ({
       ...e,
+      slot,
       side: positionClass(e.index, after.enemies, before.enemies, e.index),
       // Whether a BOSS just left the field. Read from the name (`enemyLook` already maps
       // "Guardian" -> boss for the card frame), never from a stat: it decides how large the
@@ -403,9 +416,18 @@ export function act(actionId, targetK = null) {
       boss: enemyLook(e.id).boss,
     }));
   // Each departure becomes a `death` burst, which the next paint draws as an inert ghost
-  // card that collapses. The ghost is positioned by ENEMY ROW ORDER (`side-*`), never by a
-  // measured coordinate.
-  for (const d of dying) fx.push({ kind: 'death', enemy: d.index, name: d.name, side: d.side, boss: d.boss });
+  // card that holds the victim's own slot while it collapses. The burst carries BOTH
+  // index namespaces the row speaks: `slot` — the position the body occupied in the
+  // BEFORE painted row (this array), which combatView keys the ghost by so the row's
+  // living and ghost slots keep partitioning 0..n-1; and `enemy` — the STABLE kernel
+  // index, which the fx layer matches on (`card-fly.enemy` <-> the ghost's
+  // `data-death-index`). They differ once a kernel death is compacted out of the
+  // snapshots (the kernel keeps dead rows; `snapshotEnemies` omits them): every later
+  // stable index then sits above its painted position, and a ghost keyed by the stable
+  // index lands past the row's end — the aimed-kill crash.
+  // `id` rides along too: the ghost card's art is keyed by it (`dyingCard` -> `enemyMarkup`),
+  // and without it every death ghost fell back to the jaw-worm sprite (SPRITES.jaw_worm).
+  for (const d of dying) fx.push({ kind: 'death', enemy: d.index, slot: d.slot, id: d.id, name: d.name, side: d.side, boss: d.boss });
 
   /* ------------------------------------------------------------- PHASE ARRIVALS ------
    * The end-of-run beat. `ended` is reached the instant the last enemy (or the player) is
@@ -443,14 +465,15 @@ export function act(actionId, targetK = null) {
   setFlash(nextFlash);
   setBursts(fx);
   setSnap(after);
-  // The victory/defeat panel must WAIT for the collapse that precedes it, so a run that ends
-  // on this action is marked here and `render()` holds the stage empty for one beat. A run
-  // that was ALREADY over (a restart) never reaches this line, which is why a fresh run
-  // paints its map immediately instead of waiting for a death that already happened.
+  // The victory/defeat panel must WAIT for the collapse (or, on a defeat, the killing
+  // turn and the hero's death) that precedes it, so a run that ends on this action is
+  // marked here and `render()` holds the stage for one beat. A run that was ALREADY over
+  // (a restart) never reaches this line, which is why a fresh run paints its map
+  // immediately instead of waiting for a death that already happened.
   if (after.phase !== before.phase) {
     if (after.phase === 'ended') {
-      // The panel must WAIT for the collapse that precedes it, so the run is marked here and
-      // `render()` holds the stage empty for one beat. A run that was ALREADY over (a
+      // The panel must WAIT for the beat that precedes it, so the run is marked here and
+      // `render()` holds the stage for one beat. A run that was ALREADY over (a
       // restart) never reaches this line, which is why a fresh run paints its map at once.
       setPhaseArriving(after.outcome === 'win' ? 'victory' : 'defeat');
       setEndFocusPending(true);
@@ -465,11 +488,24 @@ export function act(actionId, targetK = null) {
   // ALREADY-PACED durations (animMs applies the dock and the UX-4 base factor once,
   // here), so the dock scales every beat and reduced motion / » never arm one at all —
   // those shapes collapse to the simultaneous fast form the turn had before this slice.
-  // A flip that ENDS the run (the hero died on the enemy turn) arms nothing: the defeat
-  // panel is the moment, and unplaced floats would land unpositioned over it (UX-2
-  // review P3).
-  const seqBurst = after.phase === 'ended' ? null : fx.find((b) => b.kind === 'enemy-turn');
-  if (seqBurst && !reducedMotion && animSpeed !== 0) {
+  // A flip that ENDS the run in DEFEAT arms the plan TOO: the defeat hold (render.js)
+  // paints the fight exactly as it stood and replays THIS plan over it, so the killing
+  // turn is a beat the player sees instead of a snapshot they are handed. The named
+  // floats land on the HELD hero — fx.js heroLane() measures whatever `.fight .hero` is
+  // painted, and the hold paints one — so nothing is unpositioned over the panel (the
+  // UX-2 review P3 concern that used to gate this off is superseded, not ignored). A
+  // victory flip that ends the run (the last enemy falling to end-of-turn damage during
+  // its own turn) keeps the old shape: no plan — the kill hold owns that beat.
+  const seqBurst = after.phase === 'ended' && !defeatFlip ? null : fx.find((b) => b.kind === 'enemy-turn');
+  // A defeat flip that ALSO carries enemy deaths (Combust can clear the last foe inside
+  // the very endTurn that kills the hero — rules/act.js:439-447) runs the EXISTING kill
+  // hold in render.js, not the defeat hold, and on that path the plan has no retirement
+  // timer: it would sit armed forever, reporting busyReason 'enemy-turn' over the
+  // finished screen and swallowing every key until a restart. The plan is therefore
+  // armed only for the CLEAN killing turn; the else-if below retires it on every other
+  // ended flip (reduced motion and » reach the same cleanup), so no plan survives a run
+  // that is already over.
+  if (seqBurst && !(defeatFlip && dying.length > 0) && !reducedMotion && animSpeed !== 0) {
     const beatMs = animMs(STRIKE_SEQ.beat);
     const slamMs = animMs(STRIKE_SEQ.slam);
     // UX-9b: the non-attack beats (guard / power / hex) ride the SAME plan as a tail after
@@ -504,16 +540,27 @@ export function act(actionId, targetK = null) {
     // UX-5: the retirement now REPAINTS — the plan's busy reason sits painted on the
     // hand and End Turn, and a player who never moves the mouse would keep seeing the
     // locked shape after the sequence is over.
-    later(() => {
-      if (strikeSeq !== plan) return;
-      setStrikeSeq(null);
-      repaint();
-    }, plan.totalMs + 400);
-  } else if (!seqBurst) {
+    // The timer is the NORMAL turn's cleanup only. On the clean killing turn the defeat
+    // hold in render.js owns the clock end to end and retires the plan itself when the
+    // hero's death beat is over — a retirement repaint here would paint the ended panel
+    // OVER the still-playing sequence. A defeat flip that carries deaths never arms (the
+    // guard above), and » (skipAnim), the hold's backdrop skip, the hold's dock and a
+    // restart all retire it too.
+    if (after.phase !== 'ended') {
+      later(() => {
+        if (strikeSeq !== plan) return;
+        setStrikeSeq(null);
+        repaint();
+      }, plan.totalMs + 400);
+    }
+  } else if (!seqBurst || after.phase === 'ended') {
     // UX-2 review P2: the turn-flip that is NOT an enemy attack (the player's own
     // actions, the reward/rest flips) must retire any plan still armed — the
     // End-Turn timer above only covers the sequence's own lifetime, and an unguarded
-    // plan re-slams stale attackers over the player's next action for ~1.5s.
+    // plan re-slams stale attackers over the player's next action for ~1.5s. Every run-
+    // ending flip that did not arm reaches this same cleanup — the defeat-with-deaths
+    // flip (no hold of its own for a plan there), a killing turn under reduced motion
+    // or » — so nothing may stay armed over a run that has already ended.
     setStrikeSeq(null);
   }
   // UX-5: arm the play's input lock BEFORE the paint, the same place and order the

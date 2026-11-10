@@ -38,8 +38,12 @@ import {
   setPaintedPhase,
   setPhaseArriving,
   setPrevEnemies,
+  setStrikeSeq,
+  setHeroMoveHold,
+  skipAnim,
   snap,
   stageEl,
+  strikeSeq,
   DEAL,
   animMs,
 } from './runtime.js';
@@ -49,9 +53,10 @@ import { signatureFor } from './hero-moves.js';
 import { backdropMarkup } from './stage-art.js';
 import { dyingRow } from './floats.js';
 import { endTargeting, pendingCard, pendingSlot } from './targeting.js';
-import { renderHud, helpPanel, helpOpen, HELP_SEEN_KEY, deckPanel, deckOpen, codexPanel, codexOpen, beltOpenSlot, beltPanel, setBeltOpenSlot } from './hud.js';
+import { renderHud, helpPanel, helpOpen, deckPanel, deckOpen, codexPanel, codexOpen, beltOpenSlot, beltPanel, setBeltOpenSlot } from './hud.js';
+import { tourSync } from './tour.js';
 import { t } from './i18n.js';
-import { heroFigure, combatView } from './combat-view.js';
+import { heroFigure, combatView, enemyCard, speedDock } from './combat-view.js';
 import { mapView } from './map-view.js';
 import { rewardView } from './reward-view.js';
 import { kindlingView } from './kindling-view.js';
@@ -83,6 +88,18 @@ import { setRepaint } from './runtime.js';
  */
 const COLLAPSE_MS = 500;
 const END_DELAY_MS = 480;
+/**
+ * The hero's DEATH beat (base, pre-pace milliseconds): the collapse-and-dissolve the
+ * defeat hold plays on the hero's own figure after the killing turn has landed — the
+ * figure sinks, dulls and scatters into embers/ash (see `hero-death` in style.css; no
+ * image assets, the same CSS vocabulary as the enemy ghosts' `ash-fall`). The stylesheet
+ * paces it through `--pace`, so `animMs` here and the keyframe never drift: ~0.9s at the
+ * 1× dock, half at 2×, none at » or reduced motion (where the defeat hold never paints).
+ * The defeat hold's wait (the killerTurn branch below) adds this constant to the 200 ms
+ * the ash tail needs after it — 120 ms of mote stagger + 80 ms of settle — so the figure
+ * is fully dissolved before the panel repaints.
+ */
+const HERO_DEATH_MS = 450;
 
 // render.js is the paint sink: nothing imports back into it (the views repaint through the
 // runtime hook), so registering here at load is enough and the graph stays acyclic.
@@ -199,13 +216,10 @@ export function render() {
    * hold — 480 ms on a defeat, 1150 ms on a boss kill — while `juice-shatter` has the ghost
    * at `opacity: 0` from 500 ms on (`fill: both`).
    *
-   * WHY IT IS GUARDED, AND WHAT THAT FIXES. A hold is worth exactly one thing: the collapse.
-   * A DEFEAT has none to show — the player is the one who died, no death burst is emitted,
-   * and the enemies are still standing — so there is nothing for a hold to hold, and holding
-   * anyway is what burned 480 ms of blank stage on the run's most common ending (the bot wins
-   * about 7% of runs). The guard then falls through to the switch below and the DEFEAT panel
-   * is simply there on the next paint. The fight that killed the player is on screen right up
-   * to that paint; it is the blank window, not the panel, that used to discard it.
+   * A DEFEAT has no collapse to show HERE — no death burst is emitted when the PLAYER is
+   * the one who dies — but it is no longer dropped to the panel either: the killing turn
+   * takes its own branch below, which holds the fight exactly as it stood and replays the
+   * enemy turn that ended the run on it, then the hero's death, THEN the panel.
    *
    * HOW LONG. `wait` is clamped to the collapse duration: past `COLLAPSE_MS` the ghost is
    * transparent and the stage would be blank again. The sequence the brief asks for survives
@@ -217,6 +231,115 @@ export function render() {
   // no collapse (owner report: "when I use a card that kills the enemy I don't see any
   // animation, just the victory screen").
   const endHeld = arriving.victory || arriving.defeat || arriving.reward;
+  /* THE KILLING TURN, HELD (defeat). A defeat that arrives on the enemy turn is the one
+   * ending the kernel resolves WITHOUT a death burst: nobody died on the board, the hero
+   * did — so the branch above never fires and the DEFEAT panel used to replace the fight
+   * on the very next paint, discarding the turn that killed the player (owner report:
+   * "when an enemy defeats the hero you don't see the attack animation, it just shows the
+   * defeat screen").
+   *
+   * WHAT THIS BRANCH PAINTS. The fight EXACTLY as it stood the instant the turn began —
+   * the same `.stage-combat > .fight` wrapper the live view uses, backdrop, ground, the
+   * hero holding its final HP, and the standing enemies rebuilt by the SAME `enemyCard()`
+   * the live row uses, so the attackers wear the same plan-driven slam poses and intent
+   * highlights. The strike plan was armed in `act()` BEFORE this paint and lives in
+   * `runtime.strikeSeq` (presentation state, like every other motion lifetime), so the
+   * dispatcher (`dispatchFx()`, called right after this paint by `act()`) replays the
+   * WHOLE killing turn on this stage on the plan's own divided clock — attacker dash,
+   * named damage float over the held hero's chest (`heroLane()` measures whatever
+   * `.fight .hero` is painted), tail steps, closing pulse. Nothing about the kernel's
+   * answer is re-derived or mutated: this is presentation replaying facts it already has.
+   *
+   * THEN THE DEATH. When the last slam has landed (`--death-delay` = the plan's own
+   * totalMs), the hero's figure plays its death beat — a collapse that dulls, sinks and
+   * dissolves into embers/ash (`hero-death`, `hero-ash` in style.css; CSS only, the same
+   * ember/ash vocabulary the stage already speaks). After that tail the panel repaints.
+   *
+   * THE GUARDS. Reduced motion never enters: `act()` arms no plan there, so the branch
+   * falls through and the panel is simply there — the information is static on it, which
+   * is the reduced-motion contract. » (the speed dock, painted on the hold itself, or the
+   * backdrop's skip) retires the plan and repaints, so the hold is skippable exactly like
+   * the live fight. The whole span gates on the UX-5 door the plan itself provides
+   * (`busyReason()` reads `strikeSeq` first): no card, no key, no End Turn while the
+   * turn-and-death sequence plays, and the stage is FULL from the first frame (AC-5.6's
+   * empty-stage bound never sees this window). paintedPhase is deliberately left at
+   * 'combat' so the panel's own entrance deal still plays when the beat ends.
+   */
+  const killerTurn = arriving.defeat && dyingThisPaint.length === 0
+    && Boolean(strikeSeq) && bursts.some((b) => b.kind === 'enemy-turn');
+  if (killerTurn) {
+    const plan = strikeSeq;
+    // The pose hold of the player's last card may still sit in its hit-stop grace window
+    // (heroPose's `start + dur + 260ms`), in which case heroFigure() would paint the
+    // figure with inline `animation: none` — and an inline style outranks the
+    // `.is-hero-death` rule, freezing the hero standing through the whole death beat.
+    // The held stage is the TURN's, not the last play's: the hold owns the pose.
+    setHeroMoveHold(null);
+    const holdWrap = el('div', { cls: 'stage-combat' });
+    const holdFight = el('div', { cls: 'fight' });
+    const holdBackdrop = el('div', { cls: 'backdrop', attrs: { 'aria-hidden': 'true' } });
+    holdBackdrop.innerHTML = backdropMarkup((BIOMES[snap.biome] ?? BIOMES[DEFAULT_BIOME]).backdrop);
+    // The skip the live backdrop honours: retire the plan (which also clears the plan's
+    // own busy reason) and repaint — the ended panel replaces the held stage at once.
+    // render() is the paint sink, so the callback paints directly.
+    holdBackdrop.addEventListener('pointerdown', () => { skipAnim(); render(); });
+    holdFight.append(holdBackdrop);
+    holdFight.append(el('div', { cls: 'ground', attrs: { 'aria-hidden': 'true' } }));
+    const heldHero = heroFigure();
+    const deathFig = typeof heldHero.querySelector === 'function' ? heldHero.querySelector('.fig') : null;
+    if (deathFig && deathFig.classList) deathFig.classList.add('is-hero-death');
+    // `--death-delay` rides the .hero CONTAINER, not the .fig: the figure and the ash
+    // span below are SIBLINGS, and custom properties inherit downward only — written on
+    // the container, both children read the same plan total (the death collapse starts
+    // when the last slam has landed; the ash rises on that same clock). setProperty is
+    // guarded — only a real CSSOM can hold custom properties.
+    if (heldHero.style && heldHero.style.setProperty) {
+      heldHero.style.setProperty('--death-delay', `${plan ? plan.totalMs : 0}ms`);
+    }
+    // The ash: three rising motes timed to the same delay (the stylesheet staggers them).
+    heldHero.append(el('span', { cls: 'hero-ash', attrs: { 'aria-hidden': 'true' } },
+      el('i', {}), el('i', {}), el('i', {})));
+    holdFight.append(heldHero);
+    const holdEnemies = el('div', { cls: 'enemies' });
+    (snap.enemies || []).forEach((e, i) => holdEnemies.append(enemyCard(e, i)));
+    holdFight.append(holdEnemies);
+    const holdDock = speedDock();
+    // ANY dock press on the held stage retires the plan: 1×/2× cannot re-pace timers
+    // already scheduled, so on the hold they read as the skip the » button documents —
+    // without this, a 1×/2× press repainted the panel with the plan still armed (its
+    // busyReason swallowing keys over the finished screen until the hold's own wait
+    // retired it). Capture phase: the retirement lands before the button's own handler.
+    holdDock.addEventListener('click', () => setStrikeSeq(null), true);
+    holdFight.append(holdDock);
+    holdWrap.append(holdFight, el('div', { cls: 'ended-hold', attrs: { 'aria-hidden': 'true' } }));
+    // The hold stage must sit in the SAME page wrapper combatView uses (`page-combat`
+    // sizes and positions the fight), or the hero lands outside the frame and the
+    // backdrop loses its lighting — a near-black stage instead of the fight it ended.
+    stageEl.replaceChildren(page('combat', t('combat.chapter'), 'blade', '', [holdWrap]));
+    // How long the stage holds: the killing turn's own plan total (every slam, every
+    // named float, the tail), then the death beat (HERO_DEATH_MS) plus the 200 ms its
+    // ash tail needs after it (120 ms of mote stagger + 80 ms of settle). One clock, the
+    // plan's plus one figure — nothing here invents a second timing system.
+    const wait = plan ? plan.totalMs + animMs(HERO_DEATH_MS + 200) : 0;
+    // The killing turn's discard phase emits a `deal` burst (the hand emptied), but the
+    // hold paints no hand and the panel arrives only after the beat — the deal clock
+    // armed for that burst must not own a release repaint here: measured, its ~720ms
+    // release repainted the ended panel into the middle of the sequence. Retiring the
+    // clock NOW no-ops its own release callback (it guards on clock identity) and keeps
+    // this branch the sole owner of the wait.
+    setDealPending(false);
+    setDealClock(null);
+    // The plan's retirement is THIS branch's job (act() schedules none for the killing
+    // turn): when the death beat is over, retire the plan — which releases the UX-5
+    // gate with it — and repaint into the panel, whose entrance still plays because
+    // paintedPhase was left at 'combat'.
+    laterPaint(() => { setStrikeSeq(null); render(); }, wait);
+    setLastPlayerStatuses(statusKeysNow);
+    setLastEnemyStatuses(enemyStatusKeysNow);
+    setPrevEnemies((snap.enemies || []).map((e) => ({ index: e.index, id: e.id, name: e.name })));
+    setEnteringIds(new Set());
+    return;
+  }
   if (endHeld && dyingThisPaint.length > 0) {
     // The killing stroke must still be SEEN. The old hold painted only the dying ghost +
     // a spacer, so the hero vanished the instant its blow landed and the victory panel
@@ -292,14 +415,11 @@ export function render() {
     sceneBeat(paintedPhase, snap.phase);
     setPaintedPhase(snap.phase);
   }
-  // The first-run explanation, shown once. A player who has never seen the game should
-  // not have to guess what "3 Energy" or an enemy's announced attack means.
-  let seen = false;
-  try { seen = localStorage.getItem(HELP_SEEN_KEY) === '1'; } catch { seen = true; }
-  // The battle moved on underneath a target step (the hand changed, the fight ended): the
-  // step is no longer about anything real, so it ends silently rather than aiming at a
-  // stale slot.
-  if (helpOpen || !seen) stageEl.append(helpPanel());
+  // The first-run explanation is now the TOUR (tourSync below): a fresh boot paints the
+  // coach-marks on the kindling screen instead of the auto-opened Help sheet, and BOTH
+  // onboarding flags are written when the tour ends (tour.js closeTour). Help still
+  // opens through its own HUD button, exactly as before — never automatically.
+  if (helpOpen) stageEl.append(helpPanel());
   // The S1 master-deck viewer, when the player opened it from the HUD. It paints AFTER the
   // phase view like the help sheet, and its `.modal-back` covers the stage, so the run
   // underneath stays untouched (and unclickable) while it is open.
@@ -318,6 +438,10 @@ export function render() {
     if ((snap.belt ?? []).some((r) => r.slot === beltOpenSlot)) stageEl.append(beltPanel());
     else setBeltOpenSlot(null);
   }
+  // The product tour's paint-path hook (ONBOARDING-TOUR spec): it may open on a fresh
+  // boot, follow a phase change, and re-measure its shade ring against THIS paint's
+  // layout. It repaints nothing and owns no rule (see tour.js tourSync).
+  tourSync(phaseChanged);
   // The arriving VICTORY or DEFEAT panel takes the caret, so a keyboard player lands on
   // Restart instead of at the top of the document. Best effort, and never a rule.
   if (endFocusPending) {

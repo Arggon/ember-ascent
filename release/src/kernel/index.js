@@ -21,7 +21,7 @@ import { rollQuests, advanceQuests } from './rules/quests.js';
 // One row per action kind: what step() dispatches to (the mechanics live in rules).
 import { STEP_HANDLERS } from './rules/steps.js';
 import './rules/effects/index.js'; // registers the exotic handlers exactly once
-import { observe as observeState, observeActions, snapshot as snapshotState, cardPool } from './observe.js';
+import { observe as observeState, observeActions, snapshot as snapshotState, cardPool, intentChips } from './observe.js';
 import {
   describeCard as describeCardDef,
   describeEffect,
@@ -31,6 +31,9 @@ import {
   describeCardType,
   describePlayability,
   describeTile,
+  describeVerbChip,
+  cardChips,
+  chipsCover,
   GLOSSARY_SECTIONS,
   glossary,
   helpTopics,
@@ -43,7 +46,7 @@ _setCardDefs(defaultContent().cards);
 export { hashState as hash, canonical };
 // B5: the one biome table, for surfaces (GUI picker, Act I card, CLI).
 export { BIOMES, DEFAULT_BIOME };
-export { observeState as observe, observeActions, snapshotState as snapshot };
+export { observeState as observe, observeActions, snapshotState as snapshot, intentChips };
 // S2 card codex: the draft pool, enriched through the describe layer. Exported as a
 // FUNCTION, not a snapshot field, on purpose — the pool is content-derived and
 // phase-independent, so no action repaint should carry 39 descriptions it did not ask for.
@@ -59,6 +62,12 @@ export {
   describeCardType,
   describePlayability,
   describeTile,
+  // The effect-chip layer (the card faces' icon row): the per-chip explainer sentence,
+  // the chip list of one definition, and the "fully covered" flag a tile reads before it
+  // drops the visible sentence. Kernel-owned for the same reason every other sentence is.
+  describeVerbChip,
+  cardChips,
+  chipsCover,
   glossary,
   helpTopics,
 };

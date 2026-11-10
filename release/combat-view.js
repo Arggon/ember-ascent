@@ -7,7 +7,7 @@
 // hold through incidental repaints. The hero's movement is chosen by WHICH card was
 // played (hero-moves.js), never only by its type.
 
-import { BIOMES, DEFAULT_BIOME, describeTile, loadContent } from './src/kernel/index.js';
+import { BIOMES, DEFAULT_BIOME, describeTile, intentChips, loadContent } from './src/kernel/index.js';
 import {
   HERO_POSE_MS,
   SPEED_KEY,
@@ -32,11 +32,11 @@ import {
   strikeSlot,
 } from './runtime.js';
 import { el, keywordText } from './dom.js';
-import { TEMPER_GLYPH, TYPE_GLYPH, enemyLook, glyphBox } from './glyphs.js';
+import { EFFECT_GLYPH, TEMPER_GLYPH, TYPE_GLYPH, enemyLook, glyphBox } from './glyphs.js';
 import { heroMove, isMeleeMove, signatureFor } from './hero-moves.js';
-import { backdropMarkup, enemyMarkup, enemyVariant, heroMarkup, attackTier, intentGlyph } from './stage-art.js';
+import { backdropMarkup, enemyMarkup, enemyVariant, heroMarkup } from './stage-art.js';
 import { cardArtMarkup } from './card-art.js';
-import { dyingCard, efxBox, freshEnemyStatusKeys, heroEfx, hitClass } from './floats.js';
+import { dyingCard, efxBox, freshEnemyStatusKeys, freshStatusKeys, heroEfx, hitClass } from './floats.js';
 import { aimed, cancelTargeting, clickCard, consumeClick, enemyLabel, pendingCard, pendingSlot, pickTarget, setAimed } from './targeting.js';
 import { act } from './actions.js';
 import { page } from './page-frame.js';
@@ -97,16 +97,24 @@ export function heroFigure() {
     attrs: { role: 'group', 'aria-label': t('combat.hero.aria', { name: snap.characterName || 'Ashwright', hp: p.hp, max: p.maxHp, block: p.block }) },
   });
   const fig = el('div', { cls: `fig pose-${pose}`, attrs: { 'aria-hidden': 'true' } });
-  // The stage tree is rebuilt on every paint, which would restart the keyframe from 0%
-  // on each hover repaint during the hold. A negative animation-delay resumes the run
-  // from where it should be, so the movement stays in phase across repaints.
+  // The stage tree is rebuilt on every paint, which would restart every pose keyframe
+  // from 0% on each repaint during the hold. MID-RUN a negative animation-delay resumes
+  // the run where it should be, so the movement stays in phase across repaints. PAST
+  // THE END (hit-stop grace) the pose class stays but every layer is frozen with
+  // animation:none — which lands each child on its own base styles, the pose's natural
+  // end state (idle sprite visible, frames at their base opacity 0, no transform) — so
+  // no repaint can ever replay the swing. The layers are the .fig AND every child its
+  // markup paints (.sh, .spr, each .spr-frame-*): the children are phased together
+  // further down, once the markup above has painted them.
   const held = heroMoveHold;
-  if (held && held.pose === pose && pose !== 'idle') {
-    const elapsed = Math.max(0, Date.now() - held.start);
-    if (elapsed < held.dur) {
+  const holding = Boolean(held && held.pose === pose && pose !== 'idle');
+  const heldElapsed = holding ? Math.max(0, Date.now() - held.start) : -1;
+  const midRun = holding && heldElapsed < held.dur;
+  if (holding) {
+    if (midRun) {
       // Mid-run: resume the keyframe where it should be, so hover repaints do not stutter.
       fig.style.animationDuration = `${held.dur}ms`;
-      fig.style.animationDelay = `-${elapsed}ms`;
+      fig.style.animationDelay = `-${heldElapsed}ms`;
     } else {
       // Past the end (hit-stop grace): keep the pose class but stop the motion, so a
       // repaint can never replay the swing.
@@ -118,8 +126,10 @@ export function heroFigure() {
   // back, over the pose's full duration. The distance lands after the paint (fx.js
   // measures it and writes --approach-x both live and onto this hold), so a mid-hold
   // repaint re-applies it from here. Reduced motion and speed 0 never arm the hold.
-  if (held && held.melee && held.pose === pose) {
-    const elapsed = Math.max(0, Date.now() - held.start);
+  // MID-RUN ONLY: past the end the class stays off — the approach's 100% keyframe is
+  // translateX(0), the hero's own place, so a grace-window repaint cannot restart the
+  // walk from 0%.
+  if (held && held.melee && held.pose === pose && midRun) {
     node.classList.add('is-approach');
     // setProperty is guarded: the fake-DOM test hosts carry a plain style object, and
     // only a real CSSOM can hold custom properties anyway.
@@ -127,14 +137,26 @@ export function heroFigure() {
       node.style.setProperty('--approach-dur', `${held.dur}ms`);
       if (held.approachX != null) node.style.setProperty('--approach-x', `${held.approachX}px`);
     }
-    if (elapsed < held.dur) {
-      node.style.animationDuration = `${held.dur}ms`;
-      node.style.animationDelay = `-${elapsed}ms`;
-    } else {
-      node.style.animation = 'none';
-    }
+    node.style.animationDuration = `${held.dur}ms`;
+    node.style.animationDelay = `-${heldElapsed}ms`;
   }
   fig.innerHTML = heroMarkup(snap.character);
+  // The pose's frame layers are the .fig's CHILDREN, painted fresh by the markup above
+  // — the .fig's own phasing does not cover them, and an unphased child restarts its
+  // timeline from 0% on the next repaint (the whole swing replaying after its impact).
+  // Phase them with the .fig: mid-run they resume at the hold's elapsed point; past
+  // the end they freeze with it. (Only a real DOM parses markup into children; the
+  // fake-DOM test hosts carry no child list, so this sweep is empty there.)
+  if (holding) {
+    for (const child of fig.children ?? []) {
+      if (midRun) {
+        child.style.animationDuration = `${held.dur}ms`;
+        child.style.animationDelay = `-${heldElapsed}ms`;
+      } else {
+        child.style.animation = 'none';
+      }
+    }
+  }
   node.append(fig);
   node.append(el('div', { cls: 'hero-name', text: snap.characterName || 'Ashwright' }));
   node.append(el('div', { cls: 'ehp', text: `${p.hp}/${p.maxHp}` }));
@@ -142,6 +164,29 @@ export function heroFigure() {
   bar.querySelector('i').style.width = `${Math.max(0, Math.round((p.hp / Math.max(1, p.maxHp)) * 100))}%`;
   node.append(bar);
   if (p.block > 0) node.append(el('div', { cls: 'eblock', text: `⛨ ${p.block}` }));
+  // PARITY: the hero's statuses (Vulnerable, Weak, …) read as CHIPS under her own HP
+  // bar — mark + stacks, the card chips' own component — instead of a full sentence per
+  // pill: the user reads an icon and a number, and the sentence is one click away (the
+  // kernel's own explain, through the shared popover) and on the chip's native title.
+  // The hero card is a read-only readout (a div), so the chips are real controls. The
+  // juice-in diff is unchanged (`freshStatusKeys` diffs against the PREVIOUS paint,
+  // which render.js records before this view is built) — the entrance class moves onto
+  // the chip, and the reduced-motion block neutralizes it there like it does the pills.
+  // Powers (run-long counters: Combust, Rupture, …) STAY on the HUD: they outlive the
+  // fight, and this card exists only in combat.
+  const freshHero = freshStatusKeys(p.statuses || []);
+  const heroStatuses = (p.statuses || []).map((s) => chipNode(
+    {
+      verb: 'status',
+      status: s.key,
+      num: String(s.stacks ?? 0),
+      label: s.name || s.label || s.key,
+      explain: s.explain || s.text || '',
+    },
+    true,
+    freshHero.has(s.key) ? 'juice-in' : '',
+  ));
+  if (heroStatuses.length > 0) node.append(el('div', { cls: 'e-statuses' }, ...heroStatuses));
   node.append(heroEfx());
   return node;
 }
@@ -222,28 +267,6 @@ function enemyPose(e) {
   return 'idle';
 }
 
-export function intentBadge(e) {
-  const kind = e.intent.kind;
-  let which = 'buff';
-  let tier = 1;
-  if (kind === 'attack') {
-    tier = attackTier(e.intent.damage);
-    which = tier >= 3 ? 'meteor' : tier >= 2 ? 'axe' : 'dagger';
-  } else if (kind === 'block') which = 'shield';
-  else if (kind === 'debuff') which = 'down';
-  const badge = el('div', {
-    cls: `intent-badge kind-${kind} tier-${tier}`,
-    attrs: { title: e.intent.text || e.intent.label || '', 'aria-hidden': 'true' },
-  });
-  badge.innerHTML = intentGlyph(which);
-  if (kind === 'attack') {
-    // `damage` is the intent's TOTAL (all hits); the badge reads per-hit × hits, as the label does.
-    const n = e.intent.hits > 1 ? `${Math.round(e.intent.damage / e.intent.hits)}×${e.intent.hits}` : String(e.intent.damage ?? '');
-    badge.append(el('b', { cls: 'intent-num', text: n }));
-  }
-  return badge;
-}
-
 function pileButton(which) {
   const isDraw = which === 'draw';
   const count = snap.piles[which] ?? 0;
@@ -282,7 +305,11 @@ function energyOrb() {
   );
 }
 
-function speedDock() {
+/**
+ * The »/1×/2× dock. Shared with render.js's defeat hold, which paints the same dock on
+ * the held stage so the killing turn can be skipped exactly like a live fight's.
+ */
+export function speedDock() {
   const dock = el('div', { cls: 'speed-dock', attrs: { role: 'group', 'aria-label': t('combat.speed.aria') } });
   const add = (speed, text, title) => dock.append(el('button', {
     cls: 'btn ghost speed-btn' + (animSpeed === speed ? ' is-on' : ''),
@@ -389,15 +416,28 @@ export function combatView() {
   // The row paints the LINEUP the stroke was aimed at: a just-killed enemy keeps its slot
   // as a collapsing ghost and the survivors keep theirs, so the killing blow reads
   // against the target it was aimed at and no survivor slides into a dead foe's place
-  // while the weapon is still in the air. (The row never reorders, so the stable kernel
-  // index IS the old slot; death only removes — living slots and ghost slots together
-  // are exactly 0..n-1.)
-  const ghostAt = new Map(dyingThisPaint.map((d) => [d.enemy, d]));
+  // while the weapon is still in the air. (The row never reorders, so a ghost holds the
+  // slot its body occupied in the PREVIOUS row — the burst's `slot`, its position in the
+  // before snapshot's enemies array, the same position the aim's `targetK` names. The
+  // stable kernel `index` is a DIFFERENT namespace: the kernel keeps dead rows in its
+  // enemy list while snapshots omit them, so once one death has left the painted row
+  // every later stable index sits ABOVE its painted position — keying ghosts by it put
+  // the ghost past the row's end and fed `undefined` into enemyCard. Living slots and
+  // ghost slots together are exactly 0..n-1.)
+  const ghostAt = new Map(dyingThisPaint.map((d) => [d.slot, d]));
   const slots = snap.enemies.length + dyingThisPaint.length;
   const row = el('div', { cls: 'enemies' });
   for (let slot = 0, live = 0; slot < slots; slot += 1) {
-    if (ghostAt.has(slot)) row.append(dyingCard(ghostAt.get(slot)));
-    else row.append(enemyCard(snap.enemies[live], live++));
+    const ghost = ghostAt.get(slot);
+    if (ghost) row.append(dyingCard(ghost));
+    else if (snap.enemies[live]) row.append(enemyCard(snap.enemies[live], live++));
+    /* DEFENSIVE (must stay unreachable): the partition above is computed, not assumed —
+     * `slot` is the victim's own position in the before row, so every slot lands either a
+     * ghost or a living enemy. Should a future burst shape break that invariant, SKIP the
+     * hole here rather than crash the whole stage — an enemy card missing beats a dead
+     * screen. Do not tighten this into an assert: a throw here is the aimed-kill crash
+     * this loop once shipped with. */
+    else console.error('[combat] enemy row slot %d has no ghost and no living enemy (live=%d, slots=%d, dying=%o) — skipped', slot, live, slots, dyingThisPaint);
   }
   fight.append(row);
   fight.append(speedDock());
@@ -432,11 +472,13 @@ export function combatView() {
 }
 
 /**
- * One enemy card.
+ * One enemy card. Shared with render.js's defeat hold: the held stage paints the SAME
+ * builder, so the standing attackers wear the same plan-driven slam poses and delays the
+ * live fight was wearing when the killing turn began.
  * @param {any} e a snapshot enemy
  * @param {number} position its 0-based place among the LIVING enemies (= k - 1)
  */
-function enemyCard(e, position) {
+export function enemyCard(e, position) {
   const kind = e.intent.kind;
   const look = enemyLook(e.id);
   const targeting = pendingSlot !== null && snap.enemies.length > 1;
@@ -498,13 +540,13 @@ function enemyCard(e, position) {
 
   const pose = enemyPose(e);
   // UX-2: the sequenced attacker. The plan clock gives this enemy its own beat: the
-  // intent badge lights up exactly while ITS slam plays (a CSS animation whose delay is
-  // the same clock, so a repaint re-derives it without restarting the timeline), and the
-  // .fig's slam waits for (or resumes at) its slot. Reduced motion and » never arm a
-  // plan, so both fall through to the static forms.
+  // intent row (its `.e-intent` chips) lights up exactly while ITS slam plays (a CSS
+  // animation whose delay is the same clock, so a repaint re-derives it without
+  // restarting the timeline), and the .fig's slam waits for (or resumes at) its slot.
+  // Reduced motion and » never arm a plan, so both fall through to the static forms.
   const seq = strikeSlot(e.index);
   if (seq) {
-    // The badge highlight rides a CSS variable pair so the stylesheet owns the look and
+    // The row highlight rides a CSS variable pair so the stylesheet owns the look and
     // the plan only owns the clock. setProperty is guarded: the fake-DOM test hosts carry
     // a plain style object, and only a real CSSOM can hold custom properties anyway.
     if (card.style && card.style.setProperty) {
@@ -513,7 +555,39 @@ function enemyCard(e, position) {
     }
     card.classList.add('is-striking');
   }
-  card.append(intentBadge(e));
+  // UX-9 D3: the chip juices off THIS enemy's own previous status keys (per-index), not
+  // off the player's list, which made an enemy chip animate whenever the player gained one.
+  // Statuses read as CHIPS now — mark + stacks, no visible sentence (the user's ask):
+  // the kernel's explain is the native title and one click away through the shared
+  // popover. While TARGETING the enemy card is a native <button>, so the chips take the
+  // hand-card path (spans whose click stops propagation — clicking a chip must never
+  // pick the target); the rest state is a read-only readout (a div) and gets real
+  // controls, exactly like the read-only card tiles.
+  //
+  // THE SPLIT (the user's ask): the kernel publishes each row's `kind` (observe.js
+  // statusPairs, from vocabulary.js STATUS_KINDS — no key matching here). The enemy's
+  // own BUFFS go up with the intent row (hosted above the fig); the hero-applied
+  // DEBUFFS stay at the foot. A row missing `kind` (a hand-crafted snapshot) reads as a
+  // debuff — the bottom group it always rendered in before this split. Chip internals,
+  // the juice-in entrance and the targeting demotion are the same component in both
+  // rows; only which row hosts a chip changed.
+  const fresh = freshEnemyStatusKeys(e.index, e.statuses);
+  const statusChip = (s) => chipNode(
+    {
+      verb: 'status',
+      status: s.key,
+      num: String(s.stacks ?? 0),
+      label: s.name || s.label || s.key,
+      explain: s.explain || s.text || '',
+    },
+    !targeting,
+    fresh.has(s.key) ? 'juice-in' : '',
+  );
+  const buffs = e.statuses.filter((s) => s.kind === 'buff').map(statusChip);
+  const debuffs = e.statuses.filter((s) => s.kind !== 'buff').map(statusChip);
+  // Plain visual grouping: no sentence of its own (the chips carry their own aria),
+  // so a bare div — the same treatment the foot row has always had.
+  const buffRow = buffs.length > 0 ? el('div', { cls: 'e-statuses e-buffs' }, ...buffs) : null;
   const fig = el('div', { cls: `fig pose-${pose}${enemyVariant(e.id)}`, attrs: { 'aria-hidden': 'true' } });
   if (seq && pose === 'slam') {
     // Same resume mechanism as the hero's pose: a positive delay waits for the
@@ -525,6 +599,26 @@ function enemyCard(e, position) {
     }
   }
   fig.innerHTML = enemyMarkup(e.id);
+  // THE ENEMY'S OWN HEADLINE sits ABOVE the figure, where the retired intent badge used
+  // to float (the user's ask): the ACTIONS row (the `.e-intent` chips — what the enemy is
+  // about to do) topmost, then the enemy's own BUFFS (`.e-statuses.e-buffs`, from the
+  // kernel-published `kind`), then the art. The hero-applied DEBUFFS stay at the card's
+  // foot below (their own row further down this function). The strike-lit ring stays
+  // exactly what it was: the class and the --seq-* variables ride the CARD, the
+  // keyframes light `.e-intent` wherever the row lives, and both branch shapes below
+  // carry the class — so the animation follows the row up unchanged.
+  const plain = e.intent.text || `${e.intent.label}`;
+  const ichips = intentChips(e, currentLang());
+  card.append(ichips.length > 0
+    ? el('div', {
+        cls: `e-intent kind-${kind}`,
+        attrs: { role: 'group', title: plain, 'aria-label': plain },
+      }, ...ichips.map((c) => chipNode(c, !targeting)))
+    : el('div', {
+        cls: `e-intent kind-${kind}`,
+        attrs: { title: plain },
+      }, el('span', { cls: 'ilabel', text: plain })));
+  if (buffRow) card.append(buffRow);
   card.append(fig);
   // The target mark is a SHAPE, not a colour: a slot number, plus a crosshair on the
   // enemy the player has actually selected.
@@ -544,23 +638,228 @@ function enemyCard(e, position) {
     bb.querySelector('i').style.width = `${Math.min(100, Math.round((e.block / Math.max(1, e.maxHp)) * 100))}%`;
     card.append(bb);
   }
-  // UX-9 D3: the chip juices off THIS enemy's own previous status keys (per-index), not
-  // off the player's list, which made an enemy chip animate whenever the player gained one.
-  const fresh = freshEnemyStatusKeys(e.index, e.statuses);
-  const statuses = e.statuses.map((s) => el('span', {
-    cls: `pill ${s.key}` + (fresh.has(s.key) ? ' juice-in' : ''),
-    text: s.text || `${s.label} ${s.stacks}`,
-    attrs: { title: s.explain || '' },
-  }));
-  if (statuses.length > 0) card.append(el('div', { cls: 'e-statuses' }, ...statuses));
+  // The DEBUFF foot row: the statuses the kernel classifies as debuffs (Vulnerable,
+  // Weak — `kind: 'debuff'`), exactly where the single status row always sat. The
+  // floating-damage efx box follows it, as before.
   card.append(efxBox(e.index));
-  // The sentence stays readable under the figure. The badge above is the scaled glyph.
-  const plain = e.intent.text || `${e.intent.label}`;
-  card.append(el('div', {
-    cls: `e-intent kind-${kind}`,
-    attrs: { title: plain },
-  }, el('span', { cls: 'ilabel', text: plain })));
+  if (debuffs.length > 0) card.append(el('div', { cls: 'e-statuses' }, ...debuffs));
   return card;
+}
+
+/* ----------------------------------------------- effect chips (the card icon row) */
+//
+// The kernel publishes one chip per effect (`card.chips`, kernel-worded: `{verb,
+// status?, amount, num, label, explain}`); this layer only paints glyph + number and
+// opens the explainer. NO number or sentence is derived here — an unknown chip shape
+// simply renders without its number, and a card with no chips keeps its sentence.
+
+/** The one open explainer popover, plus the chip node it explains. One at a time, like
+ *  every other panel in the surface. Hosted on #pop-layer — NOT #fx-layer: the fx layer
+ *  is switched off wholesale for reduced-motion users (`#fx-layer { display: none }` in
+ *  the reduce block), and a popover inside it would be INVISIBLE for exactly the users
+ *  who most need the static reveal. A descendant rule cannot override that ancestor, so
+ *  the explainer gets its own always-visible fixed layer, created once on first open
+ *  (a sibling of #fx-layer, never cleared by render(), so a repaint under an open
+ *  popover cannot clip it inside the hand's overflow:hidden fan box or lose it). */
+let chipPop = null;
+let chipPopFor = null;
+
+/** The explainer's host layer, created lazily so narrow test hosts and pre-pop paints
+ *  never grow stray nodes. */
+function popLayer() {
+  if (chipPopHost && chipPopHost.parent) return chipPopHost;
+  let existing = null;
+  try { existing = document.getElementById('pop-layer'); } catch { /* no document */ }
+  if (existing) { chipPopHost = existing; return existing; }
+  const layer = document.createElement('div');
+  layer.setAttribute('id', 'pop-layer');
+  try { document.body.append(layer); } catch { /* no body in a narrow host */ }
+  chipPopHost = layer;
+  return layer;
+}
+let chipPopHost = null;
+
+/** Detach a node from both real and fake-DOM hosts (the test harness's nodes have no
+ *  .remove; splicing the parent's kid list is the same fact there). */
+function detachNode(node) {
+  if (!node) return;
+  if (typeof node.remove === 'function') { node.remove(); return; }
+  const p = node.parent;
+  if (p && Array.isArray(p.kids)) p.kids = p.kids.filter((k) => k !== node);
+}
+
+/** Close the chip explainer and hand focus back to the chip it came from (a read-only
+ *  chip is a real control; the keyboard user who opened this must not be dropped). */
+function closeChipPop() {
+  const back = chipPopFor;
+  detachNode(chipPop);
+  chipPop = null;
+  chipPopFor = null;
+  if (back && typeof back.focus === 'function') {
+    try { back.focus(); } catch { /* best effort */ }
+  }
+}
+
+/** Open (or toggle closed) the kernel-worded explainer for one chip node. Anchored to
+ *  the chip when the host can measure a rect (a real browser), flipped ABOVE the chip
+ *  when it would cross the viewport floor; the layer's CSS gives the unmeasured
+ *  fallback a sane resting spot, and the native `title` on the chip always carried the
+ *  same sentence for the no-JS/hover path. Focus moves to the popover's Close button
+ *  so a keyboard user lands inside what they just opened. */
+function openChipPop(chipNode, chip) {
+  if (chipPopFor === chipNode) { closeChipPop(); return; }
+  closeChipPop();
+  const host = popLayer();
+  if (!host || typeof host.append !== 'function') return; // narrow host: the title still carries the sentence
+  const pop = el('div', {
+    cls: 'cfx-pop',
+    attrs: { role: 'dialog', 'aria-label': chip.explain || '' },
+  },
+    el('b', { cls: 'cfx-pop-label', text: chip.label || '' }),
+    el('p', { cls: 'cfx-pop-body', text: chip.explain || '' }),
+    el('button', {
+      cls: 'btn secondary cfx-pop-close',
+      text: t('combat.close'),
+      attrs: { type: 'button' },
+      on: { click: (ev) => { consumeClick(ev); closeChipPop(); } },
+    }),
+  );
+  let measured = false;
+  if (typeof chipNode.getBoundingClientRect === 'function') {
+    try {
+      const r = chipNode.getBoundingClientRect();
+      pop.style.left = `${Math.round(r.left + r.width / 2)}px`;
+      pop.style.top = `${Math.round(r.bottom + 6)}px`;
+      measured = true;
+    } catch { /* decorative positioning only; the CSS fallback stands */ }
+  }
+  host.append(pop);
+  chipPop = pop;
+  chipPopFor = chipNode;
+  // Viewport clamp, measured AFTER the append (the popover must be in the tree to have
+  // a height): a chip near the screen's bottom would push the sheet off-screen, so it
+  // flips above the chip instead. Purely presentational; skipped where unmeasurable.
+  if (measured) {
+    try {
+      const h = typeof pop.offsetHeight === 'number' ? pop.offsetHeight : 0;
+      const vh = (typeof window !== 'undefined' && Number.isFinite(window.innerHeight)) ? window.innerHeight : 0;
+      if (h > 0 && vh > 0 && parseFloat(pop.style.top) + h + 6 > vh) {
+        const r = chipNode.getBoundingClientRect();
+        pop.style.top = `${Math.round(r.top - 6)}px`;
+        pop.classList.add('cfx-pop-above');
+      }
+    } catch { /* decorative only */ }
+  }
+  const closer = pop.querySelector ? pop.querySelector('.cfx-pop-close') : null;
+  if (closer && typeof closer.focus === 'function') {
+    try { closer.focus(); } catch { /* best effort */ }
+  }
+}
+
+// Escape closes the explainer. A dismissal by tapping OUTSIDE it must never also play
+// the card under the finger, and the swallow has to happen on CLICK: the Pointer Events
+// spec exempts `click` from pointerdown cancellation, so stopping pointerdown alone
+// would still let the tap through to the play button. Both listeners sit in capture
+// phase at the document, ahead of every card handler; the popover's own buttons and the
+// chips (which toggle) are let through. Registered once at module load, like i18n's
+// document-level lang sync.
+let chipPopSwallowUntil = 0;
+const insideChipUi = (at) => Boolean(at && typeof at.closest === 'function'
+  && (at.closest('.cfx-pop') || at.closest('.cfx-chip')));
+const swallowClick = (ev) => {
+  if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+  if (typeof ev.preventDefault === 'function') ev.preventDefault();
+};
+try {
+  document.addEventListener('keydown', (ev) => {
+    if (chipPop && (ev.key === 'Escape' || ev.key === 'Esc')) closeChipPop();
+  });
+  document.addEventListener('pointerdown', (ev) => {
+    if (!chipPop || !ev) return;
+    if (insideChipUi(ev.target)) return;
+    // Close early (feels immediate) and arm a short swallow window: the click this
+    // press produces is exempt from pointerdown cancellation, so it is stopped below.
+    closeChipPop();
+    chipPopSwallowUntil = Date.now() + 600;
+  }, true);
+  document.addEventListener('click', (ev) => {
+    if (!ev) return;
+    if (chipPop) {
+      if (insideChipUi(ev.target)) return; // chips toggle, popover buttons work
+      closeChipPop();
+      swallowClick(ev);
+      return;
+    }
+    // The press that dismissed us just produced this click: swallow it.
+    if (Date.now() < chipPopSwallowUntil) {
+      chipPopSwallowUntil = 0;
+      swallowClick(ev);
+    }
+  }, true);
+} catch { /* narrow test hosts with no document */ }
+
+/**
+ * One chip: the mark, the kernel's number, the kernel's sentence as the native title.
+ * On READ-ONLY tiles (a div) the chip is a real interactive element (role=button,
+ * tabindex, Enter/Space). On hand tiles the tile is a native <button> and nested
+ * interactive elements are invalid HTML, so the chip stays a span whose pointer click
+ * opens the explainer with stopPropagation — swallowing the play click, because
+ * clicking a chip must NEVER play the card. The trade-off the span buys: a disabled
+ * hand tile (no Energy, busy gate) also swallows its children's clicks in a real
+ * browser, so those chips explain through their native title only, and keyboard users
+ * reach the same sentence through the tile's aria-label, which always carries it.
+ * @param {any} chip a kernel-published chip row
+ * @param {boolean} readOnly the containing tile is a READ-ONLY READOUT, so the chip
+ *   becomes a real control (role=button, tabbable); inside a native button (a hand tile,
+ *   a targeting-mode enemy card) it stays an inert span — but with tabindex -1, so
+ *   closing the explainer can still hand focus back to the chip it came from
+ * @returns {HTMLElement}
+ */
+function chipNode(chip, readOnly, extraCls = '') {
+  const mark = EFFECT_GLYPH[chip.status ?? chip.verb] || 'rune';
+  const node = el('span', {
+    cls: 'cfx-chip' + (extraCls ? ` ${extraCls}` : ''),
+    attrs: {
+      title: chip.explain || '',
+      'aria-label': chip.explain || '',
+      ...(readOnly ? { role: 'button', tabindex: '0' } : { tabindex: '-1' }),
+    },
+  },
+    glyphBox(mark, 'cfx-mark'),
+    chip.num ? el('b', { cls: 'cfx-num', text: chip.num }) : null,
+  );
+  const open = (ev) => {
+    consumeClick(ev);
+    // The play click dies here: the chip sits inside the play button, and without the
+    // stopPropagation the hand tile would fire right after this handler in a real DOM.
+    if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    openChipPop(node, chip);
+  };
+  node.addEventListener('click', open);
+  if (readOnly) {
+    node.addEventListener('keydown', (ev) => {
+      if (ev && (ev.key === 'Enter' || ev.key === ' ')) {
+        if (typeof ev.preventDefault === 'function') ev.preventDefault();
+        open(ev);
+      }
+    });
+  }
+  return node;
+}
+
+/**
+ * The chip row for one tile: one chip per kernel-published effect.
+ * @param {any[]} chips the snapshot card's `chips` (may be empty)
+ * @param {boolean} readOnly the tile is a fact, not a control
+ * @returns {HTMLElement}
+ */
+function chipRow(chips, readOnly) {
+  // role="group": the enemy-card readout pattern. Without a role, the aria-label on a
+  // plain span is ignored by assistive tech — the row's name would never be heard.
+  return el('span', {
+    cls: 'cfx',
+    attrs: { role: 'group', 'aria-label': t('card.effects') },
+  }, ...chips.map((c) => chipNode(c, readOnly)));
 }
 
 /**
@@ -601,7 +900,13 @@ export function cardTile(card, opts = {}) {
   // The plain-English text comes from the kernel (`describeCard`), never from the
   // renderer. The compact shorthand stays visible but secondary and labelled, so a
   // reader who meets "A6" in the CLI can still connect the two.
-  const desc = card.description || card.summary;
+  // PARITY-2: while THIS card waits for a target, its sentence is the AIMED enemy's own
+  // variant (kernel-published `descriptionsByTarget`, keyed by the same 1-based living
+  // slot `aimed` holds) — the fold preview follows the crosshair, so a Vulnerable foe
+  // shows its amplified number the moment the pointer rests on it. No variant, or not
+  // aiming: the resting face.
+  const aimedDesc = isPending && aimed != null ? (card.descriptionsByTarget?.[aimed] ?? null) : null;
+  const desc = aimedDesc || card.description || card.summary;
   const awaiting = isPending ? t('combat.choosing') : '';
   // The locked wait is named in the tile's own sentence (the i18n busy keys), so a
   // screen reader hears why the playable card is not taking input right now.
@@ -671,7 +976,24 @@ export function cardTile(card, opts = {}) {
   }
   tile.append(el('span', { cls: 'cname', text: card.name }));
   if (card.flavor) tile.append(el('span', { cls: 'cflavor', text: card.flavor }));
-  tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));
+  // The EFFECT CHIPS occupy the rules row on every surface, and they own it outright
+  // when the kernel says the chips say the whole card (`chipsComplete`): the long
+  // sentence then leaves the visible face but stays in the tile's title and aria-label
+  // above (they already carry `desc`). A card whose effects are not fully chip-
+  // expressible (a `custom` verb) keeps its sentence BESIDE the chips, so nothing its
+  // text says is ever lost to the icons. Rows without chips (an old snapshot) fall
+  // straight through to the sentence — the old face.
+  // PARITY-2b: while THIS card waits for a target, its chip row is the AIMED enemy's
+  // own variant (kernel-published `chipsByTarget`, keyed by the same 1-based living slot
+  // `aimed` holds) — the same swap `aimedDesc` performs on the sentence, so a covered
+  // card's hidden fold still shows its amplified number under the crosshair. No variant
+  // for this enemy, or not aiming: the resting face.
+  const chips = (isPending && aimed != null ? (card.chipsByTarget?.[aimed] ?? null) : null)
+    || (Array.isArray(card.chips) ? card.chips : []);
+  if (chips.length > 0) tile.append(chipRow(chips, readOnly));
+  if (!(chips.length > 0 && card.chipsComplete === true)) {
+    tile.append(keywordText(el('span', { cls: 'cdesc' }), desc));
+  }
   // The compact code is NOT repeated on a reward tile: the player is choosing a card to
   // keep, not playing one, so the shorthand is noise there.
   if (card.showSummary !== false) {
@@ -723,7 +1045,7 @@ const GALLERY_FACTS = {};
 
 /**
  * The describe-layer facts one content card needs for a read-only tile: its sentence,
- * its flavor line, and its type word — computed in the CURRENT language and cached per
+ * its flavor line, its type word, and its effect-chip row — computed in the CURRENT language and cached per
  * language, so a language switch re-derives exactly once like the codex pool cache.
  * The kernel's own `describeTile` is the fact bundle (it feeds the hand tiles' fields:
  * the name, the cost, the SHORT type word, the describe sentence), so every word here is
@@ -748,9 +1070,13 @@ export function cardDescribe(cardId) {
           flavor: (lang === 'es' ? (def.flavor_es ?? def.flavor) : def.flavor) || '',
           type: tile.type,
           typeLabel: tile.typeLabel,
+          // The chip row rides the same fact bundle (describeTile's own), so a caller
+          // that builds tiles from facts alone still paints kernel-worded icons.
+          chips: tile.chips,
+          chipsComplete: tile.chipsComplete,
         };
       })()
-    : { description: '', flavor: '', type: 'unknown', typeLabel: 'unknown' };
+    : { description: '', flavor: '', type: 'unknown', typeLabel: 'unknown', chips: [], chipsComplete: false };
   per.set(cardId, fact);
   return fact;
 }
