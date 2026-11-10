@@ -2658,22 +2658,30 @@ test('la pose melee no se repite tras el impacto (Hammerfall)', { timeout: 60000
 //     six coach-marks over the REAL screens, anchored to elements the views
 //     already paint, phase-gated (review round 2): a Next/Back exists only
 //     where its destination step shares the phase on screen, and an action
-//     step (kindling, map) carries a hint line instead. The tour tests are the
-//     INVERSE of the mainline walks' addInitScript contract: they seed NO flag
-//     by default (fresh onboarding), and seed both explicitly only where the
-//     claim is about a veteran. Every title carries 'tour' so the suite runs
-//     isolated with --test-name-pattern=tour. Real clicks and real keys only;
-//     the tour's own published truth (window.__dlb.tour) is what the walks
-//     wait on.
+//     step (kindling, map) carries a hint line instead. THE LANGUAGE PRE-STEP
+//     (the language ask): a fresh-onboarding boot whose player never chose a
+//     language opens on the bilingual language card BEFORE the heroes step —
+//     choosing there (or any exit) writes dlb.lang and it never shows again;
+//     a browser whose locale starts with 'es' boots Spanish WITHOUT dlb.lang
+//     until the choice. The tour tests are the INVERSE of the mainline walks'
+//     addInitScript contract: they seed NO flag by default (fresh onboarding),
+//     and seed both explicitly only where the claim is about a veteran. Every
+//     title carries 'tour' so the suite runs isolated with
+//     --test-name-pattern=tour. Real clicks and real keys only; the tour's own
+//     published truth (window.__dlb.tour) is what the walks wait on.
 // ---------------------------------------------------------------------------
 /** A fresh page with NO onboarding flags seeded (or exactly the ones the test
  *  names). Mirrors freshPage but does not seed dlb.helpSeen.v1 — seeding it
- *  would hide the very surface these tests claim. */
-async function freshTourPage(t, { seed = 7, width = 1280, height = 800, flags = null } = {}) {
+ *  would hide the very surface these tests claim. `locale` overrides the
+ *  context's navigator.language (the browser-default language rule); `reduce:
+ *  false` runs with motion NORMAL — the tour's geometry claims must hold while
+ *  the card's entrance animation runs, not only under the reduce default. */
+async function freshTourPage(t, { seed = 7, width = 1280, height = 800, flags = null, locale = null, reduce = true } = {}) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width, height },
-    reducedMotion: 'reduce', // the tour's claims are structural, not animated
+    reducedMotion: reduce ? 'reduce' : 'no-preference',
+    ...(locale ? { locale } : {}),
   });
   t.after(() => { void browser.close(); });
   const page = await ctx.newPage();
@@ -2722,22 +2730,35 @@ const tourRing = (page, sel) => page.evaluate((anchorSel) => {
   };
 }, sel);
 
-test('tour: a fresh boot opens the guided tour on the kindling screen instead of the auto-Help sheet', { timeout: 120000 }, async (t) => {
+test('tour: a fresh boot opens on the language choice, then the guided tour on the kindling screen', { timeout: 120000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   const page = await freshTourPage(t);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
-  // The tour, not the sheet: the coach card is on the persistent layer with the
-  // heroes step up (review round 2: the run's first decision is hero + path, so the
-  // fresh boot lands there, not on the boon), and NO .modal is painted — the auto-Help
-  // is retired.
+  // THE LANGUAGE PRE-STEP comes first (the language ask): a fresh-onboarding boot whose
+  // player never chose reads the bilingual card — both languages at once, two native-
+  // named buttons — with NO step counter and NO shade ring: the kindling screen below
+  // must stay visible, because picking is supposed to flip it before the player's eyes.
   await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'the first step is the heroes one');
-  assert.equal(await page.locator('.modal').count(), 0, 'no auto-opened Help sheet');
+  assert.equal(await page.locator('.tour-count').count(), 0, 'the pre-step carries no n-of-6 counter');
+  assert.equal((await page.locator('.tour-head').first().textContent()).trim(), 'Idioma — Language', 'the title is bilingual');
+  const bodies = await page.locator('.tour-body').allTextContents();
+  assert.ok(bodies.some((b) => b.includes('Elige el idioma del juego')), 'the Spanish body is on the card');
+  assert.ok(bodies.some((b) => b.includes('Pick the game’s language')), 'the English body is on the card');
+  assert.equal(await page.getByRole('button', { name: 'Español' }).count(), 1, 'the native Spanish button');
+  assert.equal(await page.getByRole('button', { name: 'English' }).count(), 1, 'the native English button');
+  assert.equal(await page.locator('.tour-shade').count(), 0, 'no ring: the kindling screen stays visible');
+  assert.deepEqual(await page.evaluate(() => window.__dlb.tour()), { open: true, step: -1 }, 'the pre-step is the published truth');
+  assert.equal(await page.locator('.modal').count(), 0, 'no auto-opened Help sheet (still retired)');
   assert.equal(await page.getByRole('button', { name: 'Help' }).count(), 1, 'the HUD Help button still renders');
-  const state = await page.evaluate(() => window.__dlb.tour());
-  assert.deepEqual(state, { open: true, step: 0 }, 'the surface publishes the tour truth');
+
+  // Choosing ENGLISH (the en-US default, confirmed explicitly) writes dlb.lang and lands
+  // the heroes step with its full union ring — the review-round-2 claims, untouched.
+  await page.getByRole('button', { name: 'English' }).click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'the first REAL step is the heroes one');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en', 'the choice persisted');
   assert.equal(await page.locator('.tour-shade').count(), 4, 'the shade ring is up around the hero+path union');
   // Review round 2: the ring is the UNION of .hero-select and .biome-select — both
   // radio groups sit visible and clickable in the one hole.
@@ -2774,12 +2795,168 @@ test('tour: a fresh boot opens the guided tour on the kindling screen instead of
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
 });
 
+test('tour: choosing Español flips the tour AND the kindling screen to Spanish at once and persists the choice', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshTourPage(t);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+
+  // The pick re-snapshots the CURRENT run with {lang} (switchLang's move) and repaints:
+  // the coach card AND the kindling screen underneath read Spanish on the same beat.
+  await page.getByRole('button', { name: 'Español' }).click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Paso 1 de 6', 'the tour card is Spanish immediately');
+  assert.ok((await page.locator('.tour-head').first().textContent()).includes('Tu héroe y tu camino'), 'the heroes step narrates in Spanish');
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'es', '<html lang> followed the choice');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'es', 'dlb.lang was written');
+  assert.equal((await page.locator('.kindling-head').first().textContent()).trim(), 'La forja ofrece un rescoldo', 'the kindling screen underneath flipped too');
+  assert.equal(await page.getByRole('button', { name: 'Ayuda' }).count(), 1, 'the HUD reads Spanish too');
+
+  // PERSISTENCE: skip the tour (both flags), reload — Spanish stands, the tour is done.
+  await page.locator('.tour-skip').click();
+  await page.waitForFunction(() => window.__dlb.tour().open === false, null, { timeout: 5000 });
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await sleep(300);
+  assert.equal(await page.locator('.tour-card').count(), 0, 'the tour does not come back');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'es', 'the choice survived the reload');
+  assert.equal((await page.locator('.kindling-head').first().textContent()).trim(), 'La forja ofrece un rescoldo', 'the reload boots Spanish');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+test('tour: a Spanish browser boots in Spanish before any choice, and nothing is written until it chooses', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshTourPage(t, { locale: 'es-ES' });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+
+  // The browser default (i18n readLang): navigator.language es-ES reads Spanish in
+  // MEMORY — <html lang>, the kernel snapshot and the chrome are Spanish on the first
+  // paint — while dlb.lang stays UNWRITTEN: the explicit choice is the only writer.
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'es', 'the boot is Spanish');
+  assert.equal((await page.locator('.kindling-head').first().textContent()).trim(), 'La forja ofrece un rescoldo', 'the kernel narrates Spanish');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), null, 'and the choice is NOT written yet');
+  // The pre-step still asks: the default is the browser's guess, not the player's voice.
+  await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+  assert.deepEqual(await page.evaluate(() => window.__dlb.tour()), { open: true, step: -1 }, 'the language pre-step is up');
+  assert.equal(await page.getByRole('button', { name: 'Español' }).count(), 1, 'and it offers the native Spanish button');
+  assert.equal(await page.locator('.tour-lang[aria-pressed="true"]').textContent(), 'Español', 'the pressed default is the browser guess');
+
+  // Confirming the default with Next persists it — and only now does the key exist.
+  await page.locator('.tour-next').click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'es', 'the explicit confirmation wrote the key');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+test('tour: every exit from the language step persists — Next confirms the default, Escape writes it too', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const errors = [];
+
+  // (a) NEXT with nothing picked confirms the browser default (en-US → English) and
+  // advances: the key appears the moment the pre-step is left.
+  let page = await freshTourPage(t);
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), null, 'nothing written while the pre-step stands');
+  await page.locator('.tour-next').click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'Next advanced to the heroes step');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en', 'Next persisted the en-US default');
+  await page.close();
+
+  // (b) ESCAPE on the pre-step dismisses the whole tour AND persists — no exit leaves
+  // the choice unwritten, so the pre-step can never nag the same player twice.
+  page = await freshTourPage(t);
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__dlb.tour().open === false, null, { timeout: 5000 });
+  assert.equal(await page.locator('.tour-card').count(), 0, 'Escape closed the pre-step');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en', 'the Escape exit persisted the default too');
+  const flags = await page.evaluate(() => [localStorage.getItem('dlb.tourSeen.v1'), localStorage.getItem('dlb.helpSeen.v1')]);
+  assert.deepEqual(flags, ['1', '1'], 'and wrote both onboarding flags as any dismissal does');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+test('tour: the language card stays centred and every control click-reachable with motion normal', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const errors = [];
+  // Motion NORMAL: the .tour-card entrance animation runs, and its `to { transform: none }`
+  // keyframe (fill-mode 'both') overrides an inline transform for the card's whole life —
+  // review round 1 measured the inline translateX(-50%) stomped, the bottom-centre card
+  // hung 125px off the right edge at 390x844 (left 195 + width 320 = 515 > 390) and
+  // 'English'/'Next' were unreachable by click. The centring is now a computed pixel
+  // `left`, a property the keyframes never touch, so the resting geometry below must hold
+  // in every band INCLUDING the desktop one (the reduce default here hides the bug).
+  for (const [width, height] of [[1280, 800], [390, 844], [640, 460]]) {
+    const page = await freshTourPage(t, { width, height, reduce: false });
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+    await sleep(400); // the 0.24s entrance is over; the RESTING geometry is what must hold
+    const geo = await page.evaluate(() => {
+      const r = document.querySelector('.tour-card').getBoundingClientRect();
+      return { left: r.left, right: r.right, width: r.width, vw: window.innerWidth, vh: window.innerHeight };
+    });
+    assert.ok(geo.left >= 0 && geo.right <= geo.vw, `${width}x${height}: the card is fully inside the viewport (${JSON.stringify(geo)})`);
+    assert.ok(Math.abs(geo.left - (geo.vw - geo.width) / 2) < 1, `${width}x${height}: the card is centred (${JSON.stringify(geo)})`);
+    // Click-reachable, not just visible: elementFromPoint at each control's centre
+    // returns the control itself — the round-1 complaint was 'English' and 'Next' off
+    // the viewport, leaving only keyboard paths on a phone.
+    const hit = await page.evaluate(() => {
+      const probe = (btn) => {
+        const r = btn.getBoundingClientRect();
+        const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return at === btn || btn.contains(at);
+      };
+      const langs = [...document.querySelectorAll('.tour-lang')];
+      const next = document.querySelector('.tour-next');
+      const skip = document.querySelector('.tour-skip');
+      return { langCount: langs.length, langs: langs.map(probe), next: next ? probe(next) : false, skip: skip ? probe(skip) : false };
+    });
+    assert.equal(hit.langCount, 2, `${width}x${height}: both native language buttons render`);
+    assert.ok(hit.langs.every(Boolean), `${width}x${height}: 'Español' and 'English' are hit-testable at their centres`);
+    assert.ok(hit.next, `${width}x${height}: Next is hit-testable at its centre`);
+    assert.ok(hit.skip, `${width}x${height}: Skip is hit-testable at its centre`);
+    await page.close();
+  }
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+test('tour: taking a boon under the still-open language pre-step persists the default and follows the phase', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshTourPage(t);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+  assert.deepEqual(await page.evaluate(() => window.__dlb.tour()), { open: true, step: -1 }, 'the pre-step is up');
+
+  // The kindling screen under the pre-step dims NOTHING, so the player may act on it
+  // without choosing a language first — §3.5: that act is another exit from the pre-step
+  // (it persists the current default) and the tour FOLLOWS the phase, the same
+  // player's-hands jump the six steps ride.
+  await page.locator('button.boon').first().click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 2, null, { timeout: 5000 });
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en', 'the exit through an act persisted the en-US default');
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 3 of 6', 'the tour landed on the map step');
+  assert.ok(await page.evaluate(() => !!document.querySelector('.map')), 'the map is on stage');
+  assert.equal(await page.locator('.tour-shade').count(), 4, 'the ring re-anchored to the map');
+  assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
 test('tour: the steps advance by click and keyboard, follow the phase, and a shade click writes both flags', { timeout: 120000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   const page = await freshTourPage(t);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+
+  // The language pre-step stands first (the language ask): Next confirms the en-US
+  // default and lands the heroes step — from there the walk is the shipped six.
+  await page.locator('.tour-next').click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'the confirmed default lands the heroes step');
 
   // Heroes → kindling by Next: the destination step shares the kindling phase, so the
   // button exists and the phase gate lets it through.
@@ -2870,9 +3047,12 @@ test('tour: a dismissed tour never auto-opens again, and the Help sheet carries 
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
-  // A veteran boots twice: no tour card, and the retired auto-Help opens nothing.
+  // A veteran boots twice: no tour card, and the retired auto-Help opens nothing. This
+  // veteran has NO dlb.lang either — and still nothing asks (the language ask: replay
+  // and veterans are past onboarding; only a fresh boot meets the language pre-step).
   assert.equal(await page.locator('.tour-card').count(), 0, 'no tour on a veteran boot');
   assert.equal(await page.locator('.modal').count(), 0, 'no auto Help either');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), null, 'and no language was written for them');
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
   await sleep(300);
@@ -2891,7 +3071,8 @@ test('tour: a dismissed tour never auto-opens again, and the Help sheet carries 
   await replay.click();
   await page.waitForFunction(() => window.__dlb.tour().open === true, null, { timeout: 5000 });
   assert.equal(await page.locator('.modal').count(), 0, 'the sheet closed behind the tour');
-  // findIndex takes the FIRST kindling match: the heroes step, the run's first decision.
+  // findIndex takes the FIRST kindling match: the heroes step, the run's first decision —
+  // NEVER the language pre-step (the language ask: a replay never re-asks).
   assert.deepEqual(await page.evaluate(() => window.__dlb.tour()), { open: true, step: 0 }, 'the tour opened at the heroes step for the kindling phase');
   assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'the card reads the first step');
   const afterReplay = await page.evaluate(() => {
@@ -2919,6 +3100,7 @@ test('tour: a dismissed tour never auto-opens again, and the Help sheet carries 
   await page.waitForFunction(() => window.__dlb.tour().open === false, null, { timeout: 5000 });
   const flags2 = await page.evaluate(() => [localStorage.getItem('dlb.tourSeen.v1'), localStorage.getItem('dlb.helpSeen.v1')]);
   assert.deepEqual(flags2, ['1', '1'], 'the keyboard Skip rewrote the same flags');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), null, 'and the replay wrote no language either');
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
 });
 
@@ -2928,6 +3110,11 @@ test('tour: the combat steps anchor the hand, the intent row and End Turn, and f
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+
+  // The language pre-step first (the language ask): Next confirms the en-US default —
+  // the full six-step flow still works after the choice.
+  await page.locator('.tour-next').click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
 
   // Heroes → kindling by Next, then kindling → map BY DOING (the boon click through its
   // hole), then the map's own hole is the clickable region: travel to the first ordinary
@@ -2982,11 +3169,22 @@ test('tour: the coach card parks and stays legible in the small bands', { timeou
     const page = await freshTourPage(t, { width, height });
     page.on('pageerror', (e) => errors.push(e.message));
     await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+    // The language pre-step parks bottom-centre, fully on screen, and dims NOTHING —
+    // the kindling screen under it must stay readable in both bands.
+    assert.equal(await page.locator('.tour-shade').count(), 0, `${width}x${height}: the pre-step ring is absent`);
+    let parked = await page.evaluate(() => {
+      const r = document.querySelector('.tour-card').getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, vh: window.innerHeight };
+    });
+    assert.ok(parked.top >= 0 && parked.bottom <= parked.vh, `${width}x${height}: the pre-step card is fully on screen`);
+    // Choosing English lands the heroes step: the ring is up and the parked card never
+    // covers its own anchor (AC7) — the boot step is the heroes one, so the anchor is
+    // the hero+path union (measured this round: the bottom band clears it at 390x844
+    // and 700x440 alike).
+    await page.getByRole('button', { name: 'English' }).click();
+    await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
     assert.equal(await page.locator('.tour-shade').count(), 4, `${width}x${height}: the ring is up`);
-    // AC7: parked, fully on screen, and never covering its own anchor — the boot step
-    // is the heroes one, so the anchor is the hero+path union (measured this round:
-    // the bottom band clears it at 390x844 and 700x440 alike).
-    const parked = await page.evaluate(() => {
+    parked = await page.evaluate(() => {
       const r = document.querySelector('.tour-card').getBoundingClientRect();
       return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, vh: window.innerHeight };
     });
@@ -3004,6 +3202,10 @@ test('tour: taking a boon under the open tour lands the map step anchored to the
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
+
+  // The language pre-step first (the language ask): Next confirms the en-US default.
+  await page.locator('.tour-next').click();
+  await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
 
   // The real player's bug, pinned (review round 2): an action step parks the tour on
   // the player's act, and the act's own repaint must land the tour on the NEXT screen's

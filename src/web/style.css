@@ -8655,6 +8655,12 @@ button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
    (take the boon, travel a node) this line stands where a Next would mis-teach. */
 .tour-hint { margin: -4px 0 10px; font-size: var(--fs-2); color: var(--accent); }
 .tour-nav { display: flex; gap: 8px; align-items: center; }
+/* The language pre-step's button row (the language ask): two native-named choices side
+   by side, the current default marked by aria-pressed. The buttons wear the shared .btn
+   chrome; these rules keep the pair even on the narrow card. */
+.tour-langs { display: flex; gap: 8px; margin: 0 0 10px; }
+.tour-langs .tour-lang { flex: 1; }
+.tour-lang[aria-pressed='true'] { border-color: var(--accent); color: var(--ink); }
 /* The nav buttons wear the shared .btn chrome; these rules exist so the checker's class
    coverage is truthful (each emitted class has a rule) and to keep the row from wrapping
    apart on the narrow card. */

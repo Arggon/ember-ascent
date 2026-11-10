@@ -15,17 +15,48 @@
 // from ever falling back to the retired auto-opened Help sheet. A player with NEITHER
 // flag is "fresh onboarding" — the tour replaces that auto-Help as the first-run surface;
 // an old-Help veteran (helpSeen set) is onboarded and re-enters through Help's Replay.
+//
+// THE LANGUAGE PRE-STEP (LANG_STEP): on a fresh onboarding boot whose player has never
+// picked a language (i18n.js langChosen() false — no dlb.lang written), the tour's FIRST
+// card is the language choice, BEFORE the heroes step: bilingual copy (its whole job is
+// to be readable before any language exists) and two native-named buttons. Picking one,
+// pressing Next, or ANY other exit (Skip, Escape, an act on the undimmed kindling screen
+// below) persists the language — dlb.lang is written and the pre-step never shows again.
+// The replay entry (startTour) NEVER opens it: a veteran is past onboarding. No ring —
+// the kindling screen underneath stays fully visible, because watching it flip to the
+// chosen language is the point of choosing HERE.
+//
 // The shade ring is four dim boxes AROUND the anchor's rect: the marked element is the
 // one visible — and clickable — region, so the tour teaches by doing.
 
-import { snap, repaint } from './runtime.js';
+import { snap, repaint, ctl, setSnap } from './runtime.js';
 import { el, announce } from './dom.js';
-import { t } from './i18n.js';
+import { t, setLang, currentLang, langChosen } from './i18n.js';
 
 // The onboarding flag pair (spec §4): finishing or dismissing the tour writes BOTH, so
 // the strings live here and hud.js consumes HELP_SEEN_KEY from this module — no drift.
 export const TOUR_SEEN_KEY = 'dlb.tourSeen.v1';
 export const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
+
+/** The language pre-step's index in `tourStep`: NOT a member of STEPS (the other six
+ *  keep their 'n of 6' counter), one card BEFORE the heroes step, shown only while
+ *  `langChosen()` is false on a fresh onboarding boot. */
+const LANG_STEP = -1;
+
+/* The language pre-step's copy is BILINGUAL BY DESIGN, not STRINGS rows: its whole job
+ * is to be READABLE BEFORE any language has been picked, so both languages show at once
+ * (the title pairs them; the two buttons carry each language's NATIVE name) and a player
+ * who reads neither current default can still find their own. `t()` renders ONE language
+ * at a time — exactly wrong here — so these literals stay local and the i18n unit test's
+ * every-key-has-an-en-row rule deliberately does not see them. Every OTHER tour string
+ * stays in STRINGS (spec §7); the pre-step's chrome (Next, Skip) does too, because by
+ * the time it renders the browser default already speaks the player's locale. */
+const LANG_TITLE = 'Idioma — Language';
+const LANG_BODY_ES = 'Elige el idioma del juego — toda la interfaz lo sigue, y puedes cambiarlo después con el botón de idioma de la cabecera (EN/ES).';
+const LANG_BODY_EN = 'Pick the game\u2019s language — the whole interface follows it, and you can change it later with the header\u2019s language button (EN/ES).';
+/** Native names, keyed by the i18n language id — never translated: each button reads as
+ *  itself in the language it selects. */
+const LANG_NAMES = Object.freeze({ en: 'English', es: 'Español' });
 
 /** The six steps in player order. `phase` gates BOTH the contextual jump (a phase change
  *  under an open tour lands on the new phase's first step) and the Next/Back buttons (a
@@ -47,8 +78,9 @@ export let tourOpen = false;
 export let tourStep = 0;
 /** The step the overlay last painted, so focus and the live announcement fire on a step
  *  CHANGE only — tourSync runs on every repaint (a hover re-measures the ring), and
- *  refocusing the card per hover would steal the caret from the player. */
-let paintedAt = -1;
+ *  refocusing the card per hover would steal the caret from the player. The sentinel is
+ *  -2 because -1 is a REAL step now (the language pre-step). */
+let paintedAt = -2;
 
 const read = (key) => { try { return localStorage.getItem(key) === '1'; } catch { return true; } };
 const write = (key) => { try { localStorage.setItem(key, '1'); } catch { /* private mode */ } };
@@ -65,8 +97,12 @@ function layer() {
 }
 
 /** Close without repainting — the ONLY form tourSync may call (it runs mid-paint; a
- *  repaint from inside the paint sink would recurse). Event handlers use dismissTour. */
+ *  repaint from inside the paint sink would recurse). Event handlers use dismissTour.
+ *  Leaving the language pre-step by ANY route persists the current language (the ask's
+ *  "toda salida del paso persiste la elección"): a player who saw the choice and walked
+ *  away keeps the browser default rather than being asked again next boot. */
 function closeTour() {
+  if (tourStep === LANG_STEP) setLang(currentLang());
   tourOpen = false;
   write(TOUR_SEEN_KEY);
   write(HELP_SEEN_KEY);
@@ -83,6 +119,10 @@ export function dismissTour() {
 
 export function tourNext() {
   if (!tourOpen) return;
+  // The language pre-step's Next CONFIRMS the current (browser-default) language — the
+  // explicit write is the exit's persist — and moves on to the heroes step. No ring was
+  // dimming anything, so no repaint is needed; the card alone changes.
+  if (tourStep === LANG_STEP) { setLang(currentLang()); tourStep = 0; paintTour(); return; }
   if (tourStep >= STEPS.length - 1) { dismissTour(); return; }
   // The phase gate (review round 2): the next step lives on ANOTHER screen, so the way
   // forward there is the action — the key (like the absent button) does nothing, and a
@@ -92,7 +132,8 @@ export function tourNext() {
   paintTour();
 }
 export function tourBack() {
-  if (!tourOpen || tourStep === 0) return;
+  // `<= 0` also holds the language pre-step: it has NO Back — nothing exists before it.
+  if (!tourOpen || tourStep <= 0) return;
   // Same gate backwards: the previous step of another phase is another screen.
   if (STEPS[tourStep - 1].phase !== snap.phase) return;
   tourStep -= 1;
@@ -102,14 +143,86 @@ export function tourBack() {
 /** Open the tour on demand (the Help sheet's Replay entry) at the step for the CURRENT
  *  phase; an unknown phase parks on step 1. findIndex returns the FIRST match, so a
  *  kindling phase lands on the heroes step (STEPS[0]) — the run's first decision is
- *  hero + path — not on the boon. Opening writes no flag; paintedAt resets so the landed
- *  step announces and takes the caret even if a previous visit painted it. */
+ *  hero + path — not on the boon. NEVER the language pre-step: a replaying veteran is
+ *  past onboarding whatever dlb.lang says. Opening writes no flag; paintedAt resets so
+ *  the landed step announces and takes the caret even if a previous visit painted it. */
 export function startTour() {
   const at = STEPS.findIndex((s) => s.phase === snap.phase);
   tourStep = at === -1 ? 0 : at;
   tourOpen = true;
-  paintedAt = -1;
+  paintedAt = -2;
   paintTour();
+}
+
+/** The language pre-step's pick: persist through i18n (which also flips <html lang>),
+ *  then re-narrate the CURRENT run in the chosen language — a fresh `ctl.snapshot
+ *  ({ lang })` and a repaint, the exact move switchLang() makes (actions.js) — so the
+ *  kindling screen UNDER the card flips too, which is why the pre-step dims nothing.
+ *  tourStep moves first, so the repaint's tourSync already lands on the heroes step in
+ *  the new language; the trailing paintTour() only covers hosts whose repaint hook is
+ *  not yet registered. */
+function chooseLang(id) {
+  tourStep = 0;
+  setLang(id);
+  if (ctl) setSnap(ctl.snapshot({ lang: currentLang() }));
+  repaint();
+  paintTour();
+}
+
+/** The language pre-step's card (ONBOARDING-TOUR, the language ask): bilingual copy and
+ *  two native-named buttons, NO step counter (it is a pre-step — the six real steps keep
+ *  their 'n of 6') and NO shade ring — the kindling screen underneath must stay fully
+ *  visible and clickable, because the choice is supposed to flip it before the player's
+ *  eyes. The card parks bottom-centre (the missing-anchor convention) and its Next
+ *  confirms the current default. */
+function paintLangChoice(root) {
+  const card = el('div', {
+    cls: 'tour-card',
+    attrs: { role: 'dialog', tabindex: '-1', 'aria-label': LANG_TITLE },
+  });
+  card.append(el('h3', { cls: 'tour-head', text: LANG_TITLE }));
+  // Two paragraphs, Spanish first to match the title's pairing — one <p> would need
+  // white-space tricks to keep the two languages apart.
+  card.append(el('p', { cls: 'tour-body', text: LANG_BODY_ES }));
+  card.append(el('p', { cls: 'tour-body', text: LANG_BODY_EN }));
+  const langs = el('div', { cls: 'tour-langs' });
+  for (const id of ['es', 'en']) {
+    langs.append(el('button', {
+      cls: 'btn secondary tour-lang',
+      text: LANG_NAMES[id],
+      attrs: { type: 'button', 'aria-pressed': String(currentLang() === id) },
+      on: { click: () => chooseLang(id) },
+    }));
+  }
+  card.append(langs);
+  const nav = el('div', { cls: 'tour-nav' });
+  nav.append(el('button', {
+    cls: 'btn tour-next',
+    text: t('tour.next'),
+    attrs: { type: 'button' },
+    on: { click: tourNext },
+  }));
+  nav.append(el('button', {
+    cls: 'btn ghost tour-skip', text: t('tour.skip'), attrs: { type: 'button' }, on: { click: dismissTour },
+  }));
+  card.append(nav);
+  root.replaceChildren();
+  card.style.bottom = '8px';
+  root.append(card);
+  // Bottom-centre is a COMPUTED pixel `left`, never an inline transform: the .tour-card
+  // entrance keyframes end in `transform: none` and, with fill-mode 'both', that final
+  // value overrides an inline translateX(-50%) for the card's WHOLE life — measured with
+  // motion normal at 390x844 the card hung 125px off the right edge (left 195 + width
+  // 320 = 515) and 'English'/Next were unreachable by click. offsetWidth reads the
+  // settled width rule (min(320px, calc(100vw - 24px))); max(8, …) cannot matter today
+  // but keeps a wider-than-viewport card on screen.
+  card.style.left = `${Math.max(8, (window.innerWidth - card.offsetWidth) / 2)}px`;
+  if (paintedAt !== tourStep) {
+    paintedAt = tourStep;
+    announce(`${LANG_TITLE}. ${LANG_BODY_ES} ${LANG_BODY_EN}`);
+    const primary = card.querySelector('.tour-next');
+    try { (primary || card).focus({ preventScroll: true }); } catch { /* best effort */ }
+  }
 }
 
 /** One coach-mark over the current anchor. Rebuilt wholesale per paint (the stage
@@ -118,6 +231,7 @@ function paintTour() {
   const root = layer();
   if (!root) return;
   if (!tourOpen) { root.replaceChildren(); return; }
+  if (tourStep === LANG_STEP) { paintLangChoice(root); return; }
   const step = STEPS[tourStep];
   const count = t('tour.stepOf', { n: tourStep + 1, m: STEPS.length });
   const title = t(`tour.step.${step.id}.title`);
@@ -234,9 +348,12 @@ function paintTour() {
     }
   } else {
     // A missing anchor (a kill-hold stage, a phase racing the views) parks the card
-    // bottom-centre with no ring: the copy still reads.
-    card.style.left = '50%'; card.style.transform = 'translateX(-50%)'; card.style.bottom = '8px';
+    // bottom-centre with no ring: the copy still reads. Centred by a COMPUTED pixel
+    // `left`, not an inline transform — same reason as the language pre-step above (the
+    // entrance keyframes' `transform: none` override, fill-mode 'both').
+    card.style.bottom = '8px';
     root.append(card);
+    card.style.left = `${Math.max(8, (W - card.offsetWidth) / 2)}px`;
   }
   if (paintedAt !== tourStep) {
     paintedAt = tourStep;
@@ -261,11 +378,23 @@ function paintTour() {
  *  game rule (render.js's deal-clock arming is the paint-sink precedent). */
 export function tourSync(phaseChanged) {
   if (!tourOpen) {
-    if (freshOnboarding() && snap.phase === 'kindling') tourOpen = true;
+    if (freshOnboarding() && snap.phase === 'kindling') {
+      tourOpen = true;
+      // The language pre-step leads ONLY while the player has never chosen (dlb.lang
+      // unwritten): a chosen or veteran boot lands straight on the heroes step.
+      tourStep = langChosen() ? 0 : LANG_STEP;
+    }
   } else {
     const at = STEPS.findIndex((s) => s.phase === snap.phase);
     if (at === -1) { closeTour(); return; }
-    if (phaseChanged && STEPS[tourStep].phase !== snap.phase) tourStep = at;
+    if (tourStep === LANG_STEP) {
+      // The kindling screen under the language card is NOT dimmed, so the player may act
+      // on it — that act is another exit from the pre-step: persist the language, then
+      // the ordinary phase jump follows (the tour follows the player's hands).
+      if (phaseChanged) { setLang(currentLang()); tourStep = at; }
+    } else if (phaseChanged && STEPS[tourStep].phase !== snap.phase) {
+      tourStep = at;
+    }
   }
   paintTour();
 }

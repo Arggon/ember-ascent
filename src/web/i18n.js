@@ -7,11 +7,13 @@
 // through `ctl.snapshot({ lang })` — this module only decides WHICH language that is and
 // stores it. A game rule never lives here.
 //
-// THE LANGUAGE IS A SURFACE CHOICE: it persists in localStorage (`dlb.lang`, 'en'
-// default) and switches `document.documentElement.lang` with it. It never enters run
-// state, the save format or the action log — a save loads in either language, and the
-// kernel's compact dump stays English-only in both (the agent-facing contract, pinned
-// by the goldens).
+// THE LANGUAGE IS A SURFACE CHOICE: an explicit choice persists in localStorage
+// (`dlb.lang`, written ONLY by setLang) and switches `document.documentElement.lang`
+// with it. Until then the browser's own locale decides the in-memory default and
+// NOTHING is written (readLang below) — the tour's language pre-step and the HUD toggle
+// are the only writers. It never enters run state, the save format or the action log —
+// a save loads in either language, and the kernel's compact dump stays English-only in
+// both (the agent-facing contract, pinned by the goldens).
 //
 // FALLBACK HONESTY: `t()` resolves es -> en per key, so a missing Spanish string
 // renders its English twin — never a key name, never an empty node. The `i18n` unit
@@ -28,10 +30,26 @@ export const LANG_KEY = 'dlb.lang';
 /** The languages the surface offers, in display order (the toggle walks this list). */
 export const LANGUAGES = Object.freeze(['en', 'es']);
 
-function readLang() {
+/** The BROWSER decides the default while no explicit choice exists: a navigator whose
+ *  primary language starts with 'es' reads Spanish, anything else English. Guarded for
+ *  hosts without a navigator (the unit harness — undefined reads 'en', the historic
+ *  default), and case-insensitive ('es-ES', 'es-MX', 'ES' all match). */
+function browserLang() {
   try {
-    return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en';
-  } catch { /* private mode */ return 'en'; }
+    return String(navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+  } catch { /* no navigator in a narrow host */ return 'en'; }
+}
+
+function readLang() {
+  let stored = null;
+  try { stored = localStorage.getItem(LANG_KEY); } catch { /* private mode */ }
+  // An EXPLICIT choice (either value; only setLang writes here) always wins — a Spanish
+  // browser that picked English stays English on every boot.
+  if (stored === 'es' || stored === 'en') return stored;
+  // Nothing chosen yet: the browser's locale decides the IN-MEMORY default and nothing
+  // is written — the explicit choice (the tour's language step, or the HUD toggle) is
+  // the only writer, so an un-chosen browser can still be asked (ONBOARDING-TOUR).
+  return browserLang();
 }
 
 let lang = readLang();
@@ -60,6 +78,21 @@ export function setLang(next) {
     localStorage.setItem(LANG_KEY, lang);
   } catch { /* private mode */ }
   applyDocumentLang();
+}
+
+/**
+ * Whether the player has made an EXPLICIT language choice (the key holds a value this
+ * module writes). The tour's language pre-step shows only while this is false — a
+ * replaying veteran or a toggle user never sees it (ONBOARDING-TOUR spec). A host whose
+ * storage refuses reads reads CHOSEN, the tour.js read() convention: an un-persistable
+ * choice must not re-ask on every boot.
+ * @returns {boolean}
+ */
+export function langChosen() {
+  try {
+    const stored = localStorage.getItem(LANG_KEY);
+    return stored === 'es' || stored === 'en';
+  } catch { /* private mode */ return true; }
 }
 
 /* ------------------------------------------------------------------ the dictionary
