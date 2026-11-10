@@ -104,12 +104,13 @@ async function waitIdle(page, timeoutMs = 8000) {
 
 /** A fresh browser + page with the first-run help dismissed. Caller closes the browser.
  *  `seed` defaults to 7; a test whose claim is pinned to a specific first fight picks
- *  its own (the S4 map shift moved every seed's encounter rolls). */
-async function freshPage(t, seed = 7) {
+ *  its own (the S4 map shift moved every seed's encounter rolls). `reduce` serves the
+ *  prefers-reduced-motion walks. */
+async function freshPage(t, seed = 7, reduce = false) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 800 },
-    reducedMotion: 'no-preference',
+    reducedMotion: reduce ? 'reduce' : 'no-preference',
   });
   t.after(() => { void browser.close(); });
   const page = await ctx.newPage();
@@ -3041,4 +3042,189 @@ test('tour: Replay from the map lands on the map step', { timeout: 120000 }, asy
   assert.ok(ring.anchorClear, 'the map sits in the ring hole');
   assert.equal(await page.locator('.modal').count(), 0, 'the sheet closed behind the tour');
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
+});
+
+/* ------------------------------------------------------------ the defeat sequence --
+ * A defeat that arrives on the enemy turn must be SEEN: the held fight, the killing
+ * turn's beats, the hero's death, THEN the panel (the old shape painted the panel on
+ * the very next frame). The walks below sample the live page with an in-page 40ms
+ * collector — the whole sequence is transient and round-trip polling would miss it. */
+
+/** End-turn loop until the run ends. `seed` 3 dies to pure end turns (verified walk:
+ *  floor-1 Kiln Mites out-damage a hero who never plays a card); no exact turn is
+ *  pinned — the loop reads the kernel's own phase, so a redraw cannot break it. */
+async function endTurnUntilEnded(page, maxTurns = 60) {
+  for (let guard = 0; guard < maxTurns; guard += 1) {
+    const st = await readState(page);
+    if (st.phase === 'ended') return st;
+    if (st.phase !== 'combat') assert.fail(`unexpected phase ${st.phase} before the defeat`);
+    await endTurn(page);
+  }
+  assert.fail('the walk never died within the turn budget');
+}
+
+/** The defeat-sequence collector: samples hold/death/panel/busy/named floats every
+ *  40ms and records the first-seen time of each, so the ORDER (stage held, hero dies,
+ *  panel last) is assertable from inside the page. `busyInHold` counts the UX-5 gate's
+ *  own samples INSIDE the held window ([holdFirst, panelFirst)) — the walk's ordinary
+ *  turns also leave busy>0 (deal clocks), so only the in-sequence count proves the gate
+ *  covered the defeat itself. */
+async function armDefeatCollector(page) {
+  await page.evaluate(() => {
+    window.__defeat = {
+      hold: 0, holdFirst: 0, death: 0, deathFirst: 0, deathAnim: null,
+      panel: 0, panelFirst: 0, floatInHold: 0, busy: 0, busyInHold: 0, t0: performance.now(),
+    };
+    window.__defeatTimer = setInterval(() => {
+      const d = window.__defeat;
+      const now = performance.now() - d.t0;
+      const stage = document.getElementById('stage');
+      const hold = Boolean(stage && stage.querySelector('.ended-hold') && stage.querySelector('.stage-combat .fight .hero'));
+      if (hold) { d.hold += 1; if (!d.holdFirst) d.holdFirst = now; }
+      const death = stage && stage.querySelector('.hero .fig.is-hero-death');
+      if (death) {
+        d.death += 1;
+        if (!d.deathFirst) d.deathFirst = now;
+        if (!d.deathAnim) { try { d.deathAnim = getComputedStyle(death).animationName; } catch { /* sampling only */ } }
+      }
+      const panel = Boolean(document.querySelector('.page-end .big-title.loss'));
+      if (panel) { d.panel += 1; if (!d.panelFirst) d.panelFirst = now; }
+      if (hold && document.querySelector('#fx-layer .efloat-named')) d.floatInHold += 1;
+      if (window.__dlb.busy()) {
+        d.busy += 1;
+        // In-sequence only: the hold is up and the panel has not replaced it yet.
+        if (hold && !panel) d.busyInHold += 1;
+      }
+    }, 40);
+  });
+}
+
+async function readDefeatCollector(page) {
+  return page.evaluate(() => { clearInterval(window.__defeatTimer); return window.__defeat; });
+}
+
+test('defeat: the killing turn plays on the held stage, the hero dies, then the panel', { timeout: 240000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 3);
+  await bootToMap(page);
+  await travelToFight(page);
+  await armDefeatCollector(page);
+
+  const st = await endTurnUntilEnded(page);
+  assert.equal(st.player.hp, 0, 'the walk died to pure end turns');
+  assert.equal(await page.evaluate(() => window.__dlb.snapshot().ended.outcome), 'loss', 'the run ended in defeat');
+
+  await page.waitForSelector('.page-end .big-title.loss', { timeout: 15000 });
+  // The selector resolves in the very frame the panel paints; one collector tick must
+  // run after it, or the last sample predates the panel and d.panel stays 0.
+  await sleep(120);
+  const d = await readDefeatCollector(page);
+  // The held stage: the fight exactly as it stood, painted across the whole sequence —
+  // never an empty stage (AC-5.6), never the panel first.
+  assert.ok(d.hold > 0, 'the held combat stage must be painted after the kernel flips to ended');
+  // The killing turn PLAYED: named damage floats over the held hero (fx.js's
+  // enemy-turn beats, placed by heroLane on the held stage).
+  assert.ok(d.floatInHold > 0, 'the killing blow must play its named damage float over the held hero');
+  // The hero's death beat: the figure carries its death class and the hero-death
+  // animation (the collapse-and-dissolve; the hurt flinch rides the same figure).
+  assert.ok(d.death > 0, 'the hero death figure must be visible during the hold');
+  assert.ok(d.deathAnim && d.deathAnim.includes('hero-death'), `the death animation must be hero-death, got "${d.deathAnim}"`);
+  // The panel arrives AFTER the sequence, and the UX-5 gate covered it.
+  assert.ok(d.panel > 0, 'the defeat panel must arrive');
+  assert.ok(d.panelFirst > d.holdFirst, `the panel must arrive after the held stage (panel ${d.panelFirst}ms vs hold ${d.holdFirst}ms)`);
+  assert.ok(d.panelFirst > d.deathFirst, `the panel must arrive after the death beat (panel ${d.panelFirst}ms vs death ${d.deathFirst}ms)`);
+  // In-sequence only: the collector also samples the walk's ordinary turns, where the
+  // deal clocks alone would keep busy>0 — the held window's own samples are the proof.
+  assert.ok(d.busyInHold > 0, `the UX-5 gate must be engaged across the held sequence (busyInHold=${d.busyInHold})`);
+  // The input gate is RELEASED once the panel is up (busyReason fell with the plan).
+  await waitIdle(page);
+});
+
+test('defeat: reduced motion goes straight to the panel, no hold, no death beat', { timeout: 240000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 3, true);
+  await bootToMap(page);
+  await travelToFight(page);
+  await armDefeatCollector(page);
+
+  const st = await endTurnUntilEnded(page);
+  assert.equal(st.player.hp, 0, 'the walk died to pure end turns');
+  await page.waitForSelector('.page-end .big-title.loss', { timeout: 15000 });
+  await sleep(120); // everything is instant under reduce: let the collector tick once
+  const d = await readDefeatCollector(page);
+  assert.ok(d.panel > 0, 'the defeat panel arrives at once');
+  assert.equal(d.hold, 0, 'reduced motion must never paint the defeat hold');
+  assert.equal(d.death, 0, 'reduced motion must never paint the hero death beat');
+});
+
+test('defeat: the speed dock skip cuts the hold short like every other hold', { timeout: 240000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 3);
+  await bootToMap(page);
+  await travelToFight(page);
+  await armDefeatCollector(page);
+
+  // Walk by raw clicks (no waitIdle AFTER the click — the killing turn's gate holds
+  // until the whole sequence is over, and » must land DURING it): after each click,
+  // peek briefly for the hold; a normal turn simply times the peek out.
+  for (let guard = 0; guard < 60; guard += 1) {
+    const st = await readState(page);
+    if (st.phase === 'ended') break;
+    if (st.phase !== 'combat') assert.fail(`unexpected phase ${st.phase}`);
+    await waitIdle(page);
+    await page.locator('button', { hasText: 'End Turn' }).click();
+    let killed = false;
+    try {
+      await page.waitForSelector('.stage-combat .ended-hold', { timeout: 900, state: 'attached' });
+      killed = true;
+    } catch { /* an ordinary turn — keep walking */ }
+    if (killed) break;
+  }
+  // The hold is up (same paint as the phase flip); » retires the plan and repaints —
+  // the panel replaces the held stage at once instead of after the turn-plus-death wait.
+  await page.waitForSelector('.stage-combat .ended-hold', { timeout: 5000 });
+  const skip = page.locator('.speed-btn', { hasText: '»' });
+  assert.equal(await skip.count(), 1, 'the hold paints its own speed dock');
+  await skip.click();
+  await page.waitForSelector('.page-end .big-title.loss', { timeout: 3000 });
+  await sleep(120); // the selector resolves in the paint frame; let one collector tick run
+  const d = await readDefeatCollector(page);
+  assert.ok(d.hold > 0, 'the hold existed (if only briefly) before the skip');
+  assert.ok(d.panelFirst - d.holdFirst < 2500,
+    `the skipped panel must arrive at once (hold→panel ${Math.round(d.panelFirst - d.holdFirst)}ms, under the ~4s unskipped wait)`);
+});
+
+test('defeat rework leaves the victory kill-hold intact', { timeout: 240000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  // Seed 1: a single 43-HP Jaw Worm — two Mauls kill it on turn 2 (the same shape the
+  // older kill walk pins, replayed here as the defeat work's own regression guard).
+  const page = await freshPage(t, 1);
+  await bootToMap(page);
+  await injectMaulDeck(page);
+  await travelToFight(page);
+  await armDefeatCollector(page);
+
+  let s = await readState(page);
+  if (!s.hand.some((c) => c.cardId === 'bludgeon')) {
+    await endTurn(page);
+    s = await readState(page);
+    assert.ok(s.hand.some((c) => c.cardId === 'bludgeon'), 'no Maul dealt in two hands');
+  }
+  await playCard(page, 'Maul');
+  await endTurn(page);
+  await playCard(page, 'Maul');
+
+  let reward = null;
+  for (let i = 0; i < 40 && !reward; i += 1) {
+    await sleep(350);
+    const st = await readState(page);
+    if (st.phase === 'reward') reward = st;
+  }
+  assert.ok(reward, 'the killing stroke resolves into the reward phase');
+  await page.waitForSelector('button[data-action]', { timeout: 5000 });
+  await sleep(120); // the selector resolves in the paint frame; let one collector tick run
+  const d = await readDefeatCollector(page);
+  assert.ok(d.hold > 0, 'the victory kill-hold must still paint the held stage');
+  assert.ok(d.panel === 0 || d.panelFirst > d.holdFirst,
+    'the spoils panel must not precede the held stage');
 });

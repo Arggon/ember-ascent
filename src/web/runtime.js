@@ -112,7 +112,10 @@ export function setDealClock(clock) { dealClock = clock; }
  * `heroMoveHold` it is read per paint and survives incidental repaints (a hover recomputes
  * the same clock), and it is cleared when the sequence ends (act() schedules the
  * retirement timer beside the arming), when the player hits » (`skipAnim`), or when the
- * run restarts (`newGame`).
+ * run restarts (`newGame`). On the KILLING turn (a flip that ends the run in defeat)
+ * act() arms the plan and schedules no timer: the defeat hold in render.js replays the
+ * whole plan on the held stage — the hero's death beat rides the plan's own clock — and
+ * retires the plan itself when the beat is over.
  *
  * `beatMs` is the gap between two attackers' slams, `slamMs` the CSS slam length, and
  * `impactMs` the moment inside a slam where the dash ARRIVES (the keyframe's impact beat)
@@ -201,7 +204,9 @@ export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, 
  *     650ms beat) — with the hit-stop beat where the play's numbers land as the FLOOR
  *     of that span, not an addition (fx.js playInputSpan);
  *   * the enemy turn gates on `strikeSeq` — the plan UX-2 armed, read directly, so the
- *     gate retires exactly when the plan does (its own timer, totalMs + 400);
+ *     gate retires exactly when the plan does (its own timer, totalMs + 400; on the
+ *     killing turn, when the defeat hold retires the plan after the hero's death beat,
+ *     so the whole turn-and-death sequence stays gated);
  *   * a deal gates on `dealClock` — the clock UX-4 armed in render(), read directly;
  *   * a kill hold (render.js's endHeld branch) arms `inputLock` for exactly the hold's
  *     own `wait`.

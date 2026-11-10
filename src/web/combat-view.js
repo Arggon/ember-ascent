@@ -305,7 +305,11 @@ function energyOrb() {
   );
 }
 
-function speedDock() {
+/**
+ * The »/1×/2× dock. Shared with render.js's defeat hold, which paints the same dock on
+ * the held stage so the killing turn can be skipped exactly like a live fight's.
+ */
+export function speedDock() {
   const dock = el('div', { cls: 'speed-dock', attrs: { role: 'group', 'aria-label': t('combat.speed.aria') } });
   const add = (speed, text, title) => dock.append(el('button', {
     cls: 'btn ghost speed-btn' + (animSpeed === speed ? ' is-on' : ''),
@@ -468,11 +472,13 @@ export function combatView() {
 }
 
 /**
- * One enemy card.
+ * One enemy card. Shared with render.js's defeat hold: the held stage paints the SAME
+ * builder, so the standing attackers wear the same plan-driven slam poses and delays the
+ * live fight was wearing when the killing turn began.
  * @param {any} e a snapshot enemy
  * @param {number} position its 0-based place among the LIVING enemies (= k - 1)
  */
-function enemyCard(e, position) {
+export function enemyCard(e, position) {
   const kind = e.intent.kind;
   const look = enemyLook(e.id);
   const targeting = pendingSlot !== null && snap.enemies.length > 1;

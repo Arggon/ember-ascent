@@ -2242,6 +2242,14 @@ html, body {
   .enemy.targeting:hover,
   .card-wrap.is-pending { transform: none; }
   .enemy.aimed .target-mark { animation: none !important; }
+
+  /* The defeat hold never paints on this path (act() arms no strike plan under reduced
+     motion, so render.js falls straight through to the panel), which is the contract:
+     the run's ending is static information on the panel. These two are named anyway, so
+     the death beat and its ash motes can never half-run if a future caller ever paints
+     them on this path. */
+  .stage-combat .hero .fig.is-hero-death,
+  .hero-ash i { animation: none !important; }
 }
 
 /* ============================================================ P3 — run-level beats ==
@@ -3885,6 +3893,66 @@ html, body {
 .stage-combat .hero .fig.pose-sweep { animation: hero-sweep calc(0.55s * var(--pace, 1)) ease-in-out; }
 .stage-combat .hero .fig.pose-guard { animation: hero-guard calc(0.5s * var(--pace, 1)) ease-out; }
 .stage-combat .hero .fig.pose-channel { animation: hero-channel calc(0.6s * var(--pace, 1)) ease-in-out; }
+
+/* ---- The hero's DEATH beat (the defeat hold, render.js) --------------------------
+   After the killing turn has played out on the held stage, the hero's own figure
+   collapses and dissolves into embers and ash — the same vocabulary the enemy ghosts'
+   `ash-fall` already speaks, in CSS only (no image assets). Two animations share one
+   figure: the hurt flinch the action already carries, then `hero-death`, delayed by the
+   strike plan's own total (`--death-delay`, written by the defeat hold) so the collapse
+   starts when the last slam has landed. `both` holds the standing 0% frame through the
+   delay and the dissolved 100% after it, so no repaint can resurrect her before the
+   panel replaces the stage. The motes of `.hero-ash` rise on the same clock, each
+   staggered a small base step past the plan total; `--pace` paces the whole tail like
+   every other beat. Reduced motion never paints the hold at all (act() arms no plan
+   there), so this rule set is inert on that path. */
+.stage-combat .hero .fig.is-hero-death.pose-hurt {
+  animation:
+    hero-hurt calc(0.44s * var(--pace, 1)) ease-out,
+    hero-death calc(0.45s * var(--pace, 1)) ease-in var(--death-delay, 0ms) both;
+}
+.stage-combat .hero .fig.is-hero-death {
+  animation: hero-death calc(0.45s * var(--pace, 1)) ease-in var(--death-delay, 0ms) both;
+}
+.hero-ash {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12%;
+  height: 55%;
+  pointer-events: none;
+  z-index: 3;
+}
+.hero-ash i {
+  position: absolute;
+  bottom: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  opacity: 0;
+  left: 26%;
+  background: radial-gradient(circle, #ffd9a0, #ff9d3a 60%, rgba(154, 62, 16, 0));
+  box-shadow: 0 0 10px rgba(255, 157, 58, 0.9);
+  animation: hero-ember-up calc(0.45s * var(--pace, 1)) ease-out var(--death-delay, 0ms) both;
+}
+.hero-ash i:nth-child(2) {
+  left: 46%;
+  background: radial-gradient(circle, #efe6dc, #98a2bd 62%, rgba(70, 76, 96, 0));
+  box-shadow: 0 0 8px rgba(152, 162, 189, 0.7);
+  animation-delay: calc(var(--death-delay, 0ms) + 0.06s * var(--pace, 1));
+}
+.hero-ash i:nth-child(3) { left: 68%; animation-delay: calc(var(--death-delay, 0ms) + 0.12s * var(--pace, 1)); }
+
+@keyframes hero-death {
+  0% { opacity: 1; transform: none; filter: none; }
+  34% { transform: translateY(6px) scale(1.02, 0.9) rotate(-2deg); filter: brightness(1.35) saturate(1.1); }
+  100% { opacity: 0; transform: translateY(18px) scale(0.86, 0.6) rotate(-6deg); filter: brightness(0.5) saturate(0.4) blur(2px); }
+}
+@keyframes hero-ember-up {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
+  30% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(7px, -64px) scale(1.15); }
+}
 
 @media (max-width: 760px) {
   .page-combat .dock {

@@ -520,6 +520,8 @@ The engineer proved the mechanism by re-deriving it rather than trusting my repo
 
 **Status: DEF-6 is NOT FIXED.** No file was modified, no frame captured. Baseline is intact at 93/0 and gate exit 0. A deterministic reproduction is recorded: **seed 13** reaches a boss victory (`The Guardian` at 47 HP as the last enemy) under the `smart` policy, and `window.__dlb` (`app.js:1679`) exposes the controller for driving and asserting. The engineer's diagnosis is the handoff; the edit remains.
 
+> **Review note — the defeat half of this section is superseded by a later pass (do not treat §13.1's "no hold on defeat" ruling as current).** The defeat hold now EXISTS as its own branch — "the killing turn, held" in `src/web/render.js` — and it does not burn `END_DELAY_MS` of blank stage the way §13.1 feared: it holds the fight exactly as it stood (backdrop, the hero at its final HP, the standing enemies rebuilt by the same `enemyCard()`), replays the killing enemy turn on it, plays the hero's death beat (collapse + ember/ash dissolve), and only then repaints the panel. The stage is full from the first frame, so AC-5.6's 250 ms empty-stage bound never sees the window; reduced motion still falls straight to the panel. The VICTORY half of §13.1 (the ghost-row hold, its collapse clamp) remains as written.
+
 ### 13.2 PM answers to the UX Designer's six open questions
 
 The spec is accepted as the basis for the history surfaces. Answers below; where I agree with its default I say so, because a default that nobody confirms is just an unowned decision.
