@@ -14,6 +14,17 @@ Work top to bottom. Checked boxes are things already done and verified in this r
 ## Before you start — the one upload file
 
 - [x] **`release.zip`** exists in this workspace root. That is the artifact.
+- [x] **SHIPPED 2026-11-10 as 0.4.1**: `butler push release.zip
+      arggondev/ember-ascent:html --userversion 0.4.1` → build `#2350047` on the
+      `html` channel. Zip SHA-256
+      `3b38ac490acb8989ca482cfb75295a88c5fe990ee4090b6fcc3717d96a9968c1`
+      — 95 entries, **3,722,079 bytes**; butler re-used 66.55% against 0.4.0
+      (patch 455.21 KiB). Content: the first-run guided tour (six contextual
+      coach-marks anchored to the real screens, phase-gated navigation, replayable
+      from Help, i18n en/es) and the defeat hold — the killing enemy turn now plays
+      on the retained stage (attack pose + damage float over the hero), the hero
+      falls in its own ash dissolve, and the defeat panel arrives after; plus the
+      elite sprite scale fix. Superseded by nothing — this is the live build.
 - [x] **SHIPPED 2026-10-30 as 0.4.0**: `butler push release.zip
       arggondev/ember-ascent:html --userversion 0.4.0` -> build `#2257168` on the
       `html` channel. Zip SHA-256
@@ -21,7 +32,7 @@ Work top to bottom. Checked boxes are things already done and verified in this r
       — 93 entries, **3,092,725 bytes**. Content: the full StS-parity roadmap — two
       acts (The Kiln Deeps), gold/shop/potions/events/relics with meta-unlocks, 70
       cards, weaving paths, sequenced enemy turns, half-speed cinematic pacing, the
-      deck viewer and card codex. Superseded by nothing — this is the live build.
+      deck viewer and card codex. Superseded by 0.4.1 (2026-11-10).
 - [x] Zip SHA-256 `64964d19442c4a7e37fb55bbc747c2eb8394468f8e407211779a026a97f5fc03`
       — 87 entries, **2,483,583 bytes**. Rebuilt 2026-10-24 at `daba4b4` (the refactored
       module layout plus the melee-approach animation and the ended-screen fix) and
