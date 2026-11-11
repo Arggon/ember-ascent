@@ -159,6 +159,27 @@ const STATUS_MEANING = {
     enemy: (n) => `it gains ${n} Block at the end of each turn`,
     detail: 'Block is used up at the start of the next turn.',
   },
+  // The "golpes discretos NxM" trio. Each clause names the exact trigger the engine
+  // implements: parry rolls per attack strike (attackHit, rules/vocabulary.js), bleed
+  // ticks after the holder's own strike, poison at the holder's own turn end.
+  parry: {
+    label: 'Parry',
+    player: (n) => `each attack strike against you has a ${n}% chance to be blocked completely`,
+    enemy: (n) => `each attack strike against it has a ${n}% chance to be blocked completely`,
+    detail: 'Lasts the whole fight. A parried strike lands nothing and spends no Block.',
+  },
+  bleed: {
+    label: 'Bleed',
+    player: (n) => `you lose ${n} HP every time you make an attack strike`,
+    enemy: (n) => `it loses ${n} HP every time it makes an attack strike`,
+    detail: 'The HP loss ignores Block. One stack wears off after each strike it ticks.',
+  },
+  poison: {
+    label: 'Poison',
+    player: (n) => `you lose ${n} HP at the end of each of your turns`,
+    enemy: (n) => `it loses ${n} HP at the end of each of its turns`,
+    detail: 'The HP loss ignores Block. One stack wears off each time it ticks.',
+  },
 };
 
 /** The same plain-language rows in Spanish (I18N-1). Same keys, same shape. */
@@ -192,6 +213,26 @@ const STATUS_MEANING_ES = {
     player: (n) => `ganas ${n} de Bloqueo al final de cada turno`,
     enemy: (n) => `gana ${n} de Bloqueo al final de cada turno`,
     detail: 'El Bloqueo se consume al inicio del siguiente turno.',
+  },
+  // Las filas gemelas del trío "golpes discretos NxM" (mismos disparadores que el
+  // inglés, palabra por palabra).
+  parry: {
+    label: 'Parada',
+    player: (n) => `cada golpe de ataque contra ti tiene un ${n}% de probabilidad de ser bloqueado por completo`,
+    enemy: (n) => `cada golpe de ataque contra él tiene un ${n}% de probabilidad de ser bloqueado por completo`,
+    detail: 'Dura todo el combate. Un golpe parado no hace nada y no gasta Bloqueo.',
+  },
+  bleed: {
+    label: 'Sangrado',
+    player: (n) => `pierdes ${n} HP cada vez que ejecutas un golpe de ataque`,
+    enemy: (n) => `pierde ${n} HP cada vez que ejecuta un golpe de ataque`,
+    detail: 'Esa pérdida de HP ignora el Bloqueo. Una acumulación se va tras cada golpe que la haga sangrar.',
+  },
+  poison: {
+    label: 'Veneno',
+    player: (n) => `pierdes ${n} HP al final de cada uno de tus turnos`,
+    enemy: (n) => `pierde ${n} HP al final de cada uno de sus turnos`,
+    detail: 'Esa pérdida de HP ignora el Bloqueo. Una acumulación se va cada vez que hace efecto.',
   },
 };
 
@@ -878,9 +919,15 @@ export function describeIntent(enemy, lang = 'en') {
       const swing = hits > 1
         ? (es ? `Atacará ${hits} veces con ${per} de daño` : `Will attack for ${per} damage ${hits} times`)
         : (es ? `Atacará con ${damage} de daño` : `Will attack for ${damage}`);
-      return sentence(es
-        ? (move.block ? `${swing} y se cubrirá con ${move.block} de Bloqueo` : swing)
-        : (move.block ? `${swing} and block ${move.block}` : swing));
+      // RIDERS (the "golpes discretos" slice): the tick-shaped hexes each LANDED strike
+      // leaves on you, worded after the block clause so the sentence reads in the
+      // runner's own resolution order.
+      const riders = [];
+      if (move.bleed) riders.push(es ? `te dejará ${move.bleed} de Sangrado` : `leave ${move.bleed} Bleed on you`);
+      if (move.poison) riders.push(es ? `te dejará ${move.poison} de Veneno` : `leave ${move.poison} Poison on you`);
+      const riderTail = riders.length > 0 ? (es ? `, y ${riders.join(' y ')}` : `, and ${riders.join(' and ')}`) : '';
+      const blockTail = move.block ? (es ? ` y se cubrirá con ${move.block} de Bloqueo` : ` and block ${move.block}`) : '';
+      return sentence(`${swing}${blockTail}${riderTail}`);
     }
     case 'block':
       return es ? `Ganará ${move.block} de Bloqueo.` : `Will gain ${move.block} Block.`;
@@ -888,12 +935,17 @@ export function describeIntent(enemy, lang = 'en') {
       const parts = [];
       if (move.strength) parts.push(es ? `+${move.strength} de Fuerza` : `+${move.strength} Strength`);
       if (move.block) parts.push(es ? `ganará ${move.block} de Bloqueo` : `gain ${move.block} Block`);
+      // The parry rider speaks last, in the buff runner's own order.
+      if (move.parry) parts.push(es ? `ganará ${move.parry} de Parada` : `gain ${move.parry} Parry`);
       return sentence(es ? `Se potenciará: ${parts.join(' y ')}` : `Will power up: ${parts.join(' and ')}`);
     }
     case 'debuff': {
       const parts = [];
       if (move.vulnerable) parts.push(es ? `${move.vulnerable} de Vulnerable` : `${move.vulnerable} Vulnerable`);
       if (move.weak) parts.push(es ? `${move.weak} de Débil` : `${move.weak} Weak`);
+      // The tick-shaped riders ride the debuff runner's own order (bleed, then poison).
+      if (move.bleed) parts.push(es ? `${move.bleed} de Sangrado` : `${move.bleed} Bleed`);
+      if (move.poison) parts.push(es ? `${move.poison} de Veneno` : `${move.poison} Poison`);
       return sentence(es ? `Te aplicará ${parts.join(' y ')}` : `Will apply ${parts.join(' and ')} to you`);
     }
     default:
@@ -939,6 +991,9 @@ const SHORTHAND_ENTRIES = [
   glossRow('WK+n', 'apply n Weak', 'A plus on a status means APPLY that many stacks to the target. "WK+2" = apply 2 Weak, so the target attacks for 25% less.', 'B'),
   glossRow('METAL+n', 'gain n Metallicize', 'A plus on a power means GAIN that many stacks. "METAL+3" = gain 3 Metallicize, gaining 3 Block at the end of each turn.', 'B'),
   glossRow('DEX+n', 'gain n Dexterity', 'A plus on a power means GAIN that many stacks. "DEX+1" = gain 1 Dexterity, so the Block you gain from cards is 1 higher.', 'B'),
+  glossRow('BLEED+n', 'apply n Bleed', 'A plus on a status means APPLY that many stacks to the target. "BLEED+3" = apply 3 Bleed: the target loses 3 HP every time it makes an attack strike, and one stack wears off after each strike it ticks.', 'B'),
+  glossRow('PSN+n', 'apply n Poison', 'A plus on a status means APPLY that many stacks to the target. "PSN+4" = apply 4 Poison: the target loses 4 HP at the end of each of its own turns, and one stack wears off each time it ticks.', 'B'),
+  glossRow('PARRY+n', 'gain n Parry', 'A plus on a power means GAIN that many stacks. "PARRY+6" = gain 6 Parry: each attack strike against the holder has a 6% chance to be blocked completely. Lasts the whole fight.', 'B'),
   glossRow('PWRx', 'double your Strength', 'An "x" after a power means MULTIPLY the stacks you already have. "PWRx2" doubles your Strength; it does nothing if you have none.', 'C'),
   glossRow('BLKx', 'double your Block', 'An "x" after Block means MULTIPLY the Block you currently have. "BLKx2" doubles it; it does nothing if you have none.', 'C'),
 ];
@@ -952,6 +1007,9 @@ const SHORTHAND_ENTRIES_ES = [
   glossRow('WK+n', 'aplica n de Débil', 'Un signo + en un estado significa APLICAR esas acumulaciones al objetivo. "WK+2" = aplica 2 de Débil, así que ataca con 25% menos.', 'B'),
   glossRow('METAL+n', 'ganas n de Metalizado', 'Un signo + en un poder significa GANAR esas acumulaciones. "METAL+3" = ganas 3 de Metalizado, que da 3 de Bloqueo al final de cada turno.', 'B'),
   glossRow('DEX+n', 'ganas n de Destreza', 'Un signo + en un poder significa GANAR esas acumulaciones. "DEX+1" = ganas 1 de Destreza, así que el Bloqueo que ganas con cartas es 1 mayor.', 'B'),
+  glossRow('BLEED+n', 'aplica n de Sangrado', 'Un signo + en un estado significa APLICAR esas acumulaciones al objetivo. "BLEED+3" = aplica 3 de Sangrado: el objetivo pierde 3 HP cada vez que ejecuta un golpe de ataque, y una acumulación se va tras cada golpe que la haga sangrar.', 'B'),
+  glossRow('PSN+n', 'aplica n de Veneno', 'Un signo + en un estado significa APLICAR esas acumulaciones al objetivo. "PSN+4" = aplica 4 de Veneno: el objetivo pierde 4 HP al final de cada uno de sus turnos, y una acumulación se va cada vez que hace efecto.', 'B'),
+  glossRow('PARRY+n', 'ganas n de Parada', 'Un signo + en un poder significa GANAR esas acumulaciones. "PARRY+6" = ganas 6 de Parada: cada golpe de ataque contra quien la sostiene tiene un 6% de probabilidad de ser bloqueado por completo. Dura todo el combate.', 'B'),
   glossRow('PWRx', 'duplica tu Fuerza', 'Una "x" tras un poder significa MULTIPLICAR las acumulaciones que ya tienes. "PWRx2" duplica tu Fuerza; no hace nada si no tienes.', 'C'),
   glossRow('BLKx', 'duplica tu Bloqueo', 'Una "x" tras el Bloqueo significa MULTIPLICAR el Bloqueo que tienes ahora. "BLKx2" lo duplica; no hace nada si no tienes.', 'C'),
 ];
@@ -1021,6 +1079,10 @@ const GLOSSARY_CORE = {
     glossRow('WK', 'Weak', 'Attacks deal 25% less damage. Wears off by 1 each turn.', 'B'),
     glossRow('DEX', 'Dexterity', 'Block gained from cards is that much higher. Lasts the whole fight.', 'B'),
     glossRow('METAL', 'Metallicize', 'Gain that much Block at the end of each turn. The Scale Up card applies it.', 'B'),
+    // The "golpes discretos NxM" trio (B group, same rows the enemy labels abbreviate).
+    glossRow('BLEED', 'Bleed', 'The holder loses that much HP every time it makes an attack strike. One stack wears off after each strike it ticks.', 'B'),
+    glossRow('PSN', 'Poison', 'The holder loses that much HP at the end of each of its own turns. One stack wears off each time it ticks.', 'B'),
+    glossRow('PARRY', 'Parry', 'Each attack strike against the holder has that percent chance to be blocked completely. Lasts the whole fight and spends no Block.', 'B'),
   ],
   es: () => [
     glossRow('A', 'Ataque', 'Inflige el daño mostrado a un enemigo. "A6" es un ataque de 6 de daño.'),
@@ -1039,6 +1101,11 @@ const GLOSSARY_CORE = {
     glossRow('WK', 'Débil', 'Los ataques infligen 25% menos de daño. Se reduce en 1 cada turno.', 'B'),
     glossRow('DEX', 'Destreza', 'El Bloqueo ganado con cartas es esa cantidad mayor. Dura todo el combate.', 'B'),
     glossRow('METAL', 'Metalizado', 'Ganas esa cantidad de Bloqueo al final de cada turno. La carta Metalizado lo aplica.', 'B'),
+    // El trío "golpes discretos NxM" (grupo B, las mismas filas que abrevian los
+    // rótulos de los enemigos).
+    glossRow('BLEED', 'Sangrado', 'Quien lo sostiene pierde esa cantidad de HP cada vez que ejecuta un golpe de ataque. Una acumulación se va tras cada golpe que la haga sangrar.', 'B'),
+    glossRow('PSN', 'Veneno', 'Quien lo sostiene pierde esa cantidad de HP al final de cada uno de sus turnos. Una acumulación se va cada vez que hace efecto.', 'B'),
+    glossRow('PARRY', 'Parada', 'Cada golpe de ataque contra quien la sostiene tiene ese porcentaje de probabilidad de ser bloqueado por completo. Dura todo el combate y no gasta Bloqueo.', 'B'),
   ],
 };
 

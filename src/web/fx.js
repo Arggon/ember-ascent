@@ -152,6 +152,26 @@ function heroLane() {
 }
 
 /**
+ * THE PARRY PROC's decoration ("golpes discretos"): a crossing-plates spark that blooms
+ * and slides off at the DEFENDER's lane the moment a refused strike's float rises — over
+ * the hero when the hero's parry ate an enemy golpe, over the enemy card when its
+ * PARRY20 spur ate one of the hero's. Pure decoration on the persistent layer: aria-
+ * hidden, no text, transform/opacity only, sized by padding + border so the diff
+ * declares no width/height (the same shape discipline the fx-beat rings keep).
+ * @param {{x: number, y: number}} [at] the defender's measured lane, or null (no lane,
+ *   no node — an unmeasurable host simply skips the flourish)
+ */
+function parryProc(at) {
+  if (!at) return;
+  const proc = el('div', { cls: 'fx-parry-proc', attrs: { 'aria-hidden': 'true' } },
+    el('span', { cls: 'fx-parry-proc-plate' }),
+    el('span', { cls: 'fx-parry-proc-plate fx-parry-proc-plate-2' }),
+    el('span', { cls: 'fx-parry-proc-spark' }));
+  placeAt(proc, at, 0, 0);
+  fxAdd(proc, animMs(560) || 560);
+}
+
+/**
  * The input span of one play, from its card-fly burst: the LONGEST beat of the
  * choreography dispatchFx will schedule for it, in paced milliseconds. UX-5 arms the
  * input lock for exactly this figure in `act()` — BEFORE the paint, the same place and
@@ -180,6 +200,15 @@ export function playInputSpan(b) {
   if (b && b.id && HERO_THROWS[b.id]) {
     const spec = HERO_THROWS[b.id];
     span = Math.max(span, animMs(spec.delayMs ?? 0) + animMs(spec.ms ?? THROW_MS));
+  }
+  // GOLPES DISCRETOS: a multi-hit play beats out its floats one per STRIKE_SEQ beat, so
+  // the gate holds past the pose until the LAST golpe's impact has landed (plus a short
+  // beat for the float to be seen rising). A single-golpe play leaves the span untouched.
+  const strikes = Array.isArray(b && b.strikes) ? b.strikes.length : 0;
+  if (strikes > 1) {
+    const beatMs = animMs(STRIKE_SEQ.beat);
+    const impact = animMs(Math.round(STRIKE_SEQ.slam * STRIKE_SEQ.impactAt));
+    span = Math.max(span, beatMs * (strikes - 1) + impact + animMs(300));
   }
   return Math.max(span, animMs(310));
 }
@@ -240,8 +269,12 @@ export function dispatchFx() {
         // attacker (actions.js), so each strike beat knows its roster id and the moved
         // label; a type with no entry simply plays the generic beats below.
         const byFoe = new Map((plan.plans ?? []).map((p) => [p.enemy, p]));
+        // GOLPES DISCRETOS: `plan.attacks` is ONE ENTRY PER STRIKE, so this loop beats out
+        // the turn golpe by golpe — each entry gets its own float at its own impact beat,
+        // and a multi-hit move reads as two slams a beat apart, not one accumulated
+        // number with an "N×" suffix.
         plan.attacks.forEach((a, i) => {
-          // Each attacker's named float lands where its dash arrives (the slam's impact
+          // Each strike's named float lands where its dash arrives (the slam's impact
           // keyframe), measured over the hero at fire time — a repaint between beats
           // moves the hero, so the lane is re-read when the beat fires, not captured once.
           // The fx-layer class rides the hold param (className assembly, the same shape
@@ -251,14 +284,30 @@ export function dispatchFx() {
             const l = heroLane();
             if (l) placeAt(node, l, 0, 0);
             fxAdd(node, animMs(STRIKE_SEQ.floatMs) || STRIKE_SEQ.floatMs);
+            // THE PARRY PROC — the defender's own decoration. The hero's parry refused
+            // this strike outright, so the crossing-plates spark blooms over the hero
+            // (the defender), beside the float that says so.
+            if (a.parried) parryProc(l);
           }, plan.beatMs * i + plan.impactMs);
+          // The attacker's OWN bleed ticks ride this golpe (actions.js hung them off the
+          // strike). They fire a short beat after the impact — the strike landed, then
+          // the body bleeds — on the attacking enemy's measured lane, one float per tick.
+          (a.ticks ?? []).forEach((tk, j) => {
+            fire(() => {
+              const node = statusFloatNode(tk, ' fx-beat-float');
+              const at = throwLane({ enemy: tk.enemy });
+              if (at) placeAt(node, at, 0, 0);
+              fxAdd(node, animMs(STRIKE_SEQ.floatMs) || STRIKE_SEQ.floatMs);
+            }, plan.beatMs * i + plan.impactMs + animMs(260) + j * animMs(160));
+          });
         });
         // UX-9b: the NON-ATTACK beats, on the SAME clock. `plan.tail` is the turn's guard /
-        // power / hex steps in kernel order (armd in act()); they play one TURN_STEP slot
-        // each, starting where the last slam ended — so a compound move reads strike THEN
-        // guard, and a turn with no attack at all plays entirely here. The input gate holds
-        // for the whole plan (busyReason reads strikeSeq, not the attack count), which is
-        // what keeps a block/buff/debuff turn from being raced by a player click.
+        // power / hex / TICK steps in kernel order (armed in act()); they play one
+        // TURN_STEP slot each, starting where the last slam ended — so a compound move
+        // reads strike THEN guard, and the turn-closing poison ticks (the hero's, then
+        // one per living foe) play as the tail's own beats. The input gate holds for the
+        // whole plan (busyReason reads strikeSeq, not the attack count), which is what
+        // keeps a block/buff/debuff turn from being raced by a player click.
         // The per-type table, iterated one knob at a time exactly like the hero's SIG_FX loop
         // above — one entry per ROSTER ID, one knob per beat kind. A knob that does not exist
         // for this type, or does not exist at all, leaves the generic beat as the fallback.
@@ -273,9 +322,13 @@ export function dispatchFx() {
           // this attacker's beat — plan.beatMs * i. Attacker 0 is then byte-identical to
           // before, and attacker 2's flourish lands on its own slam instead of one beat
           // early, where it overlapped attacker 1's impact.
+          // GOLPES DISCRETOS: the per-type attack flourish is ONE MARK PER BEAT now — the
+          // payload carries this golpe's index (`hit` of `hits`), and the mark functions
+          // (fxWardenPockets / fxCrawlerClaws) place exactly one pocket or claw pair per
+          // call, offset by it.
           const offset = plan.beatMs * i;
           const staggered = (cb, ms) => fire(cb, (ms || 0) + offset);
-          table.attack(staggered, null, { enemy: a.enemy, id: foe.id, move: foe.move, hits: a.hits }, plan.slamMs, gen);
+          table.attack(staggered, null, { enemy: a.enemy, id: foe.id, move: foe.move, hit: a.hit, hits: a.hits }, plan.slamMs, gen);
         });
         plan.tail.forEach((s, i) => {
           fire(() => {
@@ -298,7 +351,8 @@ export function dispatchFx() {
             const isHex = s.kind === 'status' && s.to === 'player';
             // UX-9c: the SAME beat kind selects the type's own knob. `ownerId` is the acting
             // enemy (a `player_status` step carries no index of its own, see actions.js).
-            const board = sigFor(s.ownerId);
+            // A tick is nobody's power move — the generic pulse carries it, no type knob.
+            const board = s.kind === 'tick' ? null : sigFor(s.ownerId);
             const knob = isBlock ? 'guard' : (isHex ? 'hex' : 'power');
             if (board && board[knob]) {
               board[knob](fire, null, { enemy: s.owner, id: s.ownerId, move: s.move, hits: 1 }, plan.stepMs, gen);
@@ -395,6 +449,28 @@ export function dispatchFx() {
           for (const [knob, play] of Object.entries(SIG_FX)) {
             if (sig[knob]) play(fire, lane, b, sigMs, gen);
           }
+        }
+        // GOLPES DISCRETOS — the hero's own strike sequence. A play whose kernel events
+        // carried per-strike `damage` facts (actions.js hung them on this burst as
+        // `strikes`) floats ONE number per golpe, each on its own STRIKE_SEQ beat, while
+        // the pose hold (combat-view) keeps the hero mid-swing: "pose + impacto + float
+        // propio por CADA golpe". The lane is re-measured at fire time — a killing golpe
+        // resolves to the victim's collapsing ghost, exactly like a thrown hammer's
+        // landing. A parried golpe blooms the parry proc at the foe (the defender) that
+        // refused it. Speed 0 skips the choreography; the » fast form stacks the same
+        // facts statically in the enemy's own effect box (floats.js efxBox).
+        if (Array.isArray(b.strikes) && b.strikes.length > 0) {
+          const beatMs = animMs(STRIKE_SEQ.beat);
+          const impact = animMs(Math.round(STRIKE_SEQ.slam * STRIKE_SEQ.impactAt));
+          b.strikes.forEach((s, k) => {
+            fire(() => {
+              const node = strikeFloatNode(s, ' fx-golpe-float');
+              const at = throwLane({ enemy: s.enemy });
+              if (at) placeAt(node, at, 0, 0);
+              fxAdd(node, animMs(STRIKE_SEQ.floatMs) || STRIKE_SEQ.floatMs);
+              if (s.parried) parryProc(at);
+            }, beatMs * k + impact);
+          });
         }
         // UX-5: this play's input lock was armed by act() for `playInputSpan(b)` — the
         // figure this case's own choreography adds up to — BEFORE the paint, so the

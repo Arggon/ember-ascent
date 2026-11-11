@@ -67,6 +67,44 @@ test('intentChips: a debuff move yields a status chip; a buff yields self Streng
   assert.equal(bchips[0].status, 'strength');
 });
 
+test('the rider moves chip their hexes: soulfire is attack 7×2 + Bleed +2, spur_set is Parry +20', async () => {
+  // The Ash Matriarch's soulfire ("A7x2 BLEED2"): the attack chip stays per-hit × hits,
+  // and the bleed rider is a status chip ON YOU, after the attack in resolution order.
+  const matriarch = await combatState('strike', { enemyId: 'ash_wraith_elite', enemyOver: { moveIndex: 1 } });
+  const mrow = enemy0(matriarch);
+  assert.equal(mrow.intent.label, 'A7x2 BLEED2', 'the label is honest about the rider');
+  assert.equal(mrow.intent.damage, 14, 'intentDamage keeps announcing the TOTAL (7×2)');
+  assert.deepEqual(mrow.intent.statuses, [{ status: 'bleed', stacks: 2 }]);
+  const mchips = K.intentChips(mrow);
+  assert.deepEqual(mchips.map((c) => [c.verb, c.status ?? null, c.num]), [['attack', null, '7×2'], ['status', 'bleed', '+2']]);
+  assert.match(mchips[0].explain, /Will attack for 7 damage 2 times, and leave 2 Bleed on you/);
+
+  // The Slag Crawler's spur_set ("PARRY20"): a self-buff chips its Parry like its
+  // Strength does, `to: 'self'` stamped.
+  const crawler = await combatState('strike', { enemyId: 'slag_crawler', enemyOver: { moveIndex: 3 } });
+  const crow = enemy0(crawler);
+  assert.equal(crow.intent.label, 'PARRY20');
+  assert.deepEqual(crow.intent.statuses, [{ status: 'parry', stacks: 20, to: 'self' }]);
+  const cchips = K.intentChips(crow);
+  assert.deepEqual(cchips.map((c) => [c.verb, c.status, c.num]), [['status', 'parry', '+20']]);
+  assert.equal(cchips[0].label, 'Parry');
+  assert.match(cchips[0].explain, /Will power up: gain 20 Parry/);
+});
+
+test('the rider sentences word themselves in Spanish too', async () => {
+  const matriarch = await combatState('strike', { enemyId: 'ash_wraith_elite', enemyOver: { moveIndex: 1 } });
+  const mrow = enemy0(matriarch, { lang: 'es' });
+  const mchips = K.intentChips(mrow, 'es');
+  assert.match(mchips[0].explain, /Atacará 2 veces con 7 de daño, y te dejará 2 de Sangrado/);
+  assert.equal(mchips[1].label, 'Sangrado');
+
+  const crawler = await combatState('strike', { enemyId: 'slag_crawler', enemyOver: { moveIndex: 3 } });
+  const crow = enemy0(crawler, { lang: 'es' });
+  const cchips = K.intentChips(crow, 'es');
+  assert.match(cchips[0].explain, /Se potenciará: ganará 20 de Parada/);
+  assert.equal(cchips[0].label, 'Parada');
+});
+
 test('the intent facts and chips word themselves in Spanish too', async () => {
   const s = await combatState('strike', { enemyId: 'jaw_worm', enemyOver: { moveIndex: 1 } });
   const e = enemy0(s, { lang: 'es' });

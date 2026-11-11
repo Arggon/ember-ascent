@@ -69,6 +69,27 @@ test('the forge voice translates the SENTIMENT: every es flavor differs from the
   }
 });
 
+test('the golpes-discretos cards carry Spanish twins, and the three new statuses speak Spanish pills', () => {
+  for (const id of ['slag_barb', 'kiln_fume', 'anvil_guard']) {
+    const def = C.cards.get(id);
+    assert.ok(nonEmpty(def.name_es) && nonEmpty(def.flavor_es), `the new card "${id}" is swept`);
+    assert.notEqual(def.name_es, def.name);
+  }
+  // The status pills in a snapshot: kernel-worded, per language, side-aware.
+  const es = snapshot(combat(), { lang: 'es' });
+  void es;
+  const st = { ...combat(), player: { ...combat().player, statuses: { parry: 6, bleed: 3, poison: 4 } } };
+  const rows = snapshot(st, { lang: 'es' }).player.statuses;
+  const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
+  assert.equal(byKey.parry.name, 'Parada');
+  assert.match(byKey.parry.text, /cada golpe de ataque contra ti tiene un 6%/);
+  assert.equal(byKey.bleed.name, 'Sangrado');
+  assert.match(byKey.bleed.text, /pierdes 3 HP cada vez que ejecutas/);
+  assert.equal(byKey.poison.name, 'Veneno');
+  assert.match(byKey.poison.text, /al final de cada uno de tus turnos/);
+  assert.deepEqual(rows.map((r) => r.kind), ['buff', 'debuff', 'debuff'], 'the es rows keep their kind');
+});
+
 /* ------------------------------------------------------------------------- enemies */
 
 test('every enemy carries a Spanish display name, and the hashed stateName is unchanged', () => {

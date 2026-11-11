@@ -76,4 +76,7 @@ test('a mines run plays, the header carries the biome, and replay matches the go
 // moves (the Ash Wraith's wail, the Matriarch's grief), and a weakened hero's attacks
 // now resolve for 25% less — the drive diverges from the old hash at the first
 // weakened swing. Pure state math, no RNG change (same draw count, same 160-step drive).
-const GOLDEN = 'sha256:6c6a554cffc9149c0e643c81c34f149275ab4f4a52651aedc8972e387edb6190';
+// Recomputed for the "golpes discretos NxM" slice: the Matriarch's soulfire carries
+// the BLEED2 rider and the crawler gained spur_set (PARRY20), so the mines intents and
+// the hero's bleed diverge from the UX-7 hash at the first soulfire strike.
+const GOLDEN = 'sha256:e3a952a00e5166a35a5f81cb1060b5badf88992fac4fde3c9f0953f493a4dbc0';

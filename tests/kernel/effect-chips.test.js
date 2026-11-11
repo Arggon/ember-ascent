@@ -26,7 +26,7 @@ const C = await content();
 
 /** The verbs the shipped pool actually uses (the closed vocabulary minus `custom`). */
 const PLAIN_VERBS = ['damage', 'block', 'draw', 'discard', 'energy', 'heal', 'exhaust', 'retain'];
-const STATUSES = ['strength', 'vulnerable', 'weak', 'dexterity', 'metallicize'];
+const STATUSES = ['strength', 'vulnerable', 'weak', 'dexterity', 'metallicize', 'parry', 'bleed', 'poison'];
 
 test('every covered verb returns a complete EN and ES sentence', () => {
   for (const verb of PLAIN_VERBS) {
@@ -104,6 +104,27 @@ test('a custom-only card gets NO chip and is NOT covered — its sentence stays 
     const custom = def.effects.some((e) => e.verb === 'custom');
     assert.equal(chipsCover(def), !custom, `${id} coverage follows its custom verbs exactly`);
   }
+});
+
+test('the golpes-discretos trio chips itself: Slag Barb is A4 + BLEED+3, Anvil Guard PARRY+6, Kiln Fume PSN+4', () => {
+  // The new statuses ride the SAME status-chip machinery — the label is STATUS_MEANING's
+  // own, the explainer the kernel's own sentence, exactly like Strength above.
+  const barb = cardChips(C.cards.get('slag_barb'));
+  assert.deepEqual(barb.map((c) => [c.verb, c.status ?? null, c.num]), [['damage', null, '4'], ['status', 'bleed', '+3']]);
+  assert.equal(barb[1].label, 'Bleed');
+  assert.match(barb[1].explain, /loses 3 HP every time it makes an attack strike/);
+  assert.ok(chipsCover(C.cards.get('slag_barb')), 'the barb is fully chip-expressible');
+
+  const guard = cardChips(C.cards.get('anvil_guard'));
+  assert.deepEqual(guard.map((c) => [c.verb, c.status, c.num]), [['status', 'parry', '+6']]);
+  assert.equal(guard[0].label, 'Parry');
+  assert.match(guard[0].explain, /blocked completely/);
+  assert.ok(chipsCover(C.cards.get('anvil_guard')));
+
+  const fume = cardChips(C.cards.get('kiln_fume'), 'es');
+  assert.deepEqual(fume.map((c) => [c.verb, c.status, c.num]), [['status', 'poison', '+4']]);
+  assert.equal(fume[0].label, 'Veneno', 'the es chip speaks the es status label');
+  assert.match(fume[0].explain, /^Veneno — /);
 });
 
 test('repeated identical damage folds onto hits: Pummel is one 2×4 chip, not four', () => {

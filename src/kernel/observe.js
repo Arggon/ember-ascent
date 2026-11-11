@@ -75,13 +75,19 @@ function fieldFor(def, key, lang) {
 }
 
 /** Compact status label for the header, e.g. PWR2 VULN1. Exported so the plain-English
- * layer (describe.js) can derive its glossary from these tables instead of copying them. */
+ * layer (describe.js) can derive its glossary from these tables instead of copying them.
+ * The "golpes discretos" slice grew the table by three: BLEED and PSN are the tick-shaped
+ * debuffs, PARRY the whole-strike-dodge buff (an enemy move's honest label reads
+ * "A7x2 BLEED2" / "PARRY20" off these rows). */
 export const STATUS_ABBREV = {
   strength: 'PWR',
   vulnerable: 'VULN',
   weak: 'WK',
   dexterity: 'DEX',
   metallicize: 'METAL',
+  parry: 'PARRY',
+  bleed: 'BLEED',
+  poison: 'PSN',
 };
 
 /** One-line summaries for the exotic cards (they cannot be derived from data).
@@ -892,6 +898,13 @@ function snapshotEnemies(state, lang = 'en') {
             ...(move.vulnerable ? [{ status: 'vulnerable', stacks: move.vulnerable }] : []),
             ...(move.weak ? [{ status: 'weak', stacks: move.weak }] : []),
             ...(move.kind === 'buff' && move.strength ? [{ status: 'strength', stacks: move.strength, to: 'self' }] : []),
+            // RIDERS (the "golpes discretos" slice): a move's tick-shaped hexes and its
+            // parry grant speak in chips beside the older facts, in the runners' own
+            // resolution order (debuff: vulnerable, weak, bleed, poison; buff: strength,
+            // block, parry).
+            ...(move.bleed ? [{ status: 'bleed', stacks: move.bleed }] : []),
+            ...(move.poison ? [{ status: 'poison', stacks: move.poison }] : []),
+            ...(move.kind === 'buff' && move.parry ? [{ status: 'parry', stacks: move.parry, to: 'self' }] : []),
           ],
           // The sentence for the SAME intent, from the same rules, so the compact number
           // and the readable line can never disagree. The enemy NAME stays English until

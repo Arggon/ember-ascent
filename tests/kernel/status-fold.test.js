@@ -259,15 +259,32 @@ test('each snapshot status row publishes its kind (the one buff/debuff classific
   // The web splits the enemy card into an ABOVE-the-art buffs row and a foot debuffs
   // row off this field — a surface must never string-match status keys, so the kernel's
   // own table (rules/vocabulary.js STATUS_KINDS, the same source the Purge Flask list
-  // derives from) is what the row carries. Additive metadata: every existing field is
+  // derives from) is what the row carries. Additive metadata only: every existing field is
   // untouched, and the compact dump reads statuses through statusLine, so no dump byte
   // moves (the goldens pin that separately).
   const st = await combatState('defend', {
-    enemyId: 'jaw_worm', enemyOver: { moveIndex: 0, statuses: { strength: 2, dexterity: 1, metallicize: 3, vulnerable: 2, weak: 1 } },
+    enemyId: 'jaw_worm', enemyOver: { moveIndex: 0, statuses: { strength: 2, dexterity: 1, metallicize: 3, vulnerable: 2, weak: 1, parry: 6, bleed: 3, poison: 4 } },
   });
   const kinds = Object.fromEntries(snapshot(st).enemies[0].statuses.map((r) => [r.key, r.kind]));
   assert.deepEqual(kinds, {
-    strength: 'buff', dexterity: 'buff', metallicize: 'buff',
-    vulnerable: 'debuff', weak: 'debuff',
-  });
+    strength: 'buff', dexterity: 'buff', metallicize: 'buff', parry: 'buff',
+    vulnerable: 'debuff', weak: 'debuff', bleed: 'debuff', poison: 'debuff',
+  }, 'the golpes-discretos trio is classified once, in the ONE table');
+});
+
+test('a BLEED-RIDER strike keeps its damage fold — the Ash Matriarch\u2019s soulfire (A7x2 BLEED2)', async () => {
+  // The rider is additive to the golpe, not a replacement of its fold: the strike still
+  // folds Strength/Weak into `raw`, and each LANDED strike leaves the hero Bleeding.
+  const res = endTurn(await combatState('defend', {
+    enemyId: 'ash_wraith_elite', enemyOver: { moveIndex: 1, intentStep: 1, statuses: { strength: 1 } },
+  }));
+  const hits = res.events.filter((e) => e.t === 'enemy_attack');
+  assert.deepEqual(hits.map((h) => h.raw), [8, 8], '7 printed + 1 Strength per golpe — the fold is untouched');
+  assert.deepEqual(
+    res.events.filter((e) => e.t === 'player_status'),
+    [{ t: 'player_status', enemy: 0, status: 'bleed', stacks: 2 }, { t: 'player_status', enemy: 0, status: 'bleed', stacks: 2 }],
+    'one rider per LANDED golpe, exactly as the honest label "A7x2 BLEED2" promises',
+  );
+  assert.equal(res.state.player.statuses.bleed, 4);
+  assert.equal(res.state.player.hp, 60 - 16, '16 damage landed before the hex');
 });

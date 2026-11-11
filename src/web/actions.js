@@ -74,9 +74,27 @@ import { currentLang, setLang, t } from './i18n.js';
  * states, kept here so a future self-debuff stacks on the right body without the grouping
  * changing again. A debuff move afflicts the player through the kernel's `debuff` runner,
  * whose `player_status` events carry NO attacker index — those are read as their own
- * beats below (that is what keeps a wail/grief turn from being silent).
+ * beats below (that is what keeps a wail/grief turn from being silent). The "golpes
+ * discretos" slice grew the hex half by the two tick-shaped debuffs: the Matriarch's
+ * soulfire leaves Bleed on the hero (`player_status {status:'bleed', enemy}`), and a
+ * poison hex would land the same shape.
  */
-const PLAYER_AFFLICTING = new Set(['weak', 'vulnerable']);
+const PLAYER_AFFLICTING = new Set(['weak', 'vulnerable', 'bleed', 'poison']);
+
+/**
+ * A multi-hit move's own printed label (`A4x2`, `A7x2 BLEED2`) is the announced golpe
+ * total the wire carries. Read per strike beat so each beat knows its own `hit` of
+ * `hits`; clamped 1..4 (no shipped label exceeds x3) so a malformed label cannot spawn
+ * an unbounded anything, and a label without `xN` is one golpe.
+ * @param {string|null} move the intent label from the before snapshot
+ * @returns {number}
+ */
+function announcedHits(move) {
+  const m = /x(\d)/.exec(String(move ?? ''));
+  if (!m) return 1;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? Math.min(4, Math.max(1, n)) : 1;
+}
 
 /** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it.
  *  The NAMES are proper nouns in every language. The blurbs are NOT carried here: the
@@ -147,10 +165,10 @@ export function act(actionId, targetK = null) {
 
     // UX-2: the enemy turn, SEQUENCED AND NAMED. The turn flip is the one moment the
     // kernel resolves several attackers in one step, so the snapshot diff can only say
-    // "the hero lost N in total" — the per-attacker facts live in the kernel's OWN
+    // "the hero lost N in total" — the per-golpe facts live in the kernel's OWN
     // event stream for this step (`enemy_attack` carries the attacker's index, what it
-    // dealt and what the hero's block ate, per hit, in resolution order). They are read
-    // here the same way the run record reads them: kernel words about what happened,
+    // dealt and what the hero's block ate, per strike, in resolution order). They are
+    // read here the same way the run record reads them: kernel words about what happened,
     // regrouped for presentation, never re-derived. The result is ONE burst the
     // dispatcher plays as a sequence — enemy 1 winds up and strikes (its named float
     // lands on the hero), THEN enemy 2 — instead of every foe slamming at once.
@@ -165,10 +183,20 @@ export function act(actionId, targetK = null) {
     // that step rides the flat beat list with `enemy: null` and lands on the hero, which is
     // what keeps a wail/grief turn from being silent too.
     //
+    // GOLPES DISCRETOS (this slice): `attacks` is ONE ENTRY PER STRIKE, not one per
+    // attacker — an A4x2 move yields two beats, each with its own dealt/blocked/parried
+    // and its 1-based golpe index (`hit`) against the move's announced total (`hits`,
+    // parsed off the printed label "A4x2" — the only hit count the wire carries). The
+    // attacker's OWN bleed rides the strike that triggered it: the kernel's
+    // `bleed_tick {who:'enemy', index}` resolves right after that attacker's golpe, so
+    // the tick steps hang off the strike (`strike.ticks`) and fx.js plays them on the
+    // golpe's own clock. Poison is turn-END business, not golpe business: both tick
+    // events (`poison_tick` on the hero, then one per living foe) become plain tail
+    // beats in stream order, and fx.js plays the tail after the last slam.
+    //
     // `plans` groups the beats per attacker, in kernel resolution order (what 9c paints
     // poses from); `beats` is the same steps flat in that same order (spec §4.1's list).
-    // `attacks` keeps the exact shape and accumulation order the strike sequence already
-    // consumes, so the shipped attack path is untouched.
+    // `attacks` is the per-strike list the sequenced playback iterates.
     let turnPlans = null;
     let turnBeats = null;
     let turnStrikes = null;
@@ -188,8 +216,52 @@ export function act(actionId, targetK = null) {
       let lastOwner = null;
       let lastOwnerId = null;
       let lastMove = null;
+      // Per-enemy golpe counters for the strike beats (`hit` is 1-based).
+      const golpeOf = new Map();
+      // The last attack beat per enemy, so a bleed tick can ride its own golpe. BOTH
+      // shapes that beat travels in are kept: the plan step (steps/beats, which the tail
+      // and pose clocks read) and the per-strike entry (plan.attacks, which the golpe
+      // playback iterates) — one tick, hung on both.
+      const lastStrikeOf = new Map();
+      const lastAttackOf = new Map();
       for (const ev of (Array.isArray(res.events) ? res.events : [])) {
         if (!ev) continue;
+        if (ev.t === 'bleed_tick' || ev.t === 'poison_tick') {
+          const status = ev.t === 'bleed_tick' ? 'bleed' : 'poison';
+          // The tick's BODY names itself: `who: 'player'` is the hero's own close (the
+          // hero poison tick), an enemy tick carries `index`.
+          const onPlayer = ev.who === 'player';
+          const foeIdx = onPlayer ? null : ev.index;
+          const tick = {
+            enemy: onPlayer ? null : foeIdx,
+            owner: foeIdx,
+            ownerId: onPlayer ? null : (plans.get(foeIdx)?.id ?? null),
+            move: onPlayer ? lastMove : (plans.get(foeIdx)?.move ?? null),
+            kind: 'tick',
+            status,
+            to: onPlayer ? 'player' : 'enemy',
+            amount: ev.amount ?? 0,
+            remaining: ev.remaining ?? 0,
+          };
+          if (!onPlayer && status === 'bleed' && Number.isInteger(foeIdx)) {
+            // BLEED rides the golpe that triggered it — the holder ticks right after
+            // each strike it executes, so the tick hangs off that golpe (present only
+            // when a strike of this turn reached the tick; a tail slot would misorder
+            // it against the NEXT golpe's slam). Both shapes the beat travels in carry
+            // it: the plan step and the per-strike entry the playback iterates.
+            const step = lastStrikeOf.get(foeIdx);
+            const entry = lastAttackOf.get(foeIdx);
+            if (step && entry) {
+              step.ticks = [...(step.ticks ?? []), tick];
+              entry.ticks = [...(entry.ticks ?? []), tick];
+              continue;
+            }
+          }
+          // Everything else — the POISON close on both sides, and a bleed tick with no
+          // strike of its own to ride — is a plain tail beat, in stream order.
+          beats.push(tick);
+          continue;
+        }
         if (ev.t === 'player_status') {
           // UX-9: the debuff that lands on the HERO is the acting enemy's own move half.
           // The kernel now stamps `enemy: i` on it (act.js debuff runner), the same index
@@ -227,8 +299,9 @@ export function act(actionId, targetK = null) {
           // UX-9c: the step carries the enemy's ROSTER ID and the move's own printed label.
           // The presentation table (fx-signatures ENEMY_SIG_FX) is keyed by id, so a beat must
           // know which type is acting; the label is the only hit count the wire carries
-          // (`A5x3`, `A4x2`), which is what tells a triple-pocket from a single slam. Both
-          // come from the BEFORE snapshot — the acting enemy is still on it, dead or not.
+          // (`A5x3`, `A4x2`, `A7x2 BLEED2`), which is what tells a triple-pocket from a
+          // single slam. Both come from the BEFORE snapshot — the acting enemy is still
+          // on it, dead or not.
           plan = {
             enemy: ev.enemy,
             name: foe ? foe.name : t('toast.enemyFallback'),
@@ -239,14 +312,21 @@ export function act(actionId, targetK = null) {
           plans.set(ev.enemy, plan);
         }
         if (kind === 'attack') {
-          let a = attacks.find((x) => x.enemy === ev.enemy);
-          if (!a) {
-            a = { enemy: ev.enemy, name: plan.name, dealt: 0, blocked: 0, hits: 0 };
-            attacks.push(a);
-          }
-          a.dealt += ev.dealt ?? 0;
-          a.blocked += ev.blocked ?? 0;
-          a.hits += 1;
+          // ONE BEAT PER GOLPE: no accumulation. `hit` counts this attacker's own
+          // golpes; `hits` is the move's announced total (the label's xN, clamped).
+          const soFar = golpeOf.get(ev.enemy) ?? 0;
+          golpeOf.set(ev.enemy, soFar + 1);
+          const entry = {
+            enemy: ev.enemy,
+            name: plan.name,
+            dealt: ev.dealt ?? 0,
+            blocked: ev.blocked ?? 0,
+            parried: Boolean(ev.parried),
+            hit: soFar + 1,
+            hits: announcedHits(plan.move),
+          };
+          attacks.push(entry);
+          lastAttackOf.set(ev.enemy, entry);
         }
         lastOwner = ev.enemy;
         lastOwnerId = plan.id;
@@ -259,12 +339,13 @@ export function act(actionId, targetK = null) {
         // presentation can key on the roster id and read the move's own label.
         const who = { id: plan.id, move: plan.move };
         const step = kind === 'attack'
-          ? { enemy: ev.enemy, ...who, kind, to, dealt: ev.dealt ?? 0, blocked: ev.blocked ?? 0, hits: 1 }
+          ? { enemy: ev.enemy, ...who, kind, to, dealt: ev.dealt ?? 0, blocked: ev.blocked ?? 0, parried: Boolean(ev.parried), hit: golpeOf.get(ev.enemy), hits: announcedHits(plan.move) }
           : kind === 'block'
             ? { enemy: ev.enemy, ...who, kind, to, amount: Math.max(0, ev.amount ?? 0) }
             : { enemy: ev.enemy, ...who, kind, to, status: ev.status, stacks: ev.stacks ?? 0 };
         plan.steps.push(step);
         beats.push(step);
+        if (kind === 'attack') lastStrikeOf.set(ev.enemy, step);
       }
       if (beats.length > 0) {
         turnPlans = [...plans.values()];
@@ -284,13 +365,48 @@ export function act(actionId, targetK = null) {
     }
     if (gainedBlock > 0) fx.push({ kind: 'hero-float', amount: gainedBlock, tone: 'block', tier: 1 });
 
+    // GOLPES DISCRETOS — the hero's own strikes, per golpe. A play whose kernel events
+    // carry `damage {source:'player'}` resolves as M discrete golpes (M×E across an
+    // all-row hit), and each event is one golpe's truth (dealt through block, the
+    // parry proc). The per-golpe `strike` bursts below REPLACE the snapshot-diff float
+    // for the enemies they cover: the diff can only say "the enemy lost N in total",
+    // while the events say what each strike did, in resolution order — and a parried
+    // strike (dealt 0, HP untouched) would be invisible to the diff entirely. Cards
+    // whose damage never rides the `damage` verb (the custom handlers, potion damage)
+    // emit no events, so they keep the diff floats exactly as before.
+    const playStrikes = [];
+    for (const ev of (Array.isArray(res.events) ? res.events : [])) {
+      if (!ev || ev.t !== 'damage' || ev.source !== 'player' || !Number.isInteger(ev.target)) continue;
+      const foe = after.enemies.find((e) => e.index === ev.target) ?? before.enemies.find((e) => e.index === ev.target);
+      playStrikes.push({
+        kind: 'strike',
+        enemy: ev.target,
+        // A killing golpe empties the AFTER row — the name rides the BEFORE snapshot's
+        // body, which is also the one the death ghost carries.
+        name: foe ? foe.name : t('toast.enemyFallback'),
+        dealt: ev.dealt ?? 0,
+        blocked: ev.blocked ?? 0,
+        parried: Boolean(ev.parried),
+        hp: ev.hp ?? 0,
+        hit: playStrikes.length + 1,
+      });
+    }
+    if (playStrikes.length > 0) fx.push(...playStrikes);
+    const struckIdx = new Set(playStrikes.map((s) => s.enemy));
     // Per-enemy: the damage that landed (HP delta), the glyph tier for that amount, and
-    // whether block ate all of it. The bar still shows the remaining total.
+    // whether block ate all of it. The bar still shows the remaining total. Enemies the
+    // per-golpe events already covered are skipped — their numbers travel with the
+    // sequenced strike floats instead (the `block-eat` bar flash still fires for them:
+    // it animates the bar, it prints no number).
     const beforeByIdx = new Map(before.enemies.map((e) => [e.index, e]));
     let absorbed = false;
     for (const e of after.enemies) {
       const was = beforeByIdx.get(e.index);
       if (!was || e.hp >= was.hp) continue;
+      if (struckIdx.has(e.index)) {
+        if (was.block > 0) fx.push({ kind: 'block-eat', enemy: e.index });
+        continue;
+      }
       const dealt = was.hp - e.hp;
       const tier = dealt >= 16 ? 3 : dealt >= 8 ? 2 : 1;
       fx.push({ kind: 'float', enemy: e.index, amount: dealt, tone: 'dmg', tier, defeated: e.hp <= 0 });
@@ -320,13 +436,28 @@ export function act(actionId, targetK = null) {
     }
     // A hit that was FULLY absorbed leaves the enemy's HP untouched, so the loop above
     // never fires. Detected by the enemy's block falling while its HP held — and it says
-    // so in words, because "0" or "−0" would contradict a bar that did not move.
+    // so in words, because "0" or "−0" would contradict a bar that did not move. The
+    // per-golpe events already carry that word for their own enemies (a fully blocked
+    // golpe prints "absorbed" on its own float), so covered enemies only feed the bar
+    // flash here, never a second float.
     for (const e of after.enemies) {
       const was = beforeByIdx.get(e.index);
       if (was && was.block > e.block && e.hp === was.hp) {
-        fx.push({ kind: 'absorbed', enemy: e.index });
+        if (!struckIdx.has(e.index)) fx.push({ kind: 'absorbed', enemy: e.index });
+        else fx.push({ kind: 'block-eat', enemy: e.index });
         absorbed = true;
       }
+    }
+
+    // The hero's OWN bleed ticks ("golpes discretos"): every attack golpe the hero
+    // executes ticks his bleed right after the strike lands (the kernel's
+    // `bleed_tick {who:'player'}`), and the number is the HP that tick took. One
+    // hero-float per tick, in the tick language (floatNode's tone 'tick'); `playerLost`
+    // above already flinched the hero at the play's total, so these are words on top.
+    let tickFloats = 0;
+    for (const ev of (Array.isArray(res.events) ? res.events : [])) {
+      if (!ev || ev.t !== 'bleed_tick' || ev.who !== 'player') continue;
+      fx.push({ kind: 'hero-float', tone: 'tick', status: 'bleed', amount: ev.amount ?? 0, remaining: ev.remaining ?? 0, silent: false, at: tickFloats++ });
     }
 
     // Card played: it travels toward the enemy row as a copy on the effect layer. The
@@ -357,6 +488,11 @@ export function act(actionId, targetK = null) {
           enemy: aimIdx ? aimIdx.index : null,
           // A whole lane class, not an index: `positionClass` already returns `side-0` etc.
           side: aimIdx ? positionClass(aimIdx.index, after.enemies) : 'side-none',
+          // GOLPES DISCRETOS: this play's own per-strike facts (the same list the
+          // `strike` bursts above carry), so fx.js can beat out a multi-hit card's
+          // floats one per golpe on the STRIKE_SEQ clock and `playInputSpan` can hold
+          // the input for the whole sequence.
+          strikes: playStrikes,
         });
       }
       // The hand the player is looking at changed: the replacement cards fan in.

@@ -9,12 +9,26 @@
 // handler in rules/effects/<id>.js through the one `custom` verb.
 
 import { drawIntoHand } from './draw.js';
+import { intAt } from '../rng.js';
 
 /** @typedef {{state: any, events: any[]}} EffectResult */
 /** @typedef {{rng: {shuffle: Function, pick: Function, int: Function}, card: any, source: string, target: any, targetEnemyIndex: number}} EffectCtx */
 
-/** Debuff/buff counters the engine understands. */
-export const STATUSES = ['strength', 'vulnerable', 'weak', 'dexterity', 'metallicize'];
+/** Debuff/buff counters the engine understands.
+ *
+ * The slice "golpes discretos NxM" grew the table by three, all of them REACTIVE
+ * statuses that ride the discrete strike (the parry roll, the bleed tick), or the
+ * turn's own end (the poison tick):
+ *
+ *   parry  — each stack is a 1% chance to block one attack STRIKE completely. Rolled
+ *            per golpe, only when the defender holds stacks (attackHit below).
+ *   bleed  — the holder loses `stacks` HP every time IT executes an attack strike,
+ *            one stack per tick, gone at zero (attackHit below).
+ *   poison — StS style: the holder loses `stacks` HP at the end of its OWN turn, then
+ *            one stack falls off (rules/powers.js poisonTick*). Zero interaction with
+ *            the multi-golpe loop.
+ */
+export const STATUSES = ['strength', 'vulnerable', 'weak', 'dexterity', 'metallicize', 'parry', 'bleed', 'poison'];
 
 /**
  * The ONE classification of that table (S5 review P3, single-sourced in the POLISH
@@ -30,6 +44,9 @@ export const STATUS_KINDS = Object.freeze({
   metallicize: 'buff',
   vulnerable: 'debuff',
   weak: 'debuff',
+  parry: 'buff',
+  bleed: 'debuff',
+  poison: 'debuff',
 });
 
 /** The debuff half of the table, in STATUSES order. Derived, never maintained twice. */
@@ -155,6 +172,146 @@ export function addStatus(who, status, stacks) {
 }
 
 /**
+ * Take ONE stack of `status` off a combatant, deleting the key at zero — the shared
+ * decrement of every tick-shaped status (bleed falls off one charge per strike it
+ * ticks, poison one per turn-end tick). A status the combatant does not hold is a
+ * no-op, never a throw.
+ * @param {any} who
+ * @param {string} status
+ * @returns {any}
+ */
+export function consumeStack(who, status) {
+  const left = (who.statuses?.[status] ?? 0) - 1;
+  const statuses = { ...(who.statuses ?? {}) };
+  if (left > 0) statuses[status] = left;
+  else delete statuses[status];
+  return { ...who, statuses };
+}
+
+/**
+ * attackHit — ONE discrete strike of an attack, both sides of a fight. The two canonical
+ * attack loops (the `damage` verb, single and all_enemies branches, and MOVE_RUNNERS.attack
+ * in rules/act.js) resolve every golpe through this one fold:
+ *
+ *   [parry roll] -> [damage] -> [the attacker's bleed tick]
+ *
+ * 1. PARRY — the defender's `parry` stacks are a whole-strike dodge: each charge is a 1%
+ *    chance to refuse the strike outright. The roll exists ONLY when the defender holds
+ *    charges — exactly ONE u64 draw per defended strike, `intAt(seed, LIVE rngDraws, 100)`,
+ *    a proc is `roll < charges` — and the returned state advances rngDraws by exactly the
+ *    draws thrown (one per defended strike). A defender WITHOUT parry consumes ZERO draws:
+ *    every parry-free fight's streams and hashes are byte-identical to the pre-parry
+ *    engine, and the parry is the FIRST consumer of RNG on the damage path, so any later
+ *    roll inside the same play reads the counter it left behind. A proc lands NOTHING:
+ *    dealt 0, blocked = raw, the defender's block pool NOT consumed, HP untouched — the
+ *    strike event carries `parried: true` so a presentation can decorate the riposte.
+ *    Parry is a chance, not a pool: nothing is spent on a proc, and it never decays
+ *    (decayStatuses touches vulnerable/weak only). Symmetric — the hero's parry covers
+ *    the enemy loop's golpes, an enemy's covers the hero's.
+ *
+ * 2. DAMAGE — the ordinary fold (Vulnerable amplifies, Block soaks); skipped entirely on
+ *    a proc because the strike never arrived.
+ *
+ * 3. BLEED TICK — the ATTACKER's own bleed resolves once per strike it executes, AFTER
+ *    the strike landed (a parried strike was still executed — it ticks; rule 4 of the
+ *    slice: the parry only covers attack golpes, never ticks). `stacks` HP straight off
+ *    the attacker — Block does not absorb a tick and no parry applies to one — then one
+ *    charge falls off, gone at zero. The hero's tick floors at 1 HP (the loseHp
+ *    convention: no DoT kills the hero in v1); an enemy CAN bleed out — its ticked copy
+ *    carries the `dead` flag in STATE (the tick event stays the contract's shape: who,
+ *    index?, amount, hp, remaining) — and this function's `attackerDied` lets the caller
+ *    cancel the golpes it has left. Ticks consume ZERO draws.
+ *
+ * Pure: fresh state in, fresh state out; the only entropy is the seed stream, counted.
+ *
+ * @param {any} state
+ * @param {{attacker: 'player'|'enemy', raw: number, defenderIndex?: number, attackerIndex?: number}} args
+ *        attacker 'player' -> the golpe flies at the enemy at `defenderIndex`; events are
+ *        the `damage` shape. attacker 'enemy' -> the golpe flies at the HERO from the
+ *        enemy at `attackerIndex`; events are the `enemy_attack` shape. Exactly these two
+ *        shapes exist: an attack always crosses the aisle.
+ * @returns {{state: any, events: any[], parried: boolean, defenderDied: boolean, attackerDied: boolean}}
+ */
+export function attackHit(state, args) {
+  const events = [];
+  const playerAttacks = args.attacker === 'player';
+  const defender = playerAttacks ? state.combat.enemies[args.defenderIndex] : state.player;
+  const attacker = playerAttacks ? state.player : state.combat.enemies[args.attackerIndex];
+
+  // 1. THE PARRY ROLL — one draw when the defender holds charges, zero otherwise. The
+  //    counter read is LIVE (this strike sees every draw the play has spent so far).
+  let rngDraws = state.rngDraws;
+  let parried = false;
+  const charges = defender.statuses?.parry ?? 0;
+  if (charges > 0) {
+    parried = intAt(state.seed, rngDraws, 100) < charges;
+    rngDraws += 1;
+  }
+
+  // 2. THE DAMAGE — the ordinary fold, or the whole strike refused. `raw` keeps each
+  //    side's historical meaning: on a player strike it is the target-Vulnerable-folded
+  //    number damageEnemy reports; on an enemy strike it is the strike itself (the
+  //    hero's Vulnerable shows up in `dealt`, exactly as the pre-slice runner printed).
+  let raw = args.raw;
+  let dealt = 0;
+  let blocked = 0;
+  let after = defender;
+  if (parried) {
+    blocked = args.raw; // bookkeeping only — the pool itself is not touched
+  } else if (playerAttacks) {
+    const out = damageEnemy(defender, args.raw);
+    raw = out.raw;
+    dealt = out.dealt;
+    blocked = out.blocked;
+    after = out.enemy;
+  } else {
+    const out = damagePlayer(defender, args.raw);
+    dealt = out.dealt;
+    blocked = out.blocked;
+    after = out.player;
+  }
+  events.push(playerAttacks
+    ? { t: 'damage', source: 'player', target: args.defenderIndex, raw, dealt, blocked, hp: after.hp, ...(parried ? { parried: true } : {}) }
+    : { t: 'enemy_attack', enemy: args.attackerIndex, raw, dealt, blocked, hp: after.hp, ...(parried ? { parried: true } : {}) });
+  let next = playerAttacks
+    ? { ...state, combat: { ...state.combat, enemies: state.combat.enemies.map((e, i) => (i === args.defenderIndex ? after : e)) } }
+    : { ...state, player: after };
+
+  // 3. THE ATTACKER'S BLEED TICK — after the golpe, zero draws, one charge per tick.
+  const bleed = attacker.statuses?.bleed ?? 0;
+  let attackerBledOut = false;
+  if (bleed > 0) {
+    if (playerAttacks) {
+      const bled = consumeStack(loseHp(attacker, bleed), 'bleed');
+      next = { ...next, player: bled, rngDraws };
+      events.push({ t: 'bleed_tick', who: 'player', amount: bleed, hp: bled.hp, remaining: bleed - 1 });
+    } else {
+      const hp = Math.max(0, attacker.hp - bleed);
+      attackerBledOut = hp <= 0;
+      const bled = consumeStack({ ...attacker, hp, dead: hp <= 0 }, 'bleed');
+      next = {
+        ...next,
+        rngDraws,
+        combat: { ...next.combat, enemies: next.combat.enemies.map((e, i) => (i === args.attackerIndex ? bled : e)) },
+      };
+      events.push({ t: 'bleed_tick', who: 'enemy', index: args.attackerIndex, amount: bleed, hp, remaining: bleed - 1 });
+    }
+  } else {
+    next = { ...next, rngDraws };
+  }
+
+  return {
+    state: next,
+    events,
+    parried,
+    defenderDied: playerAttacks ? Boolean(after.dead) : next.player.hp <= 0,
+    // The hero's own bleed can never fell him (the loseHp floor at 1), so the player
+    // side of this flag is false by construction; the enemy side reads the tick.
+    attackerDied: playerAttacks ? false : (bleed > 0 ? attackerBledOut : Boolean(attacker.dead)),
+  };
+}
+
+/**
  * Add power stacks.
  * @param {any} state
  * @param {string} power
@@ -171,37 +328,42 @@ export const VOCABULARY = {
   /** damage — deal `amount` (plus Strength, then Weak-reduced) to the target, `hits` times.
    *  THE ATTACK FOLD, deliberately shared: every card attack resolves through
    *  playerStrike, and potions deliberately do NOT (potion_damage, rules/potions.js —
-   *  a potion is not an attack; its printed number is the number). */
+   *  a potion is not an attack; its printed number is the number).
+   *
+   *  GOLPES DISCRETOS: M hits are M discrete strikes, each resolved through attackHit
+   *  (the shared fold [parry roll] -> [damage] -> [the hero's bleed tick]) — an
+   *  all_enemies hit across E living bodies is M×E golpes, each one defended (and bled)
+   *  on its own. A strike the target's parry refused still executed: the hero's bleed
+   *  ticks after it, exactly as after a landed one. */
   damage(state, ctx, params) {
     const perHit = playerStrike(params.amount, state.player);
     const hits = params.hits ?? 1;
 
     if (params.target === 'all_enemies') {
-      let enemies = state.combat.enemies;
+      let next = state;
       const events = [];
       for (let h = 0; h < hits; h += 1) {
-        enemies = enemies.map((e, i) => {
-          if (e.dead) return e;
-          const out = damageEnemy(e, perHit);
-          events.push({ t: 'damage', source: 'player', target: i, raw: out.raw, dealt: out.dealt, blocked: out.blocked, hp: out.enemy.hp });
-          return out.enemy;
-        });
+        for (let i = 0; i < next.combat.enemies.length; i += 1) {
+          if (next.combat.enemies[i].dead) continue;
+          const out = attackHit(next, { attacker: 'player', defenderIndex: i, raw: perHit });
+          next = out.state;
+          events.push(...out.events);
+        }
       }
-      return { state: { ...state, combat: { ...state.combat, enemies } }, events };
+      return { state: next, events };
     }
 
     const idx = ctx.targetEnemyIndex ?? 0;
-    let enemies = state.combat.enemies;
+    let next = state;
     const events = [];
-    let hit = 0;
-    for (; hit < hits; hit += 1) {
-      const target = enemies[idx];
+    for (let hit = 0; hit < hits; hit += 1) {
+      const target = next.combat.enemies[idx];
       if (!target || target.dead) break;
-      const out = damageEnemy(target, perHit);
-      enemies = enemies.map((e, i) => (i === idx ? out.enemy : e));
-      events.push({ t: 'damage', source: 'player', target: idx, raw: out.raw, dealt: out.dealt, blocked: out.blocked, hp: out.enemy.hp });
+      const out = attackHit(next, { attacker: 'player', defenderIndex: idx, raw: perHit });
+      next = out.state;
+      events.push(...out.events);
     }
-    return { state: { ...state, combat: { ...state.combat, enemies } }, events };
+    return { state: next, events };
   },
 
   /** block — gain `amount` (plus Dexterity) block. */

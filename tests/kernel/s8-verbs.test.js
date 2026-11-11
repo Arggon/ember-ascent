@@ -211,3 +211,36 @@ test('multi-hit to ALL enemies: Cinder Storm hits every living enemy 4 times', a
   assert.deepEqual([...byTarget.entries()].sort(), [[0, 4], [1, 2]], 'enemy 0 takes 4 hits, the 6-HP enemy dies on its 2nd');
   assert.ok(res.state.combat.enemies[1].dead);
 });
+
+/* ------------------------------- multi-hit x the golpes-discretos fold (the slice) --
+ * Every hit is a discrete golpe through attackHit (rules/vocabulary.js): the defender's
+ * parry rolls PER HIT, and the attacker's own bleed ticks PER HIT. The full contract
+ * lives in tests/kernel/discrete-strikes.test.js; these two pins hold the multi-hit
+ * shape of it (M hits = exactly M rolls, and ticks that stop when the stacks run out). */
+
+test('multi-hit: the defender\u2019s parry rolls once per hit — 4 golpes, exactly 4 draws (measured)', async () => {
+  const withParry = freezeDeep(await combatState('slag_shrapnel', { enemyOver: { statuses: { parry: 100 } } }));
+  const without = freezeDeep(await combatState('slag_shrapnel', { enemyOver: {} }));
+  const a = step(withParry, 'p1');
+  const b = step(without, 'p1');
+  const hits = a.events.filter((e) => e.t === 'damage');
+  assert.equal(hits.length, 4, 'four golpes');
+  assert.ok(hits.every((h) => h.parried && h.dealt === 0 && h.blocked === 2), 'each golpe refused whole');
+  assert.equal(a.state.combat.enemies[0].hp, 40, 'not a scratch landed');
+  assert.equal((a.state.rngDraws - withParry.rngDraws) - (b.state.rngDraws - without.rngDraws), 4,
+    `M hits paid exactly M draws (${a.state.rngDraws - withParry.rngDraws} vs control ${b.state.rngDraws - without.rngDraws})`);
+});
+
+test('multi-hit: the attacker\u2019s bleed ticks per hit and stops when the stacks run out', async () => {
+  // 4 golpes with Bleed 2: tick 2, tick 1, then the status is gone and the last two
+  // golpes tick nothing.
+  const state = freezeDeep(await combatState('slag_shrapnel', { statuses: { bleed: 2 } }));
+  const res = step(state, 'p1');
+  assert.deepEqual(res.events.filter((e) => e.t === 'bleed_tick'), [
+    { t: 'bleed_tick', who: 'player', amount: 2, hp: 58, remaining: 1 },
+    { t: 'bleed_tick', who: 'player', amount: 1, hp: 57, remaining: 0 },
+  ]);
+  assert.deepEqual(res.state.player.statuses, {}, 'the status is gone at zero, well before the 4th golpe');
+  assert.equal(res.state.player.hp, 57);
+  assert.equal(res.state.rngDraws - state.rngDraws, 0, 'ticks consume ZERO draws');
+});

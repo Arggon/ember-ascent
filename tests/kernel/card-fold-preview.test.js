@@ -185,3 +185,20 @@ test('a block chip folds Dexterity through blockGain', async () => {
   assert.equal(chip.num, '7', 'Defend 5 + Dexterity 2 lands 7');
   assert.equal(chip.explain, 'Gain 7 Block — it soaks damage and is spent at the start of your next turn.');
 });
+
+test('the golpes-discretos cards preview their hexes in plain words (EN and ES)', async () => {
+  const { combatState: cs } = await import('../helpers/harness.mjs');
+  assert.equal(p1(await cs('slag_barb')), 'Deal 4 damage to the enemy. Apply 3 Bleed to the enemy — it loses 3 HP every time it makes an attack strike.');
+  assert.equal(p1(await cs('kiln_fume')), 'Apply 4 Poison to the enemy — it loses 4 HP at the end of each of its turns.');
+  assert.equal(p1(await cs('anvil_guard')), 'Gain 6 Parry — each attack strike against you has a 6% chance to be blocked completely.');
+  assert.equal(p1(await cs('anvil_guard', {}), { lang: 'es' }), 'Ganas 6 de Parada — cada golpe de ataque contra ti tiene un 6% de probabilidad de ser bloqueado por completo.');
+});
+
+test('Slag Barb’s previewed number is the raw the play lands (the strongest pin, on the new card)', async () => {
+  const { combatState: cs } = await import('../helpers/harness.mjs');
+  const s = await cs('slag_barb', { statuses: { strength: 2 } });
+  assert.equal(p1(s), 'Deal 4 damage to the enemy — 6 with Strength 2. Apply 3 Bleed to the enemy — it loses 3 HP every time it makes an attack strike.');
+  const landed = await land(s);
+  assert.equal(landed.raw, 6, 'the rider after the strike never moves the damage fold');
+  assert.equal(landed.parried, undefined, 'and the fold runs through attackHit unchanged');
+});

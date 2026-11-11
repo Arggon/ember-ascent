@@ -113,4 +113,6 @@ test('log header carries the flag and replay matches hash-for-hash (golden)', ()
   assert.equal(runHash(session), GOLDEN);
 });
 
-const GOLDEN = 'sha256:62636675e7a641f40ea5d3c6ec0919e5ebdf9c4f599906d4dd3fd093cd699392';
+// Recomputed for the "golpes discretos NxM" slice (pool 70 -> 73 cards; strikes
+// resolve through attackHit).
+const GOLDEN = 'sha256:9c5f1695c988a3434f148ed10eadcd97453533a423325ce9395a79987233a96c';

@@ -11,6 +11,7 @@ import { BIOMES, DEFAULT_BIOME, describeTile, intentChips, loadContent } from '.
 import {
   HERO_POSE_MS,
   SPEED_KEY,
+  STRIKE_SEQ,
   animMs,
   animSpeed,
   bursts,
@@ -59,20 +60,32 @@ export function heroPose() {  // Precedence: getting hit outranks the card's own
     return 'hurt';
   }
   // A fresh card play wins over any hold still running from the previous card.
-  const move = heroMove(bursts.find((b) => b.kind === 'card-fly'));
+  const fly = bursts.find((b) => b.kind === 'card-fly');
+  const move = heroMove(fly);
   if (move) {
     // Reduced motion and speed 0 skip the animation; do not hold a pose that never plays.
     // The hold length is the pose's PACED duration — the same `animMs` figure the
     // stylesheet's `calc(<base>s * var(--pace, 1))` resolves to — so the pose is never
     // dropped mid-swing on a repaint and the swing plays at the dock's pace. A per-card
     // SIGNATURE (HERO_SIGNATURES) may override the pose's base duration.
-    const sig = move ? signatureFor(bursts.find((b) => b.kind === 'card-fly')) : null;
+    const sig = signatureFor(fly);
     const base = (sig && sig.poseMs) || HERO_POSE_MS[move] || 400;
+    // GOLPES DISCRETOS: a multi-hit play beats out its floats one per STRIKE_SEQ beat
+    // (fx.js), so the pose hold takes the SAME extension playInputSpan arms for the
+    // input gate — past the single-pose duration, until the LAST golpe's impact has
+    // landed (plus a short beat for its float to be seen rising). The pose stays
+    // mid-swing on every golpe, not only the first; a single-golpe play (or one whose
+    // damage never rode the `damage` verb — no strikes facts on the burst) keeps the
+    // plain pose duration.
+    const strikes = Array.isArray(fly && fly.strikes) ? fly.strikes.length : 0;
+    const strikeHold = strikes > 1
+      ? animMs(STRIKE_SEQ.beat) * (strikes - 1) + animMs(Math.round(STRIKE_SEQ.slam * STRIKE_SEQ.impactAt)) + animMs(300)
+      : 0;
     if (reducedMotion || animSpeed === 0) setHeroMoveHold(null);
     // `melee` arms the approach (`.hero.is-approach`): a stroke that is not a throw or a
     // cast carries the hero into the enemy lane. fx.js measures the real gap right after
     // the paint and writes it back as `approachX` on this same hold.
-    else setHeroMoveHold({ pose: move, start: Date.now(), dur: animMs(base), melee: isMeleeMove(move) });
+    else setHeroMoveHold({ pose: move, start: Date.now(), dur: Math.max(animMs(base), strikeHold), melee: isMeleeMove(move) });
     return move;
   }
   // An incidental repaint (hover, aim) during the hold repaints the SAME pose rather
@@ -247,7 +260,11 @@ function beatPose(e) {
   if (i < 0 || i >= plan.tail.length) return null;
   const step = plan.tail[i];
   if (step.enemy !== e.index && step.owner !== e.index) return null;
-  const kind = step.kind === 'block' ? 'guard' : step.kind === 'status' ? (step.to === 'player' ? 'hex' : 'power') : 'attack';
+  // GOLPES DISCRETOS: a tick step (the turn-closing poison) is a hex fact landing on
+  // that body — HP straight off — so it wears the hex pose, never the attack's slam.
+  const kind = step.kind === 'block' ? 'guard'
+    : step.kind === 'status' || step.kind === 'tick' ? 'hex'
+      : 'attack';
   return table[kind] ?? null;
 }
 

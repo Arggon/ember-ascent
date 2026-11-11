@@ -120,7 +120,7 @@ let src = body
   .replace(/\bboot\(\)\s*;?\s*$/, '');
 src = src.replace('function toast(msg, kind = \'warn\') {', 'function toast(msg, kind = \'warn\') { __toasts.push(msg);');
 src = 'async function measure(){ return null; }\n' + src;
-src += '\nreturn { render, clickCard, act, get pendingSlot(){return pendingSlot;}, snapGet(){return snap;}, heroMove, heroPose, HERO_MOVES, MOVE_DEFAULTS, HERO_THROWS, MELEE_APPROACH_MOVES, isMeleeMove, signatureFor, animSpeedGet: () => animSpeed, injectBursts: (b) => { bursts = b; } };';
+src += '\nreturn { render, clickCard, act, get pendingSlot(){return pendingSlot;}, snapGet(){return snap;}, heroMove, heroPose, HERO_MOVES, MOVE_DEFAULTS, HERO_THROWS, MELEE_APPROACH_MOVES, isMeleeMove, signatureFor, animMs, STRIKE_SEQ, HERO_POSE_MS, heroHold: () => heroMoveHold, animSpeedGet: () => animSpeed, injectBursts: (b) => { bursts = b; } };';
 
 const ctlMod = await import('../../src/surface/gui/controller.js');
 const factory = new Function('__ctl', '__toasts', '__mods', `
@@ -335,6 +335,34 @@ test('a fast consecutive play replaces the still-running hold with the new card 
   assert.equal(api.heroPose(), 'heavy');
   api.injectBursts([{ kind: 'card-fly', id: 'defend', type: 'skill', name: 'Quench', side: 'side-none' }]);
   assert.equal(api.heroPose(), 'quench', 'the fresh card play wins over the previous hold');
+});
+
+test('a MULTI-HIT play\u2019s pose hold outlives the single-pose window — the strike-sequence extension (golpes discretos)', () => {
+  // fx.js beats out one float per golpe on the STRIKE_SEQ clock and playInputSpan holds
+  // the INPUT past the pose; the pose hold itself must take the SAME extension, or the
+  // hero falls back to pose-idle while golpes 2..M still land ("pose + impacto + float
+  // propio por CADA golpe" — the fx.js contract comment). The math is shared verbatim
+  // with playInputSpan: beats to the last golpe + its impact + a short float-rise beat.
+  const { api } = startRun(11);
+  // Cinder Flick: three golpes.
+  api.injectBursts([{ kind: 'card-fly', id: 'cinder_flick', type: 'attack', name: 'Cinder Flick', side: 'side-none', strikes: [{}, {}, {}] }]);
+  assert.equal(api.heroPose(), 'strike');
+  const plain = api.animMs(api.HERO_POSE_MS.strike);
+  const extended = api.animMs(api.STRIKE_SEQ.beat) * 2
+    + api.animMs(Math.round(api.STRIKE_SEQ.slam * api.STRIKE_SEQ.impactAt))
+    + api.animMs(300);
+  assert.ok(extended > plain, `the sequence outlives the single pose (paced ${extended} vs ${plain})`);
+  assert.equal(api.heroHold().dur, extended, 'the hold is the strike extension, not the bare pose');
+  // A single-golpe play keeps the plain pose duration — the extension only exists to
+  // cover golpes 2..M.
+  api.injectBursts([{ kind: 'card-fly', id: 'cinder_flick', type: 'attack', name: 'Cinder Flick', side: 'side-none', strikes: [{}] }]);
+  api.heroPose();
+  assert.equal(api.heroHold().dur, plain, 'one golpe: the plain paced pose duration');
+  // No strikes facts at all (a play whose damage never rode the `damage` verb) — the
+  // plain duration, byte-identical to the pre-slice behavior.
+  api.injectBursts([{ kind: 'card-fly', id: 'bash', type: 'attack', name: 'Anvil Blow', side: 'side-none' }]);
+  api.heroPose();
+  assert.equal(api.heroHold().dur, api.animMs(api.HERO_POSE_MS.heavy), 'no strikes facts: the plain paced pose duration');
 });
 
 test('MAUL (bludgeon) plays its own colossal signature move, not the shared heavy', () => {

@@ -84,7 +84,9 @@ test('log header carries the flag and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:4954658459e46f17933c2590e6863e21e523d7509d506668b234a8a9f12592c3';
+// Recomputed for the "golpes discretos NxM" slice (pool 70 -> 73 cards; strikes
+// resolve through attackHit).
+const GOLDEN = 'sha256:a57352bc630a4336ce651d5472549278e9067491178f5e36e2f1676c581ceead';
 
 // ---------------------------------------------------------------------------
 // Visible tempers: every rendering of a tempered card shows what it really plays.

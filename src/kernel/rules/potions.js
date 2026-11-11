@@ -67,7 +67,7 @@ export const POTIONS = Object.freeze([
   Object.freeze({ id: 'ash_salts', name: 'Ash Salts', name_es: 'Sales de Ceniza', target: 'none', summary: 'HP+20%', text: 'Heal 20% of your max HP, rounded down.', text_es: 'Recuperas el 20% de tu HP máximo, redondeado hacia abajo.' }),
   Object.freeze({ id: 'bellows_fuel', name: 'Bellows Fuel', name_es: 'Combustible de Fuelle', target: 'none', summary: 'E2', text: 'Gain 2 Energy.', text_es: 'Ganas 2 de Energía.' }),
   Object.freeze({ id: 'whetstone', name: 'Whetstone', name_es: 'Piedra de Afilar', target: 'none', summary: 'PWR+2', text: 'Gain 2 Strength for the rest of this combat.', text_es: 'Ganas 2 de Fuerza por el resto de este combate.' }),
-  Object.freeze({ id: 'purge_flask', name: 'Purge Flask', name_es: 'Frasco Purgador', target: 'none', summary: 'PURGE', text: 'Remove ALL of your debuffs (Vulnerable and Weak). Buffs stay.', text_es: 'Elimina TODOS tus estados negativos (Vulnerable y Débil). Los positivos se quedan.' }),
+  Object.freeze({ id: 'purge_flask', name: 'Purge Flask', name_es: 'Frasco Purgador', target: 'none', summary: 'PURGE', text: 'Remove ALL of your debuffs (Vulnerable, Weak, Bleed and Poison). Buffs stay.', text_es: 'Elimina TODOS tus estados negativos (Vulnerable, Débil, Sangrado y Veneno). Los positivos se quedan.' }),
 ]);
 
 /** id -> definition. The ONE lookup; unknown ids yield undefined (never a throw). */

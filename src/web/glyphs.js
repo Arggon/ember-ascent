@@ -36,6 +36,12 @@ const MARKS = {
   ward: { box: '0 0 20 20', body: '<circle class="m" cx="10" cy="10" r="6"/><path class="m" d="M10 1 V5"/><path class="m" d="M10 15 V19"/>' },
   blade: { box: '0 0 20 20', body: '<path class="m" d="M4 16 L15 5"/><path class="m" d="M11 4 L16 4 L16 9"/><path class="m" d="M3 17 L6 14"/>' },
   shield: { box: '0 0 20 20', body: '<path class="m" d="M10 2 L17 5 V11 C17 15 14 17.4 10 18.6 C6 17.4 3 15 3 11 V5 Z"/><path class="m" d="M10 7 V13"/>' },
+  // --- the "golpes discretos NxM" statuses: a crossed guard for Parry (the haft held
+  //     across, refusing the stroke) and Poison as a rising fume — three wavy vapor
+  //     strokes, the kiln exhaling. Bleed borrows the droplet below. Same woodcut
+  //     family; unknown ids still fall back through the rune. ---
+  crossguard: { box: '0 0 20 20', body: '<path class="m" d="M4 16 L16 4"/><path class="m" d="M4 4 L16 16"/><path class="m" d="M10 2 V5"/><path class="m" d="M10 15 V18"/>' },
+  fume: { box: '0 0 20 20', body: '<path class="m" d="M6 17 C4.6 14 7.4 12.6 6 9.6 C5 7.6 6 5.6 7.4 4.4"/><path class="m" d="M11 17 C9.6 14 12.4 12.6 11 9.6 C10 7.6 11 5.6 12.4 4.4"/><path class="m" d="M16 17 C14.6 14 17.4 12.6 16 9.6"/><path class="m" d="M15 7.6 C14.6 6.6 15 5.6 16 4.8"/>' },
   star: { box: '0 0 20 20', body: '<path class="m" d="M10 2 L11.9 8.1 L18 10 L11.9 11.9 L10 18 L8.1 11.9 L2 10 L8.1 8.1 Z"/>' },
   hourglass: { box: '0 0 20 20', body: '<path class="m" d="M5 3 H15 M5 17 H15 M6.5 3 V6 L10 10 L13.5 6 V3 M6.5 17 V14 L10 10 L13.5 14 V17"/>' },
   skull: { box: '0 0 20 20', body: '<path class="m" d="M10 2 C13.9 2 17 5 17 8.6 C17 11 15.6 12.6 14.2 13.6 V16.4 H5.8 V13.6 C4.4 12.6 3 11 3 8.6 C3 5 6.1 2 10 2 Z"/><circle class="mf" cx="7.4" cy="9" r="1.5"/><circle class="mf" cx="12.6" cy="9" r="1.5"/>' },
@@ -274,6 +280,11 @@ export const EFFECT_GLYPH = {
   weak: 'chevDown',
   dexterity: 'chevUp',
   metallicize: 'ward',
+  // The "golpes discretos NxM" trio (borrowed marks where the shape reads: Bleed is the
+  // droplet; Parry the crossed guard, Poison the fume — both drawn above in MARKS).
+  parry: 'crossguard',
+  bleed: 'droplet',
+  poison: 'fume',
 };
 
 /** Node type (after stripping the `combat_` prefix) -> its silhouette. The shop (S4)

@@ -79,4 +79,6 @@ test('log header carries the hero and replay matches the golden hash', () => {
   assert.equal(runHash(s), GOLDEN);
 });
 
-const GOLDEN = 'sha256:6bc7b4de81aa0371d4c7b21a82d8b0c7f5ff2c32f5dc91a91eb6a7aae4d3d84f';
+// Recomputed for the "golpes discretos NxM" slice (pool 70 -> 73 cards; strikes
+// resolve through attackHit).
+const GOLDEN = 'sha256:df3e77d9b8fd66323abdccb3f723f39fa1926e49d8f0539fd260b689a0329de2';

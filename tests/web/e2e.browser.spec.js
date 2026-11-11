@@ -105,8 +105,10 @@ async function waitIdle(page, timeoutMs = 8000) {
 /** A fresh browser + page with the first-run help dismissed. Caller closes the browser.
  *  `seed` defaults to 7; a test whose claim is pinned to a specific first fight picks
  *  its own (the S4 map shift moved every seed's encounter rolls). `reduce` serves the
- *  prefers-reduced-motion walks. */
-async function freshPage(t, seed = 7, reduce = false) {
+ *  prefers-reduced-motion walks. `biome` selects the kernel BIOMES entry via the same
+ *  `?biome=` knob the surface itself reads (actions.js) — the "golpes discretos" specs
+ *  need the Cinder Mines roster (the slag_crawler's A4x2 and PARRY20 moves live there). */
+async function freshPage(t, seed = 7, reduce = false, biome = null) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 800 },
@@ -115,7 +117,7 @@ async function freshPage(t, seed = 7, reduce = false) {
   t.after(() => { void browser.close(); });
   const page = await ctx.newPage();
   await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
-  await page.goto(`${base}/src/web/index.html?seed=${seed}`);
+  await page.goto(`${base}/src/web/index.html?seed=${seed}${biome ? `&biome=${biome}` : ''}`);
   await page.waitForLoadState('domcontentloaded');
   return page;
 }
@@ -164,6 +166,19 @@ async function injectMaulDeck(page) {
     for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-maul-${i}`, cardId: 'bludgeon' });
     return ctl.load(save);
   });
+  assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
+}
+
+/** The same lever, any card id: 8 copies (the deck shuffles them like real cards).
+ *  The "golpes discretos" specs use it to put Slag Barb / Kiln Fume / Cinder Flick in
+ *  a hand the play path deals for real. */
+async function injectDeck(page, cardId) {
+  const res = await page.evaluate((id) => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-golpe-${id}-${i}`, cardId: id });
+    return ctl.load(save);
+  }, cardId);
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
 }
 
@@ -480,14 +495,16 @@ test('UX-8: the codex gallery renders card tiles with art, and the deck sheet on
   const page = await freshPage(t);
   await bootToMap(page);
 
-  // The codex gallery. The fresh pool is 20 cards; 14 of them have a drawn woodcut
-  // today (the six Bellows-family cards ship through the designed no-art fallback —
-  // the head stays, only the drawing is absent), so 14 tiles carry an illustration.
+  // The codex gallery. The fresh pool is 20 cards; 13 of them have a drawn woodcut
+  // today (the "golpes discretos" slice grew the pool by the three new status cards —
+  // kiln_fume and cinder_flick joined without a drawing — displacing one drawn card,
+  // and the Bellows-family cards ship through the designed no-art fallback: the head
+  // stays, only the drawing is absent), so 13 tiles carry an illustration.
   await openCodex(page);
   const sheet = page.locator('.modal.codex-modal');
   const tiles = sheet.locator('.codex-grid .card');
   assert.equal(await tiles.count(), 20, 'the gallery shows one tile per offerable card');
-  assert.equal(await sheet.locator('.codex-grid .card .c-illus svg').count(), 14,
+  assert.equal(await sheet.locator('.codex-grid .card .c-illus svg').count(), 13,
     'the drawn cards render their woodcut inside the tile head');
 
   // Phone fit: the sheet never outgrows a 390x844 viewport, and the gallery scrolls
@@ -712,14 +729,17 @@ test('UX-3: every cost gem is a whole circle inside its card, and the type word 
 });
 
 // ---------------------------------------------------------------------------
-// UX-2: the enemy turn is a SEQUENCE of named attacks, not one simultaneous slam.
-// Seed 22's opening fight is two Kiln Mites whose turn-1 intents are both "Will
-// attack for 6" — the smallest shape that can prove ordering. The claims:
+// UX-2, per GOLPE (the "golpes discretos NxM" slice rewrote the plan one entry per
+// strike). Seed 22's opening fight is two Kiln Mites whose turn-1 intents are both
+// "Will attack for 6" — one golpe each, the smallest shape that proves ordering across
+// attackers. The claims:
 //   * the kernel truth is unchanged (turn advances, the announced total lands);
-//   * each attacker's OWN named float ("Kiln Mite −6") lands over the hero, in
-//     attack order, one beat apart — and no aggregate "−12" float paints;
+//   * each GOLPE's own named float ("Kiln Mite −6") lands over the hero, in strike
+//     order, one beat apart — one float per strike, never an accumulated "−12", and
+//     the retired "×N" hit-count suffix is gone from the floats;
 //   * the current attacker's intent row carries the striking highlight, and the
 //     highlight MOVES: attacker 1's window starts a beat before attacker 2's.
+// The crawler spec below proves the same clock WITHIN one attacker's multi-hit move.
 // The floats and the highlight are transient (~1s), so an in-page 40ms collector
 // samples them, exactly like the kill beat's collector.
 // ---------------------------------------------------------------------------
@@ -777,13 +797,16 @@ test('the enemy turn plays as ordered, named attacks (UX-2 sequence)', { timeout
   assert.equal(before.player.hp - after.player.hp, announced,
     'the kernel total still equals what the intents announced');
 
-  // One NAMED float per attacker, each carrying its own damage; no aggregate number.
+  // One NAMED float per GOLPE (here: one golpe per attacker), each carrying its own
+  // strike's damage; no aggregate number, no "×N" suffix.
   assert.equal(seq.floats.length, attackers.length,
-    `one named float per attacker: ${JSON.stringify(seq.floats)}`);
+    `one named float per golpe: ${JSON.stringify(seq.floats)}`);
   for (let i = 0; i < seq.floats.length; i += 1) {
     assert.match(seq.floats[i].text, new RegExp(`−${attackers[i].damage}`),
-      `float ${i} carries its own attacker's damage: ${seq.floats[i].text}`);
+      `float ${i} carries its own golpe's damage: ${seq.floats[i].text}`);
     assert.match(seq.floats[i].text, /Kiln Mite/, `the float NAMES the attacker: ${seq.floats[i].text}`);
+    assert.doesNotMatch(seq.floats[i].text, /×/,
+      `the hit-count suffix is retired: ${seq.floats[i].text}`);
   }
   assert.ok(seq.floats[1].t - seq.floats[0].t >= 700,
     `the strikes land in ORDER, a beat apart (the UX-4 beat is 1000ms): ${seq.floats.map((f) => `${f.text}@${f.t - seq.floats[0].t}ms`).join(', ')}`);
@@ -797,6 +820,299 @@ test('the enemy turn plays as ordered, named attacks (UX-2 sequence)', { timeout
   assert.ok(two, 'attacker 2 intent row carried the intent-strike highlight');
   assert.ok(two.t - one.t >= 700,
     `the highlight moved attacker 1 -> attacker 2, a beat apart (the UX-4 beat is 1000ms): ${two.t - one.t}ms`);
+});
+
+// ---------------------------------------------------------------------------
+// GOLPES DISCRETOS — one enemy turn, TWO GOLPES FROM THE SAME ATTACKER. The mines
+// crawler's move list carries A4x2 ("Pincers"); the walk plays end turns until the
+// crawler's intent label IS 'A4x2' (which turn that is depends on the kindling boon the
+// boot took, which consumes draws before the map rolls — so the walk reads the LABEL
+// off the snapshot instead of pinning a turn number). The claims for that turn:
+//   * TWO named floats over the hero, both naming the SAME attacker, each carrying its
+//     OWN golpe's −4 (not one accumulated −8, and no "2×" suffix);
+//   * the floats land a beat apart on the STRIKE_SEQ clock;
+//   * the attacker's intent row highlights on EACH golpe (the highlight re-lights).
+// ---------------------------------------------------------------------------
+test('golpes discretos: a multi-hit enemy turn beats one float per strike (A4x2, mines)', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 15, false, 'mines');
+  await bootToMap(page);
+  await travelToFight(page);
+  const crawler = await page.evaluate(() => window.__dlb.snapshot().enemies.find((e) => e.id === 'slag_crawler'));
+  assert.ok(crawler, 'the mines fight opens on the Slag Crawler');
+
+  // Walk to the crawler's A4x2 turn (the label is the snapshot's own fact).
+  let label = await page.evaluate(() => window.__dlb.snapshot().enemies.find((e) => e.id === 'slag_crawler')?.intent.label);
+  for (let guard = 0; guard < 5 && label !== 'A4x2'; guard += 1) {
+    await endTurn(page);
+    label = await page.evaluate(() => window.__dlb.snapshot().enemies.find((e) => e.id === 'slag_crawler')?.intent.label);
+  }
+  assert.equal(label, 'A4x2', `the walk reached the double-golpe intent: ${label}`);
+
+  // Leftover floats from the walk's turns must not pollute the count: the layer's
+  // strike floats are removed before the collector arms.
+  await page.evaluate(() => {
+    document.querySelectorAll('#fx-layer .fx-strike-float').forEach((n) => n.remove());
+    window.__golpe = { floats: [], strikes: [] };
+    const seen = new WeakSet();
+    window.__golpeTimer = setInterval(() => {
+      for (const n of document.querySelectorAll('#fx-layer .fx-strike-float')) {
+        if (seen.has(n)) continue;
+        seen.add(n);
+        window.__golpe.floats.push({ text: (n.textContent || '').trim(), t: Math.round(performance.now()) });
+      }
+      for (const card of document.querySelectorAll('.enemy.is-striking')) {
+        const row = card.querySelector('.e-intent');
+        const live = row && row.getAnimations
+          ? row.getAnimations().some((a) => {
+            if (a.animationName !== 'intent-strike' || a.playState !== 'running' || !a.effect) return false;
+            const tt = a.effect.getComputedTiming();
+            const at = (a.currentTime ?? 0) - (tt.delay ?? 0);
+            return at >= 0 && at < (tt.duration ?? 0);
+          })
+          : false;
+        if (live) window.__golpe.strikes.push({ k: card.getAttribute('data-target-index'), t: Math.round(performance.now()) });
+      }
+    }, 40);
+  });
+
+  const before = await readState(page);
+  await endTurn(page);
+  const golpe = await page.evaluate(() => { clearInterval(window.__golpeTimer); return window.__golpe; });
+  const after = await readState(page);
+
+  assert.equal(after.turn, before.turn + 1, 'the turn advances');
+  assert.equal(before.player.hp - after.player.hp, 8, 'the kernel total is still the announced 2×4');
+
+  assert.equal(golpe.floats.length, 2, `one float per golpe, two golpes: ${JSON.stringify(golpe.floats)}`);
+  for (const f of golpe.floats) {
+    assert.match(f.text, /Slag Crawler/, `the float names the attacker: ${f.text}`);
+    assert.match(f.text, /−4/, `the float carries ONE golpe's damage: ${f.text}`);
+    assert.doesNotMatch(f.text, /×/, `no hit-count suffix: ${f.text}`);
+  }
+  assert.doesNotMatch(golpe.floats.map((f) => f.text).join('|'), /−8/,
+    'no accumulated −8 float may paint');
+  assert.ok(golpe.floats[1].t - golpe.floats[0].t >= 700,
+    `the two golpes land a beat apart: ${golpe.floats.map((f) => `${f.text}@${f.t - golpe.floats[0].t}ms`).join(', ')}`);
+  assert.ok(golpe.strikes.length >= 2, `the intent row lit on each golpe: ${JSON.stringify(golpe.strikes)}`);
+});
+
+// ---------------------------------------------------------------------------
+// GOLPES DISCRETOS — the hero's MULTI-HIT CARD plays one float per golpe. Cinder Flick
+// (3 damage, hits 3) is injected 8-deep through the save lever; playing it must beat
+// out THREE `.fx-golpe-float` nodes over the struck enemy, one per golpe, a beat apart,
+// while the pose hold keeps the hero mid-swing. The kernel total (3×3 = 9) still lands.
+// ---------------------------------------------------------------------------
+test('golpes discretos: a multi-hit card floats one number per golpe over the target', { timeout: 60000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 1, false, 'mines');
+  await bootToMap(page);
+  await injectDeck(page, 'cinder_flick');
+  await travelToFight(page);
+  const before = await readState(page);
+  assert.equal(before.enemies.length, 1, 'seed 1 mines is the single Slag Crawler');
+
+  await page.evaluate(() => {
+    window.__c = { floats: [] };
+    const seen = new WeakSet();
+    window.__cTimer = setInterval(() => {
+      for (const n of document.querySelectorAll('#fx-layer .fx-golpe-float')) {
+        if (seen.has(n)) continue;
+        seen.add(n);
+        window.__c.floats.push({ text: (n.textContent || '').trim(), t: Math.round(performance.now()) });
+      }
+    }, 40);
+  });
+
+  await playCard(page, 'Cinder Flick');
+  const got = await page.evaluate(() => { clearInterval(window.__cTimer); return window.__c; });
+  const after = await readState(page);
+
+  assert.equal(after.enemies[0].hp, before.enemies[0].hp - 9, 'the kernel lands the printed 3×3');
+  assert.equal(got.floats.length, 3, `one float per golpe (3 golpes): ${JSON.stringify(got.floats)}`);
+  for (const f of got.floats) {
+    assert.match(f.text, /−3/, `each float is one golpe's −3: ${f.text}`);
+    assert.doesNotMatch(f.text, /×/, `no hit-count suffix: ${f.text}`);
+  }
+  assert.ok(got.floats[2].t - got.floats[0].t >= 1400,
+    `the golpes are a beat apart (2 × 1000ms): ${got.floats.map((f) => `${f.t - got.floats[0].t}ms`).join(', ')}`);
+});
+
+// ---------------------------------------------------------------------------
+// GOLPES DISCRETOS — the PARRY PROC, visually. The proc is a 20% roll per golpe against
+// the crawler's PARRY20 spur, so the spec makes it DETERMINISTIC the one way the lever
+// allows: the save is reloaded mid-combat (the header's one writable lever, the same
+// move the torn-save tests make) with the crawler holding Parry 100 — every strike is
+// then refused outright by the SAME attackHit fold (dealt 0, blocked = raw, the block
+// pool untouched, `parried: true` on the event). The claims:
+//   * the golpe float says the parry word and never a "−0";
+//   * the `.fx-parry-proc` decoration blooms at the defender's lane;
+//   * the kernel truth is untouched: the hero's HP and the enemy's HP both unchanged.
+// ---------------------------------------------------------------------------
+test('golpes discretos: a parried golpe reads as its own fact, with its proc decoration', { timeout: 60000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 3, false, 'mines');
+  await bootToMap(page);
+  await travelToFight(page);
+  const crafted = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.combat.enemies[0].statuses = { parry: 100 };
+    const res = ctl.load(save);
+    if (!res.ok) return res.problems;
+    return null;
+  });
+  assert.equal(crafted, null, `the parry-100 reload failed: ${JSON.stringify(crafted)}`);
+  // The reload does not repaint, so window.__dlb.snapshot() is stale — the KERNEL state
+  // (the same source readState reads) is the truth about the crafted spur.
+  const spur = await page.evaluate(() => window.__dlb.controller().state.combat.enemies[0].statuses?.parry ?? 0);
+  assert.equal(spur, 100, 'the crawler now holds Parry 100 — every strike is refused');
+
+  await page.evaluate(() => {
+    window.__p = { floats: [], procs: 0 };
+    const seen = new WeakSet();
+    window.__pTimer = setInterval(() => {
+      for (const n of document.querySelectorAll('#fx-layer .fx-golpe-float')) {
+        if (seen.has(n)) continue;
+        seen.add(n);
+        window.__p.floats.push({ text: (n.textContent || '').trim(), t: Math.round(performance.now()) });
+      }
+      if (document.querySelector('#fx-layer .fx-parry-proc')) window.__p.procs += 1;
+    }, 40);
+  });
+
+  const before = await readState(page);
+  await playCard(page, 'Hammerfall');
+  const got = await page.evaluate(() => { clearInterval(window.__pTimer); return window.__p; });
+  const after = await readState(page);
+
+  assert.equal(after.enemies[0].hp, before.enemies[0].hp, 'the parried golpe landed nothing');
+  assert.equal(after.player.hp, before.player.hp, 'the hero is untouched on her own turn');
+  assert.equal(got.floats.length, 1, `one golpe float: ${JSON.stringify(got.floats)}`);
+  assert.match(got.floats[0].text, /parried/i, `the float SAYS the parry: ${got.floats[0].text}`);
+  assert.doesNotMatch(got.floats[0].text, /−0/, `a refused strike never prints a 0: ${got.floats[0].text}`);
+  assert.ok(got.procs > 0, 'the parry proc decoration must bloom at the defender');
+});
+
+// ---------------------------------------------------------------------------
+// GOLPES DISCRETOS — the POISON TICK at the end of the enemy's turn. Kiln Fume
+// (poison 4) is injected and played on the mines crawler; the end turn closes with the
+// kernel's `poison_tick {who:'enemy'}` — the tail's own beat, after whatever move the
+// crawler's intent named (which move that is depends on the kindling boon's draws, so
+// the spec claims the TICK, not the move). The claims:
+//   * the tail carries exactly ONE `.efloat-tick` float "−4 poison" over the CRAWLER;
+//   * the kernel truth: the crawler lost exactly 4 HP across the turn and its poison
+//     chip count fell 4 -> 3.
+// ---------------------------------------------------------------------------
+test('golpes discretos: the poison ticks at the turn close as a tail beat (mines)', { timeout: 60000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 1, false, 'mines');
+  await bootToMap(page);
+  await injectDeck(page, 'kiln_fume');
+  await travelToFight(page);
+
+  await playCard(page, 'Kiln Fume');
+  const poisoned = await page.evaluate(() => window.__dlb.snapshot().enemies[0].statuses.find((s) => s.key === 'poison'));
+  assert.equal(poisoned?.stacks, 4, `Kiln Fume applies Poison 4: ${JSON.stringify(poisoned)}`);
+
+  await page.evaluate(() => {
+    window.__t = { ticks: [] };
+    const seenT = new WeakSet();
+    window.__tTimer = setInterval(() => {
+      for (const n of document.querySelectorAll('#fx-layer .efloat-tick')) {
+        if (seenT.has(n)) continue;
+        seenT.add(n);
+        window.__t.ticks.push({ text: (n.textContent || '').trim(), t: Math.round(performance.now()) });
+      }
+    }, 40);
+  });
+
+  const before = await readState(page);
+  await endTurn(page);
+  const got = await page.evaluate(() => { clearInterval(window.__tTimer); return window.__t; });
+  const after = await readState(page);
+  const poisonNow = await page.evaluate(() => window.__dlb.snapshot().enemies[0].statuses.find((s) => s.key === 'poison'));
+
+  assert.equal(after.enemies[0].hp, before.enemies[0].hp - 4, 'the tick took exactly the 4 poison HP');
+  assert.equal(poisonNow?.stacks, 3, 'one poison stack wore off with the tick');
+  assert.equal(got.ticks.length, 1, `one tick float: ${JSON.stringify(got.ticks)}`);
+  assert.match(got.ticks[0].text, /−4/, `the tick float carries the HP lost: ${got.ticks[0].text}`);
+  assert.match(got.ticks[0].text, /poison/i, `the tick float names its status: ${got.ticks[0].text}`);
+});
+
+// ---------------------------------------------------------------------------
+// GOLPES DISCRETOS — the BLEED TICK rides each golpe the bleeding enemy strikes. The
+// walk (end turns) reaches the crawler's A4x2 turn (label-driven — which turn that is
+// depends on the kindling boon's draws), then the save lever sets EXACTLY Bleed 2 on
+// the crawler: one stack falls per tick, so the two golpes tick −2 then −1 and the
+// status is spent to zero by the turn's end. The claims:
+//   * TWO `.efloat-tick` floats over the crawler, one per golpe, carrying the HP that
+//     tick took (−2, then −1 — the stack the tick consumed is the amount);
+//   * each tick lands no earlier than its golpe's own strike float (the tick resolves
+//     AFTER the golpe landed);
+//   * the kernel truth: the crawler's HP fell exactly 2+1 across the turn.
+// ---------------------------------------------------------------------------
+test('golpes discretos: a bleeding enemy ticks per golpe it strikes (A4x2, mines)', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 15, false, 'mines');
+  await bootToMap(page);
+  await travelToFight(page);
+
+  // Walk to the crawler's A4x2 turn (the label is the snapshot's own fact).
+  let label = await page.evaluate(() => window.__dlb.snapshot().enemies.find((e) => e.id === 'slag_crawler')?.intent.label);
+  for (let guard = 0; guard < 5 && label !== 'A4x2'; guard += 1) {
+    await endTurn(page);
+    label = await page.evaluate(() => window.__dlb.snapshot().enemies.find((e) => e.id === 'slag_crawler')?.intent.label);
+  }
+  assert.equal(label, 'A4x2', `the walk reached the double-golpe intent: ${label}`);
+
+  // Bleed 2 exactly: two golpes, two ticks, the status spent to zero by the turn's end.
+  const crafted = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.combat.enemies[0].statuses = { bleed: 2 };
+    const res = ctl.load(save);
+    if (!res.ok) return res.problems;
+    return null;
+  });
+  assert.equal(crafted, null, `the bleed-2 reload failed: ${JSON.stringify(crafted)}`);
+
+  await page.evaluate(() => {
+    document.querySelectorAll('#fx-layer .fx-strike-float, #fx-layer .efloat-tick').forEach((n) => n.remove());
+    window.__b = { ticks: [], strikes: [] };
+    const seenT = new WeakSet();
+    const seenS = new WeakSet();
+    window.__bTimer = setInterval(() => {
+      for (const n of document.querySelectorAll('#fx-layer .efloat-tick')) {
+        if (seenT.has(n)) continue;
+        seenT.add(n);
+        window.__b.ticks.push({ text: (n.textContent || '').trim(), t: Math.round(performance.now()) });
+      }
+      for (const n of document.querySelectorAll('#fx-layer .fx-strike-float')) {
+        if (seenS.has(n)) continue;
+        seenS.add(n);
+        window.__b.strikes.push({ text: (n.textContent || '').trim(), t: Math.round(performance.now()) });
+      }
+    }, 40);
+  });
+
+  const before = await readState(page);
+  await endTurn(page);
+  const got = await page.evaluate(() => { clearInterval(window.__bTimer); return window.__b; });
+  const after = await readState(page);
+
+  assert.equal(before.player.hp - after.player.hp, 8, 'the two golpes still land their 2×4 on the hero');
+  assert.equal(after.enemies[0].hp, before.enemies[0].hp - 3,
+    `the crawler bled 2 then 1 (one stack per tick): ${before.enemies[0].hp} -> ${after.enemies[0].hp}`);
+  assert.equal(got.ticks.length, 2, `two golpes, two bleed ticks: ${JSON.stringify(got.ticks)}`);
+  assert.match(got.ticks[0].text, /−2/, `tick 1 carries its stack count: ${got.ticks[0].text}`);
+  assert.match(got.ticks[0].text, /bleed/i, `the tick float names its status: ${got.ticks[0].text}`);
+  assert.match(got.ticks[1].text, /−1/, `tick 2 carries the last stack: ${got.ticks[1].text}`);
+  assert.ok(got.strikes.length >= 2, `both golpe floats played: ${JSON.stringify(got.strikes)}`);
+  assert.ok(got.ticks[0].t >= got.strikes[0].t,
+    `tick 1 lands after golpe 1's strike: tick@+${got.ticks[0].t - got.strikes[0].t}ms`);
+  assert.ok(got.ticks[1].t >= got.strikes[1].t,
+    `tick 2 lands after golpe 2's strike: tick@+${got.ticks[1].t - got.strikes[1].t}ms`);
 });
 
 // ---------------------------------------------------------------------------

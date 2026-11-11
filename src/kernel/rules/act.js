@@ -5,12 +5,12 @@
 //
 // stepIndex is owned by the top-level step() in kernel/index.js. Nothing in this
 // file mutates it, so one submitted action always means exactly one step increment.
-import { VOCABULARY, damagePlayer } from './vocabulary.js';
+import { VOCABULARY, attackHit, addStatus } from './vocabulary.js';
 import { setCardDefs } from './card-instance.js';
 import { drawIntoHand } from './draw.js';
 import { ENEMIES, chooseIntent, buildEncounterTable, BIOMES, ACT2_BIOME } from './encounters.js';
 import { generateMap, goldBand } from './map.js';
-import { fireHook, endOfTurnStatuses, decayStatuses } from './powers.js';
+import { fireHook, endOfTurnStatuses, decayStatuses, poisonTickEnemies } from './powers.js';
 import { shuffleAt, pickAt, intAt } from '../rng.js';
 import {
   activeRelicDefs, relicId, firstTurnDrawOf, rollEliteRelicDrop, rollBossRelicOffers, gainRelic,
@@ -269,12 +269,28 @@ const MOVE_RUNNERS = {
    * the "gain N Strength, then attack" move lands the buffed number on that same strike
    * (StS ruling), and intentDamage's pending fold announces exactly this number.
    *
-   * KNOWN GAP, ON RECORD (solo review of 8083336): the runner reads `move.strength` only
-   * — a compound move printing Block or a debuff (jaw_worm.thrash "A7 B5",
+   * GOLPES DISCRETOS: every strike resolves through attackHit (rules/vocabulary.js) —
+   * the hero's parry rolls per golpe, the damage lands, and the striker's OWN bleed
+   * ticks after each strike it executes (a bleeding foe bleeds per golpe, NxM = M
+   * ticks while its stacks last). A striker felled by its own tick — or a hero at
+   * 0 HP — cancels the golpes it has left.
+   *
+   * THE BLEED RIDER (`move.bleed`): a strike that LANDED leaves `move.bleed` Bleed on
+   * the hero, whose own attacks then tick it. A fully PARRIED strike delivers no hex —
+   * the strike never arrived (the block pool absorbs damage, but a parry refuses the
+   * whole golpe). The event mirrors the debuff runner's `player_status` shape with the
+   * acting enemy stamped, so a presentation can attribute the hex.
+   *
+   * KNOWN GAP, ON RECORD (solo review of 8083336; updated by the "golpes discretos NxM"
+   * slice): the runner reads `move.strength` and `move.bleed` only — a compound move
+   * printing Block or Vulnerable/Weak (jaw_worm.thrash "A7 B5",
    * gremlin_nob.skull_bash "A6 VULN2") still resolves its attack half alone; the
    * printed B/VULN words are promises the runner does not keep. The kernel already
    * emits `enemy_block {enemy, amount}` and `enemy_status`; wiring them into this runner
-   * is the queued next kernel slice.
+   * is the queued next kernel slice. ALSO OUTSIDE THE FOLD (slice ruling, ALCANCE v1):
+   * the exotic handlers (hemokinesis/reaper/rampage in rules/effects/index.js) and
+   * potion_damage resolve through the plain damageEnemy path — a strike there rolls no
+   * parry and ticks no bleed. Wiring them through attackHit is the follow-up.
    */
   attack(state, i, move) {
     const events = [];
@@ -287,10 +303,14 @@ const MOVE_RUNNERS = {
     const dmg = strikeDamage(enemy, move);
     const hits = move.hits ?? 1;
     for (let h = 0; h < hits; h += 1) {
-      const out = damagePlayer(next.player, dmg);
-      next = { ...next, player: out.player };
-      events.push({ t: 'enemy_attack', enemy: i, raw: dmg, dealt: out.dealt, blocked: out.blocked, hp: next.player.hp });
-      if (next.player.hp <= 0) break;
+      const out = attackHit(next, { attacker: 'enemy', attackerIndex: i, raw: dmg });
+      next = out.state;
+      events.push(...out.events);
+      if (move.bleed && !out.parried) {
+        next = { ...next, player: addStatus(next.player, 'bleed', move.bleed) };
+        events.push({ t: 'player_status', enemy: i, status: 'bleed', stacks: move.bleed });
+      }
+      if (out.attackerDied || next.player.hp <= 0) break;
     }
     return { state: next, events };
   },
@@ -311,7 +331,7 @@ const MOVE_RUNNERS = {
     };
   },
 
-  /** buff: Strength first, then Block — the printed order is the event order. */
+  /** buff: Strength first, then Block, then Parry — the printed order is the event order. */
   buff(state, i, move) {
     let next = state;
     const events = [];
@@ -326,6 +346,13 @@ const MOVE_RUNNERS = {
       next = patchEnemyAt(next, i, (e) => ({ ...e, block: e.block + amount }));
       events.push({ t: 'enemy_block', enemy: i, amount });
     }
+    if (move.parry) {
+      // PARRY RIDER — each stack is a 1% chance (per golpe of the hero's next attacks) to
+      // refuse one of this enemy's received strikes outright (attackHit rolls it). Lasts
+      // the whole fight: nothing spends it and decayStatuses never touches it.
+      next = patchEnemyAt(next, i, (e) => addStatus(e, 'parry', move.parry));
+      events.push({ t: 'enemy_status', enemy: i, status: 'parry', stacks: move.parry });
+    }
     return { state: next, events };
   },
 
@@ -338,10 +365,19 @@ const MOVE_RUNNERS = {
    * Wraith's opening wail must play its signature, and on a multi-foe turn a hex cannot be
    * attributed by "whoever spoke last" (on a debuff-only turn nobody did). The field is
    * event payload only — it is not state, so no replay hash depends on it.
+   *
+   * RIDERS (the "golpes discretos" slice): the same stamped shape carries the tick-shaped
+   * hexes — `move.bleed` ("the hero bleeds on every strike he makes") and `move.poison`
+   * ("the hero loses stacks HP at the end of his own turn"). Both follow vulnerable/weak
+   * so a move's chip row reads in its printed order.
    */
   debuff(state, i, move) {
     let next = state;
     const events = [];
+    const applyToPlayer = (status, stacks) => {
+      next = { ...next, player: addStatus(next.player, status, stacks) };
+      events.push({ t: 'player_status', enemy: i, status, stacks });
+    };
     if (move.vulnerable) {
       next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, vulnerable: (next.player.statuses?.vulnerable ?? 0) + move.vulnerable } } };
       events.push({ t: 'player_status', enemy: i, status: 'vulnerable', stacks: move.vulnerable });
@@ -350,6 +386,8 @@ const MOVE_RUNNERS = {
       next = { ...next, player: { ...next.player, statuses: { ...next.player.statuses, weak: (next.player.statuses?.weak ?? 0) + move.weak } } };
       events.push({ t: 'player_status', enemy: i, status: 'weak', stacks: move.weak });
     }
+    if (move.bleed) applyToPlayer('bleed', move.bleed);
+    if (move.poison) applyToPlayer('poison', move.poison);
     return { state: next, events };
   },
 };
@@ -425,6 +463,14 @@ export function endTurn(state, cardDefs) {
   // vulnerable do not decrease and stays for all the fight."
   // Placed after the enemy acts so the stacks the player SEES during their turn are the ones
   // that will apply to their attacks: Vulnerable 3 gives three turns of +50%, then expires.
+  //
+  // POISON (the "golpes discretos" slice) ticks at the same close of the enemies' turn,
+  // just BEFORE the decay sweep: one tick per living foe, `stacks` HP straight off (it can
+  // fell a foe — the all-dead field below settles victory through the one implementation),
+  // then one stack off. Zero draws.
+  const poison = poisonTickEnemies(next);
+  next = poison.state;
+  events.push(...poison.events);
   next = {
     ...next,
     combat: {

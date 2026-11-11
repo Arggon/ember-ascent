@@ -2,8 +2,9 @@
 // truth is snapshot.draftPool — the ids its rewards actually roll from. The surface's
 // "in deck" chip sums the kernel's own deck rows.
 //
-// Pins: the table IS draftPoolFrom(shipped content) (65 ids, starters excluded, 22/30/13
-// by rarity after S8 grew the table 44 → 70); every row carries the definition's own
+// Pins: the table IS draftPoolFrom(shipped content) (68 ids, starters excluded, 24/31/13
+// by rarity after the "golpes discretos NxM" slice grew the table 70 → 73: Slag Barb and
+// Kiln Fume are commons, Anvil Guard an uncommon); every row carries the definition's own
 // name/cost/type/rarity and a non-empty description that is the describe layer's sentence
 // verbatim; rows sort deterministically (rarity tier → cost → face name → card id);
 // snapshot() publishes the RUN'S draftPool (narrowed profiles make it shorter than the
@@ -26,7 +27,7 @@ test('cardPool is exactly the draft pool: draftPoolFrom ids, starters excluded',
   // Built independently from the shipped content, so the codex cannot drift from what
   // the reward deck can offer.
   const expected = C.cardList.filter((c) => c.rarity !== 'starter').map((c) => c.id).sort();
-  assert.equal(pool.length, 65);
+  assert.equal(pool.length, 68);
   // Same id SET (the pool's own order is rarity tier → cost → name → id, pinned below).
   assert.deepEqual(pool.map((r) => r.cardId).sort(), expected);
   // The starters are no one's reward: none of them may appear in the sheet.
@@ -34,10 +35,10 @@ test('cardPool is exactly the draft pool: draftPoolFrom ids, starters excluded',
   for (const row of pool) assert.ok(!starters.has(row.cardId), `${row.cardId} is a starter`);
 });
 
-test('the pool splits 22 common / 30 uncommon / 13 rare (S8: 44 → 70 cards)', () => {
+test('the pool splits 24 common / 31 uncommon / 13 rare (golpes discretos: 70 → 73 cards)', () => {
   const counts = { common: 0, uncommon: 0, rare: 0 };
   for (const row of cardPool()) counts[row.rarity] += 1;
-  assert.deepEqual(counts, { common: 22, uncommon: 30, rare: 13 });
+  assert.deepEqual(counts, { common: 24, uncommon: 31, rare: 13 });
 });
 
 test('every row carries the definition\'s own facts and a non-empty description', () => {
@@ -79,7 +80,7 @@ test('snapshot publishes the RUN\'S draftPool — the full table only for an unn
   // The default content: the run's pool IS the whole shipped draft pool.
   const full = snapshot(newRun({ seed: 7 }));
   assert.deepEqual(full.draftPool, C.cardList.filter((c) => c.rarity !== 'starter').map((c) => c.id).sort());
-  assert.equal(full.draftPool.length, 65);
+  assert.equal(full.draftPool.length, 68);
   // A state that predates the field (validateSave never required draftPool) publishes
   // null — "pool unknown", NOT an empty pool — so a surface can fall back to the table
   // instead of lying about an empty codex.
