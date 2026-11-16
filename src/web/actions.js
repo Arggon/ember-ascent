@@ -255,6 +255,27 @@ function buildHpTrail(events, preState) {
       else reveal.push({ unit: 'p', hp: heroRun });
       continue;
     }
+    if (ev.t === 'hp_cost') {
+      // The OTHER HP-cost shape: the temper toll (`temperHpCost` — 'redhot' is "Lose 2
+      // HP when played", steps.js) and an event choice's toll (events.js), both carried
+      // as an AMOUNT. The cost ALWAYS rides the pre-beat, no guard: steps.js pays it
+      // BEFORE the effect loop of the play even starts, and the pre fire (animMs(240))
+      // lands strictly before the first golpe's impact (animMs(294+)) at every dock —
+      // the heroGolpeAt check would be a rule the stream answers by construction
+      // (hp_cost only travels in card streams, which carry no enemy_attack). The amount
+      // is what the payer PAID (steps.js floors it: paid = min(cost, hp-1)), so the
+      // mirror is a plain subtraction; the max(1, ·) is loseHp's own belt, not a rule.
+      // Without this branch the anchor sat 2 HP HIGH, and any later HP fact of the same
+      // stream — the burning_blood heal a killing stroke arrives with — lifted the bar
+      // ABOVE the snapshot for the retire to snap back down: the owner's "the bar
+      // rises, then falls again" report (repro: seed 14, a redhot cinder_flick kills a
+      // 8-HP foe, bar 45 -> 51 -> 49).
+      const amount = Math.max(0, ev.amount ?? 0);
+      unit('p', heroRun, heroMax);
+      heroRun = Math.max(1, heroRun - amount);
+      pre.push({ unit: 'p', hp: heroRun });
+      continue;
+    }
     if (ev.t === 'heal' && ev.who === 'player') {
       // `amount` is what the kernel actually restored (overcapped heals report less),
       // so the running value needs no clamp beyond maxHp.

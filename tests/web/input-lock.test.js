@@ -471,3 +471,160 @@ test('reduced motion and » arm no trail (invariant c: instant truth)', async ()
   playACard(fast.api);
   assert.equal(fast.api.hpTrailGet(), null, '» arms nothing');
 });
+
+/* -------------------------------------- hp_cost: the temper toll anchors the model ---
+ * The temper toll (`temperHpCost` — 'redhot' is "Lose 2 HP when played", steps.js) and
+ * an event choice's toll (events.js) travel as `hp_cost { amount }`, paid BEFORE the
+ * play's own effects. The trail's running hero model must pay it on the PRE beat and
+ * stay anchored on the kernel's truth — without the branch the anchor sat 2 HP high,
+ * and a later HP fact of the same stream (the burning_blood heal a killing stroke
+ * arrives with) lifted the bar ABOVE the snapshot for the retire to snap back down:
+ * the owner's "the bar rises, then falls again" report. These pins drive the REAL
+ * act() through the fake-DOM harness with a wrapper that reports a PINNED stream while
+ * the real controller below resolves the same play — and the craft makes the real
+ * truth agree with the pinned stream (45 - 2 = 43 alive; 45 - 2 + 6 = 49 on the kill),
+ * so the no-snap claim is checked against a consistent run, not a stream's say-so. */
+
+/** A delegating wrapper around a REAL controller whose dispatch reports `streamOf()`
+ *  as the step's kernel events. The state, the snapshots and save/load stay the
+ *  kernel's own — the stream is the presentation input, nothing else. */
+function ctlReporting(ctl, streamOf) {
+  return {
+    get state() { return ctl.state; },
+    get submitted() { return ctl.submitted; },
+    dispatch(id) {
+      const res = ctl.dispatch(id);
+      const stream = streamOf(id);
+      if (stream) res.events = stream;
+      return res;
+    },
+    snapshot(opts) { return ctl.snapshot(opts); },
+    save() { return ctl.save(); },
+    load(raw) { return ctl.load(raw); },
+  };
+}
+
+/** Start a run at the first combat whose controller reports the pinned stream — the
+ *  same deck-lever shape startRunWithDeck uses (8× `cardId` pushed before the first
+ *  hand), but the wrapper is in the module's ctl seat from the boot onward. */
+function startWithStream(seed, streamOf, cardId = 'cinder_flick') {
+  globalThis.localStorage._d['dlb.helpSeen.v1'] = '1';
+  keyFrom = (docListeners.keydown || []).length;
+  const ctl = ctlMod.createController({ run: { seed } });
+  const save = JSON.parse(ctl.save());
+  for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `t-${cardId}-${i}`, cardId });
+  const res = ctl.load(save);
+  if (!res.ok) throw new Error(`deck load failed: ${JSON.stringify(res.problems)}`);
+  ctl.dispatch('n1');
+  const api = factory(ctlReporting(ctl, streamOf), toasts, importedModules);
+  api.render();
+  return { api, ctl };
+}
+
+/** Craft a live combat into the repro's shape through the save/load lever (the one
+ *  documented writable lever): the hero at `hp`, the first living foe at `foeHp` with
+ *  no block, and every deck copy of the tested card tempered 'redhot' (the toll's
+ *  payer — the kernel then pays exactly the 2 HP the pinned stream declares). */
+function craftRepro(ctl, { hp, foeHp }) {
+  const save = JSON.parse(ctl.save());
+  save.state.player.hp = hp;
+  const foe = save.state.combat.enemies.find((e) => !e.dead);
+  foe.hp = foeHp;
+  foe.block = 0;
+  save.state.tempers = save.state.tempers ?? {};
+  for (const c of save.state.deck) if (c.cardId === 'cinder_flick') save.state.tempers[c.uid] = 'redhot';
+  const res = ctl.load(save);
+  assert.equal(res.ok, true, `the repro craft failed: ${JSON.stringify(res.problems)}`);
+  return { foeIdx: foe.index };
+}
+
+/** Capture '[hp-trail]' warns while `fn` runs — the retire's snap warn is the bug's
+ *  signature (a trail the stream did not fully carry), so a no-warn claim needs the
+ *  channel spied across the WHOLE span, retire timer included. */
+async function withoutTrailWarns(fn) {
+  const warns = [];
+  const realWarn = console.warn;
+  console.warn = (...a) => { warns.push(a.map(String).join(' ')); };
+  try {
+    await fn();
+  } finally {
+    console.warn = realWarn;
+  }
+  return warns.filter((w) => w.includes('[hp-trail]'));
+}
+
+/** Wait for the play's own span timer to retire the armed trail (the natural retire —
+ *  the same path the repro's snap warn rode). */
+async function awaitTrailRetire(api, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  while (api.hpTrailGet() && Date.now() < deadline) await sleep(100);
+}
+
+test('hp_cost pays on the pre-beat and the heal stays anchored: the retire snaps nothing', async () => {
+  const box = { stream: null };
+  const { api, ctl } = startWithStream(14, () => box.stream);
+  const { foeIdx } = craftRepro(ctl, { hp: 45, foeHp: 8 });
+  // The repro's trio in the kernel's OWN measured shape (K.step, redhot cinder_flick
+  // vs the crafted 8-HP foe): the toll, the killing golpes, the relic heal that arrives
+  // with the kill. cinder_flick is Deal 3 damage 3 times; redhot floors that to 4
+  // (tempers.js Math.floor((3*3)/2)), so the fight resolves as TWO damage facts —
+  // hp 4, then 0 — with the third golpe re-resolving to nothing on the dead aim. The
+  // heal amount is the full +6 under this craft (45 - 2 + 6 = 49 < maxHp), which is
+  // what every assertion below hangs on; the foe's truth (hp 0, omitted from the
+  // snapshot) is the other half the retire checks.
+  box.stream = [
+    { t: 'hp_cost', amount: 2, source: 'temper' },
+    { t: 'damage', source: 'player', target: foeIdx, raw: 4, dealt: 4, blocked: 0, hp: 4 },
+    { t: 'damage', source: 'player', target: foeIdx, raw: 4, dealt: 4, blocked: 0, hp: 0 },
+    { t: 'heal', who: 'player', amount: 6, source: 'burning_blood' },
+  ];
+  const trailWarns = await withoutTrailWarns(async () => {
+    playCardById(api, 'cinder_flick');
+    const trail = api.hpTrailGet();
+    assert.ok(trail, 'the play armed the trail');
+    // The cost rides the PRE list (always — it precedes the play's whole choreography);
+    // the heal rides the reveal, anchored on 45 - 2, NOT on the unpayed 45.
+    assert.deepEqual(trail.pre, [{ unit: 'p', hp: 43 }],
+      `the pre list carries the cost step: ${JSON.stringify(trail.pre)}`);
+    assert.deepEqual(trail.reveal, [{ unit: 'p', hp: 49 }],
+      `the reveal carries the heal anchored on the paid model: ${JSON.stringify(trail.reveal)}`);
+    // Both fires land inside the feel queue (pre at animMs(240), reveal +animMs(70);
+    // 620ms at the harness's 1x pace) — past it the hero bar walked 43 then 49.
+    await sleep(620 + 150);
+    const fired = api.hpTrailGet();
+    assert.ok(fired, 'the trail is still armed right after the reveal');
+    assert.deepEqual(fired.units.get('p').applied.map((s) => s.hp), [43, 49],
+      'the hero bar stepped pre-2, then pre-2+6, in that order');
+    assert.equal(fired.units.get('p').current, 49, 'the shown value is the kernel truth');
+    assert.equal(ctl.state.player.hp, 49, 'and the kernel itself holds 45 - 2 + 6');
+    // The retire runs on the play span's own timer: past it the trail is gone and no
+    // '[hp-trail]' snap warn ever fired — every HP fact the model carried was truth.
+    await awaitTrailRetire(api);
+    assert.equal(api.hpTrailGet(), null, 'the trail retired with the play span');
+  });
+  assert.equal(trailWarns.length, 0, `the retire snapped nothing: ${JSON.stringify(trailWarns)}`);
+});
+
+test('a hp_cost alone steps the pre-beat and the model ends at pre-2 (no heal to misplace)', async () => {
+  const box = { stream: null };
+  const { api, ctl } = startWithStream(14, () => box.stream);
+  const { foeIdx } = craftRepro(ctl, { hp: 45, foeHp: 60 });
+  box.stream = [{ t: 'hp_cost', amount: 2, source: 'temper' }];
+  const trailWarns = await withoutTrailWarns(async () => {
+    playCardById(api, 'cinder_flick');
+    const trail = api.hpTrailGet();
+    assert.ok(trail, 'the cost armed a trail');
+    assert.deepEqual(trail.pre, [{ unit: 'p', hp: 43 }],
+      `the pre list carries the cost step alone: ${JSON.stringify(trail.pre)}`);
+    assert.deepEqual(trail.reveal, [], `nothing else to reveal: ${JSON.stringify(trail.reveal)}`);
+    assert.ok(!trail.units.has(`e${foeIdx}`), 'the foe the pinned stream never touches stays unarmed');
+    await sleep(620 + 150);
+    const fired = api.hpTrailGet();
+    assert.ok(fired, 'the trail is still armed inside its span');
+    assert.equal(fired.units.get('p').current, 43, 'the model ends at pre-2');
+    assert.equal(ctl.state.player.hp, 43, 'the kernel paid exactly the 2 HP');
+    await awaitTrailRetire(api);
+    assert.equal(api.hpTrailGet(), null, 'the trail retired with the play span');
+  });
+  assert.equal(trailWarns.length, 0, `the retire snapped nothing: ${JSON.stringify(trailWarns)}`);
+});
