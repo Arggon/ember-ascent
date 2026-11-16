@@ -397,6 +397,26 @@ html, body {
   background: linear-gradient(90deg, #2f6c96, var(--block) 60%, #b6e2ff);
 }
 
+/* ---- barra de vida por golpe: the per-impact step pulses --------------------------
+   The bar's width CHANGE itself rides the `.hpbar > i` transition above: the trail's
+   per-golpe writes land on a LIVE node (the dispatcher's own golpe fires), so the
+   existing width transition is what animates the step. These two one-shot pulses say
+   WHICH way a step went — a flash-and-settle for damage, a green-tinted bloom for a
+   heal — so a small step (2 of 44) still reads as an event. The class is added by
+   runtime.applyHpStep on the same fire that lands the golpe's float, and removed on a
+   paced timer so the next golpe re-adds it as a fresh animation; `both` leaves no
+   residue, and the reduce block neutralizes the classes outright. */
+.hpbar.hp-step-dn > i { animation: hp-step-dn calc(0.34s * var(--pace, 1)) ease-out both; }
+.hpbar.hp-step-up > i { animation: hp-step-up calc(0.34s * var(--pace, 1)) ease-out both; }
+@keyframes hp-step-dn {
+  0% { filter: brightness(2) saturate(1.4); }
+  100% { filter: none; }
+}
+@keyframes hp-step-up {
+  0% { filter: brightness(1.7) saturate(0.85) hue-rotate(105deg); }
+  100% { filter: none; }
+}
+
 .enemy .eblock {
   color: var(--block);
   font-weight: 700;
@@ -2154,6 +2174,8 @@ html, body {
   .card-wrap,
   .card,
   .hpbar > i,
+  .hpbar.hp-step-dn > i,
+  .hpbar.hp-step-up > i,
   #toast { animation: none !important; transition: none !important; }
 
   /* Keep the cues that carry information, drop the ones that only move: the card still

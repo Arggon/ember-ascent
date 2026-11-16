@@ -120,6 +120,7 @@ src = 'async function measure(){ return null; }\n' + src;
 src += '\nreturn { render, clickCard, act, skipAnim, setAnimSpeed, busyReason, playInputSpan,'
   + ' get pendingSlot(){return pendingSlot;}, snapGet(){return snap;},'
   + ' strikeSeqGet: () => strikeSeq, dealClockGet: () => dealClock, lockGet: () => inputLock,'
+  + ' hpTrailGet: () => hpTrail,'
   + ' injectBursts: (b) => { bursts = b; } };';
 
 const ctlMod = await import('../../src/surface/gui/controller.js');
@@ -318,4 +319,155 @@ test('the gate is presentation only: the kernel still takes what the gate blocks
   assert.ok(endId, 'the snapshot offers the end turn');
   const res = ctl.dispatch(endId);
   assert.ok(!res.error, `the kernel still takes the blocked action: ${JSON.stringify(res.error || {})}`);
+});
+
+/* ------------------------------------- barra de vida por golpe: the step timelines ---
+ * The trail is presentation state armed from the kernel's OWN event stream. These tests
+ * pin its DATA shape and its FIRE-TIME behaviour against the real act()/dispatchFx code
+ * with real timers: the golpe fires are the dispatcher's own paced `later` timers, so
+ * awaiting the paced impact puts the assertions on the same clock the floats land on.
+ * The live-node writes are the browser e2e's claim (the fake DOM cannot resolve
+ * `.fight .hero`); what is pinned here is that the RIGHT step fires at the RIGHT beat,
+ * that the last applied value equals the snapshot (invariant (a)), and that skip
+ * retires (invariant (b)). */
+
+/** Start a run at the first combat with `cardId` injected 8-deep BEFORE the first hand
+ *  is dealt (the e2e's save lever, at run-start where the snapshot cannot go stale). */
+function startRunWithDeck(seed, cardId, matchMediaReduce = false) {
+  globalThis.localStorage._d['dlb.helpSeen.v1'] = '1';
+  keyFrom = (docListeners.keydown || []).length;
+  const prev = globalThis.matchMedia;
+  if (matchMediaReduce) globalThis.matchMedia = () => ({ matches: true });
+  const ctl = ctlMod.createController({ run: { seed } });
+  const save = JSON.parse(ctl.save());
+  for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `t-${cardId}-${i}`, cardId });
+  const res = ctl.load(save);
+  if (!res.ok) throw new Error(`deck load failed: ${JSON.stringify(res.problems)}`);
+  ctl.dispatch('n1');
+  const api = factory(ctl, toasts, importedModules);
+  if (matchMediaReduce) {
+    if (prev === undefined) delete globalThis.matchMedia;
+    else globalThis.matchMedia = prev;
+  }
+  api.render();
+  return { api, ctl };
+}
+
+/** The stable index of the first living enemy (the trail's unit key namespace). */
+const firstFoeKey = (ctl) => `e${ctl.state.combat.enemies.findIndex((e) => !e.dead)}`;
+
+/** Play a SPECIFIC card by id the way a player does (playACard plays whatever the hand
+ *  offers first — the injected deck does not reorder the shuffle). */
+function playCardById(api, cardId) {
+  const hand = api.snapGet().hand;
+  const card = hand.find((c) => c.cardId === cardId && c.playable);
+  assert.ok(card, `${cardId} playable in hand (hand: ${hand.map((c) => c.cardId).join(', ')})`);
+  byId.stage.querySelector(`[data-slot="${card.slot}"]`).dispatch('click');
+  if (api.pendingSlot !== null) {
+    const enemies = byId.stage.querySelectorAll('.enemy');
+    assert.ok(enemies.length > 0, 'targeting offers at least one enemy');
+    enemies[0].dispatch('click');
+  }
+  return card;
+}
+
+test('a multi-hit play arms the trail and its bar steps land golpe by golpe', async () => {
+  const { api, ctl } = startRunWithDeck(11, 'cinder_flick');
+  const foeKey = firstFoeKey(ctl);
+  const foeStart = ctl.state.combat.enemies.find((e) => !e.dead).hp;
+  // The paint BEFORE any fire shows the trail's start, never the resolved end.
+  playCardById(api, 'cinder_flick');
+  const trail = api.hpTrailGet();
+  assert.ok(trail, 'a damage play armed the trail');
+  const unit = trail.units.get(foeKey);
+  assert.ok(unit, `the struck enemy is an armed unit: ${[...trail.units.keys()].join(', ')}`);
+  assert.equal(unit.start, foeStart, 'the unit starts where the bar was painted');
+  assert.equal(unit.current, null, 'no step has fired yet at paint time');
+  // The strike entries carry per-golpe HP — the timeline the dispatcher reads.
+  const plan = api.strikeSeqGet();
+  assert.equal(plan, null, 'a card play does not arm the enemy-turn plan');
+  // The first golpe's float lands at the STRIKE_SEQ impact (beat 0 + impact, paced).
+  const impact = Math.round(640 * 2 * 0.46);
+  await sleep(impact + 120);
+  const mid = api.hpTrailGet();
+  assert.ok(mid && mid.units.get(foeKey).current !== null, 'the first golpe fired its bar step');
+  const first = mid.units.get(foeKey).current;
+  assert.ok(first < foeStart, `the first golpe took HP off the shown value: ${foeStart} -> ${first}`);
+  // The last golpe fires two beats later (beat 2 + impact); past it the applied value IS
+  // the snapshot, and the read still lands inside the trail's own span (the retire waits
+  // on playInputSpan + its transition tail, a beat past the last golpe).
+  await sleep(Math.round(500 * 2 * 2) + 200);
+  const end = api.hpTrailGet();
+  assert.ok(end, 'the trail is still armed inside its own span (all golpes applied)');
+  const last = end.units.get(foeKey).current;
+  const kernelHp = ctl.state.combat.enemies.find((e) => !e.dead)?.hp ?? 0;
+  assert.equal(last, kernelHp, `invariant (a): the last applied step equals the snapshot (${last} vs ${kernelHp})`);
+  assert.ok(end.units.get(foeKey).applied.length >= 2, `the bar stepped per golpe (${end.units.get(foeKey).applied.length} steps)`);
+});
+
+test('a heal play arms the hero unit and its reveal step lands on the reveal fire', async () => {
+  const { api, ctl } = startRunWithDeck(11, 'tallow_rub');
+  // Damage the hero the one way the harness may: the save lever (documented as the one
+  // writable lever). The trail's AMOUNT steps anchor on the kernel's pre-action truth
+  // (ctl.state), so a stale painted snapshot cannot poison the heal's step.
+  const crafted = (() => {
+    const save = JSON.parse(ctl.save());
+    save.state.player.hp = 30;
+    return ctl.load(save);
+  })();
+  assert.equal(crafted.ok, true, `the hp craft failed: ${JSON.stringify(crafted.problems)}`);
+  const healedBefore = ctl.state.player.hp;
+  assert.equal(healedBefore, 30, 'the kernel holds the crafted 30 HP');
+  playCardById(api, 'tallow_rub');
+  const trail = api.hpTrailGet();
+  assert.ok(trail, 'a heal play armed the trail');
+  const unit = trail.units.get('p');
+  assert.ok(unit, 'the hero is an armed unit');
+  assert.equal(unit.start, 30, 'the unit anchors on the kernel truth, not the painted snapshot');
+  assert.equal(trail.reveal.length, 1, `exactly one reveal step (the heal): ${JSON.stringify(trail.reveal)}`);
+  assert.equal(trail.reveal[0].unit, 'p', 'the heal speaks for the hero');
+  // `heal.amount` is what the kernel actually restored: start + amount == the step.
+  const healed = ctl.state.player.hp - healedBefore;
+  assert.ok(healed > 0, `the kernel restored HP (${healed})`);
+  assert.equal(trail.reveal[0].hp, unit.start + healed,
+    `the reveal step carries the kernel's own restoration (${unit.start} + ${healed})`);
+  assert.equal(trail.reveal[0].hp, ctl.state.player.hp, 'the step equals the kernel truth');
+  // The reveal fire is the feel queue's (animMs(240)+animMs(70) at 1x = 620ms).
+  await sleep(620 + 150);
+  const fired = api.hpTrailGet();
+  assert.ok(fired, 'the trail is still armed right after the reveal');
+  assert.equal(fired.units.get('p').current, trail.reveal[0].hp, 'the heal step fired on the reveal beat');
+  assert.equal(fired.units.get('p').current, ctl.state.player.hp, 'the hero bar shows the kernel truth');
+});
+
+test('the enemy turn arms the hero unit and the slams step its bar per golpe', async () => {
+  // Seed 3: the first End Turn meets two attackers (the same shape the gate test pins).
+  const { api, ctl } = startRun(3);
+  const heroStart = ctl.state.player.hp;
+  endTurnBtn().dispatch('click');
+  const trail = api.hpTrailGet();
+  assert.ok(trail, 'an attacking turn armed the hero trail');
+  assert.ok(trail.units.has('p'), 'the hero is armed');
+  assert.equal(trail.units.get('p').start, heroStart, 'the hero bar starts where the paint put it');
+  const plan = api.strikeSeqGet();
+  assert.ok(plan && plan.attacks.length >= 2, 'the seeded turn has per-strike entries');
+  for (const a of plan.attacks) assert.equal(typeof a.hp, 'number', 'each strike entry carries its golpe HP');
+  // The first golpe's impact: the same fire that lands the named float.
+  await sleep(Math.round(640 * 2 * 0.46) + 120);
+  const mid = api.hpTrailGet();
+  assert.ok(mid && mid.units.get('p').current !== null, 'the first slam fired its hero bar step');
+  assert.equal(mid.units.get('p').current, plan.attacks[0].hp, 'the step is the kernel\'s own enemy_attack.hp');
+  // » mid-sequence: the remaining golpes never fire and the bar snaps to the snapshot.
+  api.skipAnim();
+  assert.equal(api.hpTrailGet(), null, 'invariant (b): skip retires the trail');
+});
+
+test('reduced motion and » arm no trail (invariant c: instant truth)', async () => {
+  const reduce = startRunWithDeck(11, 'cinder_flick', true);
+  playACard(reduce.api);
+  assert.equal(reduce.api.hpTrailGet(), null, 'reduced motion arms nothing');
+  const fast = startRunWithDeck(11, 'cinder_flick');
+  fast.api.setAnimSpeed(0);
+  playACard(fast.api);
+  assert.equal(fast.api.hpTrailGet(), null, '» arms nothing');
 });

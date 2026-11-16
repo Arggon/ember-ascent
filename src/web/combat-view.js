@@ -21,6 +21,8 @@ import {
   enteringIds,
   flash,
   heroMoveHold,
+  hpDisplay,
+  paintHpFill,
   pileOpen,
   reducedMotion,
   repaint,
@@ -102,7 +104,13 @@ export function heroPose() {  // Precedence: getting hit outranks the card's own
 
 export function heroFigure() {
   const p = snap.player;
-  const ratio = p.maxHp > 0 ? p.hp / p.maxHp : 1;
+  // barra de vida por golpe: the bar and its readout paint the TRAIL's stepped value
+  // while an action's steps are playing out (display ?? snapshot) — the bar holds where
+  // the action found it, steps per golpe with the fires, and shows the snapshot once the
+  // trail retires. The aria-label below keeps reading the SNAPSHOT: assistive tech hears
+  // the truth, the stepped value is the sighted layer's (invariant (e)).
+  const shown = hpDisplay('p') ?? p.hp;
+  const ratio = p.maxHp > 0 ? shown / p.maxHp : 1;
   const pose = heroPose();
   const isBellows = snap.character === 'bellows';
   const node = el('div', {
@@ -172,9 +180,9 @@ export function heroFigure() {
   }
   node.append(fig);
   node.append(el('div', { cls: 'hero-name', text: snap.characterName || 'Ashwright' }));
-  node.append(el('div', { cls: 'ehp', text: `${p.hp}/${p.maxHp}` }));
+  node.append(el('div', { cls: 'ehp', text: `${shown}/${p.maxHp}` }));
   const bar = el('div', { cls: 'hpbar' }, el('i', {}));
-  bar.querySelector('i').style.width = `${Math.max(0, Math.round((p.hp / Math.max(1, p.maxHp)) * 100))}%`;
+  paintHpFill(bar.querySelector('i'), 'p', shown, p.maxHp);
   node.append(bar);
   if (p.block > 0) node.append(el('div', { cls: 'eblock', text: `⛨ ${p.block}` }));
   // PARITY: the hero's statuses (Vulnerable, Weak, …) read as CHIPS under her own HP
@@ -268,7 +276,7 @@ function beatPose(e) {
   return table[kind] ?? null;
 }
 
-function enemyPose(e) {
+function enemyPose(e, shownRatio = null) {
   // UX-2, the SEQUENCED attack run: while a strike sequence is playing, its attackers
   // slam one at a time — the plan (runtime.strikeSeq) carries each attacker's beat, and
   // enemyCard applies the per-attacker animation delay from the same clock. The pose
@@ -279,7 +287,10 @@ function enemyPose(e) {
   const turn = bursts.find((b) => b.kind === 'enemy-turn');
   if (turn && turn.attacks.some((a) => a.enemy === e.index)) return 'slam';
   if (flash.hits.includes(e.index)) return 'hurt';
-  if (e.hp / Math.max(1, e.maxHp) <= 0.35) return 'low';
+  // barra de vida por golpe: the low pose follows the SHOWN value (the trail's stepped
+  // value while an action's steps are playing), so the tint never leads the bar.
+  const ratio = shownRatio ?? e.hp / Math.max(1, e.maxHp);
+  if (ratio <= 0.35) return 'low';
   if (e.intent && e.intent.kind === 'attack') return 'windup';
   return 'idle';
 }
@@ -555,7 +566,12 @@ export function enemyCard(e, position) {
       : {},
   });
 
-  const pose = enemyPose(e);
+  // barra de vida por golpe: the SHOWN value this card paints — the trail's stepped
+  // value while an action's steps are playing (display ?? snapshot). The bar, the
+  // `.ehp` readout and the low pose all follow it; the aria-label (enemyLabel) keeps
+  // reading the snapshot row — the truth for assistive tech (invariant (e)).
+  const shown = hpDisplay(`e${e.index}`) ?? e.hp;
+  const pose = enemyPose(e, e.maxHp > 0 ? shown / e.maxHp : 1);
   // UX-2: the sequenced attacker. The plan clock gives this enemy its own beat: the
   // intent row (its `.e-intent` chips) lights up exactly while ITS slam plays (a CSS
   // animation whose delay is the same clock, so a repaint re-derives it without
@@ -644,9 +660,9 @@ export function enemyCard(e, position) {
     card.append(el('span', { cls: 'target-mark', text: '◎', attrs: { 'aria-hidden': 'true' } }));
   }
   card.append(el('div', { cls: 'ename', text: e.name }));
-  card.append(el('div', { cls: 'ehp', text: `${e.hp}/${e.maxHp}` }));
+  card.append(el('div', { cls: 'ehp', text: `${shown}/${e.maxHp}` }));
   const bar = el('div', { cls: 'hpbar' }, el('i', {}));
-  bar.querySelector('i').style.width = `${Math.max(0, Math.round((e.hp / e.maxHp) * 100))}%`;
+  paintHpFill(bar.querySelector('i'), `e${e.index}`, shown, e.maxHp);
   card.append(bar);
   if (e.block > 0) {
     card.append(el('div', { cls: 'eblock', text: `⛨ ${e.block}` }));

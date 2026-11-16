@@ -39,6 +39,10 @@ import {
   setEnteringIds,
   setFlash,
   setHeroMoveHold,
+  setHeldDeaths,
+  setHpTrail,
+  hpTrail,
+  retireHpTrail,
   setInputLock,
   setLastPlayerStatuses,
   setLastEnemyStatuses,
@@ -96,6 +100,178 @@ function announcedHits(move) {
   return Number.isFinite(n) ? Math.min(4, Math.max(1, n)) : 1;
 }
 
+/**
+ * BARRA DE VIDA POR GOLPE — arm the per-unit HP trail from the kernel's OWN event
+ * stream, so the bars FOLLOW the hits instead of jumping to the resolved snapshot at
+ * action start. Read-only over facts the kernel already published: `damage.hp` (the
+ * struck enemy's HP after each of the hero's golpes), `enemy_attack.hp` (the hero's HP
+ * after each golpe of the enemy turn), the tick events' `hp` (with `who`/`index` naming
+ * the body), `heal.amount` (HP actually restored) and `self_damage.amount` (an HP cost —
+ * the loseHp floor at 1 is the kernel's own convention). Nothing here re-derives a rule;
+ * a fact the stream does not carry is handled by the retire's snap, not by a guess.
+ *
+ * The steps' FIRE SITES are the entries the dispatcher already iterates — the per-golpe
+ * strike entries (`strikes` on the card-fly burst), the plan's per-strike `attacks` and
+ * their hung `ticks`, the plan's `tail` steps — each carrying `hp` since this slice; fx.js
+ * applies them on the very fire that lands the golpe's float (ONE clock). Only the facts
+ * with NO per-golpe fire of their own — HP costs, heals, and the hook damage Combust's
+ * sweep deals — come back as `reveal` steps, applied on the feel-queue fire where the
+ * play's numbers land (the same fire the diff floats reveal on).
+ *
+ * Units are armed only when the stream touched their HP: an untouched bar paints the
+ * snapshot exactly as before. Starts are the kernel's own pre-action values (in ordinary
+ * play the same numbers the painted snapshot shows); the running model is anchored there
+ * because the two AMOUNT facts (heal, self_damage) have no absolute HP of their own, and
+ * every absolute-hp fact re-seeds the model, so it cannot drift.
+ *
+ * @param {Array<any>} events the kernel's event stream for this step
+ * @param {any} preState the kernel's own pre-action state (the seeded truth and the
+ *   amount facts' anchor; the snapshots carry no number this builder needs)
+ * @returns {{start: number, units: Map<string, any>, reveal: Array<{unit: string, hp: number}>}|null}
+ *   null when no HP fact was carried (no trail to arm)
+ */
+function buildHpTrail(events, preState) {
+  const units = new Map();
+  const reveal = [];
+  const pre = [];
+  const unit = (key, startHp, maxHp) => {
+    if (!units.has(key)) units.set(key, { start: Math.max(0, startHp), max: Math.max(1, maxHp), current: null, applied: [] });
+    return units.get(key);
+  };
+  // Running HP per body, seeded from the kernel's pre-action truth, kept current for the
+  // two facts that arrive as AMOUNTS rather than absolute HP (heal, self_damage). Every
+  // absolute-hp fact re-seeds it, so the model cannot drift.
+  let heroRun = preState.player.hp;
+  const heroMax = preState.player.maxHp;
+  const foeRun = new Map((preState.combat?.enemies ?? []).filter((e) => !e.dead).map((e) => [e.index, e.hp]));
+  const foeMax = new Map((preState.combat?.enemies ?? []).filter((e) => !e.dead).map((e) => [e.index, e.maxHp]));
+  // The stream position of each body's FIRST golpe step, found in a FIRST PASS: the
+  // walk below is single-pass in stream order, so a fact it is classifying cannot yet
+  // have seen the golpe that follows it — the pre/reveal split needs the answer up
+  // front. A reveal/tick/cost fact that PRECEDES its body's first golpe must land on
+  // that body's bar before the golpe's fire — the reveal and tail fires both sit after
+  // it (the reveal at ~animMs(310) vs the first impact at ~animMs(294+); the tail after
+  // the last slam) — or the bar would fall with the slam and then RISE back to the
+  // pre-golpe value with a heal pulse: a visual lie on a body being hit (the Combust
+  // end-of-turn shape: its sweep and HP cost resolve in the end-of-turn hooks, before
+  // the enemy attacks of the same stream). No golpe steps for a body -> Infinity ->
+  // nothing is pre for it, and its facts keep the reveal/tail fire they always rode.
+  let heroGolpeAt = Infinity;
+  const foeGolpeAt = new Map();
+  for (let i = 0; i < events.length; i += 1) {
+    const ev = events[i];
+    if (!ev) continue;
+    if (ev.t === 'damage' && ev.source === 'player' && Number.isInteger(ev.target) && !foeGolpeAt.has(ev.target)) {
+      foeGolpeAt.set(ev.target, i);
+    }
+    if (ev.t === 'enemy_attack' && Number.isInteger(ev.enemy) && heroGolpeAt === Infinity) {
+      heroGolpeAt = i;
+    }
+  }
+  for (let i = 0; i < events.length; i += 1) {
+    const ev = events[i];
+    if (!ev) continue;
+    if (ev.t === 'damage' && Number.isInteger(ev.target) && foeRun.has(ev.target)) {
+      if (typeof ev.hp !== 'number') continue;
+      const key = `e${ev.target}`;
+      if (ev.source !== 'player') {
+        // Combust's end-of-turn sweep and potion damage: no golpe fire of their own —
+        // they ride the reveal fire, the same one their diff float lands on — unless
+        // they precede this body's first golpe, in which case they ride the pre-beat.
+        if (foeGolpeAt.has(ev.target) && i < foeGolpeAt.get(ev.target)) pre.push({ unit: key, hp: ev.hp });
+        else reveal.push({ unit: key, hp: ev.hp });
+      }
+      unit(key, foeRun.get(ev.target), foeMax.get(ev.target) ?? 1);
+      foeRun.set(ev.target, ev.hp);
+      // A hero golpe's step rides its strike entry (`strikes[k].hp`, k = the golpe's
+      // index in stream order — the order playStrikes is built in below).
+      continue;
+    }
+    if (ev.t === 'enemy_attack' && Number.isInteger(ev.enemy)) {
+      // The hero's bar steps on the plan's golpe fire (fx.js reads `attacks[i].hp`).
+      if (typeof ev.hp === 'number') {
+        unit('p', heroRun, heroMax);
+        heroRun = ev.hp;
+      }
+      continue;
+    }
+    if (ev.t === 'bleed_tick') {
+      if (ev.who === 'player') {
+        // The hero bleeds per golpe of his own multi-hit card: no per-golpe fire of its
+        // own (the tick floats stack in the hero's box and reveal with the feel queue),
+        // so the bar steps ride the reveal fire in stream order — or the pre-beat when
+        // the tick precedes the body's first golpe.
+        if (typeof ev.hp === 'number') {
+          unit('p', heroRun, heroMax);
+          heroRun = ev.hp;
+          if (heroGolpeAt < Infinity && i < heroGolpeAt) pre.push({ unit: 'p', hp: ev.hp });
+          else reveal.push({ unit: 'p', hp: ev.hp });
+        }
+        continue;
+      }
+      // An attacker bleeding on its own golpe: the step rides the golpe's tick fire
+      // (fx.js reads `tk.hp` off the hung tick) — a stray one that precedes the body's
+      // first golpe rides the pre-beat instead. The running model follows the stream
+      // either way: the fire choice must not desync it.
+      if (Number.isInteger(ev.index) && foeRun.has(ev.index) && typeof ev.hp === 'number') {
+        unit(`e${ev.index}`, foeRun.get(ev.index), foeMax.get(ev.index) ?? 1);
+        if (foeGolpeAt.has(ev.index) && i < foeGolpeAt.get(ev.index)) pre.push({ unit: `e${ev.index}`, hp: ev.hp });
+        foeRun.set(ev.index, ev.hp);
+      }
+      continue;
+    }
+    if (ev.t === 'poison_tick') {
+      // Poison is turn-close business on both sides — the grouping makes these TAIL
+      // beats, and the tail fire reads `s.hp` off the step. But the HERO's close
+      // (endOfTurnStatuses) resolves in the stream BEFORE the enemy attacks of the same
+      // turn, so a hero tick that precedes the body's first golpe rides the pre-beat:
+      // the tail fire would land its absolute pre-attack HP after the slams and lift the
+      // bar the golpes had already taken down.
+      if (ev.who === 'player') {
+        if (typeof ev.hp === 'number') {
+          unit('p', heroRun, heroMax);
+          heroRun = ev.hp;
+          if (heroGolpeAt < Infinity && i < heroGolpeAt) pre.push({ unit: 'p', hp: ev.hp });
+        }
+        continue;
+      }
+      if (Number.isInteger(ev.index) && foeRun.has(ev.index) && typeof ev.hp === 'number') {
+        unit(`e${ev.index}`, foeRun.get(ev.index), foeMax.get(ev.index) ?? 1);
+        if (foeGolpeAt.has(ev.index) && i < foeGolpeAt.get(ev.index)) pre.push({ unit: `e${ev.index}`, hp: ev.hp });
+        // The tail fire carries this step's bar step (fx.js reads `s.hp` off the beat) —
+        // no reveal push here, or the same fact would apply twice. The running model
+        // follows the stream either way: the fire choice must not desync it.
+        foeRun.set(ev.index, ev.hp);
+      }
+      continue;
+    }
+    if (ev.t === 'self_damage') {
+      // An HP cost (bloodletting, offering, hemokinesis, Combust's own sweep): the
+      // amount is the kernel's fact, the floor at 1 is loseHp's own convention.
+      const amount = Math.max(0, ev.amount ?? 0);
+      unit('p', heroRun, heroMax);
+      heroRun = Math.max(1, heroRun - amount);
+      if (heroGolpeAt < Infinity && i < heroGolpeAt) pre.push({ unit: 'p', hp: heroRun });
+      else reveal.push({ unit: 'p', hp: heroRun });
+      continue;
+    }
+    if (ev.t === 'heal' && ev.who === 'player') {
+      // `amount` is what the kernel actually restored (overcapped heals report less),
+      // so the running value needs no clamp beyond maxHp.
+      const amount = Math.max(0, ev.amount ?? 0);
+      unit('p', heroRun, heroMax);
+      heroRun = Math.min(heroMax, heroRun + amount);
+      if (heroGolpeAt < Infinity && i < heroGolpeAt) pre.push({ unit: 'p', hp: heroRun });
+      else reveal.push({ unit: 'p', hp: heroRun });
+      continue;
+    }
+  }
+  if (units.size === 0) return null;
+  // `pre` is built in stream order (the walk pushes as it goes), so the pre-beat applies
+  // a body's pre-golpe facts in exactly the order the kernel resolved them.
+  return { start: Date.now(), units, reveal, pre };
+}
+
 /** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it.
  *  The NAMES are proper nouns in every language. The blurbs are NOT carried here: the
  *  kindling picker builds the key `hero.<id>.blurb` from the id and resolves it through
@@ -121,7 +297,19 @@ export let heroChoice = HEROES.some((h) => h.id === new URLSearchParams(location
 export function act(actionId, targetK = null) {
   if (!actionId) return;
   setPileOpen(null);
+  // barra de vida por golpe: the held ghosts belong to the PREVIOUS action's row truth —
+  // this action repaints the row from its own snapshot and its own death bursts, so a
+  // ghost still mid-collapse is dropped here rather than mixed into the new slot
+  // partition (heldDeaths exist only across repaints INSIDE one action's span).
+  setHeldDeaths([]);
   const before = snap;
+  // barra de vida por golpe: the kernel's OWN pre-action truth. In ordinary play it
+  // equals the painted snapshot (every act() re-snapshots); the one writable lever that
+  // can desync them (a mid-combat ctl.load in a test harness) must not poison the trail's
+  // AMOUNT steps — a heal or an HP cost is anchored to the HP the kernel actually had,
+  // never to a stale painted number (the golpe steps are absolute event hp and need no
+  // anchor at all).
+  const preState = ctl.state;
   // The map the player is standing on BEFORE this action, kept for the travel beat: the
   // node the step started from is gone from the rebuilt map, and this is the only handle on
   // it. Recorded from the snapshot, never computed from a coordinate.
@@ -146,6 +334,9 @@ export function act(actionId, targetK = null) {
   if (Array.isArray(res.events)) setRunEvents([...runEvents, ...res.events]);
 
   const fx = [];
+  // barra de vida por golpe: armed below, in the success branch, from the kernel's own
+  // event stream; declared here so the publish site beside the input lock sees it.
+  let trail = null;
   if (res.error) {
     toast(t('toast.illegal', { err: res.error.error, id: res.error.id }));
     announce(t('toast.rejected.aria', { err: res.error.error }));
@@ -218,6 +409,12 @@ export function act(actionId, targetK = null) {
       let lastMove = null;
       // Per-enemy golpe counters for the strike beats (`hit` is 1-based).
       const golpeOf = new Map();
+      // barra de vida por golpe: whether each body's FIRST golpe has already been
+      // processed — the walk is in stream order, so a tick created while its body's
+      // flag is still false PRECEDES that body's first golpe and must ride the pre-beat
+      // (the same rule buildHpTrail applies to the trail's own pre list).
+      let heroAttackSeen = false;
+      const attackSeenFoes = new Set();
       // The last attack beat per enemy, so a bleed tick can ride its own golpe. BOTH
       // shapes that beat travels in are kept: the plan step (steps/beats, which the tail
       // and pose clocks read) and the per-strike entry (plan.attacks, which the golpe
@@ -242,6 +439,13 @@ export function act(actionId, targetK = null) {
             to: onPlayer ? 'player' : 'enemy',
             amount: ev.amount ?? 0,
             remaining: ev.remaining ?? 0,
+            // barra de vida por golpe: the tick's own HP truth, so the bar's step can
+            // ride the SAME fire the tick float lands on (fx.js). `pre` marks a tick
+            // that precedes its body's first golpe in the stream — its bar step rides
+            // the pre-beat instead of the tail (which fires after the slams and would
+            // lift the bar the golpes had already taken down with the pre-golpe value).
+            hp: typeof ev.hp === 'number' ? ev.hp : null,
+            pre: onPlayer ? !heroAttackSeen : !attackSeenFoes.has(foeIdx),
           };
           if (!onPlayer && status === 'bleed' && Number.isInteger(foeIdx)) {
             // BLEED rides the golpe that triggered it — the holder ticks right after
@@ -324,6 +528,9 @@ export function act(actionId, targetK = null) {
             parried: Boolean(ev.parried),
             hit: soFar + 1,
             hits: announcedHits(plan.move),
+            // barra de vida por golpe: the hero's HP after THIS golpe (the kernel's own
+            // `enemy_attack.hp`), so the hero's bar steps on the golpe's own fire.
+            hp: typeof ev.hp === 'number' ? ev.hp : null,
           };
           attacks.push(entry);
           lastAttackOf.set(ev.enemy, entry);
@@ -345,7 +552,11 @@ export function act(actionId, targetK = null) {
             : { enemy: ev.enemy, ...who, kind, to, status: ev.status, stacks: ev.stacks ?? 0 };
         plan.steps.push(step);
         beats.push(step);
-        if (kind === 'attack') lastStrikeOf.set(ev.enemy, step);
+        if (kind === 'attack') {
+          lastStrikeOf.set(ev.enemy, step);
+          heroAttackSeen = true;
+          attackSeenFoes.add(ev.enemy);
+        }
       }
       if (beats.length > 0) {
         turnPlans = [...plans.values()];
@@ -392,6 +603,25 @@ export function act(actionId, targetK = null) {
       });
     }
     if (playStrikes.length > 0) fx.push(...playStrikes);
+    // BARRA DE VIDA POR GOLPE — arm the presentation trail from the SAME stream, before
+    // the paint, exactly where the strike plan and the input lock arm: the paint this
+    // action produces must already show the bars where the action FOUND them (the trail
+    // read in combat-view/floats), with the per-golpe steps to follow on the dispatcher's
+    // fires. The gate is the same condition the golpe choreography plays under — reduced
+    // motion and » arm nothing, so the bars show snapshot truth at once (invariant (c)).
+    trail = !reducedMotion && animSpeed !== 0 && before.phase === 'combat'
+      ? buildHpTrail(Array.isArray(res.events) ? res.events : [], preState)
+      : null;
+    if (trail) {
+      // The ghost timeline this trail drives: a killing golpe's delayed ash-fall ends one
+      // collapse after its fire (the ghost's bar is stepped until then), so the trail
+      // must outlive it — the retirement below adds this to its span. The ash-fall base
+      // is render.js's COLLAPSE_MS (500, paced).
+      const lethalIdx = playStrikes.findIndex((s) => typeof s.hp === 'number' && s.hp <= 0);
+      trail.ghostMs = lethalIdx >= 0
+        ? animMs(STRIKE_SEQ.beat) * lethalIdx + animMs(Math.round(STRIKE_SEQ.slam * STRIKE_SEQ.impactAt)) + animMs(500)
+        : 0;
+    }
     const struckIdx = new Set(playStrikes.map((s) => s.enemy));
     // Per-enemy: the damage that landed (HP delta), the glyph tier for that amount, and
     // whether block ate all of it. The bar still shows the remaining total. Enemies the
@@ -563,7 +793,10 @@ export function act(actionId, targetK = null) {
   // index lands past the row's end — the aimed-kill crash.
   // `id` rides along too: the ghost card's art is keyed by it (`dyingCard` -> `enemyMarkup`),
   // and without it every death ghost fell back to the jaw-worm sprite (SPRITES.jaw_worm).
-  for (const d of dying) fx.push({ kind: 'death', enemy: d.index, slot: d.slot, id: d.id, name: d.name, side: d.side, boss: d.boss });
+  // `maxHp` rides along since the hp-trail slice: while a trail is armed for the victim,
+  // its collapsing ghost carries the victim's own HP bar (the kill-hold's "its bar falls
+  // to 0 at the lethal golpe"), and a bar width needs the max to be a width.
+  for (const d of dying) fx.push({ kind: 'death', enemy: d.index, slot: d.slot, id: d.id, name: d.name, side: d.side, boss: d.boss, maxHp: d.maxHp });
 
   /* ------------------------------------------------------------- PHASE ARRIVALS ------
    * The end-of-run beat. `ended` is reached the instant the last enemy (or the player) is
@@ -641,7 +874,9 @@ export function act(actionId, targetK = null) {
   // armed only for the CLEAN killing turn; the else-if below retires it on every other
   // ended flip (reduced motion and » reach the same cleanup), so no plan survives a run
   // that is already over.
+  let trailArmedPlan = false;
   if (seqBurst && !(defeatFlip && dying.length > 0) && !reducedMotion && animSpeed !== 0) {
+    trailArmedPlan = true;
     const beatMs = animMs(STRIKE_SEQ.beat);
     const slamMs = animMs(STRIKE_SEQ.slam);
     // UX-9b: the non-attack beats (guard / power / hex) ride the SAME plan as a tail after
@@ -686,6 +921,10 @@ export function act(actionId, targetK = null) {
       later(() => {
         if (strikeSeq !== plan) return;
         setStrikeSeq(null);
+        // barra de vida por golpe: the turn's bar steps are all fired by now — the trail
+        // retires WITH the plan (the same clock), so no paint after this one can show a
+        // stale stepped value.
+        retireHpTrail();
         repaint();
       }, plan.totalMs + 400);
     }
@@ -709,6 +948,26 @@ export function act(actionId, targetK = null) {
   const flyBurst = fx.find((b) => b.kind === 'card-fly');
   if (flyBurst && !reducedMotion && animSpeed !== 0) {
     setInputLock({ until: Date.now() + playInputSpan(flyBurst), why: 'play' });
+  }
+  // barra de vida por golpe: publish the trail and schedule its retirement. When a
+  // strike plan owns the clock, the trail retires WITH the plan (the timer above) —
+  // the gate is held for the whole sequence, so no action can supersede it mid-turn.
+  // Everything else (a card play, a belt quaff, a defeat flip that carries deaths) arms
+  // its own span: the play's choreography span covers every golpe fire it schedules
+  // (playInputSpan is the figure the gate arms from), plus the width transition's tail;
+  // the no-play fallback covers the reveal beat where the un-fired floats land. The
+  // identity check keeps a stale timer from retiring a NEWER action's trail.
+  if (trail) {
+    setHpTrail(trail);
+    if (!trailArmedPlan) {
+      // barra de vida por golpe: the span adds the trail's own ghost timeline
+      // (`trail.ghostMs`, computed where the strikes are in scope) — a repaint inside
+      // the delayed collapse must still re-draw the ghost WITH its bar.
+      const span = (flyBurst && !reducedMotion && animSpeed !== 0
+        ? playInputSpan(flyBurst)
+        : animMs(900)) + animMs(450) + (trail.ghostMs || 0);
+      later(() => { if (hpTrail === trail) retireHpTrail(); }, span);
+    }
   }
   repaint();
   dispatchFx();
@@ -783,6 +1042,11 @@ export function newGame(seed = null, opts = {}) {
   setEnteredIds(new Set());
   setHeroMoveHold(null);
   setStrikeSeq(null);
+  // barra de vida por golpe: run-scoped motion state like the rest — a restart drops the
+  // trail without the retire's snap (the fresh run repaints from its own snapshot), and
+  // any held ghosts with it.
+  setHpTrail(null);
+  setHeldDeaths([]);
   setPhaseArriving(null);
   setArriving(noArrival());
   setEndFocusPending(false);

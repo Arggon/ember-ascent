@@ -3746,3 +3746,443 @@ test('defeat rework leaves the victory kill-hold intact', { timeout: 240000 }, a
   assert.ok(d.panel === 0 || d.panelFirst > d.holdFirst,
     'the spoils panel must not precede the held stage');
 });
+
+/* ------------------------------------------------ barra de vida por golpe ----------
+ * The HP bar must FOLLOW the hits: a multi-hit card's bar steps per golpe (on the SAME
+ * fire that lands each golpe's float), a heal rises animated when it lands, a killing
+ * golpe drives the victim's bar to 0 with the collapse starting on that beat, and the
+ * killing turn steps the held hero's bar per slam before the ash. The bars' inline
+ * width is the step log (the fires write it golpe by golpe on a LIVE node; the width
+ * transition is the smooth animation), so a 40ms collector (see header) reads both the
+ * discrete steps and the glide. Snapshot truth stays where it was: the aria-labels keep
+ * reading the snapshot, reduced motion and » show the final value at once, and a skip
+ * snaps every bar to the snapshot. */
+
+/** Arm an in-page collector that samples one bar's inline width (the step log the
+ *  fires write), its computed pixel width (the glide the transition animates) and the
+ *  bar host's `.ehp` readout, every 40ms with timestamps. `sel` is the CSS selector of
+ *  the FILL (`i`). Returns through readBarCollector. */
+async function armBarCollector(page, sel) {
+  await page.evaluate((s) => {
+    window.__barc = { t0: performance.now(), samples: [] };
+    window.__barcTimer = setInterval(() => {
+      const fill = document.querySelector(s);
+      if (!fill) return;
+      window.__barc.samples.push({
+        t: Math.round(performance.now() - window.__barc.t0),
+        inline: fill.style.width,
+        px: Math.round(fill.getBoundingClientRect().width * 10) / 10,
+        ehp: (fill.closest('.hero, .enemy')?.querySelector('.ehp') || {}).textContent || '',
+      });
+    }, 40);
+  }, sel);
+}
+
+async function readBarCollector(page) {
+  return page.evaluate(() => { clearInterval(window.__barcTimer); return window.__barc; });
+}
+
+/** The click instant, in the bar collector's own epoch, so "the first sample after the
+ *  click" is readable without guessing at scheduling. */
+const barClickT = (page) => page.evaluate(() => performance.now() - window.__barc.t0);
+
+const pct = (hp, max) => `${Math.max(0, Math.round((hp / Math.max(1, max)) * 100))}%`;
+
+/** A mid-glide sample: the computed width sits strictly between two settled step
+ *  targets (the transition is animating the live node, not snapping it). */
+function glideSeen(samples) {
+  const settled = new Map();
+  for (const s of samples) settled.set(s.inline, Math.max(settled.get(s.inline) ?? 0, s.px));
+  const lo = Math.min(...settled.values());
+  const hi = Math.max(...settled.values());
+  if (hi - lo <= 3) return 0;
+  return samples.filter((s) => s.px > lo + 1 && s.px < hi - 1
+    && ![...settled.values()].some((tp) => Math.abs(tp - s.px) < 1.5)).length;
+}
+
+test('barra por golpe: a multi-hit card steps the enemy bar per golpe, never one jump', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 1, false, 'mines');
+  await bootToMap(page);
+  await injectDeck(page, 'cinder_flick');
+  await travelToFight(page);
+  const before = await page.evaluate(() => window.__dlb.snapshot().enemies[0]);
+  await armBarCollector(page, '.enemy .hpbar:not(.block) > i');
+
+  await page.locator('button[data-slot][aria-label^="Cinder Flick"][aria-disabled="false"]').first().click();
+  await waitIdle(page); // the play's own gate covers every golpe fire
+  const got = await readBarCollector(page);
+  const after = await page.evaluate(() => window.__dlb.snapshot().enemies[0]);
+  assert.equal(after.hp, before.hp - 9, 'the kernel still lands the printed 3x3');
+
+  const start = pct(before.hp, before.maxHp);
+  const end = pct(after.hp, after.maxHp);
+  const inline = got.samples.map((s) => s.inline);
+  assert.equal(inline[0], start, `the bar opens where the action found it (start ${start}, saw ${inline[0]})`);
+  assert.notEqual(inline[0], end, 'the bar must not open at the resolved value (no jump at action start)');
+  const distinct = [...new Set(inline)];
+  assert.ok(distinct.length >= 4, `the bar stepped per golpe (start + 3 golpes = 4 values): ${JSON.stringify(distinct)}`);
+  const firstOf = (v) => got.samples.find((s) => s.inline === v)?.t ?? -1;
+  for (let i = 1; i < distinct.length; i += 1) {
+    assert.ok(firstOf(distinct[i]) > firstOf(distinct[i - 1]),
+      `step ${i} appears after step ${i - 1}: ${distinct[i - 1]}@${firstOf(distinct[i - 1])}ms, ${distinct[i]}@${firstOf(distinct[i])}ms`);
+    assert.ok(firstOf(distinct[i]) - firstOf(distinct[i - 1]) >= 400,
+      `the golpes are a beat apart on the bar too: ${firstOf(distinct[i]) - firstOf(distinct[i - 1])}ms`);
+  }
+  const endAt = firstOf(end);
+  assert.ok(endAt >= 1500, `the final value first appears at the LAST golpe (>=1.5s in): ${endAt}ms`);
+  const glide = glideSeen(got.samples);
+  assert.ok(glide >= 2, `the bar glides between steps (${glide} mid-transition samples, not snaps)`);
+  const texts = [...new Set(got.samples.map((s) => s.ehp))];
+  assert.ok(texts.some((v) => v !== `${before.hp}/${before.maxHp}` && v !== `${after.hp}/${after.maxHp}`),
+    `the .ehp readout stepped with the bar: ${JSON.stringify(texts)}`);
+});
+
+test('barra por golpe: a heal raises the hero bar animated when it lands', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  // Seed 1's default fight is the jaw worm; its first move is chomp (A11), so one end
+  // turn damages the hero with a fresh snapshot -- the heal then has room to land.
+  const page = await freshPage(t, 1);
+  await bootToMap(page);
+  await injectDeck(page, 'tallow_rub');
+  await travelToFight(page);
+  await endTurn(page); // chomp lands (A11)
+  const hurt = await page.evaluate(() => window.__dlb.snapshot().player);
+  assert.ok(hurt.hp < hurt.maxHp, `the hero took the chomp to heal from: ${hurt.hp}/${hurt.maxHp}`);
+
+  await armBarCollector(page, '.fight .hero .hpbar > i');
+  await page.locator('button[data-slot][aria-label^="Tallow Rub"][aria-disabled="false"]').first().click();
+  await waitIdle(page);
+  const got = await readBarCollector(page);
+  const healed = await page.evaluate(() => window.__dlb.snapshot().player);
+  assert.ok(healed.hp > hurt.hp, `the kernel restored HP: ${hurt.hp} -> ${healed.hp}`);
+
+  const start = pct(hurt.hp, hurt.maxHp);
+  const end = pct(healed.hp, healed.maxHp);
+  const inline = got.samples.map((s) => s.inline);
+  assert.equal(inline[0], start, `the bar opens where the heal found it: ${inline[0]}`);
+  assert.notEqual(start, end, 'the heal moved the bar');
+  const endAt = got.samples.find((s) => s.inline === end)?.t ?? -1;
+  assert.ok(endAt >= 300, `the rise lands on the reveal beat, not at action start (>=300ms in): ${endAt}ms`);
+  const glide = glideSeen(got.samples);
+  assert.ok(glide >= 2, `the bar glided up through intermediate widths (${glide} mid-glide samples)`);
+  // Invariant (e): the readout paints the SHOWN value; the aria-label reads the SNAPSHOT.
+  assert.equal(got.samples[0].ehp, `${hurt.hp}/${hurt.maxHp}`, `the readout opens at the shown value: ${got.samples[0].ehp}`);
+  const aria = await page.evaluate(() => document.querySelector('.fight .hero')?.getAttribute('aria-label') || '');
+  assert.match(aria, new RegExp(`${healed.hp} of ${healed.maxHp} HP`), `the aria-label reads the snapshot truth: ${aria}`);
+});
+
+test('barra por golpe: a mid-timeline kill drops the ghost bar to 0 at the lethal golpe, then the collapse', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 1, false, 'mines');
+  await bootToMap(page);
+  await injectDeck(page, 'cinder_flick');
+  await travelToFight(page);
+  // The one writable lever: the crawler holds 6 HP, so the 3x3 kills on golpe 2 -- a kill
+  // in the MIDDLE of the play's timeline (golpe 1 lands first).
+  const crafted = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.combat.enemies[0].hp = 6;
+    const res = ctl.load(save);
+    return res.ok ? null : res.problems;
+  });
+  assert.equal(crafted, null, `the 6-hp craft failed: ${JSON.stringify(crafted)}`);
+
+  await page.evaluate(() => {
+    window.__kill = { bar: [], collapseAt: 0, t0: performance.now() };
+    const seen = new Set();
+    window.__killTimer = setInterval(() => {
+      const ghost = document.querySelector('.enemy.is-dying[data-death-index]');
+      const fill = ghost ? ghost.querySelector('.hpbar > i') : null;
+      if (fill) window.__kill.bar.push({ t: Math.round(performance.now() - window.__kill.t0), inline: fill.style.width });
+      if (ghost && ghost.getAnimations && !window.__kill.collapseAt) {
+        for (const a of ghost.getAnimations()) {
+          const timing = a.effect ? a.effect.getComputedTiming() : null;
+          // PAST the hold delay and a few frames in: the collapse is actually playing.
+          if (!timing || (a.currentTime ?? 0) < (timing.delay ?? 0) + 60) continue;
+          const key = `${a.animationName}:${Math.round((timing.delay ?? 0))}`;
+          if (!seen.has(key)) { seen.add(key); window.__kill.collapseAt = Math.round(performance.now() - window.__kill.t0); }
+        }
+      }
+    }, 40);
+  });
+
+  await page.locator('button[data-slot][aria-label^="Cinder Flick"][aria-disabled="false"]').first().click();
+  await waitIdle(page);
+  const got = await page.evaluate(() => { clearInterval(window.__killTimer); return window.__kill; });
+  const st = await readState(page);
+  assert.equal(st.phase, 'reward', 'the 6-hp crawler fell mid-play (kernel: reward)');
+
+  const inline = got.bar.map((s) => s.inline);
+  const distinct = [...new Set(inline)];
+  assert.ok(distinct.length >= 3, `the ghost bar stepped before and at the kill (start, golpe 1, 0): ${JSON.stringify(distinct)}`);
+  assert.equal(distinct[distinct.length - 1], '0%', `the lethal golpe drove the bar to 0: ${JSON.stringify(distinct)}`);
+  const at = (v) => got.bar.find((s) => s.inline === v)?.t ?? -1;
+  const zeroAt = at('0%');
+  const preKill = distinct.filter((v) => v !== '0%');
+  assert.ok(preKill.length >= 2, `golpe 1 stepped the bar before the lethal one: ${JSON.stringify(preKill)}`);
+  assert.ok(zeroAt > at(preKill[preKill.length - 1]),
+    `the bar hit 0 at the LETHAL golpe, after golpe 1: ${preKill[preKill.length - 1]}@${at(preKill[preKill.length - 1])}ms, 0%@${zeroAt}ms`);
+  assert.ok(got.collapseAt > 0, 'the ghost collapse played');
+  assert.ok(Math.abs(got.collapseAt - zeroAt) <= 250,
+    `the collapse started with the lethal golpe's fire (collapse ${got.collapseAt}ms vs bar-0 ${zeroAt}ms)`);
+});
+
+test('barra por golpe: the killer turn steps the held hero bar per slam before the ash', { timeout: 240000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 3);
+  await bootToMap(page);
+  await travelToFight(page);
+  await armDefeatCollector(page);
+  // The held hero bar's own log, on the DEFEAT collector's epoch, so the hold window
+  // filters it without an arming-gap skew. The death BEAT's own start is recorded here
+  // too (the .fig carries is-hero-death from the hold's first paint -- the animation is
+  // what is delayed by the plan total -- so the beat's start is read off the animation's
+  // own clock: currentTime crossing its delay), which is the moment the bar must have
+  // already reached 0 by.
+  await page.evaluate(() => {
+    window.__heroBar = { samples: [], deathBeatAt: 0 };
+    window.__heroBarTimer = setInterval(() => {
+      const fill = document.querySelector('.fight .hero .hpbar > i');
+      if (fill) window.__heroBar.samples.push({ t: Math.round(performance.now() - window.__defeat.t0), inline: fill.style.width });
+      const fig = document.querySelector('.hero .fig.is-hero-death');
+      if (fig && fig.getAnimations && !window.__heroBar.deathBeatAt) {
+        for (const a of fig.getAnimations()) {
+          const timing = a.effect ? a.effect.getComputedTiming() : null;
+          if (a.animationName && a.animationName.includes('hero-death') && timing
+            && (a.currentTime ?? 0) >= (timing.delay ?? 0) + 60) {
+            window.__heroBar.deathBeatAt = Math.round(performance.now() - window.__defeat.t0);
+          }
+        }
+      }
+    }, 40);
+  });
+
+  const st = await endTurnUntilEnded(page);
+  assert.equal(st.player.hp, 0, 'the walk died to pure end turns');
+  await page.waitForSelector('.page-end .big-title.loss', { timeout: 15000 });
+  await sleep(120);
+  const d = await readDefeatCollector(page);
+  await page.evaluate(() => clearInterval(window.__heroBarTimer));
+  assert.ok(d.hold > 0 && d.deathFirst > 0, 'the defeat hold and the death beat both played (walk: seed 3)');
+
+  const hb = await page.evaluate(() => window.__heroBar);
+  assert.ok(hb.deathBeatAt > 0, 'the hero death beat actually started (the animation crossed its delay)');
+  const inHold = hb.samples.filter((s) => s.t >= d.holdFirst && s.t <= hb.deathBeatAt);
+  const distinct = [...new Set(inHold.map((s) => s.inline))];
+  assert.ok(distinct.length >= 2, `the held hero bar stepped per slam inside the hold: ${JSON.stringify(distinct)}`);
+  assert.equal(distinct[distinct.length - 1], '0%', `the bar reached 0 through the slams: ${JSON.stringify(distinct)}`);
+  const zeroAt = inHold.find((s) => s.inline === '0%')?.t ?? -1;
+  assert.ok(zeroAt >= 0 && zeroAt < hb.deathBeatAt,
+    `the bar hit 0 BEFORE the death beat (0%@${Math.round(zeroAt)}ms vs beat@${Math.round(hb.deathBeatAt)}ms)`);
+});
+
+test('barra por golpe: reduced motion shows the final value at once (invariant c)', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 1, true, 'mines');
+  await bootToMap(page);
+  await injectDeck(page, 'cinder_flick');
+  await travelToFight(page);
+  await armBarCollector(page, '.enemy .hpbar:not(.block) > i');
+  await page.locator('button[data-slot][aria-label^="Cinder Flick"][aria-disabled="false"]').first().click();
+  const clickT = await barClickT(page);
+  await waitIdle(page); // instant under reduce
+  await sleep(120); // the whole flow is instant here; let the collector tick once over the painted truth
+  const got = await readBarCollector(page);
+  const after = await page.evaluate(() => window.__dlb.snapshot().enemies[0]);
+  const end = pct(after.hp, after.maxHp);
+  const postClick = got.samples.filter((s) => s.t >= clickT - 80);
+  assert.ok(postClick.length > 0, `the collector sampled after the click (clickT=${Math.round(clickT)}ms, samples: ${JSON.stringify(got.samples.slice(-6).map((s) => `${s.t}:${s.inline}`))})`);
+  assert.equal(postClick[0].inline, end, `the first post-click sample is the FINAL value: ${postClick[0].inline} vs ${end}`);
+  assert.deepEqual([...new Set(postClick.map((s) => s.inline))], [end], 'no intermediate step ever painted');
+  const trans = await page.evaluate(() => getComputedStyle(document.querySelector('.enemy .hpbar:not(.block) > i')).transitionDuration);
+  assert.equal(trans, '0s', `the width transition is off under reduce: ${trans}`);
+});
+
+test('barra por golpe: skipping snaps every bar to the snapshot (invariant b)', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 1, false, 'mines');
+  await bootToMap(page);
+  await injectDeck(page, 'cinder_flick');
+  await travelToFight(page);
+  const before = await page.evaluate(() => window.__dlb.snapshot().enemies[0]);
+  await armBarCollector(page, '.enemy .hpbar:not(.block) > i');
+  await page.locator('button[data-slot][aria-label^="Cinder Flick"][aria-disabled="false"]').first().click();
+  // Ride INTO the sequence: wait for golpe 1's own step on the bar, then skip before
+  // golpe 2's beat arrives.
+  const firstGolpe = pct(before.hp - 3, before.maxHp);
+  const secondGolpe = pct(before.hp - 6, before.maxHp);
+  await page.waitForFunction(
+    (tgt) => document.querySelector('.enemy .hpbar:not(.block) > i')?.style.width === tgt,
+    firstGolpe, { timeout: 4000 },
+  );
+  await page.locator('.speed-btn', { hasText: '»' }).click();
+  const skipT = await barClickT(page);
+  await waitIdle(page);
+  await sleep(2500); // the unfired golpes' slots pass: no step may land after the skip
+  const got = await readBarCollector(page);
+  const after = await page.evaluate(() => window.__dlb.snapshot().enemies[0]);
+  const end = pct(after.hp, after.maxHp);
+  assert.notEqual(end, firstGolpe, 'the skip caught the play mid-sequence (the kernel resolved all golpes)');
+  const snapped = got.samples.filter((s) => s.inline === end);
+  assert.ok(snapped.length > 0, 'the bar snapped to the snapshot value');
+  assert.ok(snapped[0].t <= skipT + 250,
+    `the snap happened at the skip (first snap sample @${snapped[0].t}ms, skip @${Math.round(skipT)}ms)`);
+  const seen = [...new Set(got.samples.map((s) => s.inline))];
+  assert.ok(!seen.includes(secondGolpe), `golpe 2's step never painted after the skip: ${JSON.stringify(seen)}`);
+  const legal = [pct(before.hp, before.maxHp), firstGolpe, end];
+  assert.deepEqual(seen.filter((v) => !legal.includes(v)), [],
+    `no step outside the pre-skip golpes and the snap: ${JSON.stringify(seen)}`);
+});
+
+test('barra por golpe: a 2-body mid-timeline kill keeps the ghost on stage until its bar hits 0 at the lethal golpe', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  // Seed 14 mines opens on TWO Ash Wraiths, and the fight CONTINUES after the kill (the
+  // survivor stands): the ghost is painted by the live row, not by a run-ending hold, so
+  // the deal-clock release repaint (~1.3s after the play) and any hover would remove the
+  // body while its delayed collapse is still pending. The held-death resume (runtime
+  // heldDeaths, dyingCard's stamped timeline) is what keeps it on stage to the end.
+  const page = await freshPage(t, 14, false, 'mines');
+  await bootToMap(page);
+  await injectDeck(page, 'cinder_flick');
+  await travelToFight(page);
+  assert.ok((await page.locator('.enemy').count()) === 2, 'seed 14 mines is a 2-body fight');
+  // The one writable lever drops the aimed wraith into the kill-on-golpe-2 window
+  // (golpe 1 leaves 2, golpe 2 kills): the same technique the single-body kill spec uses.
+  const crafted = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.combat.enemies[0].hp = 5;
+    const res = ctl.load(save);
+    return res.ok ? null : res.problems;
+  });
+  assert.equal(crafted, null, `the 5-hp craft failed: ${JSON.stringify(crafted)}`);
+  const maxHp = await page.evaluate(() => window.__dlb.controller().state.combat.enemies[0].maxHp);
+
+  await page.evaluate(() => {
+    window.__w2 = { bar: [], floats: [], collapseTicks: 0, t0: performance.now() };
+    const seenF = new WeakSet();
+    window.__w2Timer = setInterval(() => {
+      const ghost = document.querySelector('.enemy.is-dying[data-death-index="0"]');
+      const now = Math.round(performance.now() - window.__w2.t0);
+      const fill = ghost ? ghost.querySelector('.hpbar > i') : null;
+      if (ghost && fill) {
+        window.__w2.bar.push({ t: now, inline: fill.style.width });
+        const a = ghost.getAnimations ? ghost.getAnimations()[0] : null;
+        const timing = a && a.effect ? a.effect.getComputedTiming() : null;
+        if (a && timing && (a.currentTime ?? 0) > (timing.delay ?? 0) + 60) window.__w2.collapseTicks += 1;
+      }
+      for (const n of document.querySelectorAll('#fx-layer .fx-golpe-float')) {
+        if (seenF.has(n)) continue;
+        seenF.add(n);
+        window.__w2.floats.push({ t: now, text: (n.textContent || '').trim() });
+      }
+    }, 40);
+  });
+
+  await page.locator('button[data-slot][aria-label^="Cinder Flick"][aria-disabled="false"]').first().click();
+  await page.waitForSelector('.enemy.targeting', { timeout: 3000 });
+  await page.locator('.enemy[data-target-index="1"]').click();
+  await waitIdle(page);
+  await sleep(1500); // the delayed collapse outlives the play's own gate; let it play
+  const got = await page.evaluate(() => { clearInterval(window.__w2Timer); return window.__w2; });
+  const st = await readState(page);
+  assert.equal(st.phase, 'combat', 'the fight continues (a survivor stands)');
+  assert.equal(st.enemies.length, 1, 'one wraith fell');
+
+  assert.equal(got.floats.length, 2, `two golpe floats played: ${JSON.stringify(got.floats)}`);
+  const startPct = pct(5, maxHp);
+  const midPct = pct(2, maxHp);
+  const inline = got.bar.map((s) => s.inline);
+  const distinct = [...new Set(inline)];
+  assert.ok(distinct.length >= 3, `the ghost bar stepped start -> golpe 1 -> 0: ${JSON.stringify(distinct)}`);
+  assert.equal(distinct[0], startPct, `the ghost opens at the crafted HP: ${distinct[0]}`);
+  assert.ok(distinct.includes(midPct), `golpe 1 stepped the bar: ${JSON.stringify(distinct)}`);
+  assert.equal(distinct[distinct.length - 1], '0%', 'the lethal golpe drove the ghost bar to 0%');
+  const at = (v) => got.bar.find((s) => s.inline === v)?.t ?? -1;
+  const zeroAt = at('0%');
+  const lethalFloatAt = got.floats[got.floats.length - 1].t;
+  assert.ok(Math.abs(zeroAt - lethalFloatAt) <= 150,
+    `the bar hit 0% on the lethal golpe's own fire (bar ${zeroAt}ms vs float ${lethalFloatAt}ms)`);
+  // THE BUG's claim: the ghost never left the stage between its paint and the collapse —
+  // the deal-clock release repaint must not punch a hole in the presence log.
+  let hole = 0;
+  for (let i = 1; i < got.bar.length; i += 1) hole = Math.max(hole, got.bar[i].t - got.bar[i - 1].t);
+  assert.ok(hole <= 120, `the ghost stayed on stage continuously (max presence gap ${hole}ms at 40ms ticks)`);
+  assert.ok(got.collapseTicks > 0, `the delayed collapse actually played on the (re-drawn) ghost (${got.collapseTicks} active ticks)`);
+});
+
+test('barra por golpe: a Combust turn steps the hero cost BEFORE the first slam (no false heal between golpes)', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  // The regression: Combust's end-of-turn sweep and HP cost resolve in the stream BEFORE
+  // the enemy attacks of the same turn (rules/act.js: fireHook(end_of_turn) then
+  // enemyTurn). Their bar steps are absolute pre-attack HP, so firing them on the uniform
+  // feel-queue beat (~1 beat after the first impact) lifted the bar back up mid-turn with
+  // a green heal pulse while the golpes were landing. The stream-ordered pre-beat (the
+  // hit-stop's own fire) must step the cost first and keep the turn's steps monotonically
+  // falling. Seed 22 deals two attacking foes on turn 1.
+  const page = await freshPage(t, 22);
+  await bootToMap(page);
+  await injectDeck(page, 'combust');
+  await travelToFight(page);
+  const attackers = (await readIntents(page)).filter((i) => i.kind === 'attack');
+  assert.ok(attackers.length >= 1, `the seeded turn attacks: ${JSON.stringify(await readIntents(page))}`);
+  await playCard(page, 'Banked Coal'); // the combust power (kernel cardId 'combust')
+  const held = await page.evaluate(() => window.__dlb.controller().state.powers?.combust ?? 0);
+  assert.ok(held >= 1, `Combust is held: ${JSON.stringify(await page.evaluate(() => window.__dlb.controller().state.powers))}`);
+  // The sweep's cost IS the power's stacks (kernel: loseHp(state.player, stacks)).
+  const cost = held;
+
+  await page.evaluate(() => {
+    window.__cb = { bar: [], floats: [], t0: performance.now() };
+    const seenF = new WeakSet();
+    window.__cbTimer = setInterval(() => {
+      const now = Math.round(performance.now() - window.__cb.t0);
+      const bar = document.querySelector('.fight .hero .hpbar');
+      const fill = bar ? bar.querySelector('i') : null;
+      if (fill) window.__cb.bar.push({ t: now, inline: fill.style.width, pulse: bar.className });
+      for (const n of document.querySelectorAll('#fx-layer .fx-strike-float')) {
+        if (seenF.has(n)) continue;
+        seenF.add(n);
+        window.__cb.floats.push({ t: now, text: (n.textContent || '').trim() });
+      }
+    }, 40);
+  });
+
+  const hpBefore = await page.evaluate(() => window.__dlb.controller().state.player.hp);
+  const maxHp = await page.evaluate(() => window.__dlb.controller().state.player.maxHp);
+  await endTurn(page); // waitIdle covers the whole sequenced turn
+  await sleep(300);
+  const got = await page.evaluate(() => { clearInterval(window.__cbTimer); return window.__cb; });
+  const hpAfter = await page.evaluate(() => window.__dlb.controller().state.player.hp);
+  assert.ok(hpAfter < hpBefore, `the turn took HP (cost + golpes): ${hpBefore} -> ${hpAfter}`);
+  assert.ok(got.floats.length >= 1, `the turn played its named golpe floats: ${JSON.stringify(got.floats)}`);
+
+  // The stepped values (only width CHANGES count — the transition glides between them).
+  const w = (s) => parseInt(s.inline, 10);
+  const changes = [];
+  for (const s of got.bar) {
+    const prev = changes[changes.length - 1];
+    if (!prev || prev.inline !== s.inline) changes.push(s);
+  }
+  const stepped = changes.filter((c) => c.inline !== '100%');
+  assert.ok(stepped.length >= 2, `the bar stepped through the turn's facts: ${JSON.stringify(changes.map((c) => `${c.t}:${c.inline}[${c.pulse}]`))}`);
+  // THE ORDER: the first stepped value is the post-cost HP (the pre-beat), and it lands
+  // no later than the first golpe float — the cost precedes the slams in the stream.
+  const costPct = pct(hpBefore - cost, maxHp);
+  const firstFloatAt = got.floats[0].t;
+  assert.ok(stepped[0].t <= firstFloatAt + 120,
+    `the hero cost stepped BEFORE the first slam (bar ${stepped[0].t}ms vs float ${firstFloatAt}ms)`);
+  assert.equal(stepped[0].inline, costPct,
+    `the first stepped value is the post-cost HP (${stepped[0].inline}, expected ${costPct})`);
+  // MONOTONY: the turn's steps only ever fall — no value rises back mid-turn (the old
+  // shape rose ~1 beat after the first slam, with a green heal pulse, then fell again).
+  for (let i = 1; i < stepped.length; i += 1) {
+    assert.ok(w(stepped[i]) <= w(stepped[i - 1]) + 1,
+      `the turn's bar steps never rise: ${stepped.slice(0, i + 1).map((c) => c.inline).join(' -> ')}`);
+  }
+  // And the pulse classes agree: every step pulse is the damage one.
+  const ups = stepped.filter((c) => /hp-step-up/.test(c.pulse));
+  assert.equal(ups.length, 0, `no false heal pulse in the turn: ${JSON.stringify(ups.map((c) => `${c.t}:${c.pulse}`))}`);
+});
