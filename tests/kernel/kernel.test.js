@@ -2,9 +2,10 @@
 // and save-schema validation. These are the properties replay (R3) rests on.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadKernel, loadStateMod, loadRng, content } from '../helpers/harness.mjs';
+import { loadKernel, loadStateMod, loadRng, content, loadSession } from '../helpers/harness.mjs';
 
 const { newRun, hash, canonical, toSave, validateSave } = await loadKernel();
+const { loadObject } = await loadSession();
 const { FORMAT_VERSION } = await loadStateMod();
 const { u64At, intAt, shuffleAt, pickAt } = await loadRng();
 
@@ -118,4 +119,36 @@ test('a corrupt save is REFUSED with named problems, never repaired', () => {
   assert.deepEqual(validateSave(null), ['save: not a JSON object']);
   assert.deepEqual(validateSave([]), ['save: not a JSON object']);
   assert.ok(validateSave({ ...good, actions: 'nope' }).some((p) => p.includes('"actions" must be an array')));
+});
+
+test('an enemy HP the engine cannot produce (null / fraction / negative) is refused at load', async () => {
+  // A live combat save with integer HP still validates clean — the rule names only the
+  // shapes damageEnemy can never write (its clamp keeps every hp in [0, maxHp]).
+  const { combatState } = await import('../helpers/harness.mjs');
+  const s = await combatState('cinder_flick');
+  assert.deepEqual(validateSave(toSave(s, [])), [], 'a live combat save with integer HP is clean');
+  for (const bad of [null, 8.5, -3, '8']) {
+    const save = toSave(
+      { ...s, combat: { ...s.combat, enemies: [{ ...s.combat.enemies[0], hp: bad }, ...s.combat.enemies.slice(1)] } },
+      [],
+    );
+    const problems = validateSave(save);
+    assert.ok(
+      problems.some((p) => p.includes('save.state.combat.enemies[0]: "hp" must be a non-negative integer')),
+      `hp ${JSON.stringify(bad)} named by the validator: ${JSON.stringify(problems)}`,
+    );
+  }
+  // The same refusal through the loader's door — the exact call the controller's
+  // ctl.load (and the CLI) make: a null-HP save loads ok:false, never into a fight
+  // that opens with a dying ghost (owner live-report from a hand-written save).
+  const refused = loadObject(
+    toSave({ ...s, combat: { ...s.combat, enemies: [{ ...s.combat.enemies[0], hp: null }] } }, []),
+  );
+  assert.equal(refused.ok, false, 'the loader refuses the null-HP save');
+  assert.ok(
+    refused.problems.some((p) => p.includes('save.state.combat.enemies[0]')),
+    `the refusal names the field: ${JSON.stringify(refused.problems)}`,
+  );
+  // And the untouched row still loads: the refusal is per-field, not a combat ban.
+  assert.equal(loadObject(toSave(s, [])).ok, true, 'the same combat with valid HP loads');
 });

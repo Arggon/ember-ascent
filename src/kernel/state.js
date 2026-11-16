@@ -299,6 +299,33 @@ export function validateSave(raw) {
         });
       }
     }
+    // The combat row: OPTIONAL like every phase-scoped field — `combat` exists only
+    // while the run stands IN a fight. When the enemy row is present, every enemy's
+    // `hp` must be a non-negative integer: damageEnemy clamps every write to
+    // [0, maxHp] (vocabulary.js), so anything else — a null, a fraction, a negative —
+    // is a shape the engine can never produce, and one the renderer reads as a DEAD
+    // body (a 0% bar and a dying ghost from the first paint). Refused at load, not
+    // repaired — the same spirit as the negative-gold refusal. The HP NUMBER is the
+    // only field checked: a roster id the table no longer knows degrades at the
+    // surfaces like every other unknown id (the S2.1 tolerance ruling).
+    const combat = /** @type {Record<string, unknown>} */ (st).combat;
+    if (combat !== undefined && combat !== null && typeof combat === 'object' && !Array.isArray(combat)) {
+      const enemies = /** @type {Record<string, unknown>} */ (combat).enemies;
+      if (enemies !== undefined) {
+        if (!Array.isArray(enemies)) {
+          problems.push('save.state.combat: "enemies" must be an array');
+        } else {
+          enemies.forEach((e, i) => {
+            if (e && typeof e === 'object' && !Array.isArray(e)) {
+              const ehp = /** @type {Record<string, unknown>} */ (e).hp;
+              if (!Number.isInteger(ehp) || ehp < 0) {
+                problems.push(`save.state.combat.enemies[${i}]: "hp" must be a non-negative integer`);
+              }
+            }
+          });
+        }
+      }
+    }
   }
   const actions = /** @type {Record<string, unknown>} */ (raw).actions;
   if (actions !== undefined && !Array.isArray(actions)) problems.push('save: "actions" must be an array');
