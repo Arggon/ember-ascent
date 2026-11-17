@@ -29,11 +29,13 @@ import {
   animMs,
   animSpeed,
   animGen,
+  applyHpStep,
   arriving,
   bursts,
   clearHitstop,
   fxEl,
   heroMoveHold,
+  hpTrail,
   later,
   quietIntro,
   reducedMotion,
@@ -152,6 +154,26 @@ function heroLane() {
 }
 
 /**
+ * THE PARRY PROC's decoration ("golpes discretos"): a crossing-plates spark that blooms
+ * and slides off at the DEFENDER's lane the moment a refused strike's float rises — over
+ * the hero when the hero's parry ate an enemy golpe, over the enemy card when its
+ * PARRY20 spur ate one of the hero's. Pure decoration on the persistent layer: aria-
+ * hidden, no text, transform/opacity only, sized by padding + border so the diff
+ * declares no width/height (the same shape discipline the fx-beat rings keep).
+ * @param {{x: number, y: number}} [at] the defender's measured lane, or null (no lane,
+ *   no node — an unmeasurable host simply skips the flourish)
+ */
+function parryProc(at) {
+  if (!at) return;
+  const proc = el('div', { cls: 'fx-parry-proc', attrs: { 'aria-hidden': 'true' } },
+    el('span', { cls: 'fx-parry-proc-plate' }),
+    el('span', { cls: 'fx-parry-proc-plate fx-parry-proc-plate-2' }),
+    el('span', { cls: 'fx-parry-proc-spark' }));
+  placeAt(proc, at, 0, 0);
+  fxAdd(proc, animMs(560) || 560);
+}
+
+/**
  * The input span of one play, from its card-fly burst: the LONGEST beat of the
  * choreography dispatchFx will schedule for it, in paced milliseconds. UX-5 arms the
  * input lock for exactly this figure in `act()` — BEFORE the paint, the same place and
@@ -181,6 +203,15 @@ export function playInputSpan(b) {
     const spec = HERO_THROWS[b.id];
     span = Math.max(span, animMs(spec.delayMs ?? 0) + animMs(spec.ms ?? THROW_MS));
   }
+  // GOLPES DISCRETOS: a multi-hit play beats out its floats one per STRIKE_SEQ beat, so
+  // the gate holds past the pose until the LAST golpe's impact has landed (plus a short
+  // beat for the float to be seen rising). A single-golpe play leaves the span untouched.
+  const strikes = Array.isArray(b && b.strikes) ? b.strikes.length : 0;
+  if (strikes > 1) {
+    const beatMs = animMs(STRIKE_SEQ.beat);
+    const impact = animMs(Math.round(STRIKE_SEQ.slam * STRIKE_SEQ.impactAt));
+    span = Math.max(span, beatMs * (strikes - 1) + impact + animMs(300));
+  }
   return Math.max(span, animMs(310));
 }
 
@@ -191,7 +222,14 @@ export function playInputSpan(b) {
 export function dispatchFx() {
   const list = bursts;
   setBursts([]);
-  if (reducedMotion || list.length === 0) return;
+  // barra de vida por golpe: the trail's `reveal` steps (HP costs, heals, and the hook
+  // damage Combust's sweep deals — facts with no golpe fire of their own) ride the
+  // feel-queue fire where the play's numbers land. An action that produced no burst of
+  // its own (a belt quaff heals, nothing else moves) still has that fire to offer, so
+  // the early return below stands down for it rather than leaving the bar unfired until
+  // the retirement's snap.
+  const trailHasReveal = Boolean(hpTrail && (hpTrail.reveal.length > 0 || (Array.isArray(hpTrail.pre) && hpTrail.pre.length > 0)));
+  if (reducedMotion || (list.length === 0 && !trailHasReveal)) return;
   // ONE generation per action, captured before any timer is scheduled. Every delayed
   // effect below (signature impacts, hammer landings, the hit-stop feel queue) checks
   // THIS generation, so the effects of one action can never cancel each other. A newer
@@ -240,8 +278,12 @@ export function dispatchFx() {
         // attacker (actions.js), so each strike beat knows its roster id and the moved
         // label; a type with no entry simply plays the generic beats below.
         const byFoe = new Map((plan.plans ?? []).map((p) => [p.enemy, p]));
+        // GOLPES DISCRETOS: `plan.attacks` is ONE ENTRY PER STRIKE, so this loop beats out
+        // the turn golpe by golpe — each entry gets its own float at its own impact beat,
+        // and a multi-hit move reads as two slams a beat apart, not one accumulated
+        // number with an "N×" suffix.
         plan.attacks.forEach((a, i) => {
-          // Each attacker's named float lands where its dash arrives (the slam's impact
+          // Each strike's named float lands where its dash arrives (the slam's impact
           // keyframe), measured over the hero at fire time — a repaint between beats
           // moves the hero, so the lane is re-read when the beat fires, not captured once.
           // The fx-layer class rides the hold param (className assembly, the same shape
@@ -251,14 +293,38 @@ export function dispatchFx() {
             const l = heroLane();
             if (l) placeAt(node, l, 0, 0);
             fxAdd(node, animMs(STRIKE_SEQ.floatMs) || STRIKE_SEQ.floatMs);
+            // THE PARRY PROC — the defender's own decoration. The hero's parry refused
+            // this strike outright, so the crossing-plates spark blooms over the hero
+            // (the defender), beside the float that says so.
+            if (a.parried) parryProc(l);
+            // barra de vida por golpe: the HERO's bar steps on THIS fire — the same beat
+            // the named float lands on, one clock. `a.hp` is the kernel's own
+            // `enemy_attack.hp` (the hero's HP after this golpe); a parried golpe carries
+            // the unchanged HP and applyHpStep leaves the bar alone.
+            if (typeof a.hp === 'number') applyHpStep('p', a.hp);
           }, plan.beatMs * i + plan.impactMs);
+          // The attacker's OWN bleed ticks ride this golpe (actions.js hung them off the
+          // strike). They fire a short beat after the impact — the strike landed, then
+          // the body bleeds — on the attacking enemy's measured lane, one float per tick.
+          (a.ticks ?? []).forEach((tk, j) => {
+            fire(() => {
+              const node = statusFloatNode(tk, ' fx-beat-float');
+              const at = throwLane({ enemy: tk.enemy });
+              if (at) placeAt(node, at, 0, 0);
+              fxAdd(node, animMs(STRIKE_SEQ.floatMs) || STRIKE_SEQ.floatMs);
+              // barra de vida por golpe: the BLEEDING body's bar steps on this same
+              // tick fire — the tick float and the bar step are one event.
+              if (tk.enemy != null && typeof tk.hp === 'number') applyHpStep(`e${tk.enemy}`, tk.hp);
+            }, plan.beatMs * i + plan.impactMs + animMs(260) + j * animMs(160));
+          });
         });
         // UX-9b: the NON-ATTACK beats, on the SAME clock. `plan.tail` is the turn's guard /
-        // power / hex steps in kernel order (armd in act()); they play one TURN_STEP slot
-        // each, starting where the last slam ended — so a compound move reads strike THEN
-        // guard, and a turn with no attack at all plays entirely here. The input gate holds
-        // for the whole plan (busyReason reads strikeSeq, not the attack count), which is
-        // what keeps a block/buff/debuff turn from being raced by a player click.
+        // power / hex / TICK steps in kernel order (armed in act()); they play one
+        // TURN_STEP slot each, starting where the last slam ended — so a compound move
+        // reads strike THEN guard, and the turn-closing poison ticks (the hero's, then
+        // one per living foe) play as the tail's own beats. The input gate holds for the
+        // whole plan (busyReason reads strikeSeq, not the attack count), which is what
+        // keeps a block/buff/debuff turn from being raced by a player click.
         // The per-type table, iterated one knob at a time exactly like the hero's SIG_FX loop
         // above — one entry per ROSTER ID, one knob per beat kind. A knob that does not exist
         // for this type, or does not exist at all, leaves the generic beat as the fallback.
@@ -273,9 +339,13 @@ export function dispatchFx() {
           // this attacker's beat — plan.beatMs * i. Attacker 0 is then byte-identical to
           // before, and attacker 2's flourish lands on its own slam instead of one beat
           // early, where it overlapped attacker 1's impact.
+          // GOLPES DISCRETOS: the per-type attack flourish is ONE MARK PER BEAT now — the
+          // payload carries this golpe's index (`hit` of `hits`), and the mark functions
+          // (fxWardenPockets / fxCrawlerClaws) place exactly one pocket or claw pair per
+          // call, offset by it.
           const offset = plan.beatMs * i;
           const staggered = (cb, ms) => fire(cb, (ms || 0) + offset);
-          table.attack(staggered, null, { enemy: a.enemy, id: foe.id, move: foe.move, hits: a.hits }, plan.slamMs, gen);
+          table.attack(staggered, null, { enemy: a.enemy, id: foe.id, move: foe.move, hit: a.hit, hits: a.hits }, plan.slamMs, gen);
         });
         plan.tail.forEach((s, i) => {
           fire(() => {
@@ -298,7 +368,8 @@ export function dispatchFx() {
             const isHex = s.kind === 'status' && s.to === 'player';
             // UX-9c: the SAME beat kind selects the type's own knob. `ownerId` is the acting
             // enemy (a `player_status` step carries no index of its own, see actions.js).
-            const board = sigFor(s.ownerId);
+            // A tick is nobody's power move — the generic pulse carries it, no type knob.
+            const board = s.kind === 'tick' ? null : sigFor(s.ownerId);
             const knob = isBlock ? 'guard' : (isHex ? 'hex' : 'power');
             if (board && board[knob]) {
               board[knob](fire, null, { enemy: s.owner, id: s.ownerId, move: s.move, hits: 1 }, plan.stepMs, gen);
@@ -313,6 +384,15 @@ export function dispatchFx() {
               if (l) placeAt(beat, l, 0, 0);
             }
             fxAdd(beat, animMs(TURN_STEP.ms) || TURN_STEP.ms);
+            // barra de vida por golpe: a TICK step takes HP straight off its holder — the
+            // bar steps on this same tail fire the tick float landed on. Player ticks
+            // speak 'p'; an enemy tick names its own stable index. A tick that PRECEDES
+            // its body's first golpe in the stream (`pre`) already applied at the
+            // pre-beat — firing its absolute pre-golpe HP here would lift the bar the
+            // golpes had already taken down.
+            if (s.kind === 'tick' && typeof s.hp === 'number' && !s.pre) {
+              applyHpStep(s.to === 'player' ? 'p' : `e${s.enemy}`, s.hp);
+            }
           }, plan.tailAt + plan.stepMs * i);
         });
         // The screen pulse, re-timed to the sequence: ONE pulse when the last attack
@@ -396,6 +476,33 @@ export function dispatchFx() {
             if (sig[knob]) play(fire, lane, b, sigMs, gen);
           }
         }
+        // GOLPES DISCRETOS — the hero's own strike sequence. A play whose kernel events
+        // carried per-strike `damage` facts (actions.js hung them on this burst as
+        // `strikes`) floats ONE number per golpe, each on its own STRIKE_SEQ beat, while
+        // the pose hold (combat-view) keeps the hero mid-swing: "pose + impacto + float
+        // propio por CADA golpe". The lane is re-measured at fire time — a killing golpe
+        // resolves to the victim's collapsing ghost, exactly like a thrown hammer's
+        // landing. A parried golpe blooms the parry proc at the foe (the defender) that
+        // refused it. Speed 0 skips the choreography; the » fast form stacks the same
+        // facts statically in the enemy's own effect box (floats.js efxBox).
+        if (Array.isArray(b.strikes) && b.strikes.length > 0) {
+          const beatMs = animMs(STRIKE_SEQ.beat);
+          const impact = animMs(Math.round(STRIKE_SEQ.slam * STRIKE_SEQ.impactAt));
+          b.strikes.forEach((s, k) => {
+            fire(() => {
+              const node = strikeFloatNode(s, ' fx-golpe-float');
+              const at = throwLane({ enemy: s.enemy });
+              if (at) placeAt(node, at, 0, 0);
+              fxAdd(node, animMs(STRIKE_SEQ.floatMs) || STRIKE_SEQ.floatMs);
+              if (s.parried) parryProc(at);
+              // barra de vida por golpe: the target's bar steps on THIS fire — the same
+              // beat its golpe float lands on. `s.hp` is the kernel's `damage.hp` (the
+              // target's HP after this golpe); a killing golpe drives the bar — live
+              // card or collapsing ghost, whichever body holds it now — to 0 here.
+              if (typeof s.hp === 'number') applyHpStep(`e${s.enemy}`, s.hp);
+            }, beatMs * k + impact);
+          });
+        }
         // UX-5: this play's input lock was armed by act() for `playInputSpan(b)` — the
         // figure this case's own choreography adds up to — BEFORE the paint, so the
         // hand repainted locked. There is nothing to arm here.
@@ -426,19 +533,39 @@ export function dispatchFx() {
   // Feel queue: the card is already in flight. Hold the stage for a short hit-stop,
   // then let the damage and block numbers rise. Uses the SAME action generation captured
   // above, so it coexists with the signature timers instead of retiring them. Speed 0
-  // and reduced motion never wait.
+  // and reduced motion never wait (and neither arms a trail — the reveal application
+  // below is a no-op there by construction).
   if (reducedMotion || animSpeed === 0) {
     revealFloats();
     return;
   }
   later(() => {
     if (gen !== animGen) return;
+    // barra de vida por golpe: the trail's PRE steps — reveal/tick facts that precede
+    // their body's first golpe in the stream (Combust's end-of-turn sweep and HP cost,
+    // a hero poison tick the same way) — land HERE, at the hit-stop's start. It is
+    // strictly before the first golpe's bar step at every dock (impactMs >= animMs(294)
+    // > animMs(240)), on the same timer as the hit-stop rather than a sibling, so the
+    // bar walks the stream in order instead of falling with the first slam and then
+    // rising back to the pre-golpe value with a heal pulse.
+    const t = hpTrail;
+    if (t && Array.isArray(t.pre)) {
+      for (const s of t.pre) applyHpStep(s.unit, s.hp);
+    }
     if (stageEl && stageEl.classList) stageEl.classList.add('hitstop');
     if (fxEl && fxEl.classList) fxEl.classList.add('hitstop');
     later(() => {
       if (gen !== animGen) return;
       clearHitstop();
       revealFloats();
+      // barra de vida por golpe: the trail's reveal steps land HERE — the same fire
+      // this action's floats land on, never a sibling timer that could drift. The
+      // golpe-fired steps (the per-strike/per-attack/tail facts) were hung on their own
+      // golpe's fire above; this is only for the facts without one. The steps that
+      // preceded their body's first golpe already applied at the pre-beat above.
+      if (t && Array.isArray(t.reveal)) {
+        for (const s of t.reveal) applyHpStep(s.unit, s.hp);
+      }
     }, animMs(70));
   }, animMs(240));
 }

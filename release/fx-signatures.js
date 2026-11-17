@@ -1054,17 +1054,15 @@ export const SIG_FX = {
 /**
  * A multi-hit move's own printed label (A5x3, A4x2) is the only hit count on the beat.
  *
- * UX-9: this returns the COUNT, not a yes/no — the pocket and claw flourishes used to be
- * hardcoded to 3 and 2, which drew a triple-pocket for a single slam and a double claw for
- * a single rake. Clamped 1..4 (no shipped label exceeds x3) so a malformed label cannot
- * spawn an unbounded loop; a label without `xN` is one hit.
+ * GOLPES DISCRETOS (supersedes the UX-9 count): the turn now beats out ONE SLAM PER
+ * GOLPE — the plan's `attacks` is per strike, and dispatchFx calls this enemy's attack
+ * knob once per golpe with the golpe index on the payload (`b.hit`, 1-based). So the
+ * flourishes below draw exactly ONE mark per call, nudged sideways by the golpe index
+ * so consecutive golpes read as separate impacts rather than the same one restamped.
+ * The old N-marks-inside-one-beat shapes (a triple pocket inside the first slam) were
+ * the pre-slice presentation of a multi-hit move and are gone with the accumulation
+ * they mirrored.
  */
-function multiCount(b) {
-  const m = /x(\d)/.exec(String(b && b.move ? b.move : ''));
-  if (!m) return 1;
-  const n = Number(m[1]);
-  return Number.isFinite(n) ? Math.min(4, Math.max(1, n)) : 1;
-}
 
 /** The enemy card this beat belongs to, in viewport coordinates. */
 function foeLane(b) {
@@ -1206,23 +1204,18 @@ export function fxWardenWall(fire, lane, b, sigMs) {
     ], foe, 0, -6);
   }, animMs(40) || 1);
 }
-export function fxWardenPiston(fire, lane, b, sigMs, gen) {
+export function fxWardenPockets(fire, lane, b, sigMs) {
   const foe = foeLane(b);
   const mark = markLane();
-  fire(() => { if (foe) put('fx-warden-piston', animMs(520) || 520, [], foe); }, animMs(10) || 1);
-  fire(() => { if (mark) put('fx-pocket', animMs(280) || 280, [], mark, -20, -20); },
-    animMs(Math.round((sigMs || 640) * 0.46)) || 1);
-}
-export function fxWardenPockets(fire, lane, b, sigMs, count) {
-  const mark = markLane();
-  if (!mark) return;
   const impact = animMs(Math.round((sigMs || 640) * 0.46)) || 1;
-  const beat = animMs(360) || 360;
-  // UX-9: one pocket per hit the label actually prints (x3 -> 3, x1 -> 1), not a fixed 3.
-  const n = Math.min(4, Math.max(1, count || 1));
-  for (let k = 0; k < n; k++) {
-    fire(() => put('fx-pocket', animMs(260) || 260, [], mark, -26 + k * 4, -26), impact + beat * k);
-  }
+  // GOLPES DISCRETOS: this call IS one golpe (the dispatcher fires the attack knob once
+  // per strike), so the flourish is the piston ride plus ONE pocket at the impact — the
+  // golpe index nudges the pocket sideways so golpe 2 reads as a second impact, not the
+  // first one restamped. (The old N-pockets-inside-one-beat salvo was the accumulated
+  // presentation the per-strike plan replaced.)
+  const k = Math.min(4, Math.max(1, (b && b.hit) || 1)) - 1;
+  fire(() => { if (foe) put('fx-warden-piston', animMs(520) || 520, [], foe); }, animMs(10) || 1);
+  fire(() => { if (mark) put('fx-pocket', animMs(260) || 260, [], mark, -26 + k * 6, -26); }, impact);
 }
 export function fxSteamWash(fire, lane, b, sigMs) {
   const mark = markLane();
@@ -1236,27 +1229,23 @@ export function fxCrawlerHex(fire, lane, b, sigMs) {
   fire(() => { if (foe) put('fx-crawler-hex', animMs(480) || 480, [el('span', { cls: 'fx-hex-outline' })], foe); },
     animMs(20) || 1);
 }
-export function fxCrawlerClaws(fire, lane, b, sigMs, count) {
+export function fxCrawlerClaws(fire, lane, b, sigMs) {
   const foe = foeLane(b);
   const mark = markLane();
-  const hits = Math.min(4, Math.max(1, count || 1));
-  for (let k = 0; k < hits; k++) {
-    fire(() => {
-      if (!foe || !mark) return;
-      for (const [side, cls] of [[-1, 'fx-claw-l'], [1, 'fx-claw-r']]) {
-        const claw = put(cls, animMs(340) || 340, [], foe);
-        if (claw.style && claw.style.setProperty) {
-          claw.style.setProperty('--claw-x', `${Math.round(mark.x - foe.x)}px`);
-          claw.style.setProperty('--claw-y', `${Math.round(mark.y - foe.y)}px`);
-          claw.style.setProperty('--claw-tilt', `${side * 9}deg`);
-        }
+  // GOLPES DISCRETOS: ONE mirrored claw pair per beat — this call IS one golpe; the
+  // golpe index nudges the strike's tilt so consecutive golpes read as separate rakes.
+  const k = Math.min(4, Math.max(1, (b && b.hit) || 1)) - 1;
+  fire(() => {
+    if (!foe || !mark) return;
+    for (const [side, cls] of [[-1, 'fx-claw-l'], [1, 'fx-claw-r']]) {
+      const claw = put(cls, animMs(340) || 340, [], foe);
+      if (claw.style && claw.style.setProperty) {
+        claw.style.setProperty('--claw-x', `${Math.round(mark.x - foe.x)}px`);
+        claw.style.setProperty('--claw-y', `${Math.round(mark.y - foe.y)}px`);
+        claw.style.setProperty('--claw-tilt', `${side * (9 + k * 3)}deg`);
       }
-    }, (animMs(30) || 1) + k * (animMs(180) || 1));
-  }
-}
-export function fxCrawlerRam(fire, lane, b, sigMs) {
-  const foe = foeLane(b);
-  fire(() => { if (foe) put('fx-crawler-ram', animMs(520) || 520, [], foe); }, animMs(10) || 1);
+    }
+  }, animMs(30) || 1);
 }
 
 /* ---- 5.8 Ash Wraith: ZERO travel — thins, crosses as a streak, thickens at the hero. ---- */
@@ -1340,27 +1329,21 @@ export const ENEMY_SIG_FX = {
     hex: fxVulnRing,
     power: fxBruteSeams,
   },
-  // 5.6: defense is the flourish. Three-plate wall on B20; heavy piston on A32; the A5x3 label
-  // (multi-hit, `xN`) gets one pocket impact PER printed hit (UX-9: the count comes off the
-  // label, it used to be a hardcoded 3); vent_steam is a steam wash, no travel.
+  // 5.6: defense is the flourish. Three-plate wall on B20; the piston (with its pocket)
+  // is the per-golpe attack mark — the dispatcher fires it once per strike now, and the
+  // pocket inside it is nudged by the golpe index (fxWardenPockets); vent_steam is a
+  // steam wash, no travel.
   the_guardian: {
     guard: fxWardenWall,
-    attack: (fire, lane, b, sigMs, gen) => {
-      const hits = multiCount(b);
-      if (hits > 1) fxWardenPockets(fire, lane, b, sigMs, hits);
-      else fxWardenPiston(fire, lane, b, sigMs, gen);
-    },
+    attack: fxWardenPockets,
     hex: fxSteamWash,
   },
-  // 5.7: hex shell draw on harden; the A4x2 label gets one mirrored claw PAIR per printed hit
-  // (UX-9: count off the label, not a hardcoded 2); ram pushes low.
+  // 5.7: hex shell draw on harden; the claw pair is the per-golpe attack mark — the
+  // dispatcher fires it once per strike, the pair's tilt nudged by the golpe index
+  // (fxCrawlerClaws); ram stays the single-slam fallback shape it always was.
   slag_crawler: {
     guard: fxCrawlerHex,
-    attack: (fire, lane, b, sigMs) => {
-      const hits = multiCount(b);
-      if (hits > 1) fxCrawlerClaws(fire, lane, b, sigMs, hits);
-      else fxCrawlerRam(fire, lane, b, sigMs);
-    },
+    attack: fxCrawlerClaws,
   },
   // 5.8: zero travel. Wail thins in place and rings at the hero; drain crosses as a streak;
   // drift bobs and never moves horizontally (its block half is the shared guard shimmer).

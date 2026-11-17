@@ -17,6 +17,8 @@ import {
   endFocusPending,
   enteredIds,
   enteringIds,
+  heldDeaths,
+  setHeldDeaths,
   heroMoveHold,
   laterPaint,
   noArrival,
@@ -40,10 +42,13 @@ import {
   setPrevEnemies,
   setStrikeSeq,
   setHeroMoveHold,
+  retireHpTrail,
+  resumeHpGlides,
   skipAnim,
   snap,
   stageEl,
   strikeSeq,
+  STRIKE_SEQ,
   DEAL,
   animMs,
 } from './runtime.js';
@@ -118,7 +123,15 @@ export function render() {
    * a second — sees them cleared, so hovering an enemy can never re-deal the hand or
    * re-draw a dying enemy. */
   setDealPending(bursts.some((b) => b.kind === 'deal'));
-  setDyingThisPaint(bursts.filter((b) => b.kind === 'death'));
+  // barra de vida por golpe: the deaths whose delayed collapse is still on its timeline
+  // (heldDeaths — see runtime) re-merge into EVERY paint of their own action, so the
+  // deal-clock release repaint (~1.3s after the play) and hovers re-draw the victim's
+  // ghost — resumed, never restarted — instead of removing the body its lethal golpe is
+  // still flying toward. Expired ones drop here; fresh deaths ride `bursts` as always.
+  setDyingThisPaint([
+    ...bursts.filter((b) => b.kind === 'death'),
+    ...heldDeaths.filter((d) => Date.now() < d.holdUntil),
+  ]);
   // UX-4: arm the deal clock ONCE for the deal that just arrived (a later repaint must
   // not re-deal the hand — bursts is emptied right after this paint, so `dealPending`
   // is only true here). The clock carries the PACED step and flight (`animMs`), and its
@@ -331,13 +344,15 @@ export function render() {
     setDealClock(null);
     // The plan's retirement is THIS branch's job (act() schedules none for the killing
     // turn): when the death beat is over, retire the plan — which releases the UX-5
-    // gate with it — and repaint into the panel, whose entrance still plays because
-    // paintedPhase was left at 'combat'.
-    laterPaint(() => { setStrikeSeq(null); render(); }, wait);
+    // gate with it — and the hp trail with it (the held hero's bar has stepped to 0
+    // through the slams; the snapshot agrees), then repaint into the panel, whose
+    // entrance still plays because paintedPhase was left at 'combat'.
+    laterPaint(() => { setStrikeSeq(null); retireHpTrail(); render(); }, wait);
     setLastPlayerStatuses(statusKeysNow);
     setLastEnemyStatuses(enemyStatusKeysNow);
     setPrevEnemies((snap.enemies || []).map((e) => ({ index: e.index, id: e.id, name: e.name })));
     setEnteringIds(new Set());
+    resumeHpGlides();
     return;
   }
   if (endHeld && dyingThisPaint.length > 0) {
@@ -377,14 +392,43 @@ export function render() {
     const held = heroMoveHold;
     const sig = signatureFor(bursts.find((b) => b.kind === 'card-fly'));
     const strokeMs = held && sig ? Math.round(held.dur * 0.7) + animMs(650) : 0;
-    const wait = reducedMotion ? 0 : Math.max(Math.min(animMs(END_DELAY_MS), animMs(COLLAPSE_MS)), strokeMs);
+    // barra de vida por golpe: the kill the trail is stepping must be SEEN to its last
+    // golpe. The victim's ghost carries its own bar now, and the trail's per-golpe fires
+    // write it — so the hold waits out the LETHAL golpe's fire (the bar-0 moment, the
+    // same beat the delayed collapse starts on) plus the collapse itself, instead of
+    // replacing the stage while the bar was still falling. A death whose damage never
+    // rode the `damage` verb carries no strike facts and keeps the old clamp. An armed
+    // strike plan (a victory that lands on the enemy turn) owns the whole turn's clock
+    // the same way the defeat hold does — its golpes and its closing ticks step the
+    // bars, so the hold covers the plan's total plus one collapse.
+    const fly = bursts.find((b) => b.kind === 'card-fly');
+    const strikes = fly && Array.isArray(fly.strikes) ? fly.strikes : [];
+    const lethalIdx = strikes.findIndex((s) => s && dyingThisPaint.some((d) => d.enemy === s.enemy)
+      && typeof s.hp === 'number' && s.hp <= 0);
+    const killMs = lethalIdx >= 0
+      ? animMs(STRIKE_SEQ.beat) * lethalIdx + animMs(Math.round(STRIKE_SEQ.slam * STRIKE_SEQ.impactAt)) + animMs(COLLAPSE_MS)
+      : 0;
+    const planMs = strikeSeq ? strikeSeq.totalMs + animMs(COLLAPSE_MS) : 0;
+    const wait = reducedMotion ? 0 : Math.max(Math.min(animMs(END_DELAY_MS), animMs(COLLAPSE_MS)), strokeMs, killMs, planMs);
     // UX-5: the hold OWNS the stage while it plays, so the gate holds too — armed for
     // exactly the hold's own `wait` (the same lifetime the re-render timer below uses),
     // which keeps the reward/summary hotkeys (digits, 0, r, n) from acting mid-collapse.
     // Reduced motion computes wait 0 and arms nothing; setInputLock keeps the longer of
     // the two locks (the killing stroke's own play lock may outlive this hold).
     if (wait > 0) setInputLock({ until: Date.now() + wait, why: 'hold' });
-    laterPaint(() => { if (snap.phase === 'ended' || snap.phase === 'reward') render(); }, wait);
+    // The kill's discard phase emits a `deal` burst, but the hold paints no hand and the
+    // panel arrives only after the beat — the deal clock armed for that burst must not
+    // own a release repaint here (the same retirement the defeat hold makes): with the
+    // hold now covering the trail's golpe timeline, the clock's ~1.4s release would land
+    // MID-HOLD and replace the stage while the victim's bar was still falling. Retiring
+    // the clock NOW no-ops its own release callback (it guards on clock identity).
+    setDealPending(false);
+    setDealClock(null);
+    // The hold's end retires the lifetimes it was holding: a victory flip that armed a
+    // strike plan gets no retire timer of its own (act() schedules one for the live turn
+    // only), so the plan — and the hp trail riding it — retire here, with the repaint
+    // into the panel that was already scheduled.
+    laterPaint(() => { setStrikeSeq(null); retireHpTrail(); if (snap.phase === 'ended' || snap.phase === 'reward') render(); }, wait);
     // Keep the fight as the painted phase after a reward hold, so the spoils panel still
     // gets its entrance animation when the beat ends. The ended panel paints plain.
     if (snap.phase !== 'reward') setPaintedPhase(snap.phase);
@@ -394,6 +438,7 @@ export function render() {
       laterPaint(() => { setDealPending(false); setDyingThisPaint([]); }, 0);
     }
     setEnteringIds(new Set());
+    resumeHpGlides();
     return;
   }
 
@@ -458,8 +503,25 @@ export function render() {
   setLastEnemyStatuses(enemyStatusKeysNow);
   setLastTravel(travelPending);
   setPrevEnemies((snap.enemies || []).map((e) => ({ index: e.index, id: e.id, name: e.name })));
+  // barra de vida por golpe: the tree is in the document now — commit any bar glide a
+  // repaint caught mid-flight (see runtime.hpGlide) so the step's transition survives.
+  resumeHpGlides();
   if (dealPending || dyingThisPaint.length > 0 || travelPending) {
-    laterPaint(() => { setDealPending(false); setDyingThisPaint([]); setLastTravel(null); setEnteringIds(new Set()); }, 0);
+    laterPaint(() => {
+      setDealPending(false);
+      setLastTravel(null);
+      setEnteringIds(new Set());
+      // barra de vida por golpe: a ghost whose collapse is DELAYED to the lethal golpe's
+      // fire keeps its slot across this action's repaints (heldDeaths) instead of being
+      // cleared with the one-paint flags — the deal-clock release repaint would
+      // otherwise remove the body while its bar was still falling and the lethal golpe
+      // would land on an empty slot. Deaths without a delayed collapse clear now,
+      // exactly as always; the held ones re-merge above until their holdUntil expires,
+      // and the NEXT act() drops them with its own fresh row truth.
+      const stillHeld = dyingThisPaint.filter((d) => d.holdMs > 0 && Date.now() < d.holdUntil);
+      setHeldDeaths(stillHeld);
+      setDyingThisPaint(stillHeld);
+    }, 0);
   } else {
     // Nothing else to release, but the entrance set is only ever true for the paint that
     // created it, so it is dropped on the next microtask regardless.

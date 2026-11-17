@@ -104,6 +104,10 @@ export const ENEMIES = {
       { id: 'harden', label: 'B9', kind: 'block', block: 9 },
       { id: 'pincers', label: 'A4x2', kind: 'attack', damage: 4, hits: 2 },
       { id: 'ram', label: 'A10', kind: 'attack', damage: 10 },
+      // The shell sets a parrying spur: each of the hero's golpes against it has a 20%
+      // chance to be refused outright (the buff runner's parry rider; attackHit rolls it
+      // per strike). The label is honest — "PARRY20" — like every move label.
+      { id: 'spur_set', label: 'PARRY20', kind: 'buff', parry: 20 },
     ],
     noRepeat: 2,
   },
@@ -128,9 +132,12 @@ export const ENEMIES = {
     maxHp: [74, 78],
     elite: true,
     // A fixed rhythm the player can learn: shroud, double strike, curse, reap.
+    // Soulfire carries the slice's BLEED RIDER ("A7x2 BLEED2"): every soulfire golpe
+    // that lands leaves 2 Bleed on the hero, whose own attacks then tick it (the attack
+    // runner's move.bleed rider; a fully parried strike delivers no hex).
     moves: [
       { id: 'shroud', label: 'PWR2 B12', kind: 'buff', strength: 2, block: 12 },
-      { id: 'soulfire', label: 'A7x2', kind: 'attack', damage: 7, hits: 2 },
+      { id: 'soulfire', label: 'A7x2 BLEED2', kind: 'attack', damage: 7, hits: 2, bleed: 2 },
       { id: 'grief', label: 'VULN2 WK2', kind: 'debuff', vulnerable: 2, weak: 2 },
       { id: 'reap', label: 'A14', kind: 'attack', damage: 14 },
     ],

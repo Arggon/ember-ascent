@@ -425,6 +425,12 @@ const STRINGS = {
   'fx.absorbed': { en: 'absorbed', es: 'absorbido' },
   'fx.down': { en: 'down', es: 'caído' },
   'fx.bossDown': { en: 'BOSS DOWN', es: 'JEFE CAÍDO' },
+  // The "golpes discretos NxM" floats: the parry proc's word (a refused strike reads as
+  // its own fact, never as a 0), and the two tick words the bleed/poison floats carry in
+  // small type beside the HP they took.
+  'fx.parried': { en: 'parried', es: 'parada' },
+  'fx.bleed': { en: 'bleed', es: 'sangrado' },
+  'fx.poison': { en: 'poison', es: 'veneno' },
 
   /* ---- the kernel node labels, localized for the travel tooltip ----------
      The kernel's NODE_TYPES labels ('fight', 'fight+', …) are agent-facing English;

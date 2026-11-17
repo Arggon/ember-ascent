@@ -397,6 +397,26 @@ html, body {
   background: linear-gradient(90deg, #2f6c96, var(--block) 60%, #b6e2ff);
 }
 
+/* ---- barra de vida por golpe: the per-impact step pulses --------------------------
+   The bar's width CHANGE itself rides the `.hpbar > i` transition above: the trail's
+   per-golpe writes land on a LIVE node (the dispatcher's own golpe fires), so the
+   existing width transition is what animates the step. These two one-shot pulses say
+   WHICH way a step went — a flash-and-settle for damage, a green-tinted bloom for a
+   heal — so a small step (2 of 44) still reads as an event. The class is added by
+   runtime.applyHpStep on the same fire that lands the golpe's float, and removed on a
+   paced timer so the next golpe re-adds it as a fresh animation; `both` leaves no
+   residue, and the reduce block neutralizes the classes outright. */
+.hpbar.hp-step-dn > i { animation: hp-step-dn calc(0.34s * var(--pace, 1)) ease-out both; }
+.hpbar.hp-step-up > i { animation: hp-step-up calc(0.34s * var(--pace, 1)) ease-out both; }
+@keyframes hp-step-dn {
+  0% { filter: brightness(2) saturate(1.4); }
+  100% { filter: none; }
+}
+@keyframes hp-step-up {
+  0% { filter: brightness(1.7) saturate(0.85) hue-rotate(105deg); }
+  100% { filter: none; }
+}
+
 .enemy .eblock {
   color: var(--block);
   font-weight: 700;
@@ -1804,11 +1824,16 @@ html, body {
 .efloat-absorbed { font-size: var(--fs-2); letter-spacing: 0.06em; text-transform: uppercase; color: var(--block); }
 
 /* ---------- UX-2: the sequenced enemy turn's NAMED floats ----------
-   One float per attacker, over the hero, in attack order: WHO hit, and for what. The
-   node reuses the .efloat visual language (same glyph ladder, same rise) but sits on the
-   persistent fx layer above the hero, so it survives the paint that ends the enemy turn
-   and lands exactly when its attacker's dash arrives. */
+   One float per GOLPE (the "golpes discretos" slice made the plan per strike), over the
+   hero, in strike order: WHO hit, and what THIS strike did. The node reuses the .efloat
+   visual language (same glyph ladder, same rise) but sits on the persistent fx layer
+   above the hero, so it survives the paint that ends the enemy turn and lands exactly
+   when its attacker's dash arrives. The old "3×" hit-count suffix is gone with the
+   per-attacker accumulation it annotated. */
 .fx-strike-float { position: absolute; z-index: 30; pointer-events: none; }
+/* The hero play's own per-golpe floats ("golpes discretos"): same language, but they sit
+   over the STRUCK enemy's measured lane, one per strike, on the STRIKE_SEQ clock. */
+.fx-golpe-float { position: absolute; z-index: 30; pointer-events: none; }
 .efloat-named { gap: 7px; }
 .efloat-named .efloat-who {
   font-family: var(--text, var(--mono));
@@ -1819,7 +1844,70 @@ html, body {
   color: #ffcf9e;
   padding-right: 2px;
 }
-.efloat-named .efloat-hits { font-size: 0.72em; opacity: 0.85; }
+
+/* ---------- The PARRY PROC ("golpes discretos") ----------
+   A strike the defender's parry refused outright reads as its own fact: the float says
+   the word, and this spark — two crossed plates flaring apart around one bright core —
+   blooms at the DEFENDER's lane on the same beat. Pure decoration: aria-hidden, no text,
+   transform/opacity only, sized by padding + border like the fx-beat rings (the diff
+   declares no width/height), and gone under reduced motion with the whole fx layer. */
+.efloat-parried {
+  color: #ffe9b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 1.5rem;
+  animation: juice-float-up calc(0.82s * var(--pace, 1)) cubic-bezier(0.22, 0.7, 0.3, 1) both;
+}
+.efloat-parried .efloat-who { color: #ffe9b8; }
+.fx-parry-proc {
+  position: absolute;
+  z-index: 29;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  padding: 18px;
+  border-radius: 999px;
+  animation: fx-parry-proc calc(0.56s * var(--pace, 1)) ease-out both;
+}
+.fx-parry-proc-plate {
+  position: absolute; left: 50%; top: 50%;
+  width: 30px; height: 5px; border-radius: 3px;
+  background: linear-gradient(90deg, #fff3d0, #d9b46a);
+  box-shadow: 0 0 8px rgba(255, 224, 150, 0.55);
+  transform-origin: center;
+  animation: fx-parry-plate calc(0.56s * var(--pace, 1)) ease-out both;
+}
+/* The second plate is the cross: same flare, rotated a quarter turn, its own keyframes
+   (one rule, not two — the stylesheet keeps its selectors unique). */
+.fx-parry-proc-plate-2 {
+  animation-name: fx-parry-plate-2;
+}
+.fx-parry-proc-spark {
+  position: absolute; left: 50%; top: 50%;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #fff7e0;
+  box-shadow: 0 0 14px rgba(255, 240, 190, 0.9);
+  animation: fx-parry-spark calc(0.56s * var(--pace, 1)) ease-out both;
+}
+@keyframes fx-parry-proc {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.22); }
+}
+@keyframes fx-parry-plate {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(0deg) scaleX(0.4); }
+  35% { opacity: 1; transform: translate(-50%, -50%) rotate(22deg) scaleX(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(38deg) scaleX(1.15); }
+}
+@keyframes fx-parry-plate-2 {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(90deg) scaleX(0.4); }
+  35% { opacity: 1; transform: translate(-50%, -50%) rotate(68deg) scaleX(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(52deg) scaleX(1.15); }
+}
+@keyframes fx-parry-spark {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+}
 
 /* ---------- UX-9b: the NON-ATTACK beats' decoration (spec §4.1/§4.2) ----------
    Every enemy turn now carries guard / power / hex beats as well as strikes. Each beat
@@ -1872,6 +1960,19 @@ html, body {
 .efloat-status { animation: juice-float-up calc(0.72s * var(--pace, 1)) cubic-bezier(0.22, 0.7, 0.3, 1) both; }
 .efloat-status.is-up { color: #e9c778; }
 .efloat-status.is-down { color: #c3a9e8; }
+/* A TICK float ("golpes discretos"): the bleed/poison HP that left the holder straight
+   through block and parry. Smaller than a strike float — this is wear, not a blow — and
+   the status word rides in small type beside the number so the tick names its own cause
+   on a monochrome screen too. Always downward: HP only ever leaves a ticked body. */
+.efloat-tick { font-size: 1.3rem; gap: 4px; }
+.efloat-tick .efloat-status-word {
+  font-family: var(--text, var(--mono));
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
 
 @keyframes fx-beat-guard {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.55); }
@@ -2073,6 +2174,8 @@ html, body {
   .card-wrap,
   .card,
   .hpbar > i,
+  .hpbar.hp-step-dn > i,
+  .hpbar.hp-step-up > i,
   #toast { animation: none !important; transition: none !important; }
 
   /* Keep the cues that carry information, drop the ones that only move: the card still
@@ -8348,12 +8451,6 @@ button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
   animation: claw-dart calc(0.32s * var(--pace, 1)) cubic-bezier(0.35, 0.1, 0.3, 1) both;
   animation-delay: calc(0.2s * var(--pace, 1));
 }
-.fx-crawler-ram {
-  position: absolute; z-index: 26; pointer-events: none;
-  padding: 14px 24px; border-radius: 40%;
-  border-bottom: 3px solid rgba(230, 190, 130, 0.7);
-  animation: crawler-ram calc(0.52s * var(--pace, 1)) ease-out both;
-}
 @keyframes hex-draw {
   0% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(0.8); }
   40% { opacity: 1; transform: translate(-50%, -50%) rotate(0deg) scale(1); }
@@ -8368,11 +8465,6 @@ button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
   0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--claw-tilt, 0deg)) scale(0.6); }
   45% { opacity: 1; transform: translate(calc(-50% + var(--claw-x, 0px) * 0.6), calc(-50% + var(--claw-y, 0px) * 0.6)) rotate(var(--claw-tilt, 0deg)) scale(1); }
   100% { opacity: 0; transform: translate(calc(-50% + var(--claw-x, 0px)), calc(-50% + var(--claw-y, 0px))) rotate(var(--claw-tilt, 0deg)) scale(0.7); }
-}
-@keyframes crawler-ram {
-  0% { opacity: 0; transform: translate(-50%, -50%) translateY(0); }
-  50% { opacity: 1; transform: translate(-50%, -50%) translateY(-6px); }
-  100% { opacity: 0; transform: translate(-50%, -50%) translateY(4px); }
 }
 
 /* ---- 5.8 Ash Wraith: zero travel ---- */

@@ -3,7 +3,7 @@
 // A power is a registered counter on state.powers with a hook into the turn cycle.
 // Every hook is pure and returns a fresh state. Stack counts are finite integers, so
 // a run cannot grow unbounded state.
-import { addStatus, damageEnemy, loseHp } from './vocabulary.js';
+import { addStatus, consumeStack, damageEnemy, loseHp } from './vocabulary.js';
 import { drawIntoHand } from './draw.js';
 
 /** When the hook fires. */
@@ -81,7 +81,40 @@ const IMPL = {
   },
 };
 
-/** Apply end-of-turn status behaviour: Metallicize grants block, then decay debuffs. */
+/**
+ * One POISON tick of one combatant: StS style — at the end of the holder's OWN turn it
+ * loses `stacks` HP straight off (Block does not absorb a tick, no parry applies to
+ * one), then one stack falls off, gone at zero. Zero draws — nothing rolls, the number
+ * is the stacks themselves.
+ *
+ * `floor` is the death ruling per side: the HERO floors at 1 HP (the loseHp convention
+ * — no DoT kills the hero in v1) and carries no `dead` flag; an ENEMY floors at 0 and
+ * IS dead at it, exactly like any other death.
+ *
+ * @param {any} who the combatant
+ * @param {number} floor the HP floor for this side (1 hero, 0 enemy)
+ * @returns {{who: any, event: any|null}} event is null when there was nothing to tick
+ */
+function poisonTick(who, floor) {
+  const stacks = who.statuses?.poison ?? 0;
+  if (stacks <= 0) return { who, event: null };
+  const hp = Math.max(floor, who.hp - stacks);
+  const ticked = consumeStack(
+    floor === 0 ? { ...who, hp, dead: hp <= 0 } : { ...who, hp },
+    'poison',
+  );
+  return {
+    who: ticked,
+    event: { t: 'poison_tick', amount: stacks, hp, remaining: stacks - 1 },
+  };
+}
+
+/**
+ * Apply end-of-turn status behaviour: Metallicize grants block, then the hero's POISON
+ * ticks, and the caller (rules/act.js endTurn) runs the debuff decay after — the
+ * contract's order for the hero's own close: tick beside endOfTurnStatuses, BEFORE the
+ * decay sweep. The tick floors at 1 HP: a poisoned hero at 1 stays at 1.
+ */
 export function endOfTurnStatuses(state) {
   const events = [];
   let next = state;
@@ -90,7 +123,33 @@ export function endOfTurnStatuses(state) {
     next = { ...next, player: { ...next.player, block: next.player.block + metal } };
     events.push({ t: 'block', who: 'player', amount: metal, source: 'metallicize' });
   }
+  const poison = poisonTick(next.player, 1);
+  if (poison.event) {
+    next = { ...next, player: poison.who };
+    events.push({ who: 'player', ...poison.event });
+  }
   return { state: next, events };
+}
+
+/**
+ * The ENEMIES' poison ticks, at the close of THEIR own turn (rules/act.js endTurn calls
+ * this right before the decay sweep — the symmetric placement of the hero's tick
+ * above). One tick per LIVING enemy, each event index-stamped; a foe its own poison
+ * felled is dead like any other death, and the turn's all-dead settle runs after.
+ * Zero draws.
+ * @param {any} state
+ * @returns {{state: any, events: any[]}}
+ */
+export function poisonTickEnemies(state) {
+  const events = [];
+  const enemies = state.combat.enemies.map((e, i) => {
+    if (e.dead) return e;
+    const ticked = poisonTick(e, 0);
+    if (!ticked.event) return e;
+    events.push({ who: 'enemy', index: i, ...ticked.event });
+    return ticked.who;
+  });
+  return { state: { ...state, combat: { ...state.combat, enemies } }, events };
 }
 
 /**

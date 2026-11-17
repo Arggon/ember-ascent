@@ -1414,6 +1414,67 @@ export const cardsBundle = {
       ],
       "flavor": "Open the sluice. Let the work pour.",
       "flavor_es": "Abre la compuerta. Deja que el trabajo se vierta."
+    },
+    {
+      "id": "slag_barb",
+      "name": "Slag Barb",
+      "name_es": "Púa de Escoria",
+      "cost": 1,
+      "type": "attack",
+      "rarity": "common",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "damage",
+          "amount": 4
+        },
+        {
+          "verb": "status",
+          "status": "bleed",
+          "amount": 3,
+          "to": "enemy"
+        }
+      ],
+      "flavor": "Slag cools into barbs. Someone always bleeds on them.",
+      "flavor_es": "La escoria se enfría en púas. Alguien siempre sangra en ellas."
+    },
+    {
+      "id": "kiln_fume",
+      "name": "Kiln Fume",
+      "name_es": "Vaho de Horno",
+      "cost": 1,
+      "type": "skill",
+      "rarity": "common",
+      "target": "enemy",
+      "effects": [
+        {
+          "verb": "status",
+          "status": "poison",
+          "amount": 4,
+          "to": "enemy"
+        }
+      ],
+      "flavor": "The kiln exhales what the fire would not take.",
+      "flavor_es": "El horno exhala lo que el fuego no quiso llevarse."
+    },
+    {
+      "id": "anvil_guard",
+      "name": "Anvil Guard",
+      "name_es": "Guardia de Yunque",
+      "cost": 1,
+      "type": "skill",
+      "rarity": "uncommon",
+      "target": "self",
+      "effects": [
+        {
+          "verb": "status",
+          "status": "parry",
+          "amount": 6,
+          "to": "self"
+        }
+      ],
+      "flavor": "Hold the haft across. Let them break on it.",
+      "flavor_es": "Cruza el mango. Deja que se rompan contra él."
     }
   ],
   "statuses": {
@@ -1441,6 +1502,21 @@ export const cardsBundle = {
       "name": "METAL",
       "decays": false,
       "kind": "buff"
+    },
+    "parry": {
+      "name": "PARRY",
+      "decays": false,
+      "kind": "buff"
+    },
+    "bleed": {
+      "name": "BLEED",
+      "decays": false,
+      "kind": "debuff"
+    },
+    "poison": {
+      "name": "PSN",
+      "decays": false,
+      "kind": "debuff"
     }
   }
 };

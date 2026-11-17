@@ -7,7 +7,7 @@
 // drift apart. Under reduced motion the numbers and ghosts are simply absent — their
 // facts stay on the HP bars.
 
-import { animMs, animSpeed, bursts, flash, lastEnemyStatuses, lastPlayerStatuses, reducedMotion } from './runtime.js';
+import { animMs, animSpeed, bursts, flash, hpDisplay, lastEnemyStatuses, lastPlayerStatuses, paintHpFill, reducedMotion, STRIKE_SEQ } from './runtime.js';
 import { el } from './dom.js';
 import { HERO_THROWS, THROW_MS, heroMove, signatureFor } from './hero-moves.js';
 import { enemyMarkup } from './stage-art.js';
@@ -33,6 +33,15 @@ export function floatNode(b) {
     span.append(el('b', { text: '⛨' }), el('b', { text: t('fx.absorbed') }));
     return span;
   }
+  // The hero's OWN bleed tick ("golpes discretos"): HP straight off, one float per tick,
+  // in the tick language statusFloatNode uses (the word names the status; the number is
+  // the HP the kernel's `bleed_tick` event reports).
+  if (b.tone === 'tick') {
+    span.className = 'efloat efloat-status is-down efloat-tick' + floatHold();
+    span.append(el('b', { text: `−${b.amount}` }));
+    span.append(el('b', { cls: 'efloat-status-word', text: b.status === 'poison' ? t('fx.poison') : t('fx.bleed') }));
+    return span;
+  }
   const tier = b.tier || 1;
   const glyph = tier >= 3 ? '✸' : tier >= 2 ? '◆' : '·';
   const tone = b.tone === 'block' ? ' efloat-block' : '';
@@ -44,28 +53,40 @@ export function floatNode(b) {
 }
 
 /**
- * UX-2: the NAMED damage float for one attacker of the sequenced enemy turn — who hit
- * the hero, and for what. The name is the kernel's own enemy name (carried on the burst
- * from the before-snapshot); the number is what that attacker's hits dealt THROUGH block
- * according to the kernel's own `enemy_attack` events, or the honest "absorbed" when
- * block ate the whole attack (a 0 would contradict an unchanged HP bar). Two containers
- * share the node: the animated form sits on the fx layer above the hero (fx.js places
- * it at the impact beat), the »-speed form sits in the hero's own effect box (heroEfx).
- * @param {{name: string, dealt: number, blocked: number, hits: number}} a one attacker
+ * UX-2: the NAMED damage float for one GOLPE of the sequenced enemy turn — who struck,
+ * and what this one strike did. The name is the kernel's own enemy name (carried on the
+ * burst from the before-snapshot); the number is what THIS strike dealt THROUGH block
+ * according to the kernel's own `enemy_attack` event — one float per golpe, no per-
+ * attacker accumulation and no "3×" suffix (the "golpes discretos" ruling: the turn
+ * already plays one beat per strike, so each float is one strike's fact). The honest
+ * words: "absorbed" when block ate the whole strike, and the parry word when the
+ * defender's parry refused it outright (`parried: true` on the event — dealt 0, the
+ * block pool untouched). Two containers share the node: the animated form sits on the
+ * fx layer above the hero (fx.js places it at the strike's own impact beat), the
+ * »-speed form sits in the hero's own effect box (heroEfx).
+ * @param {{name: string, dealt: number, blocked: number, parried?: boolean}} a one strike
  * @param {string} [hold] extra class for the queued/static mechanism (`floatHold()`)
  */
 export function strikeFloatNode(a, hold = '') {
-  const absorbedByBlock = a.dealt <= 0;
-  const tier = absorbedByBlock ? 1 : a.dealt >= 16 ? 3 : a.dealt >= 8 ? 2 : 1;
-  const glyph = absorbedByBlock ? '⛨' : tier >= 3 ? '✸' : tier >= 2 ? '◆' : '·';
   // className, not a cls: template — the same shape floatNode uses, so the tier ladder
   // stays an assembled string (the surface-art checker resolves cls: templates only).
   const span = el('span', { cls: 'efloat' });
+  // THE PARRY PROC reads as its own fact, not as a zero: the strike was refused
+  // outright, so the float wears the parry word and the tier ladder stays out.
+  if (a.parried) {
+    span.className = `efloat efloat-parried efloat-named${hold}`;
+    if (a.name) span.append(el('b', { cls: 'efloat-who', text: a.name }));
+    span.append(el('b', { text: '✦' }));
+    span.append(el('b', { text: t('fx.parried') }));
+    return span;
+  }
+  const absorbedByBlock = a.dealt <= 0;
+  const tier = absorbedByBlock ? 1 : a.dealt >= 16 ? 3 : a.dealt >= 8 ? 2 : 1;
+  const glyph = absorbedByBlock ? '⛨' : tier >= 3 ? '✸' : tier >= 2 ? '◆' : '·';
   span.className = `efloat efloat-g${tier} efloat-named${hold}`;
-  span.append(el('b', { cls: 'efloat-who', text: a.name }));
+  if (a.name) span.append(el('b', { cls: 'efloat-who', text: a.name }));
   span.append(el('b', { text: glyph }));
   span.append(el('b', { text: absorbedByBlock ? t('fx.absorbed') : `−${a.dealt}` }));
-  if (a.hits > 1 && !absorbedByBlock) span.append(el('b', { cls: 'efloat-hits', text: `${a.hits}×` }));
   return span;
 }
 
@@ -91,11 +112,24 @@ export function guardFloatNode(s, hold = '') {
  * the status chip on that body already carries its name and explanation (combat-view). The
  * `-`/`+` sign states the direction (an enemy self-buff adds, a hex on the hero takes), and
  * the class carries the direction for the stylesheet.
- * @param {{status: string, stacks: number, to: 'player'|'enemy'}} s one status step
+ *
+ * THE TICKS ("golpes discretos" slice): a step whose `kind` is 'tick' is a bleed/poison
+ * tick the kernel emitted as its own event (`bleed_tick` / `poison_tick`) — HP straight
+ * off the holder, block and parry never in the way. The float is the HP lost with the
+ * status's own word in small type, always downward (HP only ever leaves): the same
+ * `efloat-status` language, one class (`efloat-tick`) so the stylesheet can set its size.
+ * @param {{status: string, stacks: number, to: 'player'|'enemy', kind?: string,
+ *          amount?: number}} s one status (or tick) step of a turn plan
  * @param {string} [hold] extra class for the queued/static mechanism (`floatHold()`)
  */
 export function statusFloatNode(s, hold = '') {
   const span = el('span', { cls: 'efloat' });
+  if (s.kind === 'tick') {
+    span.className = `efloat efloat-status is-down efloat-tick${hold}`;
+    span.append(el('b', { text: `−${s.amount}` }));
+    span.append(el('b', { cls: 'efloat-status-word', text: s.status === 'poison' ? t('fx.poison') : t('fx.bleed') }));
+    return span;
+  }
   const up = s.to !== 'player';
   span.className = `efloat efloat-g1 efloat-status ${up ? 'is-up' : 'is-down'}${hold}`;
   span.append(el('b', { text: up ? '▲' : '▼' }), el('b', { text: `${up ? '+' : '−'}${s.stacks}` }));
@@ -115,6 +149,12 @@ export const hitClass = (index) => (flash.hits.includes(index) && !reducedMotion
  * The per-enemy effect box. It is created on every paint (so it is always inside the
  * current enemy card) and holds this enemy's floaters. Because it is a child of the card,
  * a floater is aligned to the enemy by layout — there is no coordinate to get wrong.
+ *
+ * THE GOLPE FLOATS ("golpes discretos"): a play whose events carry per-strike `damage`
+ * facts (actions.js `strike` bursts) is sequenced on the fx layer at NORMAL speed —
+ * one float per golpe, on the strike's own beat — so the box prints them ONLY in the
+ * » fast form (animSpeed === 0), stacked like heroEfx stacks the turn's floats. Under
+ * reduced motion the box stays empty and the facts remain on the HP bars.
  */
 export function efxBox(index) {
   const box = el('span', { cls: 'efx' });
@@ -124,22 +164,39 @@ export function efxBox(index) {
     if (b.kind !== 'float' && b.kind !== 'absorbed') continue;
     box.append(floatNode(b));
   }
+  if (animSpeed === 0) {
+    let i = 0;
+    for (const b of bursts) {
+      if (b.kind !== 'strike' || b.enemy !== index) continue;
+      const node = strikeFloatNode(b, ' is-static');
+      if (node.style) node.style.top = `${i * 40}px`;
+      i += 1;
+      box.append(node);
+    }
+  }
   return box;
 }
 
 export function heroEfx() {
   const box = el('span', { cls: 'efx' });
   if (reducedMotion) return box;
+  // The hero's own bleed ticks ride the same box as the numbers: one float per tick,
+  // stacked so consecutive ticks (a multi-hit card ticks per golpe) read separately.
+  let tickAt = 0;
   for (const b of bursts) {
     if (b.kind !== 'hero-float') continue;
     // UX-2: on a sequenced enemy turn the aggregate damage float is silent — the
     // per-attacker NAMED floats carry the numbers instead (see strikeFloatNode).
     if (b.silent) continue;
-    box.append(floatNode(b));
+    const node = floatNode(b);
+    if (b.tone === 'tick' && node.style) node.style.top = `${tickAt++ * 40}px`;
+    box.append(node);
   }
   // UX-2, the » fast form: with the choreography skipped the per-attacker facts still
   // land — each attacker's named float, stacked, in the order the attacks resolved.
   // (The box is a 0-height absolute strip, so the stack is spaced by an inline top.)
+  // The "golpes discretos" slice made `attacks` PER STRIKE, so this stack is one float
+  // per golpe — the »-speed form of the beat-per-strike turn.
   if (animSpeed === 0) {
     const turn = bursts.find((b) => b.kind === 'enemy-turn');
     if (turn) {
@@ -228,11 +285,34 @@ export function freshEnemyStatusKeys(index, list) {
 export function deathHoldMs(d) {
   if (reducedMotion) return 0;
   const fly = bursts.find((b) => b.kind === 'card-fly');
-  if (!fly || d.enemy !== fly.enemy) return 0;
-  const spec = HERO_THROWS[fly.id];
-  if (spec) return animMs(Math.round((spec.ms ?? THROW_MS) * (spec.hitAt ?? 0.84)));
-  if (signatureFor(fly)?.twin) return animMs(Math.round(THROW_MS * 0.84));
-  return 0;
+  if (!fly) return 0;
+  let hold = 0;
+  // The weapon must still be seen ARRIVING: only the AIMED foe waits for the throw/twin
+  // impact (a splash death collapses on its own beat).
+  if (d.enemy === fly.enemy) {
+    const spec = HERO_THROWS[fly.id];
+    if (spec) hold = animMs(Math.round((spec.ms ?? THROW_MS) * (spec.hitAt ?? 0.84)));
+    else if (signatureFor(fly)?.twin) hold = animMs(Math.round(THROW_MS * 0.84));
+  }
+  // barra de vida por golpe: the collapse waits for the LETHAL golpe's fire — the body
+  // stands while the earlier golpes step its bar (the ghost carries one when the trail
+  // is armed), the killing golpe drops it to 0, and the shatter starts on that SAME
+  // beat ("its bar falls to 0 at THAT impact, together with the collapse"). The hold is
+  // the LATEST of the throw/twin impact and the golpe's own STRIKE_SEQ fire. The strike
+  // FACTS are the play's own per-golpe timeline and are read per body regardless of the
+  // burst's aim: a single-enemy fight plays without a targeting step, so the burst's
+  // `enemy` is null while the strikes still name the victim. The delay is only armed
+  // while the trail is actually stepping THIS body's bar — it is the reason the delay
+  // exists — so » and reduced motion (no trail) collapse at once as they always did.
+  // A death whose damage never rode the `damage` verb carries no strike facts and
+  // collapses as before.
+  const strikes = Array.isArray(fly.strikes) ? fly.strikes : [];
+  const lethal = strikes.findIndex((s) => s && s.enemy === d.enemy && typeof s.hp === 'number' && s.hp <= 0);
+  if (lethal >= 0 && hpDisplay(`e${d.enemy}`) != null) {
+    const at = animMs(STRIKE_SEQ.beat) * lethal + animMs(Math.round(STRIKE_SEQ.slam * STRIKE_SEQ.impactAt));
+    hold = Math.max(hold, at);
+  }
+  return hold;
 }
 
 /** The collapsing card for one just-dead enemy. `data-death-index` carries the burst's
@@ -254,13 +334,39 @@ export function dyingCard(d) {
     cls: `enemy is-dying ash` + (d.boss ? ' boss-down' : ''),
     attrs: { 'data-death-index': String(d.enemy) },
   });
-  const holdMs = deathHoldMs(d);
-  if (holdMs > 0) ghost.style.animationDelay = `${holdMs}ms`;
+  // barra de vida por golpe: the collapse's hold delay is STAMPED on the burst at first
+  // draw (`holdMs`/`paintAt`/`holdUntil`) — a re-draw inside the burst's own action (the
+  // deal-clock release repaint, a hover) must resume this same timeline, not recompute
+  // it (the dispatcher's bursts are consumed by then) and not restart it. The resume is
+  // the figure's own mechanism: a delay of `holdMs - elapsed` holds the 0% frame for the
+  // rest of the hold window and, once the lethal golpe has fired, lands the fresh node
+  // MID-COLLAPSE exactly where the replaced one was (a negative delay = resume
+  // mid-flight). `holdUntil` is the collapse's own end (the ash-fall base + a settle
+  // margin) — render.js holds the burst in `heldDeaths` until then, and drops it after.
+  const holdMs = d.holdMs ?? deathHoldMs(d);
+  d.holdMs = holdMs;
+  if (d.paintAt == null) d.paintAt = Date.now();
+  d.holdUntil = d.paintAt + holdMs + animMs(500) + 120;
+  if (holdMs > 0) ghost.style.animationDelay = `${Math.round(holdMs - (Date.now() - d.paintAt))}ms`;
   const fig = el('div', { cls: 'fig pose-hurt', attrs: { 'aria-hidden': 'true' } });
   fig.innerHTML = enemyMarkup(d.id);
   ghost.append(fig);
   ghost.append(el('div', { cls: 'ename', text: d.name }));
   ghost.append(el('div', { cls: 'ehp', text: label }));
+  // barra de vida por golpe: while a trail is armed for this body, the ghost carries its
+  // own HP bar — the kill-hold's contract ("the victim keeps its row until the lethal
+  // golpe: its bar falls to 0 at THAT impact, together with the collapse") needs a bar
+  // to drop: the trail's steps write it golpe by golpe on the dispatcher's fires (the
+  // collapse itself is delayed to the lethal golpe by deathHoldMs below). Only under an
+  // armed trail, though: reduced motion and » show no bar here, because their truth is
+  // instant — a full bar on a dying ghost would be a lie on exactly the path whose
+  // contract is "no animation, only facts".
+  const disp = hpDisplay(`e${d.enemy}`);
+  if (disp != null && d.maxHp > 0) {
+    const bar = el('div', { cls: 'hpbar' }, el('i', {}));
+    paintHpFill(bar.querySelector('i'), `e${d.enemy}`, disp, d.maxHp);
+    ghost.append(bar);
+  }
   return ghost;
 }
 

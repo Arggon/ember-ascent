@@ -124,7 +124,7 @@ export function setDealClock(clock) { dealClock = clock; }
  * never arms a plan at all. Reduced motion arms nothing: the turn collapses to the fast
  * form.
  */
-export let strikeSeq = null; // { attacks, beatMs, slamMs, impactMs, start, totalMs }
+export let strikeSeq = null; // { attacks (ONE PER STRIKE), beatMs, slamMs, impactMs, start, totalMs }
 export function setStrikeSeq(seq) { strikeSeq = seq; }
 /**
  * The sequence's base timing, at the pre-factor base, in milliseconds — the numbers the
@@ -151,19 +151,334 @@ export const TURN_STEP = { ms: 560 };
  * animation-delay should be RIGHT NOW: positive (waiting for its turn — `fill: both`
  * holds the 0% frame) or negative (resuming mid-flight after an incidental repaint),
  * exactly the resume mechanism the hero's pose uses.
+ *
+ * GOLPES DISCRETOS: `attacks` is ONE ENTRY PER STRIKE, so an enemy with a multi-hit move
+ * owns several windows — beatMs * k .. beatMs * k + slamMs for each of its golpes. This
+ * returns the FIRST of the enemy's strikes whose window has not fully passed, so the
+ * slam re-arms per golpe: between its own golpes the delay is positive again (the figure
+ * holds the standing 0% frame for the gap), then the next slam plays on its own beat.
+ * A single-strike enemy resolves exactly as before.
  */
 export function strikeSlot(index) {
   if (!strikeSeq) return null;
-  const i = strikeSeq.attacks.findIndex((a) => a.enemy === index);
-  if (i === -1) return null;
   const elapsed = Date.now() - strikeSeq.start;
-  return {
-    i,
-    delay: Math.round(strikeSeq.beatMs * i - elapsed),
-    dur: strikeSeq.slamMs,
-  };
+  for (let k = 0; k < strikeSeq.attacks.length; k += 1) {
+    if (strikeSeq.attacks[k].enemy !== index) continue;
+    const at = strikeSeq.beatMs * k;
+    if (at + strikeSeq.slamMs > elapsed) {
+      return {
+        i: k,
+        delay: Math.round(at - elapsed),
+        dur: strikeSeq.slamMs,
+      };
+    }
+  }
+  return null;
 }
 export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800, uppercut: 700, hammerfall: 560, quench: 620, bellowspush: 640, snapcast: 480, fanflames: 700, arccut: 620, collarline: 680, headbutt: 600, surge: 760, haftjab: 520, forgeclap: 780, wildflail: 740, bellowsflex: 560, dropkick: 820, bloodhammer: 900, castaside: 640, truetemper: 700, fitplate: 660, kilncry: 620, vent: 600, heattrance: 760, hailblows: 880, climbcut: 720, veintap: 560, reapsweep: 1000, heatwash: 900, bracelock: 800, flameward: 760, cindershroud: 720, stoke: 640, scaleup: 700, bankcoal: 680, ashembrace: 720, cinderskin: 660, lockdown: 900, overtemper: 820, tithe: 780, splitseam: 700 };
+
+/* ------------------------------------------- barra de vida por golpe: hpTrail ---
+ * The HP bar must FOLLOW the hits, not lead them. The kernel resolves an action in one
+ * step (a 4x2 card is one dispatch), so the paint after `act()` carries the ALREADY-
+ * RESOLVED snapshot — painting it straight onto the bar made a multi-hit's damage land
+ * as one jump at action start, with the per-golpe floats and beats left as decoration
+ * over a bar that had already finished falling. The same was true of a heal, an HP cost
+ * and the killing turn's slams.
+ *
+ * `hpTrail` is the presentation counter-weight, armed per action by `act()` from the
+ * kernel's OWN event stream (no rule re-derived): per unit — the hero (`'p'`) and each
+ * enemy by its STABLE index (`e<index>`) — the bar's starting value and the value the
+ * last applied step left. Two read paths, one per lifetime:
+ *
+ *   * PAINT-TIME (`hpDisplay`): every bar paints `hpDisplay(unit) ?? snapshot`. A paint
+ *     before the first fire shows the bar where the action FOUND it (the before value —
+ *     the "no jump at action start" ask); an incidental repaint mid-sequence (a hover)
+ *     shows the value the fired steps reached, never the un-fired end; a paint after the
+ *     sequence shows the snapshot (the last step's value IS the snapshot — invariant (a)
+ *     below). Mid-glide the paint carries the glide's INTERPOLATED position
+ *     (`hpGlideCurrent`): a repaint that replaces the tree resumes the motion where the
+ *     eye actually is, instead of replaying the step from its origin. The kill-hold and
+ *     the defeat hold get this for free: they rebuild their bodies with the same
+ *     `enemyCard()`/`heroFigure()` builders, so the held hero's bar steps per slam and
+ *     the victim's ghost keeps its bar.
+ *
+ *   * FIRE-TIME (`applyHpStep`): every fire of `dispatchFx()` that lands a golpe's float
+ *     applies that golpe's bar step in the SAME callback — one clock, never two sibling
+ *     timers that could drift. The write goes to the LIVE node, queried at fire time
+ *     (stable selectors), so a repaint that replaced the tree mid-sequence is written
+ *     through, not past.
+ *
+ * INVARIANTS (the contract's):
+ *   (a) the last step of a unit equals the snapshot HP. The stream carries every combat
+ *       HP fact today (`damage.hp`, `enemy_attack.hp`, the tick events' `hp`,
+ *       `heal.amount`, `self_damage.amount`); if a future kernel fact is not carried,
+ *       the retire SNAPS the bar to the snapshot and leaves the record on the console
+ *       rather than showing a lie.
+ *   (b) skip (» / the backdrop / skipAnim) retires the trail and snaps every bar to the
+ *       snapshot — the remaining golpes never fire, so the mid-sequence value would
+ *       otherwise be the last thing the bar showed.
+ *   (c) reduced motion and » never arm one (`act()` gates on the same condition
+ *       dispatchFx's choreography plays under) — the bar shows snapshot truth at once,
+ *       and the reduce block keeps the width transition off.
+ *   (d) the input gate is untouched: the sequence already blocks (`busyReason` reads the
+ *       same lifetimes), so the trail adds no gate of its own.
+ *   (e) the aria-labels keep reading the SNAPSHOT (`enemyLabel`/the hero's label take the
+ *       snapshot row) — assistive tech hears the truth, the animation is the sighted
+ *       layer's.
+ */
+export let hpTrail = null; // { start, units: Map(key -> { start, max, current, applied }), reveal: [{unit, hp}] }
+export function setHpTrail(trail) { hpTrail = trail; }
+
+/** The enemy unit key's shape: `e` + the STABLE kernel index (the key the event stream,
+ *  the death ghosts and `snapshotEnemies` all speak — never the living row position). */
+const HP_UNIT_ENEMY = /^e(\d+)$/;
+
+/**
+ * The HP a bar should DISPLAY for a unit on the paint being built, or null (no trail
+ * armed for that unit — the paint falls back to the snapshot). Before the first fire
+ * this is the bar's starting value, which is what keeps the action from jumping the bar
+ * to the resolved end.
+ * @param {string} key 'p' or `e<index>`
+ * @returns {number|null}
+ */
+export function hpDisplay(key) {
+  if (!hpTrail) return null;
+  const t = hpTrail.units.get(key);
+  return t ? (t.current ?? t.start) : null;
+}
+
+/** The snapshot's truth for a unit key — what invariant (a) and a retire snap write.
+ *  A dead enemy is omitted from the snapshot, and 0 is the truth its bar ends at. */
+function hpSnapshotHp(key) {
+  if (!snap) return null;
+  if (key === 'p') return snap.player.hp;
+  const m = HP_UNIT_ENEMY.exec(key);
+  if (!m) return null;
+  const idx = Number(m[1]);
+  const foe = Array.isArray(snap.enemies) ? snap.enemies.find((x) => x.index === idx) : null;
+  return foe ? foe.hp : 0;
+}
+
+/**
+ * The LIVE body a unit's bar lives on, resolved AT THE MOMENT OF THE FIRE — the paint
+ * tree may have been replaced since the trail was armed (a hover repaints many times a
+ * second), so the selector is re-run per step rather than a node captured once. The
+ * hero speaks `.fight .hero` (the defeat hold paints one too, and the replay writes
+ * through to it); an enemy speaks its living card via `data-target-index` (the STABLE
+ * index resolved against the CURRENT snapshot's row — a death shifts the positions, the
+ * indexes don't), falling back to the collapsing ghost (`data-death-index`), whose own
+ * bar the killing golpe drops to 0.
+ * @param {string} key
+ * @returns {any|null}
+ */
+function hpUnitHost(key) {
+  if (!stageEl || !stageEl.querySelector) return null;
+  if (key === 'p') return stageEl.querySelector('.fight .hero') ?? null;
+  const m = HP_UNIT_ENEMY.exec(key);
+  if (!m) return null;
+  const idx = Number(m[1]);
+  const pos = snap && Array.isArray(snap.enemies) ? snap.enemies.findIndex((x) => x.index === idx) : -1;
+  return (pos >= 0 ? stageEl.querySelector(`.enemy[data-target-index="${pos + 1}"]`) : null)
+    ?? stageEl.querySelector(`.enemy.is-dying[data-death-index="${idx}"]`);
+}
+
+/**
+ * One bar write on a live body: the fill's width, the `.ehp` readout, the pulse class
+ * that says which way the step went, and — for the hero — the low tint following the
+ * SHOWN value. The ghost is excluded from the `.ehp` write: its readout is the DOWN
+ * word, not a number. The pulse class is removed on a paced timer, so the next golpe
+ * (a beat or more later) re-adds it as a fresh animation; a `both` fill leaves no
+ * residue, and the reduce block neutralizes the classes outright.
+ */
+function hpWriteBar(host, key, hp, pulse) {
+  const bar = host.querySelector ? host.querySelector('.hpbar') : null;
+  const unit = hpTrail ? hpTrail.units.get(key) : null;
+  const max = unit ? unit.max : 1;
+  const fill = bar && bar.querySelector ? bar.querySelector('i') : null;
+  if (fill && fill.style) {
+    // The standard rhythm FIRST: a resume may have left an inline REMAINING duration on
+    // this node, and its cleanup can lose the race against the next golpe — tail steps
+    // fire animMs(160) apart (fx.js), well inside one 420ms window. A fire-time write
+    // must run the stylesheet's full --dur-slow: otherwise the glide's clock outgrows
+    // the eye and the next interpolated paint lands BEHIND the settled bar — the
+    // backward-jump class the resume exists to kill, back through a side door.
+    fill.style.transitionDuration = '';
+    fill.style.width = `${Math.max(0, Math.min(100, Math.round((hp / Math.max(1, max)) * 100)))}%`;
+  }
+  const isGhost = Boolean(host.classList && host.classList.contains('is-dying'));
+  if (!isGhost) {
+    const num = host.querySelector ? host.querySelector('.ehp') : null;
+    if (num) num.textContent = `${hp}/${max}`;
+  }
+  if (key === 'p' && host.classList && snap) {
+    host.classList.toggle('is-low', hp / Math.max(1, snap.player.maxHp) <= 0.35);
+  }
+  if (bar && bar.classList) {
+    bar.classList.remove('hp-step-dn', 'hp-step-up');
+    if (typeof bar.offsetWidth === 'number') void bar.offsetWidth; // restart the one-shot
+    bar.classList.add(pulse);
+    const liveBar = bar;
+    later(() => { if (liveBar.classList) liveBar.classList.remove(pulse); }, animMs(480) || 480);
+  }
+}
+
+/**
+ * The width transition the stylesheet actually runs on `.hpbar > i`: `--dur-slow`
+ * (0.42s, style.css — a screen-level token, NOT paced by the speed dock, and the reduce
+ * media query kills it outright). The glide's clock models THIS length and nothing else:
+ * the interpolated resume (`hpGlideCurrent`) paints where the EYE is, and a window
+ * longer than the transition would keep interpolating values BEHIND the bar's own
+ * settle — a backward jump, the exact replay the resume exists to kill (the pre-fix
+ * repro's repaint landed ~660ms after a fire, well past the 420ms settle).
+ */
+const HP_GLIDE_MS = 420;
+
+/**
+ * FIRE-TIME: apply one bar step on its golpe's own fire (the same callback that lands
+ * the float — see dispatchFx). Updates the trail's value AND the live node. A step that
+ * carries the value already shown (a parried golpe, a zero heal) updates the record and
+ * leaves the bar alone — no pulse for a strike the defender refused.
+ * @param {string} key 'p' or `e<index>`
+ * @param {number} hp the unit's HP after this golpe, exactly as the kernel's event carried it
+ */
+export function applyHpStep(key, hp) {
+  if (!hpTrail || typeof hp !== 'number') return;
+  const t = hpTrail.units.get(key);
+  if (!t) return;
+  const shown = t.current ?? t.start;
+  t.current = hp;
+  t.applied.push({ hp, at: Date.now() - hpTrail.start });
+  if (hp === shown) return;
+  const now = Date.now();
+  t.glide = { from: shown, to: hp, started: now, until: now + HP_GLIDE_MS, duration: HP_GLIDE_MS };
+  const host = hpUnitHost(key);
+  if (host) hpWriteBar(host, key, hp, hp < shown ? 'hp-step-dn' : 'hp-step-up');
+}
+
+/**
+ * The step glide still in flight for a unit, or null. The fire-time write animates on a
+ * LIVE node, but the paint tree is rebuilt wholesale — an incidental repaint (the input
+ * lock's release paint lands ~1 beat after a play's reveal, a hover whenever it wants)
+ * replaces the bar with a FRESH node whose initial width carries no transition, and the
+ * glide would die mid-flight. The trail therefore remembers the glide ({from, to,
+ * started, until, duration}); a paint that catches one starts the fresh node at the
+ * glide's INTERPOLATED position — `hpGlideCurrent`, where the eye actually is, not the
+ * step's origin — and `resumeHpGlides()` — run once per paint, AFTER the tree is in the
+ * document — commits that position with one reflow and writes the target on the
+ * REMAINING time, so the transition finishes on the new node at the rhythm the eye was
+ * already watching. The same resume philosophy the deal clock, the pose hold and the
+ * strike sequence use: an incidental repaint resumes where the motion actually is
+ * instead of cutting or replaying it.
+ * @param {string} key
+ * @returns {{from: number, to: number, started: number, until: number, duration: number}|null}
+ */
+export function hpGlide(key) {
+  if (!hpTrail) return null;
+  const t = hpTrail.units.get(key);
+  return t && t.glide && Date.now() < t.glide.until ? t.glide : null;
+}
+
+/**
+ * The glide's position RIGHT NOW — the value the eye is seeing on the live node this
+ * instant — or null when no glide is in flight. The stylesheet eases the width with
+ * `ease-out` (cubic-bezier(0, 0, 0.58, 1)); this interpolator carries the standard
+ * quadratic stand-in `1 - (1-p)^2`, which runs slightly AHEAD of the real curve (worst
+ * ~7% of the step's range, around mid-flight). That bias is the safe direction: on a
+ * resume the fresh node starts a hair FORWARD of where the eye was and eases the rest
+ * of the way — a forward micro-step, never the backward replay the old from-value
+ * restart produced (the owner's "the bar climbs back up" report).
+ * @param {string} key 'p' or `e<index>`
+ * @returns {{value: number, remaining: number}|null} the interpolated HP and the
+ *   milliseconds still left before the glide expires
+ */
+export function hpGlideCurrent(key) {
+  const g = hpGlide(key);
+  if (!g) return null;
+  const now = Date.now();
+  const p = Math.max(0, Math.min(1, (now - g.started) / g.duration));
+  const easeOut = 1 - (1 - p) * (1 - p);
+  return { value: g.from + (g.to - g.from) * easeOut, remaining: Math.max(0, g.until - now) };
+}
+
+/**
+ * PAINT-TIME fill writer: `shown` is the value the trail says the bar displays
+ * (`display ?? snapshot`), `max` the unit's max HP. Mid-glide the fresh node STARTS at
+ * the glide's interpolated position (the width the eye was watching on the replaced
+ * node); resumeHpGlides — after the tree is attached — finishes the job. Otherwise the
+ * width is the plain displayed value.
+ * @param {any} fill the `.hpbar > i` node being painted
+ * @param {string} key 'p' or `e<index>`
+ * @param {number} shown the displayed HP
+ * @param {number} max the unit's max HP
+ */
+export function paintHpFill(fill, key, shown, max) {
+  if (!fill || !fill.style) return;
+  const glide = hpGlideCurrent(key);
+  const v = glide ? glide.value : shown;
+  fill.style.width = `${Math.max(0, Math.min(100, Math.round((v / Math.max(1, max)) * 100)))}%`;
+}
+
+/**
+ * The post-paint half of the glide resume (see hpGlide): for every armed unit whose
+ * glide is still in flight, commit the painted interpolated value with one reflow and
+ * write the target — with the transition-duration set to the glide's REMAINING time, so
+ * the final stretch keeps the real rhythm instead of restarting var(--dur-slow) (a
+ * fresh full duration is what re-ran motion the eye had already seen). A paced cleanup
+ * hands the duration back to the stylesheet once the glide expires, and `hpWriteBar`
+ * clears it again on every fire-time write (a golpe can fire INSIDE the window — tail
+ * steps are animMs(160) apart), so no later write inherits the resumed tail; a glide
+ * that expires inside the reflow window writes the target straight — the painted
+ * position and the target differ by at most a rounding step there, so no visible
+ * transition exists either way.
+ * Called by render() on every paint path that leaves a fight (or a hold of one) on the
+ * stage; a no-op when no trail is armed. Hosts with no layout (the fake-DOM test
+ * harnesses carry no offsetWidth) skip the reflow: the plain painted width is the whole
+ * contract there.
+ */
+export function resumeHpGlides() {
+  if (!hpTrail || !stageEl || !stageEl.querySelectorAll) return;
+  for (const [key, t] of hpTrail.units) {
+    if (!t.glide || Date.now() >= t.glide.until) continue;
+    const host = hpUnitHost(key);
+    const fill = host && host.querySelector ? host.querySelector('.hpbar > i') : null;
+    if (!fill || !fill.style || typeof fill.offsetWidth !== 'number') continue;
+    void fill.offsetWidth; // commit the painted interpolated value as the transition's start
+    const remaining = t.glide.until - Date.now();
+    if (remaining > 0) fill.style.transitionDuration = `${remaining}ms`;
+    fill.style.width = `${Math.max(0, Math.min(100, Math.round((t.glide.to / Math.max(1, t.max)) * 100)))}%`;
+    if (remaining > 0) {
+      const live = fill;
+      later(() => { if (live.style) live.style.transitionDuration = ''; }, remaining);
+    }
+  }
+}
+
+/**
+ * Retire the trail: snap any bar whose last applied value disagrees with the snapshot
+ * (invariant (a)'s fallback — the stream did not carry every HP fact), leave the record
+ * on the console, and drop the state so every later paint shows snapshot truth. Called
+ * by each retirement path — the play's own span, the strike plan's retire, the defeat
+ * hold's retire, `skipAnim` (invariant (b): the unfired golpes make the shown value
+ * stale, so the snap is the same mechanism) — and it is identity-cheap: a retire for a
+ * trail already replaced by a newer action is a no-op the newer trail's own retirement
+ * owns.
+ */
+export function retireHpTrail() {
+  if (!hpTrail) return;
+  const stale = [];
+  for (const [key, t] of hpTrail.units) {
+    const truth = hpSnapshotHp(key);
+    if (t.current != null && truth != null && t.current !== truth) {
+      const was = t.current;
+      applyHpStep(key, truth);
+      stale.push(`${key}:${was}->${truth}`);
+    }
+  }
+  if (stale.length > 0) {
+    console.warn('[hp-trail] the event stream did not carry every HP fact; bars snapped to the snapshot:', stale.join(', '));
+  }
+  hpTrail = null;
+}
 /* ------------------------------------------------------- UX-4: the global pace ---
  * The user played at 1× and could not follow the game: strokes, throws and draws
  * flashed past. UX-4 halves the pace — every combat animation timing DOUBLES at the
@@ -296,6 +611,13 @@ export function skipAnim() {
   // » also retires a playing strike sequence: the remaining beats never fire, and the
   // next paint drops the slam poses (the past floats stay until their own removal timers).
   setStrikeSeq(null);
+  // barra de vida por golpe: skipping retires the trail too — the remaining golpes never
+  // fire, so the bars snap to the snapshot now (invariant (b)); the pending step fires
+  // are generation-guarded above and never land after this. The held ghosts rode that
+  // same timeline (their delayed collapse would never be driven now), so they are
+  // dropped with it and the next paint removes their bodies.
+  retireHpTrail();
+  setHeldDeaths([]);
   // UX-5: skipping the animation also skips the wait — the gate releases with the
   // effects it was derived from (the lock and the deal clock; the strike sequence is
   // retired directly above).
@@ -499,6 +821,22 @@ export let dealPending = false;
 export let dyingThisPaint = [];
 export function setDealPending(v) { dealPending = v; }
 export function setDyingThisPaint(list) { dyingThisPaint = list; }
+/**
+ * The death bursts whose collapsing ghost must SURVIVE repaints: a kill whose collapse is
+ * delayed to the lethal golpe's fire (the hp trail steps the ghost's own bar golpe by
+ * golpe) needs its body on stage past the one-paint flags' lifetime — the deal-clock
+ * release repaint (~1.3s after the play, render.js) and any hover would otherwise remove
+ * the victim while its bar was still falling, and the lethal golpe would land on an empty
+ * slot (the 2-body kill regression). Each held burst carries its stamped timeline
+ * (`holdMs`/`paintAt`/`holdUntil`, written by dyingCard at first draw); render() re-merges
+ * the unexpired ones into every paint and dyingCard re-draws them RESUMED (a negative
+ * animation-delay once the collapse has started), the same resume philosophy the pose
+ * hold and the deal clock use. The list is scoped to ONE action: act() clears it when the
+ * next action rebases the row's truth, skipAnim clears it with the trail it rode, and
+ * newGame clears it with the rest of the run's motion state.
+ */
+export let heldDeaths = [];
+export function setHeldDeaths(list) { heldDeaths = list; }
 
 /* ------------------------------------------------------------- WIRING HOOKS --------
  * Two owners sit ABOVE the layers that need to reach them: only render.js may paint, and
