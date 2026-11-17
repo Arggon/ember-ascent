@@ -195,9 +195,12 @@ export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, 
  *     the "no jump at action start" ask); an incidental repaint mid-sequence (a hover)
  *     shows the value the fired steps reached, never the un-fired end; a paint after the
  *     sequence shows the snapshot (the last step's value IS the snapshot — invariant (a)
- *     below). The kill-hold and the defeat hold get this for free: they rebuild their
- *     bodies with the same `enemyCard()`/`heroFigure()` builders, so the held hero's bar
- *     steps per slam and the victim's ghost keeps its bar.
+ *     below). Mid-glide the paint carries the glide's INTERPOLATED position
+ *     (`hpGlideCurrent`): a repaint that replaces the tree resumes the motion where the
+ *     eye actually is, instead of replaying the step from its origin. The kill-hold and
+ *     the defeat hold get this for free: they rebuild their bodies with the same
+ *     `enemyCard()`/`heroFigure()` builders, so the held hero's bar steps per slam and
+ *     the victim's ghost keeps its bar.
  *
  *   * FIRE-TIME (`applyHpStep`): every fire of `dispatchFx()` that lands a golpe's float
  *     applies that golpe's bar step in the SAME callback — one clock, never two sibling
@@ -292,7 +295,16 @@ function hpWriteBar(host, key, hp, pulse) {
   const unit = hpTrail ? hpTrail.units.get(key) : null;
   const max = unit ? unit.max : 1;
   const fill = bar && bar.querySelector ? bar.querySelector('i') : null;
-  if (fill && fill.style) fill.style.width = `${Math.max(0, Math.min(100, Math.round((hp / Math.max(1, max)) * 100)))}%`;
+  if (fill && fill.style) {
+    // The standard rhythm FIRST: a resume may have left an inline REMAINING duration on
+    // this node, and its cleanup can lose the race against the next golpe — tail steps
+    // fire animMs(160) apart (fx.js), well inside one 420ms window. A fire-time write
+    // must run the stylesheet's full --dur-slow: otherwise the glide's clock outgrows
+    // the eye and the next interpolated paint lands BEHIND the settled bar — the
+    // backward-jump class the resume exists to kill, back through a side door.
+    fill.style.transitionDuration = '';
+    fill.style.width = `${Math.max(0, Math.min(100, Math.round((hp / Math.max(1, max)) * 100)))}%`;
+  }
   const isGhost = Boolean(host.classList && host.classList.contains('is-dying'));
   if (!isGhost) {
     const num = host.querySelector ? host.querySelector('.ehp') : null;
@@ -311,6 +323,17 @@ function hpWriteBar(host, key, hp, pulse) {
 }
 
 /**
+ * The width transition the stylesheet actually runs on `.hpbar > i`: `--dur-slow`
+ * (0.42s, style.css — a screen-level token, NOT paced by the speed dock, and the reduce
+ * media query kills it outright). The glide's clock models THIS length and nothing else:
+ * the interpolated resume (`hpGlideCurrent`) paints where the EYE is, and a window
+ * longer than the transition would keep interpolating values BEHIND the bar's own
+ * settle — a backward jump, the exact replay the resume exists to kill (the pre-fix
+ * repro's repaint landed ~660ms after a fire, well past the 420ms settle).
+ */
+const HP_GLIDE_MS = 420;
+
+/**
  * FIRE-TIME: apply one bar step on its golpe's own fire (the same callback that lands
  * the float — see dispatchFx). Updates the trail's value AND the live node. A step that
  * carries the value already shown (a parried golpe, a zero heal) updates the record and
@@ -326,7 +349,8 @@ export function applyHpStep(key, hp) {
   t.current = hp;
   t.applied.push({ hp, at: Date.now() - hpTrail.start });
   if (hp === shown) return;
-  t.glide = { from: shown, to: hp, until: Date.now() + (animMs(480) || 480) };
+  const now = Date.now();
+  t.glide = { from: shown, to: hp, started: now, until: now + HP_GLIDE_MS, duration: HP_GLIDE_MS };
   const host = hpUnitHost(key);
   if (host) hpWriteBar(host, key, hp, hp < shown ? 'hp-step-dn' : 'hp-step-up');
 }
@@ -337,14 +361,16 @@ export function applyHpStep(key, hp) {
  * lock's release paint lands ~1 beat after a play's reveal, a hover whenever it wants)
  * replaces the bar with a FRESH node whose initial width carries no transition, and the
  * glide would die mid-flight. The trail therefore remembers the glide ({from, to,
- * until}); a paint that catches one starts the fresh node at the from-value
- * (paintHpFill) and `resumeHpGlides()` — run once per paint, AFTER the tree is in the
- * document — commits that start with one reflow and writes the target, so the
- * transition runs on the new node too. The same resume philosophy the deal clock, the
- * pose hold and the strike sequence use: an incidental repaint resumes where the motion
- * actually is instead of cutting it.
+ * started, until, duration}); a paint that catches one starts the fresh node at the
+ * glide's INTERPOLATED position — `hpGlideCurrent`, where the eye actually is, not the
+ * step's origin — and `resumeHpGlides()` — run once per paint, AFTER the tree is in the
+ * document — commits that position with one reflow and writes the target on the
+ * REMAINING time, so the transition finishes on the new node at the rhythm the eye was
+ * already watching. The same resume philosophy the deal clock, the pose hold and the
+ * strike sequence use: an incidental repaint resumes where the motion actually is
+ * instead of cutting or replaying it.
  * @param {string} key
- * @returns {{from: number, to: number, until: number}|null}
+ * @returns {{from: number, to: number, started: number, until: number, duration: number}|null}
  */
 export function hpGlide(key) {
   if (!hpTrail) return null;
@@ -353,11 +379,33 @@ export function hpGlide(key) {
 }
 
 /**
+ * The glide's position RIGHT NOW — the value the eye is seeing on the live node this
+ * instant — or null when no glide is in flight. The stylesheet eases the width with
+ * `ease-out` (cubic-bezier(0, 0, 0.58, 1)); this interpolator carries the standard
+ * quadratic stand-in `1 - (1-p)^2`, which runs slightly AHEAD of the real curve (worst
+ * ~7% of the step's range, around mid-flight). That bias is the safe direction: on a
+ * resume the fresh node starts a hair FORWARD of where the eye was and eases the rest
+ * of the way — a forward micro-step, never the backward replay the old from-value
+ * restart produced (the owner's "the bar climbs back up" report).
+ * @param {string} key 'p' or `e<index>`
+ * @returns {{value: number, remaining: number}|null} the interpolated HP and the
+ *   milliseconds still left before the glide expires
+ */
+export function hpGlideCurrent(key) {
+  const g = hpGlide(key);
+  if (!g) return null;
+  const now = Date.now();
+  const p = Math.max(0, Math.min(1, (now - g.started) / g.duration));
+  const easeOut = 1 - (1 - p) * (1 - p);
+  return { value: g.from + (g.to - g.from) * easeOut, remaining: Math.max(0, g.until - now) };
+}
+
+/**
  * PAINT-TIME fill writer: `shown` is the value the trail says the bar displays
  * (`display ?? snapshot`), `max` the unit's max HP. Mid-glide the fresh node STARTS at
- * the glide's from-value (the width the replaced node was animating away from);
- * resumeHpGlides — after the tree is attached — finishes the job. Otherwise the width is
- * the plain displayed value.
+ * the glide's interpolated position (the width the eye was watching on the replaced
+ * node); resumeHpGlides — after the tree is attached — finishes the job. Otherwise the
+ * width is the plain displayed value.
  * @param {any} fill the `.hpbar > i` node being painted
  * @param {string} key 'p' or `e<index>`
  * @param {number} shown the displayed HP
@@ -365,19 +413,27 @@ export function hpGlide(key) {
  */
 export function paintHpFill(fill, key, shown, max) {
   if (!fill || !fill.style) return;
-  const glide = hpGlide(key);
-  const v = glide ? glide.from : shown;
+  const glide = hpGlideCurrent(key);
+  const v = glide ? glide.value : shown;
   fill.style.width = `${Math.max(0, Math.min(100, Math.round((v / Math.max(1, max)) * 100)))}%`;
 }
 
 /**
  * The post-paint half of the glide resume (see hpGlide): for every armed unit whose
- * glide is still in flight, commit the painted from-value with one reflow and write the
- * target — the width transition then runs on the fresh node exactly as it ran on the
- * one the repaint replaced. Called by render() on every paint path that leaves a fight
- * (or a hold of one) on the stage; a no-op when no trail is armed. Hosts with no layout
- * (the fake-DOM test harnesses carry no offsetWidth) skip the reflow: the plain painted
- * width is the whole contract there.
+ * glide is still in flight, commit the painted interpolated value with one reflow and
+ * write the target — with the transition-duration set to the glide's REMAINING time, so
+ * the final stretch keeps the real rhythm instead of restarting var(--dur-slow) (a
+ * fresh full duration is what re-ran motion the eye had already seen). A paced cleanup
+ * hands the duration back to the stylesheet once the glide expires, and `hpWriteBar`
+ * clears it again on every fire-time write (a golpe can fire INSIDE the window — tail
+ * steps are animMs(160) apart), so no later write inherits the resumed tail; a glide
+ * that expires inside the reflow window writes the target straight — the painted
+ * position and the target differ by at most a rounding step there, so no visible
+ * transition exists either way.
+ * Called by render() on every paint path that leaves a fight (or a hold of one) on the
+ * stage; a no-op when no trail is armed. Hosts with no layout (the fake-DOM test
+ * harnesses carry no offsetWidth) skip the reflow: the plain painted width is the whole
+ * contract there.
  */
 export function resumeHpGlides() {
   if (!hpTrail || !stageEl || !stageEl.querySelectorAll) return;
@@ -386,8 +442,14 @@ export function resumeHpGlides() {
     const host = hpUnitHost(key);
     const fill = host && host.querySelector ? host.querySelector('.hpbar > i') : null;
     if (!fill || !fill.style || typeof fill.offsetWidth !== 'number') continue;
-    void fill.offsetWidth; // commit the painted from-value as the transition's start
+    void fill.offsetWidth; // commit the painted interpolated value as the transition's start
+    const remaining = t.glide.until - Date.now();
+    if (remaining > 0) fill.style.transitionDuration = `${remaining}ms`;
     fill.style.width = `${Math.max(0, Math.min(100, Math.round((t.glide.to / Math.max(1, t.max)) * 100)))}%`;
+    if (remaining > 0) {
+      const live = fill;
+      later(() => { if (live.style) live.style.transitionDuration = ''; }, remaining);
+    }
   }
 }
 
