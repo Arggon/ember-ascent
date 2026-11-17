@@ -351,6 +351,7 @@ const STRINGS = {
   'kindling.path': { en: 'Path', es: 'Camino' },
   'kindling.head': { en: 'The forge offers a kindling', es: 'La forja ofrece un rescoldo' },
   'kindling.note': { en: 'Take one. Each gift has a price.', es: 'Toma uno. Cada regalo tiene un precio.' },
+  'kindling.boonCost': { en: 'Cost: ', es: 'Coste: ' },
   // Keyed by the HERO ID (actions.js HEROES), not the display name — the picker builds
   // the key as `hero.${h.id}.blurb`, so an id/key mismatch renders an empty node.
   // I18N-2: the pick-screen names. Ashwright is a proper noun (renders identically);

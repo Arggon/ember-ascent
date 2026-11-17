@@ -300,7 +300,8 @@ export const cardsBundle = {
           "verb": "status",
           "status": "vulnerable",
           "amount": 1,
-          "to": "enemy"
+          "to": "all_enemies",
+          "target": "all_enemies"
         }
       ],
       "flavor": "The whole shop flinches.",
@@ -768,13 +769,15 @@ export const cardsBundle = {
           "verb": "status",
           "status": "weak",
           "amount": 3,
-          "to": "enemy"
+          "to": "all_enemies",
+          "target": "all_enemies"
         },
         {
           "verb": "status",
           "status": "vulnerable",
           "amount": 3,
-          "to": "enemy"
+          "to": "all_enemies",
+          "target": "all_enemies"
         }
       ],
       "flavor": "A wave that leaves them open and weak.",

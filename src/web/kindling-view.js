@@ -16,6 +16,25 @@ import { t } from './i18n.js';
 
 /* ------------------------------------------------------------------ KINDLING */
 
+/** #40: a boon's price must be as plain as its gift. The kernel sentence is
+ *  "upside. cost." (BOONS in rules/kindling.js); the cost gets its own line,
+ *  labelled and styled as a cost, so it is never mistaken for part of the upside
+ *  (Iron Skin's relic-off price had no 'Lose' keyword, so nothing marked it).
+ *  Falls back to one line when there is no second sentence. (Re-landed from the
+ *  origin/main PR-#52 line in the 2026-11-17 merge: it shipped there on the
+ *  pre-split monolith, and this module is where the kindling screen lives now.)
+ * @param {string} text */
+function boonParts(text) {
+  const cut = text.indexOf('. ');
+  if (cut < 0) return [keywordText(el('span', { cls: 'boon-text' }), text)];
+  const upside = text.slice(0, cut + 1);
+  const cost = text.slice(cut + 2);
+  const costLine = el('span', { cls: 'boon-cost' },
+    el('span', { cls: 'boon-cost-label', text: t('kindling.boonCost') }));
+  costLine.append(cost);
+  return [keywordText(el('span', { cls: 'boon-text' }), upside), costLine];
+}
+
 /** A hero portrait for the select buttons (constant markup from a fixed table). */
 function heroFace(id) {
   const face = el('span', { cls: 'hp-face', attrs: { 'aria-hidden': 'true' } });
@@ -121,7 +140,7 @@ export function kindlingView() {
     // sentence carry the meaning. An unknown id degrades to the rune, never an empty box.
     glyphBox(BOON_GLYPH[b.id] || 'rune', 'boon-glyph'),
     el('span', { cls: 'boon-name', text: b.name }),
-    keywordText(el('span', { cls: 'boon-text' }), b.text)));
+    ...boonParts(b.text)));
   }
   wrap.append(list);
   return page('kindling', t('page.kindling'), 'flame', 'panel', [wrap]);

@@ -215,16 +215,18 @@ test('a SCOPED chip names its scope — the popover cannot narrow an AOE', () =>
 });
 
 test('an AOE STATUS chip scopes its applicator clause', () => {
-  // Thunderclap's status is single-target, so its chip stays scopeless — the plain
-  // "the enemy" applicator the sentence names.
+  // Thunderclap (Forgeclap) IS the shipped AOE debuff now: the origin line's PR #56
+  // made its Vulnerable hit every living enemy, and the 2026-11-17 merge landed that
+  // ruling here — so its chip names the scope; the plain "the enemy" applicator would
+  // quietly narrow a whole-row hit.
   const chips = cardChips(C.cards.get('thunderclap'));
   const vuln = chips.find((c) => c.verb === 'status');
   assert.ok(vuln, 'Thunderclap carries a Vulnerable chip');
   assert.equal(vuln.explain,
-    'Vulnerable — it takes 50% more damage from attacks. Wears off by 1 at the end of each of your turns.');
-  // The RULE, on the shape the shipped content has not shipped yet but accepts: an
-  // all-enemies status names its scope, EN and ES, so a future AOE debuff card cannot
-  // ship a chip that quietly narrows itself to one enemy.
+    'Vulnerable on ALL enemies — it takes 50% more damage from attacks. Wears off by 1 at the end of each of your turns.');
+  // The RULE, now that the shipped content carries the shape: an all-enemies status
+  // names its scope, EN and ES, so an AOE debuff card cannot ship a chip that quietly
+  // narrows itself to one enemy.
   const aoe = cardChips({
     id: 'g',
     effects: [{ verb: 'status', status: 'vulnerable', amount: 2, to: 'enemy', target: 'all_enemies' }],

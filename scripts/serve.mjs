@@ -15,7 +15,7 @@
 //
 // Usage:  node scripts/serve.mjs [--port 5173]
 import { createServer } from 'node:http';
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, join, resolve, normalize, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -137,13 +137,17 @@ function directoryRedirect(url, file) {
  * @param {string} file absolute path inside ROOT that `url` resolved to
  * @returns {string|null}
  */
+// Where the game lives under ROOT: /src/web/ in the repo; the root itself in the release
+// artifact (release/tools/serve.mjs), whose index.html is flattened to the top (#50).
+const WEB_BASE = existsSync(join(ROOT, 'src', 'web', 'index.html')) ? '/src/web/' : '/';
+
 function legacyWebRedirect(url, file) {
   const parts = relative(ROOT, file).split(sep).filter(Boolean);
   if (parts[0] !== 'web') return null;
   const { path, query } = splitTarget(url);
   const rest = parts.slice(1).map(encodeURIComponent).join('/');
   const slash = rest === '' || path.endsWith('/') ? '/' : '';
-  return `/src/web/${rest}${rest ? slash : ''}${query}`;
+  return `${WEB_BASE}${rest}${rest ? slash : ''}${query}`;
 }
 
 // ---------------------------------------------------------------------------
