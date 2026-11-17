@@ -14,6 +14,18 @@ Work top to bottom. Checked boxes are things already done and verified in this r
 ## Before you start — the one upload file
 
 - [x] **`release.zip`** exists in this workspace root. That is the artifact.
+- [x] **SHIPPED 2026-11-16 as 0.4.3**: `butler push release.zip
+      arggondev/ember-ascent:html --userversion 0.4.3` → build `#2411130` on the
+      `html` channel. Zip SHA-256
+      `78af31ff76098eca37a2b45e8f5188e67a490f75c3439c655af87022370263ef`
+      — 95 entries, **2,724,741 bytes**; butler re-used 74.83% against 0.4.2
+      (patch 340.62 KiB). Content: discrete multi-hit strikes — parry and bleed
+      react PER HIT and poison ticks at the turn's close (3 new cards: Slag Barb,
+      Kiln Fume, Anvil Guard; Ash Matriarch's hex reads "A7x2 BLEED2", the Slag
+      Crawler guards with "PARRY20"), one beat per golpe in the presentation, and
+      the health bar that follows the hits — a 4×2 card lowers the bar 2 at a
+      time, heals glide up, and no repaint rewinds the bar to its pre-hit width.
+      Superseded by nothing — this is the live build.
 - [x] **SHIPPED 2026-11-10 as 0.4.2**: `butler push release.zip
       arggondev/ember-ascent:html --userversion 0.4.2` → build `#2351423` on the
       `html` channel. Zip SHA-256
@@ -23,7 +35,7 @@ Work top to bottom. Checked boxes are things already done and verified in this r
       boot asks Idioma — Language (Español / English) BEFORE the tour speaks,
       the pick repaints the whole interface and persists `dlb.lang`; while no
       explicit choice exists the browser's own language decides the default
-      without writing anything. Superseded by nothing — this is the live build.
+      without writing anything. Superseded by 0.4.3 (2026-11-16).
 - [x] **SHIPPED 2026-11-10 as 0.4.1**: `butler push release.zip
       arggondev/ember-ascent:html --userversion 0.4.1` → build `#2350047` on the
       `html` channel. Zip SHA-256
