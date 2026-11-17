@@ -14,6 +14,20 @@ Work top to bottom. Checked boxes are things already done and verified in this r
 ## Before you start — the one upload file
 
 - [x] **`release.zip`** exists in this workspace root. That is the artifact.
+- [x] **SHIPPED 2026-11-17 as 0.4.4**: `butler push release.zip
+      arggondev/ember-ascent:html --userversion 0.4.4` → build `#2419481` on the
+      `html` channel. Zip SHA-256
+      `f88b80b2e259fc19f33d9c8627b17f8b48931dc2ccd94b6c7595f9b90342a8d3`
+      — 95 entries, **2,724,857 bytes**; butler re-used 98.38% against 0.4.3
+      (patch 30.95 KiB). Content: the climb to act 2 no longer heals the hero —
+      the between-acts gift is the +5 max HP ALONE (designer ruling
+      2026-11-17): act 2 opens on exactly the hp the act-1 victory chain left
+      behind, the act_transition heal event is retired, and the campfire and
+      relics are the only healing again. Pre-push ritual held: two deterministic
+      rebuilds at the same zip sha, veteran+es boot (kindling → map → Skirmish,
+      Spanish chrome) and fresh boot (bilingual language card) with zero console
+      errors.
+      Superseded by nothing — this is the live build.
 - [x] **SHIPPED 2026-11-16 as 0.4.3**: `butler push release.zip
       arggondev/ember-ascent:html --userversion 0.4.3` → build `#2411130` on the
       `html` channel. Zip SHA-256
@@ -25,7 +39,7 @@ Work top to bottom. Checked boxes are things already done and verified in this r
       Crawler guards with "PARRY20"), one beat per golpe in the presentation, and
       the health bar that follows the hits — a 4×2 card lowers the bar 2 at a
       time, heals glide up, and no repaint rewinds the bar to its pre-hit width.
-      Superseded by nothing — this is the live build.
+      Superseded by 0.4.4 (2026-11-17).
 - [x] **SHIPPED 2026-11-10 as 0.4.2**: `butler push release.zip
       arggondev/ember-ascent:html --userversion 0.4.2` → build `#2351423` on the
       `html` channel. Zip SHA-256
