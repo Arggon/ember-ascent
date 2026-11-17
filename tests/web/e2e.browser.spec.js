@@ -2353,7 +2353,7 @@ test('relics: no HUD chip, the held count climbs on an elite drop, and the warde
   // offers, and the summary's relic count at the end.
   let sawEliteSpoils = null;
   let bossOffers = 0;
-  let climbedPre = null; // the max-HP the hero carried INTO the first boss pick
+  let climbedPre = null; // the max-HP AND hp the hero carried INTO the first boss pick
   let firstPickDone = false;
   let eliteMeasured = false; // the elite-height probe fires once, at the first elite fight's opening
   for (let guard = 0; guard < 600; guard += 1) {
@@ -2453,10 +2453,11 @@ test('relics: no HUD chip, the held count climbs on an elite drop, and the warde
         assert.equal(bossOffers, 3, 'the warden offers exactly three relics (five rares hold out across both acts)');
         const head = await page.locator('.reward-head span').first().textContent();
         assert.match(head, /warden/, `the boss reward head names the relic: ${head}`);
-        // First pick only: assert the CLIMB (S9) — act 2 opens, the hero heals full with
-        // the +5 bonus, and nothing held is lost. The SECOND boss pick ends the run.
+        // First pick only: assert the CLIMB (S9) — act 2 opens on exactly the hp the
+        // fight left (NO heal at the climb) with the +5 bonus, and nothing held is
+        // lost. The SECOND boss pick ends the run.
         if (climbedPre === null) {
-          climbedPre = await page.evaluate(() => window.__dlb.snapshot().player.maxHp);
+          climbedPre = await page.evaluate(() => { const p = window.__dlb.snapshot().player; return { maxHp: p.maxHp, hp: p.hp }; });
           const heldBefore = await page.evaluate(() => window.__dlb.snapshot().relics.length);
           await offers.first().click(); // take the first offer — the policies' stance
           await sleep(900);
@@ -2468,8 +2469,8 @@ test('relics: no HUD chip, the held count climbs on an elite drop, and the warde
           assert.equal(climbed.act, 2, 'the act advanced');
           assert.equal(climbed.biome, 'The Kiln Deeps', 'act 2 walks its own biome');
           assert.match(climbed.chapter, /Kiln Deeps/, `the map chapter names act 2: ${climbed.chapter}`);
-          assert.equal(climbed.maxHp, climbedPre + 5, 'the climb bonus');
-          assert.equal(climbed.hp, climbed.maxHp, 'the climb heals full');
+          assert.equal(climbed.maxHp, climbedPre.maxHp + 5, 'the climb bonus');
+          assert.equal(climbed.hp, climbedPre.hp, 'the climb does NOT heal — the hp the fight left rides over untouched');
           assert.equal(climbed.held, heldBefore + 1, 'the picked relic crossed the climb');
           firstPickDone = true;
           continue;

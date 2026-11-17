@@ -759,3 +759,11 @@ Process rules (standing):
   the debuff player_status shape (currently held only by the review's hand-written probe),
   and a future-roster note on fx.js reading sigFor at fire-schedule time. Release rebuild
   next.
+- 2026-11-17 — DESIGNER RULING: the between-acts full heal is RETIRED. The climb's gift
+  is now the +5 max HP alone (beginNextAct keeps ACT_HP_BONUS and drops the heal event);
+  act 2 opens on exactly the hp the act-1 victory chain left behind — the rest sites
+  and relic heals are the only healing again. Kernel pins updated (relics e2e event
+  order and e2e climb assertions assert hp UNCHANGED across the pick); the rngDraws
+  account is untouched (the heal never consumed draws), so maps and goldens are
+  byte-stable. Gates: 569/0/1 node, gate OK, release rebuilt twice at zip sha256
+  f88b80b2…, browser climb e2e green in isolation (147 s).

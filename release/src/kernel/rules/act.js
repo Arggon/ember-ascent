@@ -27,7 +27,8 @@ export const REST_HEAL = 8;
 export { RELIC_HEAL, LANTERN_ENERGY } from './relics.js';
 /** Reward choice count after a normal fight; elites offer one more. */
 export const REWARD_CHOICES = 3;
-/** S9: max HP gained on entering act 2 (with the full heal that follows it). */
+/** S9: max HP gained on entering act 2. It rides the climb alone — the ruling of
+ *  2026-11-17 retires the full heal that used to follow it (the wound carries over). */
 export const ACT_HP_BONUS = 5;
 
 
@@ -518,8 +519,9 @@ export function endTurn(state, cardDefs) {
  *                      in rules/steps.js, NOT here. Never reaches stages 5-7.
  *   4b. ACT TRANSITION (S9, at the pick/skip — rules/steps.js settleBossVictory):
  *                      the LAST act's boss ends the run in victory; an earlier act's
- *                      boss CLIMBS ON through beginNextAct — act +1, +5 max HP, a full
- *                      heal into the new max, and a fresh map for the next biome. Deck,
+ *                      boss CLIMBS ON through beginNextAct — act +1, +5 max HP (the
+ *                      HP itself rides over untouched: no heal at the climb), and a
+ *                      fresh map for the next biome. Deck,
  *                      gold, potions, relics and every opt-in (kindling, tempers,
  *                      quests) persist untouched; the offer, the combat and the finished
  *                      act's map are left behind. Draw accounting is documented on
@@ -697,16 +699,19 @@ function rollReward(state, count) {
  * still ends in victory exactly as before S9 — the back-compat branch is this
  * comparison and nothing else.
  *
- * WHAT CHANGES: the act number, the hero (max HP +5, then a FULL heal into the new
- * max — StS's between-acts gift), and the map (a fresh walk in the next act's biome).
+ * WHAT CHANGES: the act number, the hero (max HP +5 — and NOTHING else: the ruling of
+ * 2026-11-17 retires the full heal that once rode the climb, so act 2 opens on exactly
+ * the HP the act-1 victory chain left behind — worn, not whole), and the map (a fresh
+ * walk in the next act's biome).
  * WHAT PERSISTS UNTOUCHED: deck, gold, potions, relics, draft pool, energyPerTurn,
- * powers, and every opt-in (kindling, tempers, quests) — the whole point of the
+ * powers, hp, and every opt-in (kindling, tempers, quests) — the whole point of the
  * longer climb is that the run is a build-around. The finished act's map, the boss's
  * reward and the combat are simply left behind: state.map holds the CURRENT act only.
  *
- * EVENT ORDER (part of the format): act_advance, then the max_hp grant, then the
- * heal — the flip is announced before the gift that rides it, and the heal reads the
- * NEW max, so a relic-worn hero heals exactly (old max + 5) - hp, always positive.
+ * EVENT ORDER (part of the format): act_advance, then the max_hp grant — the flip is
+ * announced before the gift that rides it. There is no heal event: the hero's HP is
+ * not the climb's to restore (ruling 2026-11-17; the rest sites and relics remain
+ * the only healing).
  *
  * DRAW ACCOUNTING — the generation draws at the transition, from the LIVE counter, in
  * the same style and order as newRun's act-1 generation (rules/encounters.js
@@ -727,11 +732,11 @@ export function beginNextAct(state) {
   const { table: encounterTable, draws } = buildEncounterTable(state.seed, state.rngDraws + gen.draws + (state.deck?.length ?? 0), gen.rows, byType);
 
   const maxHp = state.player.maxHp + ACT_HP_BONUS;
-  const healed = Math.max(0, maxHp - state.player.hp);
+  // hp rides over UNTOUCHED (ruling 2026-11-17: no heal at the climb) — maxHp grows,
+  // so the bar shortens but the wound stays exactly as the victory chain left it.
   const events = [
     { t: 'act_advance', act: nextAct },
     { t: 'max_hp', who: 'player', amount: ACT_HP_BONUS, source: 'act_transition' },
-    ...(healed > 0 ? [{ t: 'heal', who: 'player', amount: healed, source: 'act_transition' }] : []),
   ];
   return {
     state: {
@@ -750,7 +755,7 @@ export function beginNextAct(state) {
       reward: null,
       event: null,
       shop: null,
-      player: { ...state.player, maxHp, hp: maxHp },
+      player: { ...state.player, maxHp },
     },
     events,
   };

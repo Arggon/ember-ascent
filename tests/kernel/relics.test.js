@@ -426,12 +426,12 @@ test('the boss pick r<n> settles the victory: a two-act run CLIMBS ON, a legacy 
   assert.deepEqual(take.state.relics, [...s.relics, out.state.reward.relicOffers[0]], 'the relic is held');
   assert.equal(take.state.reward, null, 'the offer is consumed');
   assert.equal(take.state.player.maxHp, s.player.maxHp + 5, 'the climb bonus');
-  assert.equal(take.state.player.hp, take.state.player.maxHp, 'the climb heals full');
+  assert.equal(take.state.player.hp, out.state.player.hp, 'the climb does NOT heal — the hp the victory left rides over untouched');
   assert.deepEqual(take.state.deck, s.deck, 'the deck carries over');
   assert.deepEqual(take.state.potions, s.potions, 'the belt carries over');
   assert.equal(take.state.player.gold, out.state.player.gold, 'the purse carries over (boss spoils included)');
   assert.equal(take.state.rngDraws > out.state.rngDraws, true, 'the act-2 map rolled at the transition');
-  assert.deepEqual(take.events.map((e) => e.t), ['relic_gained', 'act_advance', 'max_hp', 'heal'], 'the gain, then the climb');
+  assert.deepEqual(take.events.map((e) => e.t), ['relic_gained', 'act_advance', 'max_hp'], 'the gain, then the climb (no heal — the ruling keeps the wound)');
   assert.equal(take.events[0].source, 'boss');
   // The transition's exact draw account (the chain doc's three terms), pinned as a
   // number for THIS state (seed 7, the pre-transition counter the test staged):
@@ -444,7 +444,7 @@ test('the boss pick r<n> settles the victory: a two-act run CLIMBS ON, a legacy 
   assert.equal(skip.state.phase, 'map');
   assert.equal(skip.state.act, 2);
   assert.deepEqual(skip.state.relics, s.relics, 'nothing gained');
-  assert.deepEqual(skip.events.map((e) => e.t), ['relic_skipped', 'act_advance', 'max_hp', 'heal']);
+  assert.deepEqual(skip.events.map((e) => e.t), ['relic_skipped', 'act_advance', 'max_hp']);
   // A LEGACY one-act run (no `acts` field — pre-S9 save): the same pick ENDS in victory.
   const legacy = { ...s, act: undefined, acts: undefined };
   const legacyOut = resolveVictory(legacy, null);

@@ -233,7 +233,7 @@ function pickReward(state, action) {
 
 /**
  * S9: what a settled boss pick/skip MEANS. A run with acts left climbs on (beginNextAct:
- * act flip, +5 max HP, full heal, a fresh map); the LAST act's boss — or a LEGACY save,
+ * act flip, +5 max HP, no heal, a fresh map); the LAST act's boss — or a LEGACY save,
  * which has no `acts` field and reads as a one-act run at the `?? 1` — ends the run in
  * victory, exactly as every boss did before S9. The old `run_end` event fires HERE, on
  * the final act only.
