@@ -14,6 +14,23 @@ Work top to bottom. Checked boxes are things already done and verified in this r
 ## Before you start — the one upload file
 
 - [x] **`release.zip`** exists in this workspace root. That is the artifact.
+- [x] **SHIPPED 2026-11-18 as 0.4.5**: `butler push release.zip
+      arggondev/ember-ascent:html --userversion 0.4.5` → build `#2429618` on the
+      `html` channel. Zip SHA-256
+      `a014cc3c20d2cfa7934e059e0670cd09aa9a7261193527f1f622e92204aac62b`
+      — 95 entries, **2,722,962 bytes**; butler re-used 88.62% against 0.4.4
+      (patch 154.58 KiB). Content: the FIXED START (designer ruling
+      2026-11-18) — the Kindling screen no longer offers a hero or a path
+      picker; every run begins as Ashwright on The Foundry. Bellows Keeper and
+      The Cinder Mines stay in the game, seeded exactly as before by
+      `?hero=bellows` / `?biome=mines` (and the CLI flags), pinned by
+      tests/kernel/fixed-start.test.js; kernel content untouched. The
+      onboarding tour drops its heroes step (five steps, first anchored on the
+      boon list). Pre-push ritual held: two deterministic rebuilds at the same
+      zip sha, veteran+es boot (kindling → map → Skirmish, Spanish chrome, no
+      pickers) and fresh boot (bilingual language card, no pickers) with zero
+      console errors.
+      Superseded by nothing — this is the live build.
 - [x] **SHIPPED 2026-11-17 as 0.4.4**: `butler push release.zip
       arggondev/ember-ascent:html --userversion 0.4.4` → build `#2419481` on the
       `html` channel. Zip SHA-256
@@ -27,7 +44,7 @@ Work top to bottom. Checked boxes are things already done and verified in this r
       rebuilds at the same zip sha, veteran+es boot (kindling → map → Skirmish,
       Spanish chrome) and fresh boot (bilingual language card) with zero console
       errors.
-      Superseded by nothing — this is the live build.
+      Superseded by 0.4.5 (2026-11-18).
 - [x] **SHIPPED 2026-11-16 as 0.4.3**: `butler push release.zip
       arggondev/ember-ascent:html --userversion 0.4.3` → build `#2411130` on the
       `html` channel. Zip SHA-256
