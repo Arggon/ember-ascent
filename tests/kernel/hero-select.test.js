@@ -1,13 +1,12 @@
-// B4 hero select on the Kindling screen: radio-group keyboard semantics, and a hero switch
-// is not a new act.
-//
-// QA: the arrow keys did nothing on the hero picker (role=radiogroup promises they move the
-// selection), and switching hero replayed the "Act I · The Foundry" title card, because a
-// switch rebuilds the run and the first paint of a run plays it.
+// Fixed start (ruling): every run begins the same way — one hero on one start path — so
+// the kindling screen has NO hero or path pickers any more. This file keeps the fake-DOM
+// harness (boon-cost.test.js reuses the same shape) and pins what the act-start screen
+// now shows: the run opens on kindling with exactly one act title card, the stage paints
+// a boon list, and no picker markup of any kind.
 //
 // Drives the REAL src/web/app.js against a fake DOM (same shim as click-targeting.test.js, plus
-// focus/remove/firstElementChild), with real controllers, so a switch really rebuilds the
-// run for the other hero.
+// focus/remove/firstElementChild), with real controllers, so the pinned paint is what the
+// app really renders.
 let uid = 0;
 class N {
   constructor(tag) {
@@ -56,9 +55,9 @@ class N {
   remove() { if (this.parent) { this.parent.kids = this.parent.kids.filter((k) => k !== this); this.parent = null; } }
   get firstElementChild() { return this.kids.find((k) => k.tag !== '#text') ?? null; }
   dispatch(type, extra = {}) {
-    // stopPropagation is part of the event API the views rely on (kindling-view's
-    // radiogroups stop the bubble so the document guard never sees a handled arrow),
-    // so the shim models it: the walk ends after the node that stopped it.
+    // stopPropagation is part of the generic event API a real DOM models and any view
+    // may rely on, so the shim models it too: the walk ends after the node that stopped
+    // the bubble.
     const ev = {
       type, target: this,
       preventDefault() { this.defaultPrevented = true; },
@@ -125,50 +124,14 @@ src += '\nreturn { render, newGame, snapGet(){ return snap; } };';
 const api = new Function('__mods', `${prelude}\n${src}`)(importedModules);
 
 const actCards = () => fxAdded.filter((c) => c === 'fx-act-card').length;
-const radios = () => byId.stage.querySelectorAll('.hero-pick');
-const checked = () => radios().find((r) => r.attrs['aria-checked'] === 'true');
 
-test('first paint of a run plays the Act I title card once; one tab stop on the checked hero', () => {
+test('fixed start: a run opens on kindling with one title card, a boon list, and no pickers', () => {
   assert.equal(api.snapGet().phase, 'kindling');
-  assert.equal(api.snapGet().character ?? 'ironclad', 'ironclad');
+  assert.equal(api.snapGet().character ?? 'ironclad', 'ironclad', 'every run starts as the same hero');
   assert.equal(actCards(), 1, 'the run opens with its act title card');
-  const rs = radios();
-  assert.equal(rs.length, 2);
-  assert.deepEqual(rs.map((r) => r.attrs.role), ['radio', 'radio']);
-  assert.deepEqual(rs.map((r) => r.attrs.tabindex), ['0', '-1'], 'roving tabindex: only the checked radio is a tab stop');
-});
-
-test('ArrowRight moves the selection to the next hero, focus follows, and no title card replays', () => {
-  checked().dispatch('keydown', { key: 'ArrowRight' });
-  assert.equal(api.snapGet().character, 'bellows', 'the run was rebuilt for the Bellows-Keeper');
-  assert.equal(api.snapGet().seed, 11, 'same seed');
-  assert.ok(checked()._cls.includes('hp-bellows'));
-  assert.equal(document.activeElement, checked(), 'focus is on the newly checked radio');
-  assert.deepEqual(radios().map((r) => r.attrs.tabindex), ['-1', '0']);
-  assert.equal(actCards(), 1, 'a hero switch is the same screen, not a new act');
-});
-
-test('arrows wrap (Right from the last, Left from the first) and Home/End jump', () => {
-  checked().dispatch('keydown', { key: 'ArrowRight' });
-  assert.equal(api.snapGet().character, 'ironclad', 'Right from the last hero wraps to the first');
-  checked().dispatch('keydown', { key: 'ArrowLeft' });
-  assert.equal(api.snapGet().character, 'bellows', 'Left from the first hero wraps to the last');
-  checked().dispatch('keydown', { key: 'Home' });
-  assert.equal(api.snapGet().character, 'ironclad');
-  checked().dispatch('keydown', { key: 'End' });
-  assert.equal(api.snapGet().character, 'bellows');
-  checked().dispatch('keydown', { key: 'ArrowUp' });
-  assert.equal(api.snapGet().character, 'ironclad', 'Up moves to the previous hero');
-  assert.equal(actCards(), 1, 'none of these switches replayed the title card');
-});
-
-test('a click switch does not replay the title card; clicking the checked hero is a no-op', () => {
-  const runBefore = api.snapGet();
-  checked().dispatch('click');
-  assert.equal(api.snapGet(), runBefore, 'clicking the checked hero does not rebuild the run');
-  radios()[1].dispatch('click');
-  assert.equal(api.snapGet().character, 'bellows');
-  assert.equal(actCards(), 1);
+  assert.equal(byId.stage.querySelectorAll('.hero-pick').length, 0, 'no hero picker is painted');
+  assert.equal(byId.stage.querySelectorAll('.biome-pick').length, 0, 'no path picker is painted');
+  assert.ok(byId.stage.querySelectorAll('.boon').length >= 1, 'the kindling boon list is painted');
 });
 
 test('a genuinely new run (newGame() without quiet, as the n hotkey calls it) still plays the title card', () => {

@@ -255,10 +255,13 @@ export function currentBiome(state) {
 }
 
 /**
- * The act-1 START paths (S9): every biome EXCEPT the act-2 one. The kindling screen's
- * Path picker renders THIS list — the Deeps are where the climb goes, not where it
- * begins — and the choice lives here, kernel-side, so no surface curates its own list
- * (the B5 ruling). The CLI keeps accepting any BIOMES key; this is the picker's list.
+ * The act-1 START paths (S9): every biome EXCEPT the act-2 one — the Deeps are where
+ * the climb goes, not where it begins. The choice lives here, kernel-side, so no
+ * surface curates its own list (the B5 ruling). Under the fixed start the browser
+ * surface renders no chooser any more: its ?biome= seeding (actions.js biomeChoice)
+ * validates against the FULL BIOMES table, and the snapshot still publishes THIS list,
+ * kept for the value model and pinned kernel-side (biomes.test.js). The CLI keeps
+ * accepting any BIOMES key.
  * @returns {string[]}
  */
 export function startBiomeIds() {

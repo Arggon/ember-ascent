@@ -325,3 +325,16 @@ Each with the default I would ship without an answer.
   (the deep arm's budget is fully spent; clearance +8 = the contract bar) and viewport − 14
   at every 761px+ cell; End Turn topmost, no page scroll, no hand card outside the
   viewport, every gem circle inside its card — all 20 cells fit.
+
+- **2026-11-18 — fixed start: the Kindling pickers retire (owner-approved layout change).**
+  The Kindling screen loses its hero-select row and its biome-select path row: every run
+  starts as Ashwright on The Foundry, and the screen is illustration + head + note + boons
+  at every step (the `.kindling:has(.hero-select)` illustration clamp goes with them). The
+  onboarding tour drops its heroes step with the same stroke — five steps, the first
+  anchored on the boon list. Bellows Keeper and The Cinder Mines STAY in the game: they
+  are seeded exactly as before by `?hero=bellows` / `?biome=mines` (and the CLI flags),
+  the kernel's BIOMES table and hero roster are untouched, and the seeding is pinned by
+  tests/kernel/fixed-start.test.js. Verified live by the SDLC run's six Playwright checks
+  (fresh boot with no pickers, tour "Step 1 of 5" over the boon list, boon → map flow,
+  `?hero=bellows` boots the Keeper at 54 HP, `?biome=mines` names THE CINDER MINES on the
+  Act I card, veteran boots clean) and by the full browser suite after the change.

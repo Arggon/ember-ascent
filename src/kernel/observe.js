@@ -1545,8 +1545,11 @@ export function snapshot(state, opts = {}) {
     // I18N-2: the biome's display twin renders with the snapshot's language.
     biomeName: fieldFor(BIOMES[currentBiome(state)], 'name', lang),
     // S9: the START paths — every biome but the act-2 one (rules/encounters.js
-    // startBiomeIds). The kindling picker renders these; the full table (including the
-    // Deeps) stays in the public BIOMES export.
+    // startBiomeIds). Under the fixed start no surface renders a chooser from this
+    // field any more (the ?biome= seeding validates against the full table); the field
+    // stays for the value model, pinned by its kernel tests (biomes.test.js,
+    // i18n-content.test.js). The full table (including the Deeps) stays in the public
+    // BIOMES export.
     biomes: startBiomeIds().map((id) => ({ id, name: fieldFor(BIOMES[id], 'name', lang) })),
     // I18N-2: the hero's display name. Ashwright is a proper noun and carries no twin
     // (it renders identically in either language); the Bellows Keeper's title localizes.

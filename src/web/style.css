@@ -35,7 +35,7 @@
  *   §9  Combat stage      layout + figures; the @media screen THEME layers (ember
  *                         palette, then woodcut prototype, then art phase 2) sit
  *                         just above it and override §2 by source order.
- *   §10 Late features     tempers, quests, hero select, mines, hand legibility,
+ *   §10 Late features     tempers, quests, the mines biome, hand legibility,
  *                         run ledger — each self-contained, appended in delivery
  *                         order with its own banner.
  *
@@ -7163,7 +7163,7 @@ html, body {
 
 /* ======================================================= §10 · LATE FEATURES ======
    Self-contained additions delivered after the stage froze (scene beats, map pins,
-   scene illustrations, kindling, tempers, quests, hero select, the mines biome,
+   scene illustrations, kindling, tempers, quests, the mines biome,
    combat-hand legibility, run ledger). Each keeps its own banner and its media
    queries; they append in delivery order and only ever target their own selectors. */
 
@@ -7384,54 +7384,14 @@ html, body {
   .quests { margin-bottom: 2px; }
 }
 
-/* B4 hero select (on the Kindling screen, before the first choice) and Bellows accents. */
-.hero-select { display: flex; gap: 10px; justify-content: center; margin: 4px 0 10px; }
-.hero-pick {
-  display: grid; grid-template-columns: 56px 1fr; grid-template-rows: auto 1fr; column-gap: 10px;
-  align-items: start; text-align: left; max-width: 300px; padding: 6px 10px 6px 6px; cursor: pointer;
-  background: rgba(24, 14, 9, 0.85); border: 1px solid rgba(255, 170, 90, 0.3); border-radius: 8px; color: inherit;
-}
-.hero-pick .hp-face { grid-row: 1 / span 2; width: 56px; height: 64px; position: relative; overflow: hidden; }
-.hero-pick .hp-face .sh { display: none; }
-.hero-pick .hp-face .spr { width: 100%; height: 100%; object-fit: contain; object-position: top; }
-.hero-pick .hp-name { font-weight: 700; color: #ffcf8a; font-size: 0.9rem; }
-.hero-pick .hp-blurb { font-size: 0.72rem; line-height: 1.25; color: #d8c3ad; }
-.hero-pick.on { border-color: var(--gold, #ffd27a); box-shadow: 0 0 0 2px rgba(255, 207, 107, 0.2); }
-.hero-pick.hp-bellows.on { border-color: #7fe3f0; box-shadow: 0 0 0 2px rgba(110, 220, 240, 0.25), 0 0 14px rgba(90, 210, 235, 0.25); }
-.hero-pick.hp-bellows .hp-name { color: #a6eef7; }
-.hero-pick:focus-visible { outline: 2px solid #ffd27a; outline-offset: 2px; }
+/* Bellows' combat accents: the cyan name and sprite glow that mark the second hero
+   INSIDE a fight. (The kindling picker these styles used to sit beside is gone — the
+   fixed start ruling — but the fighter these accents dress is still reachable through
+   the ?hero= seeding in actions.js.) */
 .page-combat .hero.is-bellows .hero-name { color: #a6eef7; text-shadow: 0 0 8px rgba(90, 210, 235, 0.45); }
 .stage-combat .hero.is-bellows .fig .spr { filter: drop-shadow(0 0 10px rgba(90, 210, 235, 0.3)); }
-@media (max-height: 480px) {
-  .hero-select { margin: 0 0 4px; gap: 6px; }
-  .hero-pick { grid-template-columns: 34px 1fr; padding: 3px 8px 3px 3px; max-width: 280px; }
-  .hero-pick .hp-face { width: 34px; height: 38px; }
-  .hero-pick .hp-name { font-size: 0.78rem; }
-  .hero-pick .hp-blurb { font-size: 0.6rem; }
-}
-.hero-pick.hp-ironclad .hp-face .spr { object-position: center; transform: scale(1.25); }
-/* QA: on 360-412px phones, and above all with 130% text, the two hero cards stacked
-   (name + blurb each) and the Kindling boons, the actual choice on this screen, fell
-   below the fold (360x780 at 130%: the boons started at y=669). On narrow screens the
-   picker becomes one compact row: a small face and the name. The blurb stays in the
-   accessible name (visually hidden, not removed) and in the tooltip. The forge plate
-   above it gives up height on this screen only. */
-@media (max-width: 620px) {
-  .hero-select { flex-wrap: nowrap; gap: 6px; margin: 0 0 4px; width: 100%; }
-  .hero-pick {
-    flex: 1 1 0; min-width: 0; max-width: 200px; grid-template-columns: 30px minmax(0, 1fr);
-    grid-template-rows: auto; align-items: center; column-gap: 6px; padding: 3px 8px 3px 3px;
-  }
-  .hero-pick .hp-face { grid-row: auto; width: 30px; height: 34px; }
-  .hero-pick .hp-name { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hero-pick .hp-blurb {
-    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
-    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
-  }
-  .kindling:has(.hero-select) .scene-illus img { height: clamp(64px, 13vh, 120px); }
-}
 
-/* B5 The Cinder Mines: painted backdrop (pre-darkened), a cooler floor line, biome picker. */
+/* B5 The Cinder Mines: painted backdrop (pre-darkened) and a cooler floor line. */
 .page-combat .backdrop .mines-bg {
   position: absolute; inset: 0; background: #0b0908;
   filter: brightness(0.8) saturate(0.95);
@@ -7513,15 +7473,6 @@ html, body {
   .stage-combat .enemy.e-elite .spr { scale: 1; }
 }
 .stage-combat .enemy .fig .spr-cinder_foreman { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
-.biome-select { display: flex; gap: 6px; justify-content: center; align-items: center; margin: -4px 0 8px; font-size: 0.78rem; }
-.biome-select .bs-label { color: #b9a28c; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.66rem; }
-.biome-pick { padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(255, 170, 90, 0.3); background: rgba(24, 14, 9, 0.85); color: #d8c3ad; cursor: pointer; font: inherit; }
-.biome-pick.on { border-color: var(--gold, #ffd27a); color: #ffcf8a; box-shadow: 0 0 0 2px rgba(255, 207, 107, 0.18); }
-.biome-pick:focus-visible { outline: 2px solid #ffd27a; outline-offset: 2px; }
-@media (max-height: 480px) {
-  .biome-select { margin: -2px 0 4px; font-size: 0.66rem; }
-  .biome-pick { padding: 1px 8px; }
-}
 /* Long rules text (e.g. Anvil Blow with its inline Vulnerable gloss) made one card taller
    than the dock and broke LAYOUT-ACCEPTANCE S1/S3 at 844x390 and the S2 stage spill at
    768x1024. UX-1: the hand card is a FIXED-height uniform face now, so the row cannot

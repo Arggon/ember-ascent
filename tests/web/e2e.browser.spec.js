@@ -105,10 +105,12 @@ async function waitIdle(page, timeoutMs = 8000) {
 /** A fresh browser + page with the first-run help dismissed. Caller closes the browser.
  *  `seed` defaults to 7; a test whose claim is pinned to a specific first fight picks
  *  its own (the S4 map shift moved every seed's encounter rolls). `reduce` serves the
- *  prefers-reduced-motion walks. `biome` selects the kernel BIOMES entry via the same
- *  `?biome=` knob the surface itself reads (actions.js) — the "golpes discretos" specs
- *  need the Cinder Mines roster (the slag_crawler's A4x2 and PARRY20 moves live there). */
-async function freshPage(t, seed = 7, reduce = false, biome = null) {
+ *  prefers-reduced-motion walks. `biome`/`hero` select the kernel BIOMES entry and the
+ *  hero through the same ?biome=/?hero= knobs the surface itself reads at import time
+ *  (actions.js) — the "golpes discretos" specs need the Cinder Mines roster (the
+ *  slag_crawler's A4x2 and PARRY20 moves live there) and the fixed-start walk needs the
+ *  other hero on screen. */
+async function freshPage(t, seed = 7, reduce = false, biome = null, hero = null) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 800 },
@@ -117,7 +119,7 @@ async function freshPage(t, seed = 7, reduce = false, biome = null) {
   t.after(() => { void browser.close(); });
   const page = await ctx.newPage();
   await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
-  await page.goto(`${base}/src/web/index.html?seed=${seed}${biome ? `&biome=${biome}` : ''}`);
+  await page.goto(`${base}/src/web/index.html?seed=${seed}${biome ? `&biome=${biome}` : ''}${hero ? `&hero=${hero}` : ''}`);
   await page.waitForLoadState('domcontentloaded');
   return page;
 }
@@ -2794,14 +2796,8 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   const page = await freshPage(t);
 
-  // P1 WIRING (live DOM): the kindling picker is the first screen, so the hero blurbs
-  // are checkable in BOTH languages across this walk — the empty-blurb regression (a
-  // key/id mismatch) failed exactly here, silently, in both languages.
-  await page.waitForSelector('.hero-pick', { timeout: 5000 });
-  const blurbsEn = await page.locator('.hero-pick .hp-blurb').allTextContents();
-  assert.equal(blurbsEn.length, 2, 'both heroes render a blurb row');
-  for (const b of blurbsEn) assert.ok(b.trim().length > 0, `no empty hero blurb (en): "${b}"`);
-
+  // (The retired hero picker used to open this walk with live EN/ES blurb reads; that
+  // coverage moved to the fixed-start hero test below, plus the i18n unit pin.)
   await bootToMap(page);
   await travelToFight(page);
   await waitIdle(page);
@@ -2871,22 +2867,31 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   assert.equal((await page.locator('#hud button.lang-toggle').textContent()).trim(), 'ES');
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'es');
 
-  // P1 WIRING, Spanish side: the fresh boot lands on kindling again, so the hero
-  // blurbs must render non-empty in es too — and I18N-2 localizes the pick NAMES.
-  await page.waitForSelector('.hero-pick', { timeout: 5000 });
-  const blurbsEs = await page.locator('.hero-pick .hp-blurb').allTextContents();
-  assert.equal(blurbsEs.length, 2, 'both heroes render a blurb row (es)');
-  for (const b of blurbsEs) assert.ok(b.trim().length > 0, `no empty hero blurb (es): "${b}"`);
-  const namesEs = await page.locator('.hero-pick .hp-name').allTextContents();
-  assert.deepEqual(namesEs, ['Ashwright', 'Custodio del Fuelle'],
-    'the pick names localize: the proper noun stays, the Keeper title translates');
-
   // BACK TO ENGLISH: one click restores the English chrome on the fresh run.
   await page.locator('#hud button.lang-toggle').click();
   await waitIdle(page);
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
   assert.equal((await page.locator('#hud button.lang-toggle').textContent()).trim(), 'EN');
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en');
+});
+
+test('fixed start: the seeded other hero (?hero=bellows) names himself in the HUD, in English and in Spanish after the toggle', { timeout: 60000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  // A page of its OWN, seeded to the other hero: the walk above runs the fixed default,
+  // and a language toggle here would persist (dlb.lang is written) and poison every
+  // later English assertion — which is exactly why this is an independent test.
+  const page = await freshPage(t, 7, false, null, 'bellows');
+  await page.waitForSelector('#hud', { timeout: 5000 });
+  // The HUD chip paints snap.characterName (kernel-side), the same proper noun the
+  // retired picker's name row used to show. The BLURBS' live EN/ES read died with the
+  // picker; their net is the i18n unit pin (tests/web/i18n.test.js).
+  const charEn = (await page.locator('.hud-char').first().textContent()).trim();
+  assert.equal(charEn, 'Bellows Keeper', 'the seeded hero names himself in the HUD');
+  await page.locator('#hud button.lang-toggle').click();
+  await waitIdle(page);
+  const charEs = (await page.locator('.hud-char').first().textContent()).trim();
+  assert.equal(charEs, 'Custodio del Fuelle', 'the HUD name localizes with the toggle');
+  assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'es', 'the toggle persisted the language');
 });
 
 // ---------------------------------------------------------------------------
@@ -2972,12 +2977,12 @@ test('la pose melee no se repite tras el impacto (Hammerfall)', { timeout: 60000
 
 // ---------------------------------------------------------------------------
 // 12. the ONBOARDING-TOUR product tour (docs/specs/ONBOARDING-TOUR-spec.md):
-//     six coach-marks over the REAL screens, anchored to elements the views
+//     five coach-marks over the REAL screens, anchored to elements the views
 //     already paint, phase-gated (review round 2): a Next/Back exists only
 //     where its destination step shares the phase on screen, and an action
 //     step (kindling, map) carries a hint line instead. THE LANGUAGE PRE-STEP
 //     (the language ask): a fresh-onboarding boot whose player never chose a
-//     language opens on the bilingual language card BEFORE the heroes step —
+//     language opens on the bilingual language card BEFORE the kindling step —
 //     choosing there (or any exit) writes dlb.lang and it never shows again;
 //     a browser whose locale starts with 'es' boots Spanish WITHOUT dlb.lang
 //     until the choice. The tour tests are the INVERSE of the mainline walks'
@@ -3012,9 +3017,9 @@ async function freshTourPage(t, { seed = 7, width = 1280, height = 800, flags = 
   return page;
 }
 
-/** The card and the anchor must not share a pixel (ONBOARDING-TOUR AC7). `sel` may be
- *  an array — the heroes step anchors the hero row AND the path row in one union hole,
- *  so the claim is measured on the union bounding box, the way tour.js draws it. */
+/** The card and the anchor must not share a pixel (ONBOARDING-TOUR AC7). `sel` stays
+ *  array-capable (an anchor list measures the union bounding box, the way tour.js drew
+ *  the old union hole); every caller passes a single selector today. */
 const tourCardClearOfAnchor = (page, sel) => page.evaluate((anchorSel) => {
   const card = document.querySelector('.tour-card').getBoundingClientRect();
   const u = [].concat(anchorSel).map((s) => document.querySelector(s)).filter(Boolean)
@@ -3028,7 +3033,7 @@ const tourCardClearOfAnchor = (page, sel) => page.evaluate((anchorSel) => {
 }, sel);
 
 /** The ring covers the viewport EXCEPT the anchor's hole: the anchor's centre is
- *  not shaded, a far corner is. `sel` may be an array (the heroes union). */
+ *  not shaded, a far corner is. `sel` stays array-capable (union bounding box). */
 const tourRing = (page, sel) => page.evaluate((anchorSel) => {
   const u = [].concat(anchorSel).map((s) => document.querySelector(s)).filter(Boolean)
     .map((e) => e.getBoundingClientRect())
@@ -3058,7 +3063,7 @@ test('tour: a fresh boot opens on the language choice, then the guided tour on t
   // named buttons — with NO step counter and NO shade ring: the kindling screen below
   // must stay visible, because picking is supposed to flip it before the player's eyes.
   await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
-  assert.equal(await page.locator('.tour-count').count(), 0, 'the pre-step carries no n-of-6 counter');
+  assert.equal(await page.locator('.tour-count').count(), 0, 'the pre-step carries no step counter');
   assert.equal((await page.locator('.tour-head').first().textContent()).trim(), 'Idioma — Language', 'the title is bilingual');
   const bodies = await page.locator('.tour-body').allTextContents();
   assert.ok(bodies.some((b) => b.includes('Elige el idioma del juego')), 'the Spanish body is on the card');
@@ -3071,44 +3076,33 @@ test('tour: a fresh boot opens on the language choice, then the guided tour on t
   assert.equal(await page.getByRole('button', { name: 'Help' }).count(), 1, 'the HUD Help button still renders');
 
   // Choosing ENGLISH (the en-US default, confirmed explicitly) writes dlb.lang and lands
-  // the heroes step with its full union ring — the review-round-2 claims, untouched.
+  // the kindling step with its ring — the phase-gate claims, untouched.
   await page.getByRole('button', { name: 'English' }).click();
   await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'the first REAL step is the heroes one');
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 5', 'the first REAL step is the boon one');
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en', 'the choice persisted');
-  assert.equal(await page.locator('.tour-shade').count(), 4, 'the shade ring is up around the hero+path union');
-  // Review round 2: the ring is the UNION of .hero-select and .biome-select — both
-  // radio groups sit visible and clickable in the one hole.
-  const ring = await tourRing(page, ['.hero-select', '.biome-select']);
-  assert.ok(ring.anchorClear, 'the hero and path rows sit in the ring hole');
+  assert.equal(await page.locator('.tour-shade').count(), 4, 'the shade ring is up around the boon list');
+  const ring = await tourRing(page, '.boon-list');
+  assert.ok(ring.anchorClear, 'the boon list sits in the ring hole');
   assert.ok(ring.cornerShaded, 'everything outside the hole is dimmed by the shades');
-  // Clickable, not just visible: a hero pick's own centre hits the pick, never a shade —
-  // the player's complaint was exactly a subject dimmed behind its own coach-mark.
+  // Clickable, not just visible: a boon button's own centre hits the button, never a
+  // shade — the player's complaint was exactly a subject dimmed behind its own
+  // coach-mark.
   const clickable = await page.evaluate(() => {
-    const pick = document.querySelector('.hero-pick.on');
-    const hit = document.elementFromPoint(
-      pick.getBoundingClientRect().left + pick.getBoundingClientRect().width / 2,
-      pick.getBoundingClientRect().top + pick.getBoundingClientRect().height / 2);
-    return hit === pick || pick.contains(hit);
+    const boon = document.querySelector('.boon-list button');
+    const r = boon.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return hit === boon || boon.contains(hit);
   });
-  assert.ok(clickable, 'the checked hero pick sits in the hole, unshaded');
+  assert.ok(clickable, 'the first boon button sits in the hole, unshaded');
 
-  // Review round 1 of the rework: the pickers' keydown stops propagation for the keys
-  // they handle, so an arrow on a FOCUSED pick switches it and the tour stays put with
-  // the caret on the pick — before the fix the same press ALSO ran the guard's tourNext
-  // (measured: step 1, caret stolen to the card), so the copy's arrow claim was false.
-  const startHero = await page.evaluate(() => window.__dlb.snapshot().character);
-  await page.focus('.hero-pick.on');
+  // The kindling step has NO Next (its way forward is the boon), so from step 0 the
+  // keyboard cannot advance either: the guard runs tourNext (app.js) and the phase gate
+  // is a no-op — the map step lives on ANOTHER screen. The arrow must leave the step
+  // exactly where it was.
   await page.keyboard.press('ArrowRight');
   await sleep(250);
-  const arrow = await page.evaluate(() => ({
-    step: window.__dlb.tour().step,
-    hero: window.__dlb.snapshot().character,
-    focus: document.activeElement.className,
-  }));
-  assert.notEqual(arrow.hero, startHero, 'ArrowRight switched the focused pick');
-  assert.equal(arrow.step, 0, 'the arrow did not step the tour');
-  assert.ok(arrow.focus.includes('hero-pick'), `the caret stayed on the pick (${arrow.focus})`);
+  assert.equal(await page.evaluate(() => window.__dlb.tour().step), 0, 'ArrowRight is a phase-gate no-op on the kindling step');
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
 });
 
@@ -3123,8 +3117,8 @@ test('tour: choosing Español flips the tour AND the kindling screen to Spanish 
   // the coach card AND the kindling screen underneath read Spanish on the same beat.
   await page.getByRole('button', { name: 'Español' }).click();
   await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Paso 1 de 6', 'the tour card is Spanish immediately');
-  assert.ok((await page.locator('.tour-head').first().textContent()).includes('Tu héroe y tu camino'), 'the heroes step narrates in Spanish');
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Paso 1 de 5', 'the tour card is Spanish immediately');
+  assert.ok((await page.locator('.tour-head').first().textContent()).includes('El rescoldo'), 'the kindling step narrates in Spanish');
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'es', '<html lang> followed the choice');
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'es', 'dlb.lang was written');
   assert.equal((await page.locator('.kindling-head').first().textContent()).trim(), 'La forja ofrece un rescoldo', 'the kindling screen underneath flipped too');
@@ -3179,7 +3173,7 @@ test('tour: every exit from the language step persists — Next confirms the def
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), null, 'nothing written while the pre-step stands');
   await page.locator('.tour-next').click();
   await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'Next advanced to the heroes step');
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 5', 'Next advanced to the kindling step');
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en', 'Next persisted the en-US default');
   await page.close();
 
@@ -3252,11 +3246,11 @@ test('tour: taking a boon under the still-open language pre-step persists the de
   // The kindling screen under the pre-step dims NOTHING, so the player may act on it
   // without choosing a language first — §3.5: that act is another exit from the pre-step
   // (it persists the current default) and the tour FOLLOWS the phase, the same
-  // player's-hands jump the six steps ride.
+  // player's-hands jump the five steps ride.
   await page.locator('button.boon').first().click();
-  await page.waitForFunction(() => window.__dlb.tour().step === 2, null, { timeout: 5000 });
+  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en', 'the exit through an act persisted the en-US default');
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 3 of 6', 'the tour landed on the map step');
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 2 of 5', 'the tour landed on the map step');
   assert.ok(await page.evaluate(() => !!document.querySelector('.map')), 'the map is on stage');
   assert.equal(await page.locator('.tour-shade').count(), 4, 'the ring re-anchored to the map');
   assert.equal(errors.length, 0, `no page errors: ${errors.join(' | ')}`);
@@ -3270,51 +3264,36 @@ test('tour: the steps advance by click and keyboard, follow the phase, and a sha
   await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
 
   // The language pre-step stands first (the language ask): Next confirms the en-US
-  // default and lands the heroes step — from there the walk is the shipped six.
+  // default and lands the kindling step — the walk's first REAL step now.
   await page.locator('.tour-next').click();
   await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'the confirmed default lands the heroes step');
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 5', 'the confirmed default lands the kindling step');
 
-  // Heroes → kindling by Next: the destination step shares the kindling phase, so the
-  // button exists and the phase gate lets it through.
-  await page.locator('.tour-next').click();
-  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 2 of 6', 'Next advanced inside the phase');
-
-  // Review round 2 (1): the kindling step has NO Next — its way forward is the boon —
-  // and carries the hint line instead. Back still exists (its destination, the heroes
-  // step, shares the phase), and Enter is a no-op here: the phase gate holds for the
-  // keyboard too.
+  // The kindling step is the FIRST step: no Next (its way forward is the boon), no
+  // Back (nothing exists before it), only the hint line. Enter still runs the guard's
+  // tourNext, and the phase gate still answers it: the map step is another screen, so
+  // the step must hold at 0.
   assert.equal(await page.locator('.tour-next').count(), 0, 'no Next on the kindling step: taking the boon is the way on');
   assert.equal((await page.locator('.tour-hint').first().textContent()).trim(), 'Take a boon to continue — the tour follows.', 'the kindling hint is on the card');
-  assert.equal(await page.locator('.tour-back').count(), 1, 'Back exists: the heroes step shares the kindling phase');
+  assert.equal(await page.locator('.tour-back').count(), 0, 'no Back: the kindling step is the first step');
   await page.keyboard.press('Enter');
   await sleep(250);
-  assert.equal(await page.evaluate(() => window.__dlb.tour().step), 1, 'Enter is a no-op where the way forward is the action');
+  assert.equal(await page.evaluate(() => window.__dlb.tour().step), 0, 'Enter is a no-op here: the phase gate holds');
 
-  // Keyboard parity inside the phase: ← back to the heroes step, → forward again.
+  // The arrows cannot advance either: ← has nothing before step 0 (tourBack's own
+  // guard), and → dies on the same phase gate as Next/Enter above.
   await page.keyboard.press('ArrowLeft');
-  await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'ArrowLeft stepped back');
+  await sleep(250);
+  assert.equal(await page.evaluate(() => window.__dlb.tour().step), 0, 'ArrowLeft is a no-op on the first step');
   await page.keyboard.press('ArrowRight');
-  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
-
-  // Review round 1 of the rework: Enter on a focused card BUTTON activates THAT button
-  // natively — the guard used to preventDefault it and run tourNext instead, so Enter
-  // on Back stepped FORWARD. Here tourNext would be a phase-gate no-op anyway, so the
-  // paths were indistinguishable until this assertion: Back must run, step 0 follows.
-  await page.locator('.tour-back').focus();
-  await page.keyboard.press('Enter');
-  await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'Enter on the focused Back ran Back, not tourNext');
-  await page.keyboard.press('ArrowRight');
-  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
+  await sleep(250);
+  assert.equal(await page.evaluate(() => window.__dlb.tour().step), 0, 'ArrowRight is a phase-gate no-op on the first step');
 
   // Kindling → map BY DOING: the anchored .boon-list is the clickable region, so a real
   // boon click through the hole both takes the gift and lands the tour on the map step.
   await page.locator('button.boon').first().click();
-  await page.waitForFunction(() => window.__dlb.tour().step === 2, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 3 of 6', 'the tour followed the phase to the map');
+  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 2 of 5', 'the tour followed the phase to the map');
   assert.ok(await page.evaluate(() => !!document.querySelector('.map')), 'the map is on stage');
   assert.equal(await page.locator('.tour-shade').count(), 4, 'the ring re-anchored to the map');
 
@@ -3388,10 +3367,11 @@ test('tour: a dismissed tour never auto-opens again, and the Help sheet carries 
   await replay.click();
   await page.waitForFunction(() => window.__dlb.tour().open === true, null, { timeout: 5000 });
   assert.equal(await page.locator('.modal').count(), 0, 'the sheet closed behind the tour');
-  // findIndex takes the FIRST kindling match: the heroes step, the run's first decision —
-  // NEVER the language pre-step (the language ask: a replay never re-asks).
-  assert.deepEqual(await page.evaluate(() => window.__dlb.tour()), { open: true, step: 0 }, 'the tour opened at the heroes step for the kindling phase');
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 6', 'the card reads the first step');
+  // findIndex takes the FIRST kindling match: the boon step (STEPS[0]) — under the fixed
+  // start it is the run's first decision — NEVER the language pre-step (a replay never
+  // re-asks).
+  assert.deepEqual(await page.evaluate(() => window.__dlb.tour()), { open: true, step: 0 }, 'the tour opened at the kindling step for the kindling phase');
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 1 of 5', 'the card reads the first step');
   const afterReplay = await page.evaluate(() => {
     const s = window.__dlb.snapshot();
     return { seed: s.seed, step: s.stepIndex, phase: s.phase };
@@ -3406,8 +3386,8 @@ test('tour: a dismissed tour never auto-opens again, and the Help sheet carries 
   assert.deepEqual(flags, ['1', '1'], 'the flags are unchanged');
 
   // The same Skip by KEYBOARD (review round 1 of the rework): Enter on the focused Skip
-  // activates IT natively — the guard used to run tourNext there, which on the heroes
-  // step moved the tour on (step 1) instead of ever dismissing.
+  // activates IT natively — the guard used to run tourNext there, which moved the tour
+  // on instead of ever dismissing.
   await page.getByRole('button', { name: 'Help' }).click();
   await page.waitForSelector('.modal', { timeout: 3000 });
   await page.getByRole('button', { name: 'Replay the guided tour' }).click();
@@ -3429,22 +3409,19 @@ test('tour: the combat steps anchor the hand, the intent row and End Turn, and f
   await page.waitForSelector('#tour-layer .tour-card', { timeout: 5000 });
 
   // The language pre-step first (the language ask): Next confirms the en-US default —
-  // the full six-step flow still works after the choice.
+  // the full five-step flow still works after the choice.
   await page.locator('.tour-next').click();
   await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
 
-  // Heroes → kindling by Next, then kindling → map BY DOING (the boon click through its
-  // hole), then the map's own hole is the clickable region: travel to the first ordinary
-  // fight through it.
-  await page.locator('.tour-next').click();
-  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
+  // Kindling → map BY DOING (the boon click through its hole), then the map's own hole
+  // is the clickable region: travel to the first ordinary fight through it.
   await page.locator('button.boon').first().click();
-  await page.waitForFunction(() => window.__dlb.tour().step === 2, null, { timeout: 5000 });
+  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
   await travelToFight(page);
 
   // The tour jumped to the combat's first step and rings the hand.
-  await page.waitForFunction(() => window.__dlb.tour().step === 3, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 4 of 6', 'the hand step is up');
+  await page.waitForFunction(() => window.__dlb.tour().step === 2, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 3 of 5', 'the hand step is up');
   assert.equal(await page.locator('.tour-shade').count(), 4, 'the ring is up');
   // Review round 2 (3): no Back on the hand step — its previous step lives on the map
   // screen — while Next exists (the intent step shares the combat).
@@ -3455,14 +3432,14 @@ test('tour: the combat steps anchor the hand, the intent row and End Turn, and f
 
   // Next chains the shared-combat steps: hand → intent → endTurn → Done.
   await page.locator('.tour-next').click();
-  await page.waitForFunction(() => window.__dlb.tour().step === 4, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 5 of 6', 'the intent step is up');
+  await page.waitForFunction(() => window.__dlb.tour().step === 3, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 4 of 5', 'the intent step is up');
   assert.ok(await page.evaluate(() => !!document.querySelector('.e-intent')), 'the intent row is painted');
   ring = await tourRing(page, '.e-intent');
   assert.ok(ring.anchorClear, 'the intent row sits in the ring hole');
   await page.locator('.tour-next').click();
-  await page.waitForFunction(() => window.__dlb.tour().step === 5, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 6 of 6', 'the End Turn step is up');
+  await page.waitForFunction(() => window.__dlb.tour().step === 4, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 5 of 5', 'the End Turn step is up');
   const endTurnBtn = page.locator('.controls button', { hasText: 'End Turn' });
   assert.equal(await endTurnBtn.count(), 1, 'End Turn is on stage');
   ring = await tourRing(page, '.controls');
@@ -3494,10 +3471,13 @@ test('tour: the coach card parks and stays legible in the small bands', { timeou
       return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, vh: window.innerHeight };
     });
     assert.ok(parked.top >= 0 && parked.bottom <= parked.vh, `${width}x${height}: the pre-step card is fully on screen`);
-    // Choosing English lands the heroes step: the ring is up and the parked card never
-    // covers its own anchor (AC7) — the boot step is the heroes one, so the anchor is
-    // the hero+path union (measured this round: the bottom band clears it at 390x844
-    // and 700x440 alike).
+    // Choosing English lands the kindling step: the ring is up and the parked card must
+    // not cover its own anchor (AC7) — the anchor is the .boon-list. PRIMARY claim: no
+    // .boon button CENTRE sits under the card in either band (the band-scoring that
+    // parks the card counts covered buttons, tour.js). tourCardClearOfAnchor below pins
+    // the rect-level claim — card and anchor share no pixel — and it holds on both
+    // bands: under the fixed start the kindling has no pickers, so the illustration
+    // reflows and the fit was measured live (390x844 and 700x440).
     await page.getByRole('button', { name: 'English' }).click();
     await page.waitForFunction(() => window.__dlb.tour().step === 0, null, { timeout: 5000 });
     assert.equal(await page.locator('.tour-shade').count(), 4, `${width}x${height}: the ring is up`);
@@ -3506,7 +3486,18 @@ test('tour: the coach card parks and stays legible in the small bands', { timeou
       return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, vh: window.innerHeight };
     });
     assert.ok(parked.top >= 0 && parked.bottom <= parked.vh, `${width}x${height}: the card is fully on screen`);
-    assert.ok(await tourCardClearOfAnchor(page, ['.hero-select', '.biome-select']), `${width}x${height}: the card never covers the union anchor`);
+    const covered = await page.evaluate(() => {
+      const c = document.querySelector('.tour-card').getBoundingClientRect();
+      return [...document.querySelectorAll('.boon-list button')]
+        .filter((b) => {
+          const r = b.getBoundingClientRect();
+          const cx = r.left + r.width / 2; const cy = r.top + r.height / 2;
+          return cx > c.left && cx < c.right && cy > c.top && cy < c.bottom;
+        })
+        .map((b) => (b.querySelector('.boon-name') || b).textContent.trim());
+    });
+    assert.deepEqual(covered, [], `${width}x${height}: no boon button's centre sits under the card`);
+    assert.ok(await tourCardClearOfAnchor(page, '.boon-list'), `${width}x${height}: the card never covers the boon-list anchor`);
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => window.__dlb.tour().open === false, null, { timeout: 5000 });
   }
@@ -3527,11 +3518,9 @@ test('tour: taking a boon under the open tour lands the map step anchored to the
   // The real player's bug, pinned (review round 2): an action step parks the tour on
   // the player's act, and the act's own repaint must land the tour on the NEXT screen's
   // first step — never a stale card over the old screen, never a ringless card.
-  await page.locator('.tour-next').click();
-  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
   await page.locator('button.boon').first().click();
-  await page.waitForFunction(() => window.__dlb.tour().step === 2, null, { timeout: 5000 });
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 3 of 6', 'the map step is up');
+  await page.waitForFunction(() => window.__dlb.tour().step === 1, null, { timeout: 5000 });
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 2 of 5', 'the map step is up');
   assert.ok(await page.evaluate(() => !!document.querySelector('.map')), 'the map screen is what the card sits over');
   const ring = await tourRing(page, '.map');
   assert.ok(ring.anchorClear, 'the map sits in the ring hole');
@@ -3555,8 +3544,8 @@ test('tour: Replay from the map lands on the map step', { timeout: 120000 }, asy
   await page.waitForSelector('.modal', { timeout: 3000 });
   await page.getByRole('button', { name: 'Replay the guided tour' }).click();
   await page.waitForFunction(() => window.__dlb.tour().open === true, null, { timeout: 5000 });
-  assert.deepEqual(await page.evaluate(() => window.__dlb.tour()), { open: true, step: 2 }, 'the map phase resolves to its own first step');
-  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 3 of 6', 'the card reads the map step');
+  assert.deepEqual(await page.evaluate(() => window.__dlb.tour()), { open: true, step: 1 }, 'the map phase resolves to its own first step');
+  assert.equal((await page.locator('.tour-count').first().textContent()).trim(), 'Step 2 of 5', 'the card reads the map step');
   const ring = await tourRing(page, '.map');
   assert.ok(ring.anchorClear, 'the map sits in the ring hole');
   assert.equal(await page.locator('.modal').count(), 0, 'the sheet closed behind the tour');

@@ -1,12 +1,11 @@
-// B5 Path select on the Kindling screen: the same radio-group behaviour as the hero picker
-// (#26), and a Path switch is not a new act (review of #14).
+// Fixed start (ruling): every run begins on the Foundry start path, so the kindling
+// screen has no path or hero pickers any more. This file keeps the fake-DOM harness and
+// pins the act-start paint: one title card that names the run's own biome, a boon list,
+// and NO picker markup of any kind. (The seeded non-default boot — the other hero, the
+// other path — lives in fixed-start.test.js, which owns its own harness copy.)
 //
-// Before: switching Path replayed the Act I title card (a switch rebuilds the run and the
-// first paint of a run plays it), and the arrow keys did nothing although the group is
-// role=radiogroup. The Act I card also has to name the run's own biome.
-//
-// Drives the REAL src/web/app.js against the fake DOM from hero-select / click-targeting tests,
-// with real controllers, so a switch really rebuilds the run on the other path.
+// Drives the REAL src/web/app.js against the same fake DOM as the other kernel tests,
+// with real controllers, so the pinned paint is what the app really renders.
 let uid = 0;
 class N {
   constructor(tag) {
@@ -55,9 +54,9 @@ class N {
   remove() { if (this.parent) { this.parent.kids = this.parent.kids.filter((k) => k !== this); this.parent = null; } }
   get firstElementChild() { return this.kids.find((k) => k.tag !== '#text') ?? null; }
   dispatch(type, extra = {}) {
-    // stopPropagation is part of the event API the views rely on (kindling-view's
-    // radiogroups stop the bubble so the document guard never sees a handled arrow),
-    // so the shim models it: the walk ends after the node that stopped it.
+    // stopPropagation is part of the generic event API a real DOM models and any view
+    // may rely on, so the shim models it too: the walk ends after the node that stopped
+    // the bubble.
     const ev = {
       type, target: this,
       preventDefault() { this.defaultPrevented = true; },
@@ -126,63 +125,21 @@ const api = new Function('__mods', `${prelude}\n${src}`)(importedModules);
 
 const actCards = () => fxAdded.filter((x) => x._cls === 'fx-act-card');
 const actName = (card) => card._all().find((n) => n._cls === 'fx-act-name')?.txt;
-const radios = () => byId.stage.querySelectorAll('.biome-pick');
-const checked = () => radios().find((r) => r.attrs['aria-checked'] === 'true');
 const biome = () => api.snapGet().biome;
 
-test('a run opens with one Foundry title card; one tab stop on the checked path', () => {
+test('fixed start: a run opens with one Foundry title card and no pickers on the kindling screen', () => {
   assert.equal(api.snapGet().phase, 'kindling');
-  assert.equal(biome(), 'foundry');
+  assert.equal(biome(), 'foundry', 'every run starts on the same start path');
   assert.equal(actCards().length, 1);
-  assert.equal(actName(actCards()[0]), 'The Foundry');
-  const rs = radios();
-  assert.equal(rs.length, 2);
-  assert.deepEqual(rs.map((r) => r.attrs.role), ['radio', 'radio']);
-  assert.deepEqual(rs.map((r) => r.attrs.tabindex), ['0', '-1'], 'roving tabindex');
+  assert.equal(actName(actCards()[0]), 'The Foundry', 'the title card names the run\'s own biome');
+  assert.equal(byId.stage.querySelectorAll('.biome-pick').length, 0, 'no path picker is painted');
+  assert.equal(byId.stage.querySelectorAll('.hero-pick').length, 0, 'no hero picker is painted');
+  assert.ok(byId.stage.querySelectorAll('.boon').length >= 1, 'the kindling boon list is painted');
 });
 
-test('ArrowRight moves to the Mines, same seed, focus follows, no title card replays', () => {
-  checked().dispatch('keydown', { key: 'ArrowRight' });
-  assert.equal(biome(), 'mines');
-  assert.equal(api.snapGet().seed, 11);
-  assert.ok(checked()._cls.includes('bp-mines'));
-  assert.equal(document.activeElement, checked(), 'focus is on the newly checked radio');
-  assert.deepEqual(radios().map((r) => r.attrs.tabindex), ['-1', '0']);
-  assert.equal(actCards().length, 1, 'a Path switch is the same screen, not a new act');
-});
-
-test('arrows wrap and Home/End jump', () => {
-  checked().dispatch('keydown', { key: 'ArrowRight' });
-  assert.equal(biome(), 'foundry', 'Right from the last path wraps to the first');
-  checked().dispatch('keydown', { key: 'ArrowLeft' });
-  assert.equal(biome(), 'mines', 'Left from the first path wraps to the last');
-  checked().dispatch('keydown', { key: 'Home' });
-  assert.equal(biome(), 'foundry');
-  checked().dispatch('keydown', { key: 'End' });
-  assert.equal(biome(), 'mines');
-  checked().dispatch('keydown', { key: 'ArrowDown' });
-  assert.equal(biome(), 'foundry', 'Down moves to the next path (wrapping)');
-  checked().dispatch('keydown', { key: 'ArrowUp' });
-  assert.equal(biome(), 'mines', 'Up moves to the previous path (wrapping)');
-  const before = api.snapGet();
-  checked().dispatch('keydown', { key: 'a' });
-  assert.equal(api.snapGet(), before, 'other keys do nothing');
-  assert.equal(actCards().length, 1, 'none of these switches replayed the title card');
-});
-
-test('a click switch is quiet; clicking the checked path is a no-op', () => {
-  const runBefore = api.snapGet();
-  checked().dispatch('click');
-  assert.equal(api.snapGet(), runBefore);
-  radios()[0].dispatch('click');
-  assert.equal(biome(), 'foundry');
-  assert.equal(actCards().length, 1);
-});
-
-test('a genuinely new run on the Mines plays a title card that names the Mines', () => {
-  radios()[1].dispatch('click');
-  assert.equal(biome(), 'mines');
+test('a genuinely new run still plays the title card (newGame() without quiet, as the n hotkey calls it)', () => {
+  const n = actCards().length;
   api.newGame();
-  assert.equal(actCards().length, 2);
-  assert.equal(actName(actCards()[1]), 'The Cinder Mines');
+  assert.equal(actCards().length, n + 1);
+  assert.equal(actName(actCards()[actCards().length - 1]), 'The Foundry', 'a restart stays on the fixed start path');
 });

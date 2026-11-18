@@ -140,7 +140,8 @@ test('the snapshot localizes the biome, the Bellows Keeper and the starter relic
   assert.equal(esBellows.relicName, 'Farol Cian');
   const enBellows = snapshot(bellowsRun, { lang: 'en' });
   assert.equal(enBellows.characterName, 'Bellows Keeper');
-  // The biome PICKER (the kindling paths) localizes with the same snapshot.
+  // The biome name (what the Act I card shows, and what the retired kindling picker
+  // used to render) localizes with the same snapshot.
   assert.equal(esBellows.biomes[0].name, 'La Fundición');
 });
 

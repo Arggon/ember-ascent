@@ -85,10 +85,10 @@ test('the player-facing combat chrome is fully present in both languages', () =>
 });
 
 test('WIRING: every HEROES id has a kindling blurb that renders non-empty in en AND es', () => {
-  // The picker builds the key as `hero.<id>.blurb` from actions.js's HEROES ids — a
-  // renamed id with a stale key rendered an EMPTY blurb node in both languages (the
-  // P1 this test makes loud forever). Read the ids from the real source so the pin
-  // cannot drift from what the view actually renders.
+  // The keys are `hero.<id>.blurb` over actions.js's HEROES ids — the two heroes'
+  // LIVING CONTENT, kept by ruling after the fixed start. The retired kindling picker
+  // was the only src consumer, so this pin is now the blurbs' only net: read the ids
+  // from the real source so the pin cannot drift from what the game declares.
   const src = readFileSync(new URL('../../src/web/actions.js', import.meta.url), 'utf8');
   const ids = [...src.matchAll(/id:\s*'([a-z_]+)',\s*name:/g)].map((m) => m[1]);
   assert.ok(ids.length >= 2, `the two shipped heroes are declared (${ids.join(', ')})`);
