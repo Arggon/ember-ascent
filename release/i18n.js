@@ -346,15 +346,15 @@ const STRINGS = {
   'page.shop': { en: '✦ — The Vendor', es: '✦ — El Vendedor' },
 
   /* ---- kindling ----------------------------------------------------------------------- */
-  'kindling.heroes.aria': { en: 'Choose your hero', es: 'Elige tu héroe' },
-  'kindling.paths.aria': { en: 'Choose the path', es: 'Elige el camino' },
-  'kindling.path': { en: 'Path', es: 'Camino' },
   'kindling.head': { en: 'The forge offers a kindling', es: 'La forja ofrece un rescoldo' },
   'kindling.note': { en: 'Take one. Each gift has a price.', es: 'Toma uno. Cada regalo tiene un precio.' },
   'kindling.boonCost': { en: 'Cost: ', es: 'Coste: ' },
-  // Keyed by the HERO ID (actions.js HEROES), not the display name — the picker builds
-  // the key as `hero.${h.id}.blurb`, so an id/key mismatch renders an empty node.
-  // I18N-2: the pick-screen names. Ashwright is a proper noun (renders identically);
+  // Keyed by the HERO ID (actions.js HEROES), not the display name. KEPT BY RULING under
+  // the fixed start: these rows are the two heroes' living content, but after the kindling
+  // rework nothing in src consumes them at paint (the retired picker was the only one) —
+  // the wiring test (i18n.test.js) is now their only net, pinning every HEROES id to a
+  // non-empty en/es blurb.
+  // I18N-2: the names. Ashwright is a proper noun (renders identically);
   // the Bellows Keeper's title localizes, article-less per the genderless-hero ruling.
   'hero.ironclad.name': { en: 'Ashwright', es: 'Ashwright' },
   'hero.bellows.name': { en: 'Bellows Keeper', es: 'Custodio del Fuelle' },
@@ -455,7 +455,7 @@ const STRINGS = {
 
   /* ---- product tour (ONBOARDING-TOUR) ---------------------------------- */
   // While the tour is open the surface's keyboard guard swallows every game shortcut
-  // (app.js's tour guard, ONBOARDING-TOUR §5.4), so the combat steps (4-6 of 6) name
+  // (app.js's tour guard, ONBOARDING-TOUR §5.4), so the combat steps (3-5 of 5) name
   // the CLICK path and say the keys come back when the tour ends — teaching a swallowed
   // shortcut on the exact screen it is swallowed on teaches nothing.
   'tour.title': { en: 'First steps at the forge', es: 'Primeros pasos en la forja' },
@@ -465,17 +465,12 @@ const STRINGS = {
   'tour.done': { en: 'Done — climb', es: 'Listo — a escalar' },
   'tour.skip': { en: 'Skip the tour  (Esc)', es: 'Saltar el recorrido  (Esc)' },
   'tour.replay': { en: 'Replay the guided tour', es: 'Repetir el recorrido guiado' },
-  'tour.replay.title': { en: 'Six short steps over the real screens', es: 'Seis pasos cortos sobre las pantallas reales' },
-  // Review round 2: the hero/path pick got its OWN step, so the kindling step's copy is
-  // the boon alone. The heroes body leads with the click and then names the arrows —
-  // which DO teach under the open tour: kindling-view's radiogroup keydown stops
-  // propagation for the keys it handles, so an arrow on a focused pick switches it
-  // WITHOUT reaching the tour guard's ←/→ (app.js) and never steps the tour off its own
-  // subject (its review round 1 measured the double action and this is its fix).
+  'tour.replay.title': { en: 'Five short steps over the real screens', es: 'Cinco pasos cortos sobre las pantallas reales' },
+  // Under the fixed start the kindling step IS the tour's first real step, and its way
+  // forward is the boon itself — so its copy rides the hint line instead of a Next, and
+  // the old heroes-step rows (and their arrow-teaching copy) are gone with the pickers.
   'tour.hint.kindling': { en: 'Take a boon to continue — the tour follows.', es: 'Toma un rescoldo para continuar — el recorrido te sigue.' },
   'tour.hint.map': { en: 'Travel to a glowing node to continue — the tour follows.', es: 'Viaja a un nodo brillante para continuar — el recorrido te sigue.' },
-  'tour.step.heroes.title': { en: 'Your hero and your path', es: 'Tu héroe y tu camino' },
-  'tour.step.heroes.body': { en: 'Choose a hero and a path: click a portrait or a path name — the arrows switch them too, once a pick has focus. The choice rebuilds the run.', es: 'Elige un héroe y un camino: haz clic en un retrato o en el nombre de un camino — las flechas también los cambian, cuando una opción tiene el foco. La elección reconstruye la partida.' },
   'tour.step.kindling.title': { en: 'The kindling', es: 'El rescoldo' },
   'tour.step.kindling.body': { en: 'Take exactly one below: each gift has a price, and taking it starts the ascent.', es: 'Toma exactamente uno abajo: cada regalo tiene un precio, y tomarlo inicia el ascenso.' },
   'tour.step.map.title': { en: 'The ascent map', es: 'El mapa del ascenso' },

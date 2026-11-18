@@ -2,9 +2,8 @@
 //
 // Every interaction funnels through `act()`: dispatch one kernel action id, diff the two
 // snapshots the kernel just handed us (for the toasts AND for the visual-effect bursts),
-// then repaint and play the effects. `newGame()` (plus the hero/path switches that rebuild
-// the same screen) lives here too, because it is the other half of the lifecycle: it is
-// where every piece of run-scoped presentation state is reset.
+// then repaint and play the effects. `newGame()` lives here too, because it is the other
+// half of the lifecycle: it is where every piece of run-scoped presentation state is reset.
 //
 // The kernel entry is src/kernel/index.js; the controller comes from
 // src/surface/gui/controller.js. Shared presentation state lives in ./runtime.js and is
@@ -293,11 +292,12 @@ function buildHpTrail(events, preState) {
   return { start: Date.now(), units, reveal, pre };
 }
 
-/** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it.
- *  The NAMES are proper nouns in every language. The blurbs are NOT carried here: the
- *  kindling picker builds the key `hero.<id>.blurb` from the id and resolves it through
- *  i18n at paint time (I18N-1) — the wiring test pins that every id below has that key
- *  in the dictionary, so a renamed id fails a test instead of rendering an empty node. */
+/** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it —
+ *  and since the fixed start retired the kindling pickers, that seeding is the ONLY chooser.
+ *  The NAMES are proper nouns in every language. The blurbs are NOT carried here: they live
+ *  in i18n as `hero.<id>.blurb` — living content of the two heroes, but after the rework
+ *  nothing in src consumes them at paint, so the wiring test (i18n.test.js) is their only
+ *  net: it pins every id below to a non-empty en/es row, and a renamed id fails a test. */
 export const HEROES = [
   { id: 'ironclad', name: 'Ashwright' },
   { id: 'bellows', name: 'Bellows Keeper' },
@@ -1023,8 +1023,10 @@ export const sumEnemyHp = (s) => s.enemies.reduce((n, e) => n + e.hp, 0);
 
 /**
  * @param {number|null} [seed]
- * @param {{quiet?: boolean}} [opts] quiet: a hero switch on the Kindling screen, which must
- *   not replay the act title card
+ * @param {{quiet?: boolean}} [opts] quiet: skip the act title card on this run's first
+ *   paint. The in-src caller died with the fixed start (the same-seed kindling switches
+ *   are gone); the option STAYS because the test harness still passes it (boon-cost
+ *   rebuilds per seed), and such rebuilds must never replay the title card.
  */
 export function newGame(seed = null, opts = {}) {
   // A NEW run, built for the profile the player's own history has earned (DR-4). The
@@ -1076,34 +1078,6 @@ export function newGame(seed = null, opts = {}) {
   setEnteringIds(new Set());
   notifyEndTargeting();
   repaint();
-}
-
-/**
- * B4: rebuild the run, same seed, for another hero. It is the SAME screen with a different
- * hero, not a new act: the Act I title card is not replayed. Focus follows the selection,
- * so the arrow keys keep working after the repaint.
- * @param {string} id hero id from HEROES
- */
-export function switchHero(id) {
-  if (id === (snap.character ?? 'ironclad')) return;
-  heroChoice = id;
-  newGame(snap.seed, { quiet: true });
-  const picked = document.querySelector('.hero-pick.on');
-  if (picked && typeof picked.focus === 'function') picked.focus();
-}
-
-/**
- * B5: rebuild the run, same seed, on another path. Like a hero switch it is the SAME
- * screen, not a new act: the Act I title card is not replayed, and focus follows the
- * selection so the arrow keys keep working after the repaint.
- * @param {string} id biome id from the kernel BIOMES table
- */
-export function switchPath(id) {
-  if (id === (snap.biome ?? DEFAULT_BIOME)) return;
-  biomeChoice = id;
-  newGame(snap.seed, { quiet: true });
-  const picked = document.querySelector('.biome-pick.on');
-  if (picked && typeof picked.focus === 'function') picked.focus();
 }
 
 /**

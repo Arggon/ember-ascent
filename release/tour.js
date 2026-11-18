@@ -1,11 +1,10 @@
-// src/web/tour.js — the first-run product tour: six coach-marks over the REAL screens.
+// src/web/tour.js — the first-run product tour: five coach-marks over the REAL screens.
 //
 // ONBOARDING-TOUR spec (docs/specs/ONBOARDING-TOUR-spec.md). PRESENTATION ONLY: it reads
 // `snap` (the kernel's value model) and localStorage, never a rule. Its layer is the
 // PERSISTENT #tour-layer, a sibling of #stage declared in index.html, so `render()`
-// rebuilding #stage can never destroy a coach-mark mid-read. The six steps anchor to
+// rebuilding #stage can never destroy a coach-mark mid-read. The five steps anchor to
 // elements the views already paint:
-//   heroes → .hero-select + .biome-select (one union hole)
 //   kindling → .boon-list   map → .map   hand → .hand   intent → .e-intent   endTurn → .controls
 // Navigation is PHASE-GATED (review round 2): a Next/Back exists — and is keyed — only
 // when its DESTINATION step shares the phase on screen; where the way forward is an
@@ -18,7 +17,7 @@
 //
 // THE LANGUAGE PRE-STEP (LANG_STEP): on a fresh onboarding boot whose player has never
 // picked a language (i18n.js langChosen() false — no dlb.lang written), the tour's FIRST
-// card is the language choice, BEFORE the heroes step: bilingual copy (its whole job is
+// card is the language choice, BEFORE the boon step: bilingual copy (its whole job is
 // to be readable before any language exists) and two native-named buttons. Picking one,
 // pressing Next, or ANY other exit (Skip, Escape, an act on the undimmed kindling screen
 // below) persists the language — dlb.lang is written and the pre-step never shows again.
@@ -38,8 +37,8 @@ import { t, setLang, currentLang, langChosen } from './i18n.js';
 export const TOUR_SEEN_KEY = 'dlb.tourSeen.v1';
 export const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
 
-/** The language pre-step's index in `tourStep`: NOT a member of STEPS (the other six
- *  keep their 'n of 6' counter), one card BEFORE the heroes step, shown only while
+/** The language pre-step's index in `tourStep`: NOT a member of STEPS (the other five
+ *  keep their 'n of 5' counter), one card BEFORE the boon step, shown only while
  *  `langChosen()` is false on a fresh onboarding boot. */
 const LANG_STEP = -1;
 
@@ -58,15 +57,13 @@ const LANG_BODY_EN = 'Pick the game\u2019s language — the whole interface foll
  *  itself in the language it selects. */
 const LANG_NAMES = Object.freeze({ en: 'English', es: 'Español' });
 
-/** The six steps in player order. `phase` gates BOTH the contextual jump (a phase change
+/** The five steps in player order. `phase` gates BOTH the contextual jump (a phase change
  *  under an open tour lands on the new phase's first step) and the Next/Back buttons (a
  *  button is painted — and keyed — only when its destination step shares the phase on
- *  screen); `sel` is the real anchor the shade ring is measured against — a live element,
- *  or for the heroes step the UNION of two live elements, the views paint, nothing
- *  invented. `hint` names the i18n line shown where a Next would mis-teach: the way
- *  forward is the player's own act, not a button. */
+ *  screen); `sel` is the real anchor the shade ring is measured against — a live element
+ *  the views paint, nothing invented. `hint` names the i18n line shown where a Next would
+ *  mis-teach: the way forward is the player's own act, not a button. */
 const STEPS = [
-  { id: 'heroes', phase: 'kindling', sel: ['.hero-select', '.biome-select'] },
   { id: 'kindling', phase: 'kindling', sel: '.boon-list', hint: 'tour.hint.kindling' },
   { id: 'map', phase: 'map', sel: '.map', hint: 'tour.hint.map' },
   { id: 'hand', phase: 'combat', sel: '.hand' },
@@ -120,7 +117,7 @@ export function dismissTour() {
 export function tourNext() {
   if (!tourOpen) return;
   // The language pre-step's Next CONFIRMS the current (browser-default) language — the
-  // explicit write is the exit's persist — and moves on to the heroes step. No ring was
+  // explicit write is the exit's persist — and moves on to the boon step. No ring was
   // dimming anything, so no repaint is needed; the card alone changes.
   if (tourStep === LANG_STEP) { setLang(currentLang()); tourStep = 0; paintTour(); return; }
   if (tourStep >= STEPS.length - 1) { dismissTour(); return; }
@@ -141,9 +138,9 @@ export function tourBack() {
 }
 
 /** Open the tour on demand (the Help sheet's Replay entry) at the step for the CURRENT
- *  phase; an unknown phase parks on step 1. findIndex returns the FIRST match, so a
- *  kindling phase lands on the heroes step (STEPS[0]) — the run's first decision is
- *  hero + path — not on the boon. NEVER the language pre-step: a replaying veteran is
+ *  phase; an unknown phase parks on step 0. findIndex returns the FIRST match, so a
+ *  kindling phase lands on the boon step (STEPS[0]) — under the fixed start that choice
+ *  IS the run's first decision. NEVER the language pre-step: a replaying veteran is
  *  past onboarding whatever dlb.lang says. Opening writes no flag; paintedAt resets so
  *  the landed step announces and takes the caret even if a previous visit painted it. */
 export function startTour() {
@@ -158,7 +155,7 @@ export function startTour() {
  *  then re-narrate the CURRENT run in the chosen language — a fresh `ctl.snapshot
  *  ({ lang })` and a repaint, the exact move switchLang() makes (actions.js) — so the
  *  kindling screen UNDER the card flips too, which is why the pre-step dims nothing.
- *  tourStep moves first, so the repaint's tourSync already lands on the heroes step in
+ *  tourStep moves first, so the repaint's tourSync already lands on the boon step in
  *  the new language; the trailing paintTour() only covers hosts whose repaint hook is
  *  not yet registered. */
 function chooseLang(id) {
@@ -170,8 +167,8 @@ function chooseLang(id) {
 }
 
 /** The language pre-step's card (ONBOARDING-TOUR, the language ask): bilingual copy and
- *  two native-named buttons, NO step counter (it is a pre-step — the six real steps keep
- *  their 'n of 6') and NO shade ring — the kindling screen underneath must stay fully
+ *  two native-named buttons, NO step counter (it is a pre-step — the five real steps keep
+ *  their 'n of 5') and NO shade ring — the kindling screen underneath must stay fully
  *  visible and clickable, because the choice is supposed to flip it before the player's
  *  eyes. The card parks bottom-centre (the missing-anchor convention) and its Next
  *  confirms the current default. */
@@ -267,41 +264,29 @@ function paintTour() {
   // The ring: four shades AROUND the anchor's rect (a hole, not an outline), so the
   // marked element stays the visible — and clickable — region while everything else
   // dims behind the shades. A shade CLICK dismisses (the .modal-back convention).
-  // `sel` may be an ARRAY (review round 2: the heroes step anchors .hero-select AND its
-  // sibling .biome-select, so ONE hole keeps both radio groups visible and clickable —
-  // the copy's subject must never sit dimmed behind its own coach-mark). The mechanism
-  // is the union bounding box of the selectors that resolved, not a wrapper element:
-  // the two groups are independent siblings the view paints separately and no shared
-  // box hugs just them.
   const W = window.innerWidth; const H = window.innerHeight;
-  const sels = Array.isArray(step.sel) ? step.sel : [step.sel];
-  const anchors = sels.map((s) => document.querySelector(s)).filter(Boolean);
-  if (anchors.length) {
-    // The visible union (raw rects) and the resting union (translate-unwound rects):
-    // this paint may be the one that STARTED the phase entrance (.enter fade-up, the map
-    // rows' ea-rise — both translateY for ~0.42s), so r can sit ~10px from where the
-    // element RESTS. The ring dims what is on screen (r); the card's placement decides
-    // on the resting geometry — a band chosen on a rect that then settles leaves the
-    // card over its anchor for the screen's life (measured: a 1.2px graze at 390x844, a
-    // covered travel node at 640x460). Subtracting the ancestors' summed translate
-    // recovers it; real scroll is already inside r.
-    let vx0 = Infinity; let vy0 = Infinity; let vx1 = -Infinity; let vy1 = -Infinity;
-    let rx0 = Infinity; let ry0 = Infinity; let rx1 = -Infinity; let ry1 = -Infinity;
-    for (const anchor of anchors) {
-      const r = anchor.getBoundingClientRect();
-      let dx = 0; let dy = 0;
-      for (let e = anchor; e; e = e.parentElement) {
-        const tr = getComputedStyle(e).transform;
-        if (tr && tr !== 'none') {
-          const m = tr.match(/^matrix\(([^)]+)\)$/);
-          if (m) { const p = m[1].split(',').map(Number); dx += p[4]; dy += p[5]; }
-        }
+  const anchor = document.querySelector(step.sel);
+  if (anchor) {
+    // The visible rect (raw) and the resting rect (translate-unwound): this paint may be
+    // the one that STARTED the phase entrance (.enter fade-up, the map rows' ea-rise —
+    // both translateY for ~0.42s), so r can sit ~10px from where the element RESTS. The
+    // ring dims what is on screen (r); the card's placement decides on the resting
+    // geometry — a band chosen on a rect that then settles leaves the card over its
+    // anchor for the screen's life (measured: a 1.2px graze at 390x844, a covered travel
+    // node at 640x460). Subtracting the ancestors' summed translate recovers it; real
+    // scroll is already inside r.
+    const r = anchor.getBoundingClientRect();
+    let dx = 0; let dy = 0;
+    for (let e = anchor; e; e = e.parentElement) {
+      const tr = getComputedStyle(e).transform;
+      if (tr && tr !== 'none') {
+        const m = tr.match(/^matrix\(([^)]+)\)$/);
+        if (m) { const p = m[1].split(',').map(Number); dx += p[4]; dy += p[5]; }
       }
-      vx0 = Math.min(vx0, r.left); vy0 = Math.min(vy0, r.top);
-      vx1 = Math.max(vx1, r.right); vy1 = Math.max(vy1, r.bottom);
-      rx0 = Math.min(rx0, r.left - dx); ry0 = Math.min(ry0, r.top - dy);
-      rx1 = Math.max(rx1, r.right - dx); ry1 = Math.max(ry1, r.bottom - dy);
     }
+    const vx0 = r.left; const vy0 = r.top; const vx1 = r.right; const vy1 = r.bottom;
+    const rx0 = r.left - dx; const ry0 = r.top - dy;
+    const rx1 = r.right - dx; const ry1 = r.bottom - dy;
     const pad = 10;
     const x0 = Math.max(0, vx0 - pad); const y0 = Math.max(0, vy0 - pad);
     const x1 = Math.min(W, vx1 + pad); const y1 = Math.min(H, vy1 + pad);
@@ -321,19 +306,16 @@ function paintTour() {
       // bands by actionable elements covered first (a travel node hidden behind the card
       // is the unrecoverable loss — 640x460), then by anchor overlap (390x844: the
       // resting map ends at 666.5 and the bottom band's edge 671.3 clears it while the
-      // top grazes). An exact tie falls to the bottom band, the reference default. The
-      // scoring walks EVERY anchor's buttons (the heroes step's union holds two groups).
+      // top grazes). An exact tie falls to the bottom band, the reference default.
       const h = card.offsetHeight;
       const bands = [
         { top: H - 8 - h, bottom: H - 8, hits: 0, area: 0 },
         { top: 8, bottom: 8 + h, hits: 0, area: 0 },
       ];
       for (const b of bands) {
-        for (const a of anchors) {
-          for (const n of a.querySelectorAll('button, a')) {
-            const nr = n.getBoundingClientRect();
-            if (nr.bottom > b.top && nr.top < b.bottom && nr.right > 0 && nr.left < W) b.hits += 1;
-          }
+        for (const n of anchor.querySelectorAll('button, a')) {
+          const nr = n.getBoundingClientRect();
+          if (nr.bottom > b.top && nr.top < b.bottom && nr.right > 0 && nr.left < W) b.hits += 1;
         }
         b.area = Math.max(0, Math.min(ry1, b.bottom) - Math.max(ry0, b.top));
       }
@@ -381,7 +363,7 @@ export function tourSync(phaseChanged) {
     if (freshOnboarding() && snap.phase === 'kindling') {
       tourOpen = true;
       // The language pre-step leads ONLY while the player has never chosen (dlb.lang
-      // unwritten): a chosen or veteran boot lands straight on the heroes step.
+      // unwritten): a chosen or veteran boot lands straight on the boon step.
       tourStep = langChosen() ? 0 : LANG_STEP;
     }
   } else {
