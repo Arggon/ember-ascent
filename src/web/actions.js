@@ -39,6 +39,7 @@ import {
   setFlash,
   setHeroMoveHold,
   setHeldDeaths,
+  setImpactHold,
   setHpTrail,
   hpTrail,
   retireHpTrail,
@@ -1065,6 +1066,9 @@ export function newGame(seed = null, opts = {}) {
   setEnteredIds(new Set());
   setHeroMoveHold(null);
   setStrikeSeq(null);
+  // the impact bundle's hold is run-scoped motion state like the rest: a restart must
+  // not let a dead run's window resume a squash on the new run's first paint.
+  setImpactHold(null);
   // barra de vida por golpe: run-scoped motion state like the rest — a restart drops the
   // trail without the retire's snap (the fresh run repaints from its own snapshot), and
   // any held ghosts with it.

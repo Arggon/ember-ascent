@@ -23,6 +23,7 @@ import {
   signatureFor,
 } from './hero-moves.js';
 import {
+  IMPACT_FEEL,
   STRIKE_SEQ,
   TURN_STEP,
   HERO_POSE_MS,
@@ -36,12 +37,14 @@ import {
   fxEl,
   heroMoveHold,
   hpTrail,
+  hpUnitHost,
   later,
   quietIntro,
   reducedMotion,
   revealFloats,
   setBursts,
   setHeroMoveHold,
+  setImpactHold,
   setQuietIntro,
   snap,
   stageEl,
@@ -174,6 +177,137 @@ function parryProc(at) {
 }
 
 /**
+ * THE IMPACT BUNDLE's live half (the impact recipe): retrigger the one-shot squash /
+ * recoil on a golpe's victim at the beat its freeze window opens. The victim's LIVE
+ * body is resolved with the very selector the hp trail writes bars through
+ * (`hpUnitHost` — a killing golpe resolves to the collapsing ghost, exactly like a
+ * landing hammer), the animation is restarted by reflow (the same mechanism the hp
+ * pulse uses), the resume hold (`impactHold`) is armed for a repaint that lands inside
+ * the window, and a generation-guarded timer retires the class when the bundle's paced
+ * span is over — so it can never linger under a death or a launch that starts later.
+ *
+ * The bundle REPLACES the hurt flinch on this live figure for its whole span (the
+ * stylesheet rule wins it), so the retirement also pins the figure's motion off with
+ * the pose-hold grace form (`animation: none`): removing the class alone would restart
+ * that flinch from 0% and play a second flinch no kernel event asked for. The next
+ * paint rebuilds the tree and drops the inline style with it.
+ *
+ * Direction: an enemy victim recoils AWAY from the hero (`1`), the hero victim mirrors
+ * it (`-1`), so both knockbacks read away from the blow. The recoil width is
+ * pinned inline from IMPACT_FEEL so the value survives the `hitstop-heavy` class's own
+ * retirement at window close (the recoil peak lands right after the unfreeze).
+ * @param {string} key the victim unit ('p' or `e<index>`, the hpTrail namespace)
+ * @param {number} gen this action's effect generation (the fire() guard's own)
+ * @param {number} weight the golpe's freeze weight (2 widens the recoil)
+ */
+function restartImpact(key, gen, weight) {
+  if (reducedMotion || animSpeed === 0) return;
+  const host = hpUnitHost(key);
+  const fig = host && host.querySelector ? host.querySelector('.fig') : null;
+  if (!fig || !fig.classList) return;
+  fig.classList.remove('is-impact');
+  // Guarded for the fake-DOM test hosts (no offsetWidth there); the reflow is only the
+  // retrigger nicety for a second golpe on a figure already carrying the class.
+  if (typeof fig.offsetWidth === 'number') void fig.offsetWidth;
+  // --impact-dir is a UNITLESS sign (calc() multiplication forbids length*length —
+  // a px sign times a px width would drop the whole declaration); the width below
+  // carries the unit. Both ride the hold: a repaint inside the window rebuilds the
+  // figure, and the resume path (combat-view) must re-pin the SAME values, not the
+  // stylesheet fallbacks a fresh node would otherwise inherit.
+  const dir = key === 'p' ? '-1' : '1';
+  const recoil = `${weight === 2 ? IMPACT_FEEL.recoilPxHeavy : IMPACT_FEEL.recoilPx}px`;
+  if (fig.style && fig.style.setProperty) {
+    fig.style.setProperty('--impact-dir', dir);
+    fig.style.setProperty('--impact-recoil', recoil);
+  }
+  fig.classList.add('is-impact');
+  const start = Date.now();
+  const dur = animMs(IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs) || (IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs);
+  setImpactHold({ key, start, until: start + dur, dir, recoil });
+  later(() => {
+    if (gen !== animGen) return;
+    if (fig.classList) fig.classList.remove('is-impact');
+    // The grace pin is for HURT-pose victims only: the inline `animation: none` would
+    // beat the normal-specificity rules of the figures whose beats this bundle must
+    // never own — the same closed enumeration the stylesheet's :not chain names (the
+    // hero's death combo, a launch mid-flight, a gust lean) — and kill their beats
+    // outright. On those figures the class just comes off.
+    const owned = fig.classList
+      && (fig.classList.contains('is-hero-death') || fig.classList.contains('launched') || fig.classList.contains('blown'));
+    if (!owned && fig.style) fig.style.animation = 'none';
+  }, dur);
+}
+
+/**
+ * The weight of one golpe's freeze: killing (`hp <= 0` — the very predicate the death
+ * hold and the floats' DOWN word use) or a heavy hit (dealt >= heavyDealt) freezes
+ * heaviest, a mid hit (dealt >= midDealt) a step lighter, everything else light; a
+ * parried golpe freezes nothing (-1) — the defender refused it outright and the parry
+ * proc is its beat.
+ * @param {{dealt?: number, hp?: number, parried?: boolean}|null} g one golpe's facts
+ * @returns {number} 2 heavy / 1 mid / 0 light / -1 no freeze
+ */
+function feelWeight(g) {
+  if (!g || g.parried) return -1;
+  const dealt = typeof g.dealt === 'number' ? g.dealt : 0;
+  if ((typeof g.hp === 'number' && g.hp <= 0) || dealt >= IMPACT_FEEL.heavyDealt) return 2;
+  if (dealt >= IMPACT_FEEL.midDealt) return 1;
+  return 0;
+}
+
+/**
+ * THE IMPACT FEEL SCHEDULE (pure, unit-pinned): the freeze windows an action plays,
+ * one per golpe, on the same clocks the golpe floats already fire on — each window
+ * closes at or after its golpe's float beat, so the number lands INSIDE the frozen
+ * frame (the light window is 60 base, not 50, on exactly that arithmetic — see
+ * IMPACT_FEEL). The hero play reads its per-golpe facts off the card-fly burst's
+ * `strikes` (the same array the fx-layer floats ride); an enemy turn reads the armed
+ * plan's per-attacker entries, which turns the old single global freeze into one
+ * window per attacker beat. Windows are disjoint by arithmetic, never by bookkeeping:
+ * the beat is 500 base, the heaviest window 95 base, and both scale by the same
+ * divisor, so they cannot overlap at any dock. A golpe-less action (a guard, a draw,
+ * a quaff that only carries a reveal step — including a play whose burst flies with an
+ * EMPTY `strikes` list, which is how a heal flies) keeps ONE light window as the beat
+ * its numbers land on — lighter than the old fixed 70ms freeze; the same for a
+ * non-attack turn's empty `attacks`. All-parried golpes (a NON-empty strike list whose
+ * every entry was refused) freeze nothing at all.
+ * @param {Array} list the action's bursts (dispatchFx's own list)
+ * @param {any} plan the armed strike plan (runtime.strikeSeq) on an enemy turn
+ * @returns {Array<{key: string|null, at: number, dur: number, weight: number}>}
+ *   paced windows in time order; `key` null marks the golpe-less single window
+ */
+export function feelSchedule(list, plan) {
+  const events = [];
+  const fly = Array.isArray(list)
+    ? list.find((b) => b && b.kind === 'card-fly' && Array.isArray(b.strikes) && b.strikes.length > 0)
+    : null;
+  const golpes = fly
+    ? fly.strikes
+    : (plan && Array.isArray(plan.attacks) && plan.attacks.length > 0 ? plan.attacks : null);
+  if (golpes) {
+    golpes.forEach((g, i) => {
+      const weight = feelWeight(g);
+      if (weight < 0) return; // parried: the proc decorates it, no freeze, no bundle
+      const beat = fly ? animMs(STRIKE_SEQ.beat) * i : (plan.beatMs || 0) * i;
+      events.push({
+        key: fly ? `e${g.enemy}` : 'p',
+        at: beat + animMs(IMPACT_FEEL.lead),
+        dur: animMs(IMPACT_FEEL.freezeMs[weight]),
+        weight,
+      });
+    });
+  } else {
+    events.push({
+      key: null,
+      at: animMs(IMPACT_FEEL.lead),
+      dur: animMs(IMPACT_FEEL.freezeMs[0]),
+      weight: 0,
+    });
+  }
+  return events;
+}
+
+/**
  * The input span of one play, from its card-fly burst: the LONGEST beat of the
  * choreography dispatchFx will schedule for it, in paced milliseconds. UX-5 arms the
  * input lock for exactly this figure in `act()` — BEFORE the paint, the same place and
@@ -185,10 +319,11 @@ function parryProc(at) {
  *   * a signature's tail — the render.js kill-hold convention: its impact beat fires
  *     at ~70% of the pose and the effect lives a paced 650ms beyond;
  *   * a throw's flight — HERO_THROWS' condense delay plus the flight itself;
- *   * the hit-stop beat (the 240+70 feel queue) where the play's numbers land — a
- *     FLOOR on the whole span, not an addition: the numbers land at a fixed ~620ms,
- *     so every beat that outlives them already covers them and summing would hold
- *     the hand dead for another paced 620ms past the last real beat.
+ *   * the hit-stop beat (the 240 + 60..95 freeze windows of the impact recipe) where
+ *     the play's numbers land — a FLOOR on the whole span, not an addition: the numbers
+ *     land inside the FIRST window (whose close rose to up to 335 base with the per-
+ *     golpe windows), so every beat that outlives them already covers them and summing
+ *     would hold the hand dead past the last real beat.
  * `animMs` paces every figure, so the dock scales the gate with the animation. The
  * caller gates on the same condition dispatchFx plays under (not reduced motion, dock
  * not at »), so the gate never engages where nothing animates.
@@ -212,7 +347,10 @@ export function playInputSpan(b) {
     const impact = animMs(Math.round(STRIKE_SEQ.slam * STRIKE_SEQ.impactAt));
     span = Math.max(span, beatMs * (strikes - 1) + impact + animMs(300));
   }
-  return Math.max(span, animMs(310));
+  // The floor is the first freeze window's widest close (lead 240 + heavy 95 base): the
+  // reveal — where the play's numbers land — must stay inside the locked span. The
+  // multi-golpe arithmetic above already covers the later windows.
+  return Math.max(span, animMs(340));
 }
 
 /**
@@ -530,42 +668,73 @@ export function dispatchFx() {
     fxBanner('DEFEAT', 'defeat', '', animMs(1700));
     fxAdd(el('div', { cls: 'fx-darken' }), animMs(1700));
   }
-  // Feel queue: the card is already in flight. Hold the stage for a short hit-stop,
-  // then let the damage and block numbers rise. Uses the SAME action generation captured
-  // above, so it coexists with the signature timers instead of retiring them. Speed 0
-  // and reduced motion never wait (and neither arms a trail — the reveal application
-  // below is a no-op there by construction).
+  // THE IMPACT FEEL QUEUE (the impact recipe): one freeze window per golpe, armed from
+  // the pure schedule above on the SAME action generation captured above, so it
+  // coexists with the signature timers instead of retiring them. The hpTrail pre
+  // invariant keeps its shape: the trail's pre steps land on the FIRST window's arm —
+  // the first UNPARRIED golpe's beat + animMs(240); a mixed play whose golpe 0 was
+  // parried owns no window for it, so windows[0] sits one beat in — and that is still
+  // strictly before THAT golpe's bar step (its float fires at its own beat +
+  // animMs(294), and every window closes at or past its golpe's float beat) — on the
+  // same timers as the freezes rather than a sibling, so the bar walks the stream in
+  // order instead of falling with the first slam and then rising back to the pre-golpe
+  // value with a heal pulse. The first window's close still owns the reveal (the queued
+  // floats and the trail's reveal steps); later windows only freeze and unfreeze their
+  // own beat. Speed 0 and reduced motion never wait (and neither arms a trail — the
+  // reveal application below is a no-op there by construction).
   if (reducedMotion || animSpeed === 0) {
     revealFloats();
     return;
   }
-  later(() => {
-    if (gen !== animGen) return;
-    // barra de vida por golpe: the trail's PRE steps — reveal/tick facts that precede
-    // their body's first golpe in the stream (Combust's end-of-turn sweep and HP cost,
-    // a hero poison tick the same way) — land HERE, at the hit-stop's start. It is
-    // strictly before the first golpe's bar step at every dock (impactMs >= animMs(294)
-    // > animMs(240)), on the same timer as the hit-stop rather than a sibling, so the
-    // bar walks the stream in order instead of falling with the first slam and then
-    // rising back to the pre-golpe value with a heal pulse.
-    const t = hpTrail;
-    if (t && Array.isArray(t.pre)) {
-      for (const s of t.pre) applyHpStep(s.unit, s.hp);
-    }
-    if (stageEl && stageEl.classList) stageEl.classList.add('hitstop');
-    if (fxEl && fxEl.classList) fxEl.classList.add('hitstop');
-    later(() => {
-      if (gen !== animGen) return;
-      clearHitstop();
+  const t = hpTrail;
+  const windows = feelSchedule(list, strikeSeq);
+  if (windows.length === 0) {
+    // THE ALL-PARRIED ACTION: every golpe was refused outright, so the schedule opens
+    // no freeze window and pins no squash — the parry proc is the whole beat. The
+    // action's TRAIL fires are not freeze facts, though: the hp_cost/pre steps, the
+    // queued floats' reveal and the reveal steps are owed regardless of windows (the
+    // old unconditional feel queue fired them for every action). Fire that pair on the
+    // HEAD beats — pre@animMs(240), reveal@animMs(310), both inside the animMs(340)
+    // input-lock floor (playInputSpan) — with no hitstop class and no restartImpact.
+    fire(() => {
+      if (t && Array.isArray(t.pre)) {
+        for (const s of t.pre) applyHpStep(s.unit, s.hp);
+      }
+    }, animMs(240));
+    fire(() => {
       revealFloats();
-      // barra de vida por golpe: the trail's reveal steps land HERE — the same fire
-      // this action's floats land on, never a sibling timer that could drift. The
-      // golpe-fired steps (the per-strike/per-attack/tail facts) were hung on their own
-      // golpe's fire above; this is only for the facts without one. The steps that
-      // preceded their body's first golpe already applied at the pre-beat above.
       if (t && Array.isArray(t.reveal)) {
         for (const s of t.reveal) applyHpStep(s.unit, s.hp);
       }
-    }, animMs(70));
-  }, animMs(240));
+    }, animMs(310));
+  } else windows.forEach((w, i) => {
+    fire(() => {
+      if (i === 0 && t && Array.isArray(t.pre)) {
+        for (const s of t.pre) applyHpStep(s.unit, s.hp);
+      }
+      if (stageEl && stageEl.classList) {
+        stageEl.classList.add('hitstop');
+        if (w.weight === 2) stageEl.classList.add('hitstop-heavy');
+      }
+      if (fxEl && fxEl.classList) {
+        fxEl.classList.add('hitstop');
+        if (w.weight === 2) fxEl.classList.add('hitstop-heavy');
+      }
+      if (w.key) restartImpact(w.key, gen, w.weight);
+    }, w.at);
+    fire(() => {
+      clearHitstop();
+      if (i === 0) {
+        revealFloats();
+        // barra de vida por golpe: the trail's reveal steps land HERE — the same fire
+        // this action's first floats land on, never a sibling timer that could drift.
+        // The golpe-fired steps (the per-strike/per-attack/tail facts) were hung on
+        // their own golpe's fire above; this is only for the facts without one. The
+        // steps that preceded their body's first golpe already applied at the pre-beat.
+        if (t && Array.isArray(t.reveal)) {
+          for (const s of t.reveal) applyHpStep(s.unit, s.hp);
+        }
+      }
+    }, w.at + w.dur);
+  });
 }

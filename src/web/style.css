@@ -1385,6 +1385,12 @@ html, body {
 /* hit-shake was removed: .enemy.damaged now uses hit-flash, which animates
    `filter` only. A transform-based shake can move a hit box and is banned so a
    clickable element never shifts out from under the pointer. */
+/* The impact recipe (fig-impact) IS transform motion on a hit body, and is allowed by
+   this ban's own terms: the ban forbids oscillating shakes on CLICKABLE elements,
+   because a moved hit box betrays the pointer. The squash/recoil run on .fig/.spr —
+   aria-hidden decorative children of the card — so the card's hit box never moves a
+   pixel; they are one-shot with a spring settle (no loop), and they only ever play on
+   the struck body, never on a card the player is about to click. */
 @keyframes drift {
   0% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
@@ -3881,9 +3887,18 @@ html, body {
 
 .hitstop .fig,
 .hitstop .hero.is-approach,
+.hitstop .fig .spr,        /* the impact bundle's white flash must hold through the freeze */
+.hitstop .fig .spr-frame,  /* frame layers kept running through the freeze before this */
+.hitstop .enemy,           /* epose-* animate the CARD (the epose family, below) and kept moving */
 .hitstop .efloat,
 .hitstop .fx-card,
 .hitstop .card { animation-play-state: paused !important; }
+/* Death owns its beat even under the freeze: the ghost's collapse is delayed to the
+   lethal golpe's own fire ("its bar falls to 0 at THAT impact, together with the
+   collapse" — the hp-trail contract, floats.deathHoldMs), so a freeze window opening
+   on that beat must not hold the shatter back. The ghost's FIG keeps its paused white
+   squash frame — that is the impact read, not the death beat. */
+.hitstop .enemy.is-dying { animation-play-state: running !important; }
 .stage-combat .efloat.is-queued { opacity: 0; animation: none; }
 .stage-combat .efloat.is-static { animation: none; opacity: 1; position: absolute; }
 .stage-combat .is-queued { opacity: 0; }
@@ -3987,6 +4002,60 @@ html, body {
 .stage-combat .enemy .fig.pose-slam .spr { filter: brightness(1.4) drop-shadow(0 0 14px rgba(255, 90, 30, 0.7)); }
 .stage-combat .hero .fig.pose-hurt { animation: hero-hurt calc(0.44s * var(--pace, 1)) ease-out; }
 .stage-combat .enemy .fig.pose-hurt { animation: fig-hurt calc(0.4s * var(--pace, 1)) ease-out; }
+/* ---- THE IMPACT BUNDLE (slice: the impact recipe) --------------------------------
+   One-shot squash + recoil on the FIG via the INDIVIDUAL scale/translate properties,
+   which compose with (never override) the pose's `transform` keyframes — no keyframe
+   in this file animates those individuals, so the two can never fight for one property.
+   The solid-white silhouette rides the SPRITE only, so the card's hit box never moves
+   a pixel and the elite's static scale (.e-elite .spr) survives the flash; the elite
+   variant's own filter comes back the moment the animation ends. Excluded by the :not
+   chain: the hero's own death combo (is-hero-death) and the signature victim reactions
+   (launched / blown) own their beats, and a figure wearing one of those classes simply
+   fails to match this rule — the death combo wins by ABSENCE of a rival rule there,
+   not by cascade order, while the scoped !important outranks the resting
+   `animation: none` poses and the hurt flinch everywhere the rule does match. The
+   squash holds its 0% frame under the freeze pause, so the recoil begins on the first
+   LIVE frame after the freeze lifts; one squash frame, one overshoot, one settle —
+   never a loop (see the HIT MODE ban above).
+   animation-delay is deliberately NOT declared here: the resume path (combat-view)
+   writes it inline on a repaint that lands mid-impact, and an inline delay must win.
+   NEVER add another fig-level reaction animation without joining the :not chain. */
+.stage-combat .fig.is-impact:not(.is-hero-death):not(.launched):not(.blown) {
+  animation-name: fig-impact !important;
+  animation-duration: calc(0.46s * var(--pace, 1)) !important;
+  animation-timing-function: ease-out !important;
+  animation-iteration-count: 1 !important;
+  animation-fill-mode: none !important;
+  transform-origin: 50% 100%; /* squash from the feet */
+}
+.stage-combat .fig.is-impact:not(.is-hero-death):not(.launched):not(.blown) .spr { animation: hit-white calc(0.46s * var(--pace, 1)) ease-out; }
+/* Weight knob for the recoil keyframe: fx.js adds `hitstop-heavy` beside `hitstop` for
+   the heaviest freezes and ALSO pins the width inline on the live fig, so the value
+   survives this class's own retirement at window close (the recoil peak lands just
+   after the unfreeze). */
+.hitstop-heavy { --impact-recoil: 8px; }
+@keyframes hit-white {
+  /* SOLID-WHITE impact flash on the SPRITE only (the .sh shadow must not white out).
+     0%-40% holds the silhouette white for 184ms base — longer than the heaviest freeze
+     (95ms base / 190ms at 1x) — and .hitstop PAUSES the animation INSIDE that hold, so
+     the frozen frame stays white for exactly the freeze's length, whatever its weight.
+     fx.js restarts it per golpe on the live fig; the freeze holds the 0% frame. */
+  0%, 40% { filter: brightness(0) invert(1) drop-shadow(0 0 12px rgba(255, 244, 230, 0.9)); }
+  100% { filter: none; }
+}
+@keyframes fig-impact {
+  /* Squash & stretch with a spring return, on the FIG. The freeze pause holds the 0%
+     squash frame; once the freeze lifts, the run 0% -> 22% (recoil peak) -> 55%
+     (overshoot) -> 78% (counter) -> 100% plays in full, so the knockback begins on the
+     first LIVE frame after the freeze with no extra JS clock. Duration base 0.46s =
+     squashMs(260) + recoilMs(200); animMs(460) and calc(0.46s * var(--pace, 1)) are the
+     same number because --pace is SLOW_FACTOR / animSpeed (runtime.applyPace). */
+  0%   { scale: 0.86 1.14; translate: 0 0; }
+  22%  { scale: 0.95 1.05; translate: calc(var(--impact-dir, 1) * var(--impact-recoil, 6px)) 0; }
+  55%  { scale: 1.04 0.97; translate: calc(var(--impact-dir, 1) * 1px) 0; }
+  78%  { scale: 0.99 1.01; translate: 0 0; }
+  100% { scale: 1 1; translate: 0 0; }
+}
 .stage-combat .fig.pose-brace { animation: fig-brace calc(0.28s * var(--pace, 1)) ease-out; }
 .stage-combat .fig.pose-low { animation: fig-idle 1.1s ease-in-out infinite; filter: saturate(0.55) brightness(0.78); }
 /* New hero-only card movements (enemies never take these poses). Durations are long
@@ -4268,15 +4337,24 @@ html, body {
 }
 @media (prefers-reduced-motion: reduce) {
   .stage-combat .fig,
+  .stage-combat .fig.is-impact,
   .stage-combat .hero.is-approach,
   .stage-combat .enemy.is-dying,
   .stage-combat .card { animation: none !important; }
+  /* THE IMPACT BUNDLE, named out with its exact selector: this block sits AFTER the
+     bundle's own rules in source order, so at the equal !important the later `none`
+     wins the tie — reduce never sees the squash, the recoil or the white flash. Under
+     reduce nothing is armed in JS either (no freeze window, no hitstop class, no
+     impactHold), so this is the documented safety net, not the working path. */
+  .stage-combat .fig.is-impact:not(.is-hero-death):not(.launched):not(.blown),
+  .stage-combat .fig.is-impact:not(.is-hero-death):not(.launched):not(.blown) .spr { animation: none !important; }
   /* The frame layers are motion-only: statically they must never paint, or the hero
      would show a frozen swing pose instead of the idle stance. */
   .stage-combat .fig .spr-frame { display: none; }
   .stage-combat .fig.pose-low,
   .stage-combat .hero.is-low .fig { transform: translateY(2px); filter: saturate(0.55) brightness(0.78); }
-  .hitstop .fig, .hitstop .card, .hitstop .efloat { animation-play-state: running !important; }
+  .hitstop .fig, .hitstop .card, .hitstop .efloat,
+  .hitstop .fig .spr, .hitstop .fig .spr-frame, .hitstop .enemy { animation-play-state: running !important; }
 }
 
 /* ===================================================== combat stage v2 (foundry dressing) */

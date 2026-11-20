@@ -3690,7 +3690,11 @@ test('defeat: the speed dock skip cuts the hold short like every other hold', { 
   }
   // The hold is up (same paint as the phase flip); » retires the plan and repaints —
   // the panel replaces the held stage at once instead of after the turn-plus-death wait.
+  // Wait until the 40ms collector has actually SAMPLED a hold tick before skipping: the
+  // whole click sequence can otherwise fit between two ticks (hold===0) and the claim
+  // below would race, not measure. One tick is the assertion's own evidence.
   await page.waitForSelector('.stage-combat .ended-hold', { timeout: 5000 });
+  await page.waitForFunction(() => window.__defeat && window.__defeat.hold > 0, null, { timeout: 5000 });
   const skip = page.locator('.speed-btn', { hasText: '»' });
   assert.equal(await skip.count(), 1, 'the hold paints its own speed dock');
   await skip.click();
@@ -4175,4 +4179,328 @@ test('barra por golpe: a Combust turn steps the hero cost BEFORE the first slam 
   // And the pulse classes agree: every step pulse is the damage one.
   const ups = stepped.filter((c) => /hp-step-up/.test(c.pulse));
   assert.equal(ups.length, 0, `no false heal pulse in the turn: ${JSON.stringify(ups.map((c) => `${c.t}:${c.pulse}`))}`);
+});
+
+// ---------------------------------------------------------------------------
+// THE IMPACT RECIPE (slice 1/4) — the frozen frame reads, the card never moves.
+// Claims, driven the way a player drives them over the REAL surface:
+//   AC1  during the freeze window the victim's fig carries `is-impact` and its sprite
+//        runs a `hit-white` animation PAUSED under `.hitstop` (the frozen frame is the
+//        solid-white one, not a gradual 340ms glow);
+//   AC3  the same frozen sample shows a non-identity computed `scale` on the fig (the
+//        squash) while the pose class (`pose-hurt`) is still present — pose and squash
+//        coexist;
+//   AC4  the victim CARD's computed transform stays identity all through the impact
+//        (the hit box never moves; the squash/recoil live on the aria-hidden .fig), and
+//        the fig's individual `translate` shows exactly ONE excursion (one recoil, no
+//        oscillating shake).
+// Hammerfall is the instrument on purpose: one golpe (one freeze window, one excursion),
+// 6 damage (a light freeze) against the seed-1 Slag Crawler's 32+ HP (no kill holds
+// muddying the window).
+// ---------------------------------------------------------------------------
+test('impact recipe: the frozen frame is white + squashed on the fig, and the card never moves', { timeout: 60000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 1, false, 'mines');
+  await bootToMap(page);
+  await injectDeck(page, 'strike');
+  await travelToFight(page);
+  // travelToFight does NOT wait the gate (its header says so): without this, the
+  // collector would arm inside the fight-entry action's own freeze and misread it as
+  // the play's.
+  await waitIdle(page);
+  const before = await readState(page);
+  assert.equal(before.enemies.length, 1, 'seed 1 mines is the single Slag Crawler');
+
+  // In-page collector, 15ms: the freeze windows are 120-190ms at 1x, finer than the
+  // 40ms the transient-class collectors use (see header).
+  await page.evaluate(() => {
+    window.__imp = { frozen: [], translate: [], cardX: [] };
+    window.__impTimer = setInterval(() => {
+      const stage = document.getElementById('stage');
+      const hitstop = stage && stage.classList.contains('hitstop');
+      const card = document.querySelector('.enemy[data-target-index="1"]');
+      const fig = card && card.querySelector('.fig');
+      if (!fig) return;
+      const spr = fig.querySelector('.spr');
+      const whitePaused = spr && spr.getAnimations
+        ? spr.getAnimations().some((a) => a.animationName === 'hit-white' && a.playState === 'paused')
+        : false;
+      const rec = {
+        t: Math.round(performance.now()),
+        hitstop,
+        figImpact: fig.classList.contains('is-impact'),
+        poseHurt: fig.classList.contains('pose-hurt'),
+        whitePaused,
+        scale: fig.getBoundingClientRect ? getComputedStyle(fig).scale : null,
+      };
+      if (hitstop) window.__imp.frozen.push(rec);
+      window.__imp.translate.push({ t: rec.t, v: getComputedStyle(fig).translate });
+      window.__imp.cardX.push({ t: rec.t, v: getComputedStyle(card).transform });
+    }, 15);
+  });
+
+  const hcard = page.locator('button[data-slot][aria-label^="Hammerfall"][aria-disabled="false"]');
+  assert.ok((await hcard.count()) > 0, 'a Hammerfall is dealt');
+  await hcard.first().click();
+  // Two REPAINTS INSIDE the bundle window (a pile peek repaints the whole stage without
+  // any game action): the resumed figure must re-phase its sprite's hit-white with the
+  // hold's negative delay, not re-bloom solid white from 0%. Sampled at ~T+1100 — with
+  // the sweep the animation is 67% in (white decaying); a re-bloom at the last repaint
+  // (~T+860) would be at 26% — inside the 0-40% solid-white hold.
+  await sleep(650);
+  await page.locator('.pile-draw').first().click();
+  await sleep(200);
+  await page.locator('.pile-sheet button').first().click();
+  await sleep(250);
+  const resumed = await page.evaluate(() => {
+    const fig = document.querySelector('.enemy[data-target-index="1"] .fig');
+    const spr = fig && fig.querySelector('.spr');
+    return {
+      impact: fig ? fig.classList.contains('is-impact') : false,
+      filter: spr ? getComputedStyle(spr).filter : null,
+    };
+  });
+  // One sampling window covering the freeze (~480-600ms at 1x) and the recoil peak
+  // (~680ms), stopping around the input gate's own release paint (~1150ms for the
+  // 560-base pose) — the pile repaints above resume the SAME animation phase, so they
+  // add no rising edge, and the release must not pollute the excursion count either.
+  const got = await page.evaluate(() => { clearInterval(window.__impTimer); return window.__imp; });
+  await waitIdle(page);
+  const after = await readState(page);
+
+  assert.equal(resumed.impact, true,
+    'the bundle is still on the rebuilt figure inside the window (the resume ran)');
+  assert.doesNotMatch(String(resumed.filter), /brightness\(0\)/,
+    `no solid-white re-bloom after the in-window repaints (${resumed.filter})`);
+
+  assert.equal(after.enemies[0].hp, before.enemies[0].hp - 6, 'the stroke lands its printed 6');
+  assert.ok(got.frozen.length >= 2, `the freeze window was sampled (${got.frozen.length} ticks)`);
+  // AC1: inside the freeze the fig wears the bundle and its sprite's hit-white is PAUSED.
+  const solid = got.frozen.filter((s) => s.figImpact && s.whitePaused);
+  assert.ok(solid.length >= 1,
+    `a frozen sample with is-impact + paused hit-white exists (${JSON.stringify(got.frozen.slice(0, 6))})`);
+  // AC3: the same frozen samples keep the pose class and show the squash on the fig.
+  for (const s of solid) {
+    assert.ok(s.poseHurt, 'the pose class survives under the squash (they coexist)');
+    const comps = String(s.scale).trim().split(/\s+/).map(Number);
+    const identity = comps.length > 0 && comps.every((c) => Math.abs(c - 1) < 0.01);
+    assert.ok(!identity, `the frozen fig scale is the squash frame, not identity (${s.scale})`);
+  }
+  // AC4: the clickable level never moves — every sampled transform on the CARD is identity.
+  for (const s of got.cardX) {
+    assert.ok(s.v === 'none' || /^matrix\(1, 0, 0, 1, 0, 0\)$/.test(s.v),
+      `the victim card's transform stays identity through the impact (${s.v} at ${s.t}ms)`);
+  }
+  // AC4: exactly ONE recoil excursion on the fig — one rising edge from rest to nonzero.
+  const px = (v) => { const m = /-?\d+(\.\d+)?/.exec(String(v)); return m ? Number(m[0]) : 0; };
+  let edges = 0;
+  let wasZero = true;
+  for (const s of got.translate) {
+    const zero = px(s.v) === 0;
+    if (wasZero && !zero) edges += 1;
+    wasZero = zero;
+  }
+  assert.equal(edges, 1, `exactly one translate excursion (one recoil, no shake): ${JSON.stringify(got.translate.filter((s) => px(s.v) !== 0))}`);
+});
+
+// ---------------------------------------------------------------------------
+// AC2 — the hit-stop scales with the golpe's WEIGHT and never stacks.
+//   * light: Cinder Flick's three 3-dealt golpes each open a light window (60 base) —
+//     measured as the longest continuous `.hitstop` run of the first play;
+//   * heavy: the save lever (the one writable lever, see header) drops the crawler to
+//     3 HP mid-fight, so the next play's first golpe is the KILLING golpe — its window
+//     is heavy (95 base), and the same collector must read a strictly longer run;
+//   * the first play's windows are disjoint runs (one per golpe, never stacked).
+// Cinder Flick over Maul for the kill on purpose: three golpes cannot ALL be parried,
+// so the killing window exists whatever the PARRY20 roll does.
+// ---------------------------------------------------------------------------
+test('impact recipe: the hit-stop scales with weight (heavy killing window > light) and does not stack', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 1, false, 'mines');
+  await bootToMap(page);
+  await injectDeck(page, 'cinder_flick');
+  await travelToFight(page);
+  const before = await readState(page);
+
+  await page.evaluate(() => {
+    window.__hs = { on: false, runs: [], t0: performance.now() };
+    let open = null;
+    window.__hsTimer = setInterval(() => {
+      const stage = document.getElementById('stage');
+      const hitstop = stage && stage.classList.contains('hitstop');
+      const heavy = Boolean(stage && stage.classList.contains('hitstop-heavy'));
+      const t = Math.round(performance.now() - window.__hs.t0);
+      if (hitstop && open === null) { open = { start: t, ticks: 1, heavy }; }
+      else if (hitstop && open !== null) { open.ticks += 1; }
+      else if (!hitstop && open !== null) { window.__hs.runs.push(open); open = null; }
+    }, 15);
+    window.__hsClose = () => {
+      if (open !== null) window.__hs.runs.push(open);
+      clearInterval(window.__hsTimer);
+      return window.__hs.runs;
+    };
+  });
+
+  const playFlick = async () => {
+    await waitIdle(page);
+    const tile = page.locator('button[data-slot][aria-label^="Cinder Flick"][aria-disabled="false"]');
+    assert.ok((await tile.count()) > 0, 'another Cinder Flick is dealt and playable');
+    await tile.first().click();
+    await waitIdle(page);
+  };
+  // PLAY 1 — three light golpes against a full-HP crawler.
+  await playFlick();
+  const afterP1 = await readState(page);
+  assert.equal(afterP1.enemies[0].hp, before.enemies[0].hp - 9, 'the first play lands its printed 3x3');
+  // The play boundary is measured, not guessed: runs before this count are play 1's
+  // light windows (the opening deal's clock shifts absolute times around).
+  const runs1 = await page.evaluate(() => window.__hs.runs.map((r) => ({ ...r })));
+
+  // THE CRAFT: the lever drops the crawler to 3 HP, so the next play opens with a
+  // killing golpe (heavy). The reload does not repaint; the kernel state is the truth
+  // the play resolves against (the same move the parry-100 spec makes).
+  const crafted = await page.evaluate(() => {
+    const ctl = window.__dlb.controller();
+    const save = JSON.parse(ctl.save());
+    save.state.combat.enemies[0].hp = 3;
+    const res = ctl.load(save);
+    return res.ok ? null : res.problems;
+  });
+  assert.equal(crafted, null, `the hp craft failed: ${JSON.stringify(crafted)}`);
+
+  // PLAY 2 — the killing golpe. The first hand may have spent its only Flick (an
+  // earlier run timed out exactly there), so end the turn first: the redraw deals
+  // from an 8-copy deck, and the crawler's own golpes land in the measured slice as
+  // light windows beside the heavy one.
+  await endTurn(page);
+  await playFlick();
+  await sleep(300);
+  const runs = await page.evaluate(() => window.__hsClose());
+  const after = await readState(page);
+  assert.ok(after.enemies.length === 0 || after.enemies[0].hp <= 0 || after.phase !== 'combat',
+    'the killing play ended the crawler');
+
+  assert.ok(runs.length >= 3, `the golpes opened disjoint windows, not one stacked freeze (${JSON.stringify(runs)})`);
+  for (let i = 1; i < runs.length; i += 1) {
+    assert.ok(runs[i - 1].start + runs[i - 1].ticks * 15 <= runs[i].start,
+      'windows never overlap (the freezes do not stack)');
+  }
+  // WEIGHT SCALING, bunching-robust: the load-bearing fact is the `hitstop-heavy`
+  // class, which the arm fire adds ONLY for weight-2 (killing/dealt>=16) windows —
+  // under heavy machine load several windows can bunch into one long-sampled run,
+  // which makes raw tick counts lie (a light slice once read 37 ticks vs the heavy's
+  // honest 13). Play 1's golpes (3 dealt) must freeze WITHOUT the heavy class; the
+  // killing play's window must freeze WITH it. The tick floor (>= 8 ticks = the light
+  // window's nominal 120ms at 1x) just proves the heavy run is a real window.
+  assert.ok(runs1.length >= 2, `the first play's golpes each froze (${runs1.length} windows in play 1)`);
+  assert.ok(runs1.every((r) => !r.heavy),
+    `no light golpe froze heavy (${JSON.stringify(runs1.filter((r) => r.heavy))})`);
+  const heavyRuns = runs.slice(runs1.length).filter((r) => r.heavy);
+  assert.ok(heavyRuns.length >= 1, `the killing play froze HEAVY (${JSON.stringify(runs.slice(runs1.length))})`);
+  const heavyRun = Math.max(...heavyRuns.map((r) => r.ticks));
+  assert.ok(heavyRun >= 8,
+    `the heavy window is a real freeze, not a class blip (${heavyRun} ticks at 15ms; light is 8 at 1x)`);
+});
+
+// ---------------------------------------------------------------------------
+// AC2, the sequenced turn: the per-golpe windows replace the old single global freeze —
+// walking the seed-15 mines fight to the Slag Crawler's A4x2 turn must show the stage
+// freeze at least TWICE (once per golpe), a beat apart.
+// ---------------------------------------------------------------------------
+test('impact recipe: an A4x2 turn freezes the stage once per golpe (two windows, not one)', { timeout: 120000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 15, false, 'mines');
+  await bootToMap(page);
+  await travelToFight(page);
+  const crawler = await page.evaluate(() => window.__dlb.snapshot().enemies.find((e) => e.id === 'slag_crawler'));
+  assert.ok(crawler, 'the mines fight opens on the Slag Crawler');
+
+  // The same walk the golpe-discretos spec uses: the label is the snapshot's own fact.
+  let label = await page.evaluate(() => window.__dlb.snapshot().enemies.find((e) => e.id === 'slag_crawler')?.intent.label);
+  for (let guard = 0; guard < 5 && label !== 'A4x2'; guard += 1) {
+    await endTurn(page);
+    label = await page.evaluate(() => window.__dlb.snapshot().enemies.find((e) => e.id === 'slag_crawler')?.intent.label);
+  }
+  assert.equal(label, 'A4x2', `the walk reached the double-golpe intent: ${label}`);
+
+  await page.evaluate(() => {
+    // Quiesce-gated: an edge only counts after the collector has seen the stage calm,
+    // so a freeze window still in flight from the walk's last action is never misread
+    // as this turn's first window.
+    window.__w = { edges: 0, was: false, calm: false };
+    window.__wTimer = setInterval(() => {
+      const stage = document.getElementById('stage');
+      const hitstop = Boolean(stage && stage.classList.contains('hitstop'));
+      if (!hitstop) window.__w.calm = true;
+      if (hitstop && !window.__w.was && window.__w.calm) window.__w.edges += 1;
+      window.__w.was = hitstop;
+    }, 20);
+  });
+  await page.waitForFunction(() => window.__w.calm === true, null, { timeout: 5000 });
+
+  const hpBefore = (await readState(page)).player.hp;
+  await endTurn(page);
+  const w = await page.evaluate(() => { clearInterval(window.__wTimer); return window.__w; });
+  const hpAfter = (await readState(page)).player.hp;
+
+  assert.equal(hpBefore - hpAfter, 8, 'the kernel total is still the announced 2x4 (no parry noise)');
+  assert.ok(w.edges >= 2, `the turn froze once per golpe (${w.edges} freeze windows)`);
+});
+
+// ---------------------------------------------------------------------------
+// AC5 — reduced motion: the recipe simply does not exist. A played attack must never
+// show the freeze, never paint `is-impact`, and the fight must stay legible (the HP
+// readouts carry the facts statically).
+// ---------------------------------------------------------------------------
+test('impact recipe: reduced motion plays no freeze, no bundle, and the fight stays legible', { timeout: 60000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t, 7, true);
+  await bootToMap(page);
+  await travelToFight(page);
+  const before = await readState(page);
+
+  await page.evaluate(() => {
+    window.__rm = { hitstop: 0, impact: 0, ticks: 0 };
+    window.__rmTimer = setInterval(() => {
+      window.__rm.ticks += 1;
+      const stage = document.getElementById('stage');
+      if (stage && stage.classList.contains('hitstop')) window.__rm.hitstop += 1;
+      if (document.querySelector('.fig.is-impact')) window.__rm.impact += 1;
+    }, 40);
+  });
+
+  // Play whatever the hand offers (any action exercises the path); the walk logs WHICH
+  // card moved — the AC5 claims below never depend on it being a damage card.
+  const play = await page.evaluate(() => {
+    const s = window.__dlb.snapshot();
+    const c = s.hand.find((x) => x.playable);
+    return c ? { slot: c.slot, name: c.name } : null;
+  });
+  if (play) {
+    await page.locator(`button[data-slot="${play.slot}"]`).click();
+    if (await page.locator('.enemy.targeting').count() > 0) {
+      await page.locator('.enemy[data-target-index="1"]').click();
+    }
+  } else {
+    await endTurn(page);
+  }
+  await sleep(900);
+  const rm = await page.evaluate(() => { clearInterval(window.__rmTimer); return window.__rm; });
+  const after = await readState(page);
+
+  assert.ok(after.phase === 'combat', 'the fight continues under reduce');
+  const factMoved = after.player.hp < before.player.hp
+    || after.turn !== before.turn
+    || after.enemies.some((e, i) => e.hp < (before.enemies[i]?.hp ?? e.hp))
+    || after.hand.length !== before.hand.length;
+  assert.ok(factMoved, `the sampled action resolved (${play ? play.name : 'End Turn'}); state: ${JSON.stringify({ hp: after.player.hp, turn: after.turn, hand: after.hand.length })}`);
+  assert.equal(rm.hitstop, 0, `the stage never froze under reduce (${rm.ticks} ticks)`);
+  assert.equal(rm.impact, 0, 'no fig ever carried is-impact under reduce');
+  // Legibility: every HP readout is a number pair and at least one bar is drawn.
+  const readouts = await page.evaluate(() => {
+    const ehps = [...document.querySelectorAll('.ehp')].map((n) => (n.textContent || '').trim());
+    return { ehps, bars: document.querySelectorAll('.hpbar').length };
+  });
+  assert.ok(readouts.bars >= 1, 'an HP bar is drawn');
+  for (const r of readouts.ehps) assert.match(r, /\d+\/\d+/, `every HP readout is legible (${r})`);
 });

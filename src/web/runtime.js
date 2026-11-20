@@ -73,6 +73,17 @@ export function bumpAnimGen() { animGen += 1; return animGen; }
  */
 export let heroMoveHold = null; // { pose, start, dur } — the pose to keep painting, and its window
 export function setHeroMoveHold(hold) { heroMoveHold = hold; }
+/**
+ * THE IMPACT BUNDLE's hold, the same family of holds with resume as `heroMoveHold`:
+ * `{ key, start, until }` where `key` is the unit the bundle is playing on ('p' or
+ * `e<index>` — the hpTrail key namespace). fx.js arms it when a golpe's freeze window
+ * opens and a repaint inside the window (a hover, the input gate's own release paint)
+ * re-adds `is-impact` on the rebuilt figure with a negative animation-delay — the exact
+ * resume mechanism the pose hold uses. Armed only when motion is on (never under
+ * reduced motion or »), cleared by `skipAnim` and by the run reset.
+ */
+export let impactHold = null;
+export function setImpactHold(hold) { impactHold = hold; }
 
 /* --------------------------------------------------- UX-4: the deal clock ---------
  * The hand's deal is an EVENT the player must SEE: cards landing one by one, not eight
@@ -146,6 +157,27 @@ export const STRIKE_SEQ = { beat: 500, slam: 640, impactAt: 0.46, floatMs: 950 }
  * touching the event grouping again. `animMs` paces it exactly like every other beat.
  */
 export const TURN_STEP = { ms: 560 };
+/**
+ * THE IMPACT RECIPE's base timings, pre-factor base milliseconds, paced by `animMs`/
+ * `--pace` exactly like STRIKE_SEQ (slice: the impact recipe). `freezeMs[0]` is 60, not
+ * 50, on arithmetic: the first golpe's float lands at base 294 (fx.js impact =
+ * animMs(round(slam * impactAt)) = animMs(294)), so the light window anchored at 240
+ * must close at or after 294 — 240+50=290 misses it, 240+60=300 holds the numbers
+ * inside the frozen frame. Every weight closes at or past it: 300/310/335 base.
+ * `midDealt`/`heavyDealt` are the same ladder the floats tier on (floats.js,
+ * actions.js); `recoilPx(Heavy)` feed the `--impact-recoil` knob the recoil keyframe
+ * reads; `squashMs + recoilMs` is the 0.46s base the `fig-impact` keyframes span.
+ */
+export const IMPACT_FEEL = {
+  lead: 240, // freeze anchor after dispatch (the feel-queue lead; the hpTrail pre invariant names it)
+  freezeMs: [60, 70, 95], // light / mid / heavy window lengths, base ms
+  squashMs: 260,
+  recoilMs: 200, // keyframe base 0.46s = squashMs + recoilMs
+  recoilPx: 6,
+  recoilPxHeavy: 8,
+  midDealt: 8,
+  heavyDealt: 16,
+};
 /**
  * Where THIS enemy sits in the playing sequence, or null. `delay` is what its .fig's
  * animation-delay should be RIGHT NOW: positive (waiting for its turn — `fill: both`
@@ -271,7 +303,7 @@ function hpSnapshotHp(key) {
  * @param {string} key
  * @returns {any|null}
  */
-function hpUnitHost(key) {
+export function hpUnitHost(key) {
   if (!stageEl || !stageEl.querySelector) return null;
   if (key === 'p') return stageEl.querySelector('.fight .hero') ?? null;
   const m = HP_UNIT_ENEMY.exec(key);
@@ -597,8 +629,14 @@ export function animMs(ms) {
   return Math.max(0, Math.round((ms * SLOW_FACTOR) / animSpeed));
 }
 export function clearHitstop() {
-  if (stageEl && stageEl.classList) stageEl.classList.remove('hitstop');
-  if (fxEl && fxEl.classList) fxEl.classList.remove('hitstop');
+  if (stageEl && stageEl.classList) {
+    stageEl.classList.remove('hitstop');
+    stageEl.classList.remove('hitstop-heavy');
+  }
+  if (fxEl && fxEl.classList) {
+    fxEl.classList.remove('hitstop');
+    fxEl.classList.remove('hitstop-heavy');
+  }
 }
 export function revealFloats() {
   if (!stageEl || !stageEl.querySelectorAll) return;
@@ -608,6 +646,9 @@ export function revealFloats() {
 export function skipAnim() {
   animGen += 1;
   clearHitstop();
+  // the impact bundle rides the same lifetimes as the rest of the queue: skipping
+  // retires its hold so no repaint re-adds a squash the skip just took off stage.
+  setImpactHold(null);
   // » also retires a playing strike sequence: the remaining beats never fire, and the
   // next paint drops the slam poses (the past floats stay until their own removal timers).
   setStrikeSeq(null);

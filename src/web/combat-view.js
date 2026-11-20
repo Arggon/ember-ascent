@@ -10,6 +10,7 @@
 import { BIOMES, DEFAULT_BIOME, describeTile, intentChips, loadContent } from '../kernel/index.js';
 import {
   HERO_POSE_MS,
+  IMPACT_FEEL,
   SPEED_KEY,
   STRIKE_SEQ,
   animMs,
@@ -19,6 +20,7 @@ import {
   dealClock,
   dyingThisPaint,
   enteringIds,
+  impactHold,
   flash,
   heroMoveHold,
   hpDisplay,
@@ -175,6 +177,43 @@ export function heroFigure() {
         child.style.animationDelay = `-${heldElapsed}ms`;
       } else {
         child.style.animation = 'none';
+      }
+    }
+  }
+  // THE IMPACT BUNDLE's resume: a repaint that lands inside the bundle's window (a
+  // hover, the input gate's own release paint) re-adds the squash on this rebuilt
+  // figure, resumed with a negative animation-delay — the exact mechanism the pose
+  // hold above uses. The direction/width knobs ride the hold (restartImpact pinned
+  // them on the replaced node), so the resumed recoil keeps the victim's own direction
+  // and weight instead of the stylesheet fallbacks a fresh node would inherit. The
+  // stylesheet rule's :not chain keeps a death/launch figure immune to the class, and
+  // the rule leaves animation-delay undeclared precisely so this inline delay can win
+  // while the rest of the animation stays paced. The hold is only ever armed while
+  // motion is on (fx.js gates it), so no extra dock gate here.
+  const impact = impactHold;
+  if (impact && impact.key === 'p' && Date.now() < impact.until) {
+    const elapsed = Math.max(0, Date.now() - impact.start);
+    const dur = animMs(IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs)
+      || (IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs);
+    if (elapsed < dur) {
+      fig.classList.add('is-impact');
+      if (fig.style) {
+        if (fig.style.setProperty) {
+          fig.style.setProperty('--impact-dir', impact.dir || '1');
+          fig.style.setProperty('--impact-recoil', impact.recoil || `${IMPACT_FEEL.recoilPx}px`);
+        }
+        fig.style.animationDuration = `${dur}ms`;
+        fig.style.animationDelay = `-${elapsed}ms`;
+      }
+      // The white silhouette lives on the .spr CHILD (hit-white), and animation-delay
+      // is not inherited — phase the children with the figure (the markup above already
+      // painted them), exactly like the pose hold's sweep, or every repaint inside the
+      // window re-blooms solid white from 0%.
+      for (const child of fig.children ?? []) {
+        if (child.style) {
+          child.style.animationDuration = `${dur}ms`;
+          child.style.animationDelay = `-${elapsed}ms`;
+        }
       }
     }
   }
@@ -631,7 +670,38 @@ export function enemyCard(e, position) {
       fig.style.animationDelay = `${seq.delay}ms`;
     }
   }
+  // THE IMPACT BUNDLE's resume (the hero figure's carries the longer comment): a repaint
+  // inside the bundle's window re-adds the squash on this rebuilt victim figure,
+  // resumed with a negative animation-delay, and re-pins the direction/width knobs the
+  // hold carries. The victim never carries the slam inline above (a struck enemy wears
+  // pose-hurt, not the plan's slam), so the two resume writers cannot collide on one
+  // node. It runs AFTER the markup below: the white silhouette lives on the .spr CHILD
+  // (hit-white), and the sweep that phases the children with the figure can only happen
+  // once the markup has painted them — without it, any repaint inside the window
+  // re-blooms solid white from 0%.
+  const impact = impactHold;
+  const resumeImpact = impact && impact.key === `e${e.index}` && Date.now() < impact.until;
+  const impactElapsed = resumeImpact ? Math.max(0, Date.now() - impact.start) : -1;
+  const impactDur = animMs(IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs)
+    || (IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs);
   fig.innerHTML = enemyMarkup(e.id);
+  if (resumeImpact && impactElapsed < impactDur) {
+    fig.classList.add('is-impact');
+    if (fig.style) {
+      if (fig.style.setProperty) {
+        fig.style.setProperty('--impact-dir', impact.dir || '1');
+        fig.style.setProperty('--impact-recoil', impact.recoil || `${IMPACT_FEEL.recoilPx}px`);
+      }
+      fig.style.animationDuration = `${impactDur}ms`;
+      fig.style.animationDelay = `-${impactElapsed}ms`;
+    }
+    for (const child of fig.children ?? []) {
+      if (child.style) {
+        child.style.animationDuration = `${impactDur}ms`;
+        child.style.animationDelay = `-${impactElapsed}ms`;
+      }
+    }
+  }
   // THE ENEMY'S OWN HEADLINE sits ABOVE the figure, where the retired intent badge used
   // to float (the user's ask): the ACTIONS row (the `.e-intent` chips — what the enemy is
   // about to do) topmost, then the enemy's own BUFFS (`.e-statuses.e-buffs`, from the
