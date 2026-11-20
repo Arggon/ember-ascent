@@ -179,6 +179,17 @@ export const IMPACT_FEEL = {
   heavyDealt: 16,
 };
 /**
+ * THE WAAPI EMBER PARTICLES' base figures (fx-particles.js), pre-factor base
+ * milliseconds and px, paced exactly like the tables above: `lifeMs` goes through
+ * `animMs` (so 1x halves the SPEED of the flight and 2x restores the classic pace
+ * while the DISTANCE stays fixed — the heelburst ember's own convention,
+ * `calc(0.5s * var(--pace, 1))` with a fixed `--ex/--ey`), and `speedMin`/`speedMax`
+ * are the px-per-second band each particle's travel distance is drawn from at the
+ * BASE life. `count` bursts per golpe, `countHeavy` for a weight-2 (killing/heavy)
+ * golpe; the emitter clamps every ask into 12..30 so no caller can flood the layer.
+ */
+export const PARTICLES = { count: 16, countHeavy: 24, lifeMs: 700, speedMin: 200, speedMax: 400 };
+/**
  * Where THIS enemy sits in the playing sequence, or null. `delay` is what its .fig's
  * animation-delay should be RIGHT NOW: positive (waiting for its turn — `fill: both`
  * holds the 0% frame) or negative (resuming mid-flight after an incidental repaint),
@@ -665,6 +676,9 @@ export function skipAnim() {
   setInputLock(null);
   setDealClock(null);
   revealFloats();
+  // WAAPI embers ride no fx-layer timer, so the generation bump above cannot retire
+  // them — the hook cancels every live one outright (fx-particles.js).
+  onSkipFx();
 }
 
 /**
@@ -895,3 +909,10 @@ export function setRepaint(fn) { repaint = fn; }
 /** The targeting state reset, registered by targeting.js; actions.js ends steps through it. */
 export let notifyEndTargeting = () => {};
 export function setEndTargeting(fn) { notifyEndTargeting = fn; }
+
+/** The skip-side FX cancellation, registered by fx-particles.js at module load. WAAPI
+ *  particles own no `later()` timer (clearFxTimers could never reach them), so skipAnim
+ *  calls THIS to cancel every live ember animation — the same discipline the rest of
+ *  the queue gets from the generation bump. Calls before registration are no-ops. */
+export let onSkipFx = () => {};
+export function setOnSkipFx(fn) { onSkipFx = fn; }

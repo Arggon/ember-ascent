@@ -19,6 +19,7 @@
 import { el, placeAt } from './dom.js';
 import { animGen, animMs, later, stageEl } from './runtime.js';
 import { fxAdd } from './fx-add.js';
+import { EMBER_PALETTE, emberBurst } from './fx-particles.js';
 import { THROW_MS } from './hero-moves.js';
 
 
@@ -402,18 +403,20 @@ export function fxChestpulse(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.18)) || 1);
 }
 
-        // Heel Drop: the heels land — embers burst at the impact point, and the
+        // Heel Drop: the heels land — embers burst at the impact point (the WAAPI
+        // emitter's low-and-sideways fan, the heelburst embers' own palette), and the
         // refunded energy is a spark that rides FROM the burst INTO the energy orb
         // (the flarefan's spark flies hero→orb; this one flies lane→orb).
 export function fxHeelburst(fire, lane, b, sigMs, gen) {
   fire(() => {
     const burst = el('div', { cls: `fx-heelburst ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
-      el('span', { cls: 'fx-heelburst-core' }),
-      el('span', { cls: 'fx-heelburst-ember' }),
-      el('span', { cls: 'fx-heelburst-ember fx-heelburst-ember-2' }),
-      el('span', { cls: 'fx-heelburst-ember fx-heelburst-ember-3' }));
+      el('span', { cls: 'fx-heelburst-core' }));
     if (lane) placeAt(burst, lane, -40, -34);
     fxAdd(burst, animMs(560) || 560);
+    // The scatter the three fixed ember spans used to draw by stylesheet: a fan held low
+    // and sideways around the impact point (bias 0 = straight down, ±55°), the same
+    // palette. The emitter's own gates (motion, speed, measurable point) apply.
+    emberBurst(lane, { count: 12, lifeMs: 500, spreadDeg: 110, biasDeg: 0, palette: EMBER_PALETTE, gen });
     const orb = stageEl && stageEl.querySelector ? stageEl.querySelector('.energy-orb') : null;
     if (lane && orb) {
       const or2 = orb.getBoundingClientRect();

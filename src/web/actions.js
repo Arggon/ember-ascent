@@ -69,6 +69,7 @@ import { announce, toast } from './dom.js';
 import { enemyLook } from './glyphs.js';
 import { currentProfile, recordRun, resetRunOutcome } from './run-history.js';
 import { dispatchFx, playInputSpan } from './fx.js';
+import { cancelEmberParticles } from './fx-particles.js';
 import { currentLang, setLang, t } from './i18n.js';
 
 /**
@@ -1044,6 +1045,10 @@ export function newGame(seed = null, opts = {}) {
   setRunEvents([]);
   resetRunOutcome();
   clearFxTimers();
+  // WAAPI embers own no fx-layer timer, so the sweep above cannot reach them: cancel
+  // them by name BEFORE the layer is emptied (their records would otherwise outlive
+  // their nodes for the rest of the particle life).
+  cancelEmberParticles();
   if (fxEl && fxEl.replaceChildren) fxEl.replaceChildren();
   setFlash({ hp: false, energy: false, block: false, hits: [], n: 0, blockEat: false });
   setBursts([]);

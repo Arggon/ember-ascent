@@ -5977,18 +5977,28 @@ html, body {
   22% { transform: scale(1.2, 1); opacity: 1; }
   100% { transform: scale(0.7, 0.5); opacity: 0; }
 }
-.fx-heelburst .fx-heelburst-ember {
-  position: absolute; left: 50%; top: 58%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
-  background: radial-gradient(closest-side, #ffd9a0, #ff7a24 70%, transparent);
-  animation: heelburst-ember calc(0.5s * var(--pace, 1)) cubic-bezier(0.2, 0.8, 0.4, 1) both;
+/* The burst's own embers moved to the WAAPI emitter (fx-particles.js): instead of three
+   fixed spans on stylesheet keyframes, `emberBurst` spawns the palette below at the
+   measured impact point — the same low-and-sideways read, with count and reach now
+   configurable. The core above and the heelspark below keep their stylesheet beats. */
+/* WAAPI EMBER PARTICLES (fx-particles.js): one span per ember, placed by JS at the
+   measured impact point — left/top are STATIC (placeAt), only transform/opacity
+   animate, through element.animate() on the heelburst embers' own easing curve
+   cubic-bezier(0.2, 0.8, 0.4, 1). No @keyframes here: each particle's flight (radial
+   angle + distance) is drawn by the emitter. The tones reuse the heelburst embers'
+   literal colors. */
+.fx-ember {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  pointer-events: none;
 }
-.fx-heelburst .fx-heelburst-ember-2 { --ex: -32px; --ey: 10px; width: 8px; height: 8px; animation-delay: calc(0.04s * var(--pace, 1)); }
-.fx-heelburst .fx-heelburst-ember-3 { --ex: 28px; --ey: 14px; width: 7px; height: 7px; animation-delay: calc(0.09s * var(--pace, 1)); }
-@keyframes heelburst-ember {
-  0% { transform: translate(0, 0) scale(0.4); opacity: 0; }
-  20% { opacity: 1; }
-  100% { transform: translate(var(--ex, 34px), var(--ey, 6px)) scale(1.1); opacity: 0; }
-}
+.fx-ember-a { background: radial-gradient(closest-side, #ffd9a0, #ff7a24 70%, transparent); }
+.fx-ember-b { background: radial-gradient(closest-side, #ffa040, #ff7a24 70%, transparent); }
+.fx-ember-c { background: radial-gradient(closest-side, #ff7a24, rgba(210, 80, 20, 0.55) 70%, transparent); }
+.fx-ember-hot { background: radial-gradient(closest-side, #fff3d0, #ffa040 60%, transparent); }
 /* HEELSPARK (Heel Drop's refund): the burst's spark rides FROM the impact INTO the
    energy orb — the lane→orb counterpart of the flarefan's hero→orb spark. */
 .fx-heelspark {

@@ -1341,13 +1341,15 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
 
   // In-page FX collector: transient classes sampled every 40ms (see header).
   await page.evaluate(() => {
-    window.__fx = { shake: 0, shockwave: 0, floats: 0, hitstop: 0 };
+    window.__fx = { shake: 0, shockwave: 0, floats: 0, hitstop: 0, embers: 0 };
     window.__fxTimer = setInterval(() => {
       const stage = document.getElementById('stage');
       if (stage && stage.classList.contains('stage-shake')) window.__fx.shake += 1;
       if (stage && stage.classList.contains('hitstop')) window.__fx.hitstop += 1;
       if (document.querySelector('.fx-shockwave')) window.__fx.shockwave += 1;
       if (document.querySelector('.efloat:not(.is-queued)')) window.__fx.floats += 1;
+      const embers = document.querySelectorAll('#fx-layer .fx-ember').length;
+      if (embers > window.__fx.embers) window.__fx.embers = embers;
     }, 40);
   });
 
@@ -1361,10 +1363,22 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
     'the pending card must announce its targeting state');
 
   await page.locator(`.enemy[data-target-index="${tank.index + 1}"]`).click();
+  // The ember scatter (WAAPI particles): the burst spawns at the freeze anchor
+  // (animMs(240) ≈ 480ms after the play) and each particle removes itself on its own
+  // finish (a paced life of animMs(700) ≈ 1400ms). The collector's MAX is sampled
+  // through the whole flight; the drain is read directly once it must be over.
+  await sleep(900);
+  assert.ok((await page.evaluate(() => window.__fx.embers)) > 0,
+    `the impact must scatter live embers (max sample ${(await page.evaluate(() => window.__fx.embers))})`);
   // UX-4 pace: pose animMs(1150) = 2300ms; impact beat at 66% ≈ 1518ms; the shockwave
   // lives a paced 1120ms beyond that. The UX-5 play span (pose 2300 + the signature
   // tail ≈ 2910ms) covers every beat, and the gate releases past it.
   await waitIdle(page);
+  await sleep(300);
+  // Past the flight (spawned ≈480ms, alive 1400ms — long gone by the released gate),
+  // every ember is off the layer: the onfinish removal ran with the real compositor.
+  assert.equal(await page.evaluate(() => document.querySelectorAll('#fx-layer .fx-ember').length), 0,
+    'every ember must remove itself on finish (no leak)');
   await sleep(300);
 
   const fx = await page.evaluate(() => window.__fx);
@@ -1384,6 +1398,50 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
 
   // The tank survived on purpose: no victory-hold race muddies the claim.
   assert.equal(after.phase, 'combat', 'the fight must still be running');
+});
+
+test('» cancels live ember particles mid-flight (skipAnim → onSkipFx)', { timeout: 300000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const page = await freshPage(t);
+  await bootToMap(page);
+  await injectMaulDeck(page);
+  await travelToFight(page);
+  const fight = await reachQualifyingFight(page);
+
+  // A playable Maul, redraws allowed (the deck carries 8 copies, so this converges fast).
+  let maul = page.locator('button[data-slot][aria-label^="Maul"][aria-disabled="false"]');
+  for (let i = 0; i < 8 && (await maul.count()) === 0; i += 1) {
+    await endTurn(page);
+    maul = page.locator('button[data-slot][aria-label^="Maul"][aria-disabled="false"]');
+  }
+  assert.ok((await maul.count()) > 0, 'a Maul must become playable within 8 redraws');
+
+  const tank = fight.enemies.find((e) => e.hp > 32) ?? fight.enemies[0];
+  await maul.first().click();
+  await page.waitForSelector('.enemy.targeting', { timeout: 3000 });
+  await page.locator(`.enemy[data-target-index="${tank.index + 1}"]`).click();
+
+  // The burst is mid-flight (spawned ≈ animMs(240) ≈ 480ms after the play, alive a
+  // paced animMs(700) ≈ 1400ms). Polled, not sampled: the spawn timer rides the same
+  // page clock this test's sleeps ride.
+  await page.waitForFunction(() => document.querySelectorAll('#fx-layer .fx-ember').length > 0, null, { timeout: 3000 });
+
+  // The real dock button (combat-view's speed dock): » calls skipAnim, which fires the
+  // onSkipFx hook — every ember animation CANCELS.
+  await page.locator('.speed-btn', { hasText: '»' }).click();
+
+  // The assertion is SCOPED to the embers on purpose: skipAnim leaves the past floats
+  // alive until their own removal timers, so a whole-layer getAnimations() sweep would
+  // never be empty by design (runtime.skipAnim's contract). The embers, which own no
+  // timer, must be fully gone. The NODE removal waits for the platform's cancel event —
+  // WAAPI queues it as a task (the animations leave getAnimations() at once, the
+  // oncancel handler removes the node a tick later) — so this waits, it does not race
+  // the click's own protocol round-trip.
+  await page.waitForFunction(() => document.querySelectorAll('#fx-layer .fx-ember').length === 0, null, { timeout: 2000 });
+  const after = await page.evaluate(() =>
+    document.getAnimations().filter((a) => a.effect && a.effect.target
+      && a.effect.target.classList && a.effect.target.classList.contains('fx-ember')).length);
+  assert.equal(after, 0, `the skip cancels every ember animation (got ${after})`);
 });
 
 test('thrown hammers arc from the hero and land on the aimed enemy', { timeout: 300000 }, async (t) => {
@@ -1719,6 +1777,11 @@ test('a full run ends on the restart menu, not a blank stage', { timeout: 300000
         await maul.click();
         const tgt = page.locator('.enemy.targeting').last();
         if ((await tgt.count()) > 0) await tgt.click();
+        // The ember gate under reduced motion (AC4, real WAAPI surface): dispatchFx
+        // still serves the static read of every golpe, but the emitter spawns nothing —
+        // checked on every played stroke of the walk.
+        assert.equal(await page.evaluate(() => document.querySelectorAll('#fx-layer .fx-ember').length), 0,
+          'reduced motion scatters no embers even on a played stroke');
       } else {
         await page.getByRole('button', { name: /End Turn/i }).click();
       }

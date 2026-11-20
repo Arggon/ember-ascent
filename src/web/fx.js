@@ -27,6 +27,7 @@ import {
   STRIKE_SEQ,
   TURN_STEP,
   HERO_POSE_MS,
+  PARTICLES,
   animMs,
   animSpeed,
   animGen,
@@ -53,6 +54,7 @@ import {
 } from './runtime.js';
 import { el, placeAt } from './dom.js';
 import { fxAdd } from './fx-add.js';
+import { emberBurst, retireEmberGen } from './fx-particles.js';
 import { t } from './i18n.js';
 import { ENEMY_SIG_FX, SIG_FX } from './fx-signatures.js';
 import { guardFloatNode, statusFloatNode, strikeFloatNode } from './floats.js';
@@ -239,6 +241,30 @@ function restartImpact(key, gen, weight) {
 }
 
 /**
+ * The WAAPI ember burst at the struck unit's measured box (fx-particles.js), fired in
+ * the SAME window fire as restartImpact above — one measurement, one burst per golpe,
+ * on this action's own generation so the per-action retire (below) and the skip hook
+ * both reach it. The guard is restartImpact's, extended with throwLane's zero-box
+ * guard: the fake-DOM test hosts (input-lock, hero-card-poses, impact-feel) resolve no
+ * `.fight .hero` / `.enemy[data-target-index]` and carry no getBoundingClientRect at
+ * all, so an unguarded measure would throw inside the feel-queue timer — the same
+ * discipline that lets restartImpact survive those harnesses today.
+ * @param {string} key the victim unit ('p' or `e<index>`, the hpTrail namespace)
+ * @param {number} gen this action's effect generation (the fire() guard's own)
+ * @param {number} weight the golpe's freeze weight (2 bursts heavier)
+ */
+function emberImpact(key, gen, weight) {
+  const host = hpUnitHost(key);
+  if (!host || !host.getBoundingClientRect) return;
+  const r = host.getBoundingClientRect();
+  if (!r || (r.width === 0 && r.height === 0)) return;
+  emberBurst(
+    { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height * 0.55) },
+    { count: weight === 2 ? PARTICLES.countHeavy : PARTICLES.count, lifeMs: PARTICLES.lifeMs, gen },
+  );
+}
+
+/**
  * The weight of one golpe's freeze: killing (`hp <= 0` — the very predicate the death
  * hold and the floats' DOWN word use) or a heavy hit (dealt >= heavyDealt) freezes
  * heaviest, a mid hit (dealt >= midDealt) a step lighter, everything else light; a
@@ -377,6 +403,11 @@ export function dispatchFx() {
   // later increment made every delayed signature effect cancel itself before it fired —
   // the stage shake, shockwave, anvil, salvo and rend never appeared.)
   const gen = bumpAnimGen();
+  // WAAPI embers own no later() timer to retire — cancelled by generation, by name.
+  // Everything THIS action spawns below carries `gen`, so only the previous action's
+  // scatter dies here (within one action a multi-golpe play keeps at most two bursts
+  // alive: a paced particle life of 1.4s against a paced beat of 1.0s).
+  retireEmberGen(gen);
   const fire = (fn, ms) => later(() => { if (gen === animGen) fn(); }, ms);
   // The arrival banners are driven by `arriving`, not by `bursts`: they describe a moment
   // (a boss walking in, a run ending) rather than a value that changed, and `arriving` is
@@ -721,6 +752,7 @@ export function dispatchFx() {
         if (w.weight === 2) fxEl.classList.add('hitstop-heavy');
       }
       if (w.key) restartImpact(w.key, gen, w.weight);
+      if (w.key) emberImpact(w.key, gen, w.weight);
     }, w.at);
     fire(() => {
       clearHitstop();
