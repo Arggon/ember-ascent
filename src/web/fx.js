@@ -16,6 +16,7 @@
 // retires every pending timer of the previous one.
 
 import { BIOMES, DEFAULT_BIOME } from '../kernel/index.js';
+import { sfx } from './audio.js';
 import {
   HERO_THROWS,
   THROW_MS,
@@ -386,6 +387,35 @@ export function playInputSpan(b) {
 export function dispatchFx() {
   const list = bursts;
   setBursts([]);
+  // THE AUDIO PLAN's immediate half — sound is not motion and does not hang off
+  // reducedMotion/» (the sfx slice's own acceptance), so this half runs BEFORE the
+  // motion gates below. Only beats that COLLAPSED to zero (animMs → 0 under reduce/»,
+  // runtime.js) and paint-time facts schedule here, synchronously: they fire within
+  // this tick, so no generation guard is needed and no timer exists to retire. Beats
+  // > 0 only exist at a live dock, where the visual fire below (generation-guarded)
+  // carries them — the two halves are mutually exclusive by that arithmetic, so no
+  // golpe schedules its sound twice. The schedule is computed once here (pure, same
+  // args) and the visual feel queue below reuses it.
+  const windows = feelSchedule(list, strikeSeq);
+  for (const w of windows) {
+    if (!w.key || w.at > 0) continue; // a golpe-less window is silent; at > 0 rides the visual fire
+    sfx('strike-impact', { weight: w.weight });
+  }
+  const audioFly = list.find((b) => b && b.kind === 'card-fly');
+  if (audioFly) {
+    sfx('card-play'); // ONE per action — act() emits one card-fly burst per play
+    // The pose's own hurt precedence, mirrored (combat-view heroPose): a play that also
+    // costs the hero HP reads as hurt, so the guard chord would score the wrong beat.
+    if (heroMove(audioFly) === 'guard' && !list.some((b) => b.kind === 'hero-float' && b.tone === 'dmg')) {
+      sfx('hero-guard');
+    }
+  }
+  // A fresh death whose hold collapsed to 0 (reduce/» — deathHoldMs is an animMs figure)
+  // shatters at paint time, so its sound does too. Deaths stamped with a holdMs > 0 wait
+  // for the collapse's START on the generation-guarded fire below.
+  for (const d of list) {
+    if (d.kind === 'death' && !(d.holdMs > 0)) sfx('enemy-death');
+  }
   // barra de vida por golpe: the trail's `reveal` steps (HP costs, heals, and the hook
   // damage Combust's sweep deals — facts with no golpe fire of their own) ride the
   // feel-queue fire where the play's numbers land. An action that produced no burst of
@@ -409,6 +439,15 @@ export function dispatchFx() {
   // alive: a paced particle life of 1.4s against a paced beat of 1.0s).
   retireEmberGen(gen);
   const fire = (fn, ms) => later(() => { if (gen === animGen) fn(); }, ms);
+  // THE AUDIO PLAN's deferred half — the deaths with a stamped hold: `holdMs` is the
+  // collapse's START (deathHoldMs/dyingCard stamp it on the burst at first draw, floats.js),
+  // the beat the lethal golpe lands and the body begins to shatter, so the sound waits for
+  // exactly that beat here. The fire's generation guard retires it with the rest of the
+  // queue (the » skip's own bump, a newer action's dispatchFx, a restart's clearFxTimers).
+  // Under reduce/» holdMs is 0 and the sound already fired in the immediate half above.
+  for (const d of list) {
+    if (d.kind === 'death' && d.holdMs > 0) fire(() => sfx('enemy-death'), d.holdMs);
+  }
   // The arrival banners are driven by `arriving`, not by `bursts`: they describe a moment
   // (a boss walking in, a run ending) rather than a value that changed, and `arriving` is
   // already reset by the next paint. Consumed HERE, once, so nothing replays.
@@ -718,7 +757,6 @@ export function dispatchFx() {
     return;
   }
   const t = hpTrail;
-  const windows = feelSchedule(list, strikeSeq);
   if (windows.length === 0) {
     // THE ALL-PARRIED ACTION: every golpe was refused outright, so the schedule opens
     // no freeze window and pins no squash — the parry proc is the whole beat. The
@@ -753,6 +791,12 @@ export function dispatchFx() {
       }
       if (w.key) restartImpact(w.key, gen, w.weight);
       if (w.key) emberImpact(w.key, gen, w.weight);
+      // THE AUDIO PLAN's delayed half: the golpe's own sound on the same fire the squash,
+      // the embers and the float land on — one clock, one beat, generation-guarded, so a
+      // » skip or a newer action retires it with the rest of the choreography. The beats
+      // that collapsed to zero under reduce/» never reach this queue; their sound fired
+      // in the immediate half at dispatch time.
+      if (w.key) sfx('strike-impact', { weight: w.weight });
     }, w.at);
     fire(() => {
       clearHitstop();

@@ -3596,8 +3596,8 @@ html, body {
   display: flex;
   gap: 4px;
 }
-.page-combat .speed-btn { min-height: 28px; padding: 2px 8px; font-size: 0.75rem; line-height: 1; }
-.page-combat .speed-btn.is-on { color: var(--gold); border-color: var(--gold); }
+.page-combat .speed-btn, .page-combat .sfx-btn { min-height: 28px; padding: 2px 8px; font-size: 0.75rem; line-height: 1; }
+.page-combat .speed-btn.is-on, .page-combat .sfx-btn.is-on { color: var(--gold); border-color: var(--gold); }
 .page-combat .is-on { color: var(--gold); }
 
 /* The enemy row's floor pad was 6% of the fight's width (74px at 1280) and it pinned
@@ -4176,7 +4176,7 @@ html, body {
   /* Gem headroom pair (see .stage-combat .hand): net top padding unchanged (10px). */
   .stage-combat .hand { padding: 24px 4px 8px; margin-top: -14px; }
   .page-combat .dock { margin-bottom: 4px; }
-  .page-combat .speed-btn { min-height: 22px; padding: 0 6px; }
+  .page-combat .speed-btn, .page-combat .sfx-btn { min-height: 22px; padding: 0 6px; }
 }
 @media (min-height: 700px) and (min-width: 621px) {
   .stage-combat .card {

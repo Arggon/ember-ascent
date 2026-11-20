@@ -41,6 +41,7 @@
 // listener, exposes `window.__dlb` for a curious viewer, and paints the first screen.
 
 import { ctl, snap, busyReason } from './runtime.js';
+import { audioState } from './audio.js';
 import { biomeChoice, heroChoice, act, newGame } from './actions.js';
 import { cancelTargeting, clickCard, pendingSlot, pickTarget } from './targeting.js';
 import { deckOpen, toggleDeck, codexOpen, toggleCodex, beltOpenSlot, toggleBelt, helpOpen, toggleHelp } from './hud.js';
@@ -187,6 +188,9 @@ window.__dlb = {
   // The product tour's published truth (ONBOARDING-TOUR spec §5.4): walks wait on IT
   // instead of querying the layer's CSS.
   tour: () => ({ open: tourOpen, step: tourStep }),
+  // The audio layer's published truth (the sfx slice): the context's state, the toggle
+  // and the schedule counters — the e2e anchors its autoplay asserts on IT.
+  audio: audioState,
 };
 
 // The first run of the page IS newGame() — the exact construction, not a copy of it.

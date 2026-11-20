@@ -4567,3 +4567,108 @@ test('impact recipe: reduced motion plays no freeze, no bundle, and the fight st
   assert.ok(readouts.bars >= 1, 'an HP bar is drawn');
   for (const r of readouts.ehps) assert.match(r, /\d+\/\d+/, `every HP readout is legible (${r})`);
 });
+
+// ---------------------------------------------------------------------------
+// THE SFX SLICE (procedural WebAudio, zero assets). AC1: no AudioContext exists
+// before the player's first gesture and the context runs after one real click,
+// with no autoplay warning under Chromium's strictest policy; AC2: a play's
+// golpe sounds once, inside the published pitch band, nothing folded; AC3: the
+// dock's toggle persists across a reload, freezes the counters while muted, and
+// the label localizes in es and en through the real lang-toggle.
+// The launch FORCES `--autoplay-policy=document-user-activation-required`, so a
+// context constructed outside a user gesture would stay suspended and the AC1
+// assert would fail honestly (R2 of the plan) — Playwright's trusted clicks count
+// as activation, which is the claim under test.
+// ---------------------------------------------------------------------------
+test('the sfx layer: lazy context, one sound per golpe, a persistent mute', { timeout: 90000 }, async (t) => {
+  if (!chromium || !base) return t.skip('playwright/chromium unavailable');
+  const browser = await chromium.launch({ args: ['--autoplay-policy=document-user-activation-required'] });
+  const sfxCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  t.after(() => { void browser.close(); });
+  const page = await sfxCtx.newPage();
+  const autoplayWarnings = [];
+  page.on('console', (msg) => { if (/autoplay/i.test(msg.text())) autoplayWarnings.push(msg.text()); });
+  await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
+  await page.goto(`${base}/src/web/index.html?seed=22`);
+  await page.waitForLoadState('domcontentloaded');
+
+  // AC1 — anchored in state, not in console noise.
+  assert.equal(await page.evaluate(() => window.__dlb.audio().ctx), 'none',
+    'no AudioContext exists before any gesture');
+  await page.locator('button.boon').first().click();
+  await waitIdle(page);
+  assert.equal(await page.evaluate(() => window.__dlb.audio().ctx), 'running',
+    'the first real click woke the context');
+  assert.deepEqual(autoplayWarnings, [], 'no autoplay warning under the forced policy');
+
+  // AC2 — a Maul deck: every play is ONE golpe, so one impact sound per play. The
+  // seed-22 first foe is a light one, so this play KILLS: the death's own sound rides
+  // the same counts (the collapse beat, AC6's moment), and lastParams carries whatever
+  // synthesis fired last — the pitch band itself is pinned by the unit suite over 20
+  // real syntheses, not by one racy browser read.
+  await injectDeck(page, 'bludgeon');
+  await travelToFight(page);
+
+  await waitIdle(page);
+  await page.locator('button[data-slot][aria-label^="Maul"][aria-disabled="false"]').first().click();
+  if (await page.locator('.enemy.targeting').count() > 0) {
+    await page.locator('.enemy[data-target-index="1"]').click();
+  }
+  await waitIdle(page);
+  const st = await page.evaluate(() => window.__dlb.audio());
+  assert.equal(st.counts['card-play'], 1, 'the play whooshed exactly once');
+  assert.equal(st.counts['strike-impact'], 1, 'one golpe, one impact sound');
+  assert.equal(st.counts['enemy-death'], 1, 'the killing golpe also sounded the collapse');
+  assert.equal(st.throttled, 0, 'nothing folded for a single play');
+  assert.ok(st.lastParams && typeof st.lastParams.name === 'string',
+    `the publish channel carries the last synthesis (${JSON.stringify(st.lastParams)})`);
+
+  // AC3 — the dock's toggle: mute freezes the counters and persists the flag. The kill
+  // may have ended the fight, so walk back to a live one first (the dock is combat's).
+  if ((await readState(page)).phase !== 'combat') {
+    await leaveReward(page);
+    await travelToFight(page);
+  }
+  const sfxBtn = page.locator('.speed-dock .sfx-btn');
+  assert.equal(await sfxBtn.getAttribute('aria-pressed'), 'true', 'sound starts on');
+  await sfxBtn.click();
+  await waitIdle(page);
+  assert.equal(await sfxBtn.getAttribute('aria-pressed'), 'false', 'the toggle reads muted');
+  assert.equal(await page.evaluate(() => localStorage.getItem('ea.sfxMuted')), '1',
+    'the toggle wrote its flag');
+  const mutedCounts = await page.evaluate(() => window.__dlb.audio().counts);
+  await waitIdle(page);
+  if ((await page.locator('button[data-slot][aria-disabled="false"]').count()) === 0) {
+    await endTurn(page);
+  }
+  await page.locator('button[data-slot][aria-disabled="false"]').first().click();
+  if (await page.locator('.enemy.targeting').count() > 0) {
+    await page.locator('.enemy[data-target-index="1"]').click();
+  }
+  await waitIdle(page);
+  const afterMute = await page.evaluate(() => window.__dlb.audio());
+  assert.deepEqual(afterMute.counts, mutedCounts, 'a muted play scheduled nothing');
+
+  // The reload contract: the flag survives, the fresh session boots muted, and a
+  // whole enemy turn through the muted layer schedules nothing at all.
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  assert.equal(await page.evaluate(() => localStorage.getItem('ea.sfxMuted')), '1',
+    'the flag survived the reload');
+  await bootToMap(page);
+  await travelToFight(page);
+  const dockBtn = page.locator('.speed-dock .sfx-btn');
+  assert.equal(await dockBtn.getAttribute('aria-pressed'), 'false',
+    'the reloaded dock renders muted');
+  await endTurn(page);
+  const reloadedSt = await page.evaluate(() => window.__dlb.audio());
+  assert.deepEqual(reloadedSt.counts, {}, 'the muted layer stayed silent through an enemy turn');
+
+  // The labels, through the REAL language control.
+  await page.locator('#hud button.lang-toggle').click();
+  await waitIdle(page);
+  assert.equal((await dockBtn.textContent()).trim(), 'Sonido', 'the Spanish label');
+  await page.locator('#hud button.lang-toggle').click();
+  await waitIdle(page);
+  assert.equal((await dockBtn.textContent()).trim(), 'SFX', 'the English label');
+});

@@ -8,6 +8,7 @@
 // played (hero-moves.js), never only by its type.
 
 import { BIOMES, DEFAULT_BIOME, describeTile, intentChips, loadContent } from '../kernel/index.js';
+import { audioState, setSfxMuted } from './audio.js';
 import {
   HERO_POSE_MS,
   IMPACT_FEEL,
@@ -395,6 +396,28 @@ export function speedDock() {
   add(1, '1×', t('combat.speed.1'));
   add(2, '2×', t('combat.speed.2'));
   add(0, '»', t('combat.speed.skip'));
+  // The SFX toggle (the audio slice's own control). `is-on` reads like the dock's other
+  // buttons — gold marks the state that is live — so it marks SOUND ON, not muted.
+  // setSfxMuted persists under ea.sfxMuted; the repaint redraws the dock (and every
+  // other dock paint, the defeat hold's included) from audioState's own truth.
+  const muted = audioState().muted;
+  dock.append(el('button', {
+    cls: 'btn ghost speed-btn sfx-btn' + (muted ? '' : ' is-on'),
+    text: t('combat.sfx.label'),
+    attrs: {
+      type: 'button',
+      'aria-pressed': muted ? 'false' : 'true',
+      'aria-label': t('combat.sfx.aria'),
+      title: muted ? t('combat.sfx.unmute.title') : t('combat.sfx.mute.title'),
+    },
+    on: {
+      click: (ev) => {
+        consumeClick(ev);
+        setSfxMuted(!audioState().muted);
+        repaint();
+      },
+    },
+  }));
   return dock;
 }
 
