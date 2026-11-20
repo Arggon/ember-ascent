@@ -11,8 +11,9 @@ const shadow = (rx = 34, cx = 60) => `<ellipse class="sh" cx="${cx}" cy="152" rx
 
 /* Illustrated sprites (local WebP under src/web/assets/sprites/, keyed by stable encounter
    id). Constant markup only: the id is looked up in a fixed table, never interpolated
-   raw, so innerHTML stays safe. Decoration only (alt=""). */
-const SPRITES = {
+   raw, so innerHTML stays safe. Decoration only (alt=""). Exported read-only so the
+   enemy-frames test can walk every id without re-declaring the table. */
+export const SPRITES = {
   hero: 'hero', jaw_worm: 'jaw_worm', cultist: 'cultist', red_louse: 'red_louse',
   acid_slime: 'acid_slime', gremlin_nob: 'gremlin_nob', the_guardian: 'the_guardian',
   bellows_keeper: 'bellows_keeper',
@@ -29,6 +30,25 @@ const HERO_SPRITES = { ironclad: 'hero', bellows: 'bellows_keeper' };
  * keys under assets/sprites/: `hero-<pose>.webp`.
  */
 const HERO_FRAMES = { ironclad: ['windup', 'strike', 'guard', 'channel'] };
+
+/**
+ * Enemy frame layers, the mirror of HERO_FRAMES keyed by ENCOUNTER id (the ENEMY_POSES
+ * precedent, combat-view.js). Each entry maps a frame pose name (the file stem
+ * `assets/sprites/<sprite-key>-<pose>.webp`) to the bare epose name whose class lights
+ * it — the SAME name ENEMY_POSES paints for that id; a pose whose epose class no enemy
+ * paints today MUST NOT be declared. A frame image is declared ONLY together with its
+ * asset file: enemyMarkup emits `<img src>` for every entry, and nothing else checks
+ * local assets, so an entry without its file is a 404 on every paint (the
+ * enemy-frames test imposes entry ⇔ file). The sprite key for the file path is the
+ * resolved one (`SPRITES[id] ?? SPRITES.jaw_worm`), so a variant (ash_wraith_elite)
+ * can reuse its base art's files while its OWN eposes drive the lighting.
+ * 3a ships the mechanism with the table EMPTY (the image service is down); 3b fills it.
+ * 3b candidate, documented here so the shape is decided: jaw_worm: {
+ *   windup: 'maw-wind',   // lit by the attack beat (combat-view.js's strike shortcut)
+ *   inhale: 'maw-inhale', // the inhale/bellow pose — jaw_worm has NO guard beat
+ * }
+ */
+export const ENEMY_FRAMES = Object.freeze({});
 
 const sprite = (key) =>
   `<span class="sh" aria-hidden="true"></span>` +
@@ -50,9 +70,22 @@ export function heroMarkup(character = 'ironclad') {
   return sprite(key) + layers;
 }
 
-/** Enemy figure markup keyed by stable encounter id. */
-export function enemyMarkup(id) {
-  return sprite(SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id] : SPRITES.jaw_worm);
+/**
+ * Layered enemy figure, the enemy mirror of heroMarkup(): the idle sprite always paints
+ * first (so the figure box keeps its measured size) and every frame pose of the id's
+ * ENEMY_FRAMES entry is stacked on top at opacity 0. CSS lights a layer through the
+ * card's `epose-*` beat classes; a cross-fade repaint mid-beat resumes from the same
+ * plan clock (combat-view.js writes `--eframe-resume`). `frames` is an explicit test
+ * seam: both production callers pass one arg, so the default (the table) is the only
+ * live path. An id without an entry keeps the exact single-sprite markup it always had.
+ */
+export function enemyMarkup(id, frames = ENEMY_FRAMES[id]) {
+  const key = SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id] : SPRITES.jaw_worm;
+  if (!frames) return sprite(key);
+  const layers = Object.keys(frames)
+    .map((f) => `<img class="spr-frame spr-frame-${f}" src="assets/sprites/${key}-${f}.webp" alt="" draggable="false" decoding="async">`)
+    .join('');
+  return sprite(key) + layers;
 }
 
 /** Extra class for an enemy whose sprite is shared with a variant (the elite wraith). */

@@ -286,32 +286,47 @@ const ENEMY_POSES = {
 };
 
 /**
- * The beat kind the playing plan says THIS enemy is on, or null.
+ * The tail slot the plan clock is CURRENTLY in for this enemy, or null. Shared core of
+ * beatPose() and enemyCard's frame-resume writer: both need the same answer about the
+ * same clock, so the arithmetic lives once and a repaint mid-slot re-derives it, never
+ * restarts it. `slotStart` is the epoch ms this slot opened (the same start/tailAt/stepMs
+ * the CSS delays ride).
  *
  * `strikeSeq.tail` is the turn's non-attack steps in kernel order, one TURN_STEP slot each,
  * starting where the last slam ended. A single attacker's beats are therefore positional:
- * its step i plays in tail slot i. The pose the card wears is the kind of the step whose
- * slot the clock is currently in — computed from the same `start`/`stepMs` the CSS delays
- * use, so a repaint mid-beat re-derives the same answer instead of restarting anything.
- * Only the FIRST attacker is served positionally: with several foes the tail's slots are
- * not their individual beats, and a wrong pose is worse than the generic one, so a
- * multi-enemy turn keeps the shared §4 behaviour.
+ * its step i plays in tail slot i. Only the FIRST attacker is served positionally: with
+ * several foes the tail's slots are not their individual beats, and a wrong pose is worse
+ * than the generic one, so a multi-enemy turn keeps the shared §4 behaviour.
  */
-function beatPose(e) {
+function tailSlot(e) {
   const plan = strikeSeq;
   if (!plan || !Array.isArray(plan.tail) || plan.tail.length === 0) return null;
   if (plan.attacks && plan.attacks.length > 1) return null;
-  const table = ENEMY_POSES[e.id];
-  if (!table) return null;
   const elapsed = Date.now() - plan.start;
   const i = Math.floor((elapsed - plan.tailAt) / Math.max(1, plan.stepMs));
   if (i < 0 || i >= plan.tail.length) return null;
   const step = plan.tail[i];
   if (step.enemy !== e.index && step.owner !== e.index) return null;
+  return { step, slotStart: plan.start + plan.tailAt + i * plan.stepMs };
+}
+
+/**
+ * The beat kind the playing plan says THIS enemy is on, or null.
+ *
+ * The pose the card wears is the kind of the step whose slot the clock is currently in —
+ * computed from the same `start`/`stepMs` the CSS delays use, so a repaint mid-beat
+ * re-derives the same answer instead of restarting anything (the slot arithmetic is
+ * tailSlot's, shared with the frame-resume writer below).
+ */
+function beatPose(e) {
+  const slot = tailSlot(e);
+  if (!slot) return null;
+  const table = ENEMY_POSES[e.id];
+  if (!table) return null;
   // GOLPES DISCRETOS: a tick step (the turn-closing poison) is a hex fact landing on
   // that body — HP straight off — so it wears the hex pose, never the attack's slam.
-  const kind = step.kind === 'block' ? 'guard'
-    : step.kind === 'status' || step.kind === 'tick' ? 'hex'
+  const kind = slot.step.kind === 'block' ? 'guard'
+    : slot.step.kind === 'status' || slot.step.kind === 'tick' ? 'hex'
       : 'attack';
   return table[kind] ?? null;
 }
@@ -649,6 +664,25 @@ export function enemyCard(e, position) {
       card.style.setProperty('--seq-dur', `${seq.dur}ms`);
     }
     card.classList.add('is-striking');
+  }
+  // The ENEMY FRAME RESUME (the hero-figure lesson, slice 1): the frame layers are the
+  // .fig's CHILDREN painted fresh by enemyMarkup, and the stage tree is rebuilt on every
+  // repaint — an unphased layer restarts its cross-fade from 0% on a mid-beat hover. The
+  // stylesheet's eframe rules resume every layer from --eframe-resume: the NEGATIVE
+  // elapsed since this beat's slot opened, derived from the same clocks beatPose reads
+  // (no new timer, the strike loop untouched). Attack branch: the plan's per-attacker
+  // window — strikeSlot's `delay` is relative to NOW (runtime.js), so the window opened
+  // at now + delay (== plan.start + beatMs * i). Tail branch: the slot's own open, the
+  // arithmetic tailSlot shares with beatPose. The burst form (no plan armed) has no
+  // clock, so nothing is written and the layer starts at 0% — the same fresh start the
+  // card's own epose animation gets there. Never positive: a wait is a fresh 0%, not a
+  // rewind. Reduced motion never reaches this (beat is null above), matching the
+  // stylesheet's reduced-motion block that keeps the layers unlit.
+  if (beat && card.style && card.style.setProperty) {
+    const beatOpen = seq ? Date.now() + seq.delay : (tailSlot(e)?.slotStart ?? null);
+    if (beatOpen != null) {
+      card.style.setProperty('--eframe-resume', `${Math.min(0, beatOpen - Date.now())}ms`);
+    }
   }
   // UX-9 D3: the chip juices off THIS enemy's own previous status keys (per-index), not
   // off the player's list, which made an enemy chip animate whenever the player gained one.
