@@ -668,20 +668,25 @@ export function enemyCard(e, position) {
   // The ENEMY FRAME RESUME (the hero-figure lesson, slice 1): the frame layers are the
   // .fig's CHILDREN painted fresh by enemyMarkup, and the stage tree is rebuilt on every
   // repaint — an unphased layer restarts its cross-fade from 0% on a mid-beat hover. The
-  // stylesheet's eframe rules resume every layer from --eframe-resume: the NEGATIVE
-  // elapsed since this beat's slot opened, derived from the same clocks beatPose reads
-  // (no new timer, the strike loop untouched). Attack branch: the plan's per-attacker
-  // window — strikeSlot's `delay` is relative to NOW (runtime.js), so the window opened
-  // at now + delay (== plan.start + beatMs * i). Tail branch: the slot's own open, the
-  // arithmetic tailSlot shares with beatPose. The burst form (no plan armed) has no
-  // clock, so nothing is written and the layer starts at 0% — the same fresh start the
-  // card's own epose animation gets there. Never positive: a wait is a fresh 0%, not a
-  // rewind. Reduced motion never reaches this (beat is null above), matching the
-  // stylesheet's reduced-motion block that keeps the layers unlit.
+  // stylesheet's eframe rules resume every layer from --eframe-resume: the SIGNED ms
+  // until this beat's slot opens, derived from the same clocks beatPose reads (no new
+  // timer, the strike loop untouched). Attack branch: the plan's per-attacker window —
+  // strikeSlot's `delay` is relative to NOW (runtime.js), so the window opened at
+  // now + delay (== plan.start + beatMs * i); the value is POSITIVE while the window is
+  // still ahead, and `fill: both` holds the layer at its 0% frame for the wait — the
+  // cross-fade then opens exactly WITH the window, the same clock --seq-delay rides.
+  // Clamping that wait to 0 would burn the whole cross-fade before the beat arrives.
+  // Tail branch: the slot's own open (the arithmetic tailSlot shares with beatPose) is
+  // never in the future, so the value there is NEGATIVE — a resume from the same
+  // mid-beat instant a repaint re-derives, never a restart. The burst form (no plan
+  // armed) has no clock, so nothing is written and the layer starts at 0% — the same
+  // fresh start the card's own epose animation gets there. Reduced motion never reaches
+  // this (beat is null above), matching the stylesheet's reduced-motion block that
+  // keeps the layers unlit.
   if (beat && card.style && card.style.setProperty) {
     const beatOpen = seq ? Date.now() + seq.delay : (tailSlot(e)?.slotStart ?? null);
     if (beatOpen != null) {
-      card.style.setProperty('--eframe-resume', `${Math.min(0, beatOpen - Date.now())}ms`);
+      card.style.setProperty('--eframe-resume', `${Math.round(beatOpen - Date.now())}ms`);
     }
   }
   // UX-9 D3: the chip juices off THIS enemy's own previous status keys (per-index), not

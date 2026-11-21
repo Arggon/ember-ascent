@@ -40,15 +40,29 @@ const HERO_FRAMES = { ironclad: ['windup', 'strike', 'guard', 'channel'] };
  * asset file: enemyMarkup emits `<img src>` for every entry, and nothing else checks
  * local assets, so an entry without its file is a 404 on every paint (the
  * enemy-frames test imposes entry ⇔ file). The sprite key for the file path is the
- * resolved one (`SPRITES[id] ?? SPRITES.jaw_worm`), so a variant (ash_wraith_elite)
- * can reuse its base art's files while its OWN eposes drive the lighting.
- * 3a ships the mechanism with the table EMPTY (the image service is down); 3b fills it.
- * 3b candidate, documented here so the shape is decided: jaw_worm: {
- *   windup: 'maw-wind',   // lit by the attack beat (combat-view.js's strike shortcut)
- *   inhale: 'maw-inhale', // the inhale/bellow pose — jaw_worm has NO guard beat
- * }
+ * resolved one (`SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id]
+ * : SPRITES.jaw_worm`), so a variant (ash_wraith_elite) can reuse its base art's files
+ * while its OWN eposes drive the lighting.
+ *
+ * Slice 3b fills it: every id with a PAINTABLE beat ships a frame. `windup` lights on
+ * the attack epose (the strike shortcut or the attack beat — every id paints one);
+ * `guard` lights on the block/hex beats and ships only for the six ids whose non-attack
+ * steps paint an epose (jaw_worm, cultist, red_louse and cinder_foreman have none, so
+ * their guard webps stay on disk unused). The dead eposes (`power`, the held glows) get
+ * NO layer rules: a frame pose whose epose class no enemy paints must not be declared.
  */
-export const ENEMY_FRAMES = Object.freeze({});
+export const ENEMY_FRAMES = Object.freeze({
+  jaw_worm: { windup: 'maw-wind' },
+  cultist: { windup: 'cantor-cast' },
+  red_louse: { windup: 'mite-dart' },
+  acid_slime: { windup: 'ooze-lunge', guard: 'ooze-drip' },
+  gremlin_nob: { windup: 'brute-charge', guard: 'brute-bash' },
+  the_guardian: { windup: 'warden-piston', guard: 'warden-wall' },
+  slag_crawler: { windup: 'crawler-dart', guard: 'crawler-hex' },
+  ash_wraith: { windup: 'wraith-streak', guard: 'wraith-thin' },
+  ash_wraith_elite: { windup: 'matriarch-veil', guard: 'wraith-drift' },
+  cinder_foreman: { windup: 'foreman-survey' },
+});
 
 const sprite = (key) =>
   `<span class="sh" aria-hidden="true"></span>` +

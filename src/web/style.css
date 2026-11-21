@@ -8762,6 +8762,50 @@ button.belt-slot.filled:hover, button.belt-slot.filled:focus-visible {
   100% { transform: none; filter: none; }
 }
 
+/* ---- Enemy frame layers (slice 3b): one pair per lit epose, shipping WITH its ENEMY_FRAMES
+   entry (stage-art.js). Each pair lights the id's real pose frame on the SAME calc base the
+   epose's own ep-* rule rides, and resumes from --eframe-resume so a mid-beat repaint
+   continues instead of restarting; the idle-hide mirrors frame-idle-hide so the swap ends
+   together. Only the 16 eposes an ENEMY_FRAMES entry declares get a pair — the dead eposes
+   (`power` glows) keep animating the card but never take a layer. Reduced motion and the
+   hitstop freeze cover these layers for free: they wear the shared .spr-frame class
+   (stage-combat blocks above). ---- */
+.stage-combat .enemy.epose-maw-wind .fig .spr-frame-windup { animation: frame-epose-in calc(0.64s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-maw-wind .fig .spr { animation: frame-idle-hide calc(0.64s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-cantor-cast .fig .spr-frame-windup { animation: frame-epose-in calc(0.64s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-cantor-cast .fig .spr { animation: frame-idle-hide calc(0.64s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-mite-dart .fig .spr-frame-windup { animation: frame-epose-in calc(0.46s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-mite-dart .fig .spr { animation: frame-idle-hide calc(0.46s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-ooze-lunge .fig .spr-frame-windup { animation: frame-epose-in calc(0.64s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-ooze-lunge .fig .spr { animation: frame-idle-hide calc(0.64s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-ooze-drip .fig .spr-frame-guard { animation: frame-epose-in calc(0.64s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-ooze-drip .fig .spr { animation: frame-idle-hide calc(0.64s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-brute-charge .fig .spr-frame-windup { animation: frame-epose-in calc(0.9s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-brute-charge .fig .spr { animation: frame-idle-hide calc(0.9s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-brute-bash .fig .spr-frame-guard { animation: frame-epose-in calc(0.64s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-brute-bash .fig .spr { animation: frame-idle-hide calc(0.64s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-warden-piston .fig .spr-frame-windup { animation: frame-epose-in calc(0.64s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-warden-piston .fig .spr { animation: frame-idle-hide calc(0.64s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-warden-wall .fig .spr-frame-guard { animation: frame-epose-in calc(0.48s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-warden-wall .fig .spr { animation: frame-idle-hide calc(0.48s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-crawler-dart .fig .spr-frame-windup { animation: frame-epose-in calc(0.52s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-crawler-dart .fig .spr { animation: frame-idle-hide calc(0.52s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-crawler-hex .fig .spr-frame-guard { animation: frame-epose-in calc(0.48s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-crawler-hex .fig .spr { animation: frame-idle-hide calc(0.48s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-wraith-streak .fig .spr-frame-windup { animation: frame-epose-in calc(0.46s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-wraith-streak .fig .spr { animation: frame-idle-hide calc(0.46s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-wraith-thin .fig .spr-frame-guard { animation: frame-epose-in calc(0.48s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-wraith-thin .fig .spr { animation: frame-idle-hide calc(0.48s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-matriarch-veil .fig .spr-frame-windup { animation: frame-epose-in calc(0.64s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-matriarch-veil .fig .spr { animation: frame-idle-hide calc(0.64s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-wraith-drift .fig .spr-frame-guard { animation: frame-epose-in calc(0.56s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-wraith-drift .fig .spr { animation: frame-idle-hide calc(0.56s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-foreman-survey .fig .spr-frame-windup { animation: frame-epose-in calc(0.64s * var(--pace, 1)) ease-in-out both; animation-delay: var(--eframe-resume, 0ms); }
+.stage-combat .enemy.epose-foreman-survey .fig .spr { animation: frame-idle-hide calc(0.64s * var(--pace, 1)) linear both; animation-delay: var(--eframe-resume, 0ms); }
+@keyframes frame-epose-in {
+  0% { opacity: 0; } 14% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; }
+}
+
 /* §5.5: the enraged Brute HOLDS its seams at 40% while the Strength stands. Paint-time, from
    the snapshot's own statuses, and never added under reduced motion — the Strength chip says
    the same thing statically. No geometry: an inset shadow + a filter only. */

@@ -4,11 +4,13 @@
 // The contract under test, per the slice's acceptance criteria:
 //   AC1  enemyMarkup() emits `.spr-frame` layers ONLY for an id with an ENEMY_FRAMES
 //        entry; every other id keeps the markup it has always emitted, BYTE FOR BYTE
-//        (the strings below were captured from the shipped stage-art.js on 1cba0c8).
+//        (3a captured the table-empty strings on 1cba0c8; 3b recaptured the layered
+//        ones with the same `node -e "import('./src/web/stage-art.js')…"` discipline).
 //   AC2  each declared entry's epose name is one ENEMY_POSES actually paints, and the
 //        stylesheet lights it with layer + idle-hide rules that (a) ride the SAME
 //        calc(<base>s * var(--pace)) duration as that epose's own ep-* rule and (b)
-//        resume from `--eframe-resume`, the negative mid-beat elapsed enemyCard writes
+//        resume from `--eframe-resume`, the SIGNED resume enemyCard writes (negative
+//        mid-beat elapsed, positive holding the layer at 0% until the window opens)
 //        from the same clocks beatPose reads — the slice-1 lesson (an unphased layer
 //        restarts its cross-fade from 0% on every repaint).
 //   AC3  the layers reuse the EXACT shared `.spr-frame` class inside `.fig`, so the
@@ -69,16 +71,44 @@ function poseRowOf(id) {
 }
 
 test('AC1: an id without a frame entry keeps the exact single-sprite markup it has always emitted', () => {
-  for (const id of [...ENEMY_IDS, undefined]) {
+  // 3b fills the table, so every ENEMY_IDS id ships layers (pinned below); the only
+  // live entry-less paths left are the undefined fallback — and bellows_keeper, which
+  // is a HERO id pinned to the same fallback identity further down.
+  for (const id of [undefined]) {
     assert.equal(enemyMarkup(id), FALLBACK(spriteKeyOf(id)), `markup for ${id ?? 'undefined'} regressed`);
   }
 });
 
-test('AC1: the captured fallback strings are byte-for-byte (cultist, the undefined fallback, the pin bellows_keeper guards, the elite sprite-key resolution)', () => {
-  // Captured from `node -e "import('./src/web/stage-art.js')…"` on the shipped code.
+test('AC1: every table id stacks idle first, then one .spr-frame layer per declared pose, in declaration order', () => {
+  for (const [id, frames] of Object.entries(ENEMY_FRAMES)) {
+    const key = spriteKeyOf(id);
+    const bare = FALLBACK(key);
+    const markup = enemyMarkup(id);
+    assert.ok(markup.startsWith(bare), `the idle sprite still paints first for ${id}, so the figure box keeps its measured size`);
+    const layers = Object.keys(frames)
+      .map((p) => `<img class="spr-frame spr-frame-${p}" src="assets/sprites/${key}-${p}.webp" alt="" draggable="false" decoding="async">`)
+      .join('');
+    assert.equal(markup.slice(bare.length), layers, `${id} stacks exactly its declared layers, in declaration order`);
+  }
+});
+
+test('AC1 pin: windup ships on all ten encounter ids; guard only on the six whose non-attack beats paint an epose', () => {
+  // The C3 cut: `guard` exists only where a block/hex step actually paints — beatPose
+  // serves `guard` (block), `hex` (status/tick) and `attack`; the `power` eposes are
+  // never painted, so jaw_worm / cultist / red_louse / cinder_foreman are windup-only.
+  const windupIds = Object.keys(ENEMY_FRAMES).filter((id) => 'windup' in ENEMY_FRAMES[id]).sort();
+  const guardIds = Object.keys(ENEMY_FRAMES).filter((id) => 'guard' in ENEMY_FRAMES[id]).sort();
+  assert.equal(windupIds.length, 10, 'windup ships on all ten encounter ids');
+  assert.deepEqual(windupIds, ['acid_slime', 'ash_wraith', 'ash_wraith_elite', 'cinder_foreman', 'cultist', 'gremlin_nob', 'jaw_worm', 'red_louse', 'slag_crawler', 'the_guardian']);
+  assert.equal(guardIds.length, 6, 'guard ships on exactly six ids');
+  assert.deepEqual(guardIds, ['acid_slime', 'ash_wraith', 'ash_wraith_elite', 'gremlin_nob', 'slag_crawler', 'the_guardian'], 'guard only where a block/hex beat paints (the four windup-only ids stay windup-only)');
+});
+
+test('AC1: the captured strings are byte-for-byte (the undefined fallback, the bellows_keeper alias, cultist and the elite with their 3b layers)', () => {
+  // Captured from `node -e "import('./src/web/stage-art.js')…"` on the layered code.
   assert.equal(
     enemyMarkup('cultist'),
-    '<span class="sh" aria-hidden="true"></span><img class="spr spr-cultist" src="assets/sprites/cultist.webp" alt="" draggable="false" decoding="async">',
+    '<span class="sh" aria-hidden="true"></span><img class="spr spr-cultist" src="assets/sprites/cultist.webp" alt="" draggable="false" decoding="async"><img class="spr-frame spr-frame-windup" src="assets/sprites/cultist-windup.webp" alt="" draggable="false" decoding="async">',
   );
   assert.equal(
     enemyMarkup(undefined),
@@ -86,15 +116,18 @@ test('AC1: the captured fallback strings are byte-for-byte (cultist, the undefin
   );
   // The death-ghost pin (death-ghost-art.test.js) leans on this fallback identity.
   assert.equal(enemyMarkup('bellows_keeper'), enemyMarkup(undefined));
-  // ash_wraith_elite paints the ash_wraith ART (its sprite key), not its own id.
+  // ash_wraith_elite paints the ash_wraith ART (its sprite key), not its own id — the
+  // layered capture pins the same resolution for its frame files.
   assert.equal(
     enemyMarkup('ash_wraith_elite'),
-    '<span class="sh" aria-hidden="true"></span><img class="spr spr-ash_wraith" src="assets/sprites/ash_wraith.webp" alt="" draggable="false" decoding="async">',
+    '<span class="sh" aria-hidden="true"></span><img class="spr spr-ash_wraith" src="assets/sprites/ash_wraith.webp" alt="" draggable="false" decoding="async"><img class="spr-frame spr-frame-windup" src="assets/sprites/ash_wraith-windup.webp" alt="" draggable="false" decoding="async"><img class="spr-frame spr-frame-guard" src="assets/sprites/ash_wraith-guard.webp" alt="" draggable="false" decoding="async">',
   );
 });
 
 test('AC1: an entry stacks idle first, then one .spr-frame layer per pose, in declaration order (the heroMarkup pattern)', () => {
-  const idle = enemyMarkup('jaw_worm');
+  // Since 3b the DEFAULT frames for jaw_worm are the table's own entry, so the bare-idle
+  // base for these exact-pattern assertions is the explicit empty-frames call.
+  const idle = enemyMarkup('jaw_worm', {});
   const one = enemyMarkup('jaw_worm', { windup: 'maw-wind' });
   assert.ok(one.startsWith(idle), 'the idle sprite still paints first, so the figure box keeps its measured size');
   assert.equal(
