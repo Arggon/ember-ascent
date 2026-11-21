@@ -106,7 +106,7 @@ export function startCombat(state, node, cardDefs) {
     },
     // Combat-only statuses (Strength, Dexterity, Weak, Vulnerable, Metallicize) must NOT
     // carry between fights. The game prints them as "Lasts the whole fight", but leaving
-    // them on the player made Strength accumulate for the whole RUN: an Inflame taken at
+    // them on the player made Strength accumulate for the whole RUN: an Stoke taken at
     // floor 2 compounded into unbounded damage, producing three straight wins with Strength
     // 34 at the boss. Enemy statuses were already reset per spawn; the player's were not.
     // NOTE: beginTurn deliberately does NOT do this — a buff must survive the turns within
@@ -284,12 +284,12 @@ const MOVE_RUNNERS = {
    *
    * KNOWN GAP, ON RECORD (solo review of 8083336; updated by the "golpes discretos NxM"
    * slice): the runner reads `move.strength` and `move.bleed` only — a compound move
-   * printing Block or Vulnerable/Weak (jaw_worm.thrash "A7 B5",
-   * gremlin_nob.skull_bash "A6 VULN2") still resolves its attack half alone; the
+   * printing Block or Vulnerable/Weak (cinder_maw.coil_thrash "A7 B5",
+   * cinder_brute.brute_smash "A6 VULN2") still resolves its attack half alone; the
    * printed B/VULN words are promises the runner does not keep. The kernel already
    * emits `enemy_block {enemy, amount}` and `enemy_status`; wiring them into this runner
    * is the queued next kernel slice. ALSO OUTSIDE THE FOLD (slice ruling, ALCANCE v1):
-   * the exotic handlers (hemokinesis/reaper/rampage in rules/effects/index.js) and
+   * the exotic handlers (blood_hammer/ash_harvest/climbing_heat in rules/effects/index.js) and
    * potion_damage resolve through the plain damageEnemy path — a strike there rolls no
    * parry and ticks no bleed. Wiring them through attackHit is the follow-up.
    */
@@ -363,7 +363,7 @@ const MOVE_RUNNERS = {
    * UX-9: both events carry `enemy: i` — the acting enemy's index, exactly as the attack,
    * block and buff runners stamp their own events. The hex lands on the HERO, but it is
    * still THAT enemy's move, and the presentation layer needs to know which one spoke: a
-   * Wraith's opening wail must play its signature, and on a multi-foe turn a hex cannot be
+   * Wraith's opening sorrow_wail must play its signature, and on a multi-foe turn a hex cannot be
    * attributed by "whoever spoke last" (on a debuff-only turn nobody did). The field is
    * event payload only — it is not state, so no replay hash depends on it.
    *
@@ -399,7 +399,7 @@ export function enemyTurn(state) {
   const events = [];
 
   // Enemy block decays at the START of its own turn, so block gained last turn
-  // covered the player's turn — which is what makes the Guardian's B20 meaningful.
+  // covered the player's turn — which is what makes the Slag Warden's B20 meaningful.
   next = patchEnemies(next, (e) => ({ ...e, block: 0 }));
 
   for (let i = 0; i < next.combat.enemies.length; i += 1) {
@@ -459,7 +459,7 @@ export function endTurn(state, cardDefs) {
   // Decay the enemies' time-limited debuffs at the END of their own turn — symmetric with
   // the player, who is decayed just above. Without this an enemy's Vulnerable/Weak never
   // ticked down at all: Bash applied Vulnerable 2 and it displayed "Vulnerable 2" on every
-  // turn of the fight, so the number shown to the player was a lie and Shockwave's whole
+  // turn of the fight, so the number shown to the player was a lie and Heat Wash's whole
   // premise (a longer debuff) was meaningless. Owner report: "when i attack that number at
   // vulnerable do not decrease and stays for all the fight."
   // Placed after the enemy acts so the stacks the player SEES during their turn are the ones
@@ -483,7 +483,7 @@ export function endTurn(state, cardDefs) {
   if (next.player.hp <= 0) {
     return { state: { ...next, phase: 'ended', outcome: 'loss' }, events: [...events, { t: 'run_end', outcome: 'loss' }] };
   }
-  // The last enemy can die during the ENEMY turn (Combust's end-of-turn damage), not
+  // The last enemy can die during the ENEMY turn (Banked Coal's end-of-turn damage), not
   // only from a card. Returning `combat_won` here without settling left the state in
   // `phase: 'combat'` with every enemy dead and an empty hand — `actions` then offered
   // only `e1` forever, and a self-play run span until the harness step cap. Victory

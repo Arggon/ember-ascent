@@ -65,7 +65,7 @@
 // Pure: no Date, no Math.random, no I/O; the only entropy is (seed, drawIndex), counted.
 import { intAt, pickAt } from '../rng.js';
 
-/** HP restored by the Kindled Heart relic (id `burning_blood`) after each combat. */
+/** HP restored by the Kindled Heart relic (id `kindled_heart`) after each combat. */
 export const RELIC_HEAL = 6;
 /** Extra first-turn Energy from the Cyan Lantern relic (B4, Bellows Keeper). */
 export const LANTERN_ENERGY = 1;
@@ -91,7 +91,7 @@ export const CINDER_WARD_BLOCK = 6;
 export const ASH_LEDGER_GAIN = 20;
 
 /** A state with no `relic` field carries this one (Ashwright runs keep their old hashes). */
-export const DEFAULT_RELIC = 'burning_blood';
+export const DEFAULT_RELIC = 'kindled_heart';
 
 /** Rarity tiers, matching the card system's three (the codex order). */
 export const RELIC_TIERS = Object.freeze(['common', 'uncommon', 'rare']);
@@ -114,7 +114,7 @@ export const ELITE_COMMON_BAND = 70;
  */
 export const RELICS = Object.freeze({
   // --- the two starting relics (B4) -------------------------------------------------
-  burning_blood: {
+  kindled_heart: {
     tier: 'common', name: 'Kindled Heart', name_es: 'Corazón Encendido',
     summary: `HP+${RELIC_HEAL}/fight`, text: `After each combat, restore ${RELIC_HEAL} HP.`,
     text_es: `Después de cada combate, recuperas ${RELIC_HEAL} HP.`,

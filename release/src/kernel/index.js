@@ -10,6 +10,7 @@
 // No globals, no daemon, no hidden mutable state: a save file holds the entire run.
 import { freezeDeep, hash as hashState, canonical } from './state.js';
 import { loadContent, defaultContent, draftPoolFrom } from './content.js';
+import { HERO_ALIASES } from './legacy-ids.js';
 // Imported as a VALUE as well as re-exported below: `contentForProfile` calls it.
 import { poolSelection, relicPoolFor } from './unlocks.js';
 import { generateMap, ROWS, ACT_COUNT } from './rules/map.js';
@@ -73,6 +74,9 @@ export {
 };
 export { actions } from './actions.js';
 export { FORMAT_VERSION, ENGINE_VERSION, validateSave, toSave, serializeSave } from './state.js';
+// The DE-STS rename shim: legacy ids -> Ember ids at load time (the NAMES.md
+// compatibility break). Surfaces reach it through this ONE entry point (R1).
+export { LEGACY_ID_MAP, migrateLegacySave, HERO_ALIASES } from './legacy-ids.js';
 export { loadContent } from './content.js';
 
 // The run-record layer (DR-1, DR-3, DR-6, DR-7) and the unlock layer (DR-4, DR-5).
@@ -165,7 +169,9 @@ export function contentForProfile(profile = null) {
 export function newRun(opts = {}) {
   const content = opts.content ?? defaultContent();
   const seed = opts.seed ?? 0;
-  const characterId = opts.character ?? 'ironclad';
+  // Legacy hero ids resolve through the alias map BEFORE validation, so a pre-rename
+  // ?hero= / --character value keeps starting runs (the NAMES.md compatibility rule).
+  const characterId = HERO_ALIASES[opts.character] ?? opts.character ?? 'ashwright';
   const difficulty = opts.difficulty ?? 0;
   const biome = opts.biome ?? DEFAULT_BIOME;
   if (!Object.hasOwn(BIOMES, biome)) {

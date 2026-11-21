@@ -12,6 +12,7 @@
 import {
   BIOMES,
   DEFAULT_BIOME,
+  HERO_ALIASES,
   contentForProfile,
 } from './src/kernel/index.js';
 import { createController } from './src/surface/gui/controller.js';
@@ -39,6 +40,7 @@ import {
   setFlash,
   setHeroMoveHold,
   setHeldDeaths,
+  setImpactHold,
   setHpTrail,
   hpTrail,
   retireHpTrail,
@@ -68,6 +70,7 @@ import { announce, toast } from './dom.js';
 import { enemyLook } from './glyphs.js';
 import { currentProfile, recordRun, resetRunOutcome } from './run-history.js';
 import { dispatchFx, playInputSpan } from './fx.js';
+import { cancelEmberParticles } from './fx-particles.js';
 import { currentLang, setLang, t } from './i18n.js';
 
 /**
@@ -77,9 +80,9 @@ import { currentLang, setLang, t } from './i18n.js';
  * states, kept here so a future self-debuff stacks on the right body without the grouping
  * changing again. A debuff move afflicts the player through the kernel's `debuff` runner,
  * whose `player_status` events carry NO attacker index — those are read as their own
- * beats below (that is what keeps a wail/grief turn from being silent). The "golpes
+ * beats below (that is what keeps a sorrow_wail/mourning_hex turn from being silent). The "golpes
  * discretos" slice grew the hex half by the two tick-shaped debuffs: the Matriarch's
- * soulfire leaves Bleed on the hero (`player_status {status:'bleed', enemy}`), and a
+ * ember_soulfire leaves Bleed on the hero (`player_status {status:'bleed', enemy}`), and a
  * poison hex would land the same shape.
  */
 const PLAYER_AFFLICTING = new Set(['weak', 'vulnerable', 'bleed', 'poison']);
@@ -113,7 +116,7 @@ function announcedHits(move) {
  * strike entries (`strikes` on the card-fly burst), the plan's per-strike `attacks` and
  * their hung `ticks`, the plan's `tail` steps — each carrying `hp` since this slice; fx.js
  * applies them on the very fire that lands the golpe's float (ONE clock). Only the facts
- * with NO per-golpe fire of their own — HP costs, heals, and the hook damage Combust's
+ * with NO per-golpe fire of their own — HP costs, heals, and the hook damage Banked Coal's
  * sweep deals — come back as `reveal` steps, applied on the feel-queue fire where the
  * play's numbers land (the same fire the diff floats reveal on).
  *
@@ -151,7 +154,7 @@ function buildHpTrail(events, preState) {
   // that body's bar before the golpe's fire — the reveal and tail fires both sit after
   // it (the reveal at ~animMs(310) vs the first impact at ~animMs(294+); the tail after
   // the last slam) — or the bar would fall with the slam and then RISE back to the
-  // pre-golpe value with a heal pulse: a visual lie on a body being hit (the Combust
+  // pre-golpe value with a heal pulse: a visual lie on a body being hit (the Banked Coal
   // end-of-turn shape: its sweep and HP cost resolve in the end-of-turn hooks, before
   // the enemy attacks of the same stream). No golpe steps for a body -> Infinity ->
   // nothing is pre for it, and its facts keep the reveal/tail fire they always rode.
@@ -174,7 +177,7 @@ function buildHpTrail(events, preState) {
       if (typeof ev.hp !== 'number') continue;
       const key = `e${ev.target}`;
       if (ev.source !== 'player') {
-        // Combust's end-of-turn sweep and potion damage: no golpe fire of their own —
+        // Banked Coal's end-of-turn sweep and potion damage: no golpe fire of their own —
         // they ride the reveal fire, the same one their diff float lands on — unless
         // they precede this body's first golpe, in which case they ride the pre-beat.
         if (foeGolpeAt.has(ev.target) && i < foeGolpeAt.get(ev.target)) pre.push({ unit: key, hp: ev.hp });
@@ -245,7 +248,7 @@ function buildHpTrail(events, preState) {
       continue;
     }
     if (ev.t === 'self_damage') {
-      // An HP cost (bloodletting, offering, hemokinesis, Combust's own sweep): the
+      // An HP cost (vein_tap, blood_tithe, blood_hammer, Banked Coal's own sweep): the
       // amount is the kernel's fact, the floor at 1 is loseHp's own convention.
       const amount = Math.max(0, ev.amount ?? 0);
       unit('p', heroRun, heroMax);
@@ -265,7 +268,7 @@ function buildHpTrail(events, preState) {
       // is what the payer PAID (steps.js floors it: paid = min(cost, hp-1)), so the
       // mirror is a plain subtraction; the max(1, ·) is loseHp's own belt, not a rule.
       // Without this branch the anchor sat 2 HP HIGH, and any later HP fact of the same
-      // stream — the burning_blood heal a killing stroke arrives with — lifted the bar
+      // stream — the kindled_heart heal a killing stroke arrives with — lifted the bar
       // ABOVE the snapshot for the retire to snap back down: the owner's "the bar
       // rises, then falls again" report (repro: seed 14, a redhot cinder_flick kills a
       // 8-HP foe, bar 45 -> 51 -> 49).
@@ -292,20 +295,25 @@ function buildHpTrail(events, preState) {
   return { start: Date.now(), units, reveal, pre };
 }
 
-/** B4: the chosen hero ('ironclad' Ashwright or 'bellows' Bellows Keeper); `?hero=` seeds it —
+/** B4: the chosen hero ('ashwright' Ashwright or 'bellows_keeper' Bellows Keeper); `?hero=` seeds it —
  *  and since the fixed start retired the kindling pickers, that seeding is the ONLY chooser.
  *  The NAMES are proper nouns in every language. The blurbs are NOT carried here: they live
  *  in i18n as `hero.<id>.blurb` — living content of the two heroes, but after the rework
  *  nothing in src consumes them at paint, so the wiring test (i18n.test.js) is their only
  *  net: it pins every id below to a non-empty en/es row, and a renamed id fails a test. */
 export const HEROES = [
-  { id: 'ironclad', name: 'Ashwright' },
-  { id: 'bellows', name: 'Bellows Keeper' },
+  { id: 'ashwright', name: 'Ashwright' },
+  { id: 'bellows_keeper', name: 'Bellows Keeper' },
 ];
 /** B5: the chosen biome (an id from the kernel BIOMES table); `?biome=` seeds it. */
 const biomeParam = new URLSearchParams(location.search).get('biome');
 export let biomeChoice = biomeParam && Object.hasOwn(BIOMES, biomeParam) ? biomeParam : DEFAULT_BIOME;
-export let heroChoice = HEROES.some((h) => h.id === new URLSearchParams(location.search).get('hero')) ? new URLSearchParams(location.search).get('hero') : 'ironclad';
+// The DE-STS rename: the canonical ids are the HEROES rows'; the renamed pre-0.5.0
+// ids resolve through the kernel alias map BEFORE validation, so old links and old
+// seeds keep booting the same heroes.
+const heroParam = new URLSearchParams(location.search).get('hero');
+const heroRequested = HERO_ALIASES[heroParam] ?? heroParam;
+export let heroChoice = HEROES.some((h) => h.id === heroRequested) ? heroRequested : 'ashwright';
 
 /* --------------------------------------------------------- the one dispatch path */
 
@@ -393,7 +401,7 @@ export function act(actionId, targetK = null) {
     // of them now produces ONE plan, even with zero attacks. A debuff move afflicts the
     // HERO and its `player_status` event carries no attacker index (spec §4.1 notes this);
     // that step rides the flat beat list with `enemy: null` and lands on the hero, which is
-    // what keeps a wail/grief turn from being silent too.
+    // what keeps a sorrow_wail/mourning_hex turn from being silent too.
     //
     // GOLPES DISCRETOS (this slice): `attacks` is ONE ENTRY PER STRIKE, not one per
     // attacker — an A4x2 move yields two beats, each with its own dealt/blocked/parried
@@ -492,7 +500,7 @@ export function act(actionId, targetK = null) {
           // The kernel now stamps `enemy: i` on it (act.js debuff runner), the same index
           // its sibling runners use, so the hex is attributed to the enemy that actually
           // spoke — a debuff-only turn no longer falls back to `lastOwner: null`, which
-          // left the Wraith's opening wail with no signature and no pose. The FALLBACK
+          // left the Wraith's opening sorrow_wail with no signature and no pose. The FALLBACK
           // stays for any event that arrives without an index: then the last enemy that
           // spoke is still the one whose move emitted it. The step keeps `enemy: null`
           // (the float places at the HERO via `to: 'player'`), so nothing downstream
@@ -796,7 +804,7 @@ export function act(actionId, targetK = null) {
       slot,
       side: positionClass(e.index, after.enemies, before.enemies, e.index),
       // Whether a BOSS just left the field. Read from the name (`enemyLook` already maps
-      // "Guardian" -> boss for the card frame), never from a stat: it decides how large the
+      // "Warden" -> boss for the card frame), never from a stat: it decides how large the
       // collapse reads, and nothing else. The victory beat is gated on this below, which is
       // how "the boss dies, THEN the panel arrives" is sequenced without asking the kernel
       // for a new field.
@@ -813,7 +821,7 @@ export function act(actionId, targetK = null) {
   // stable index then sits above its painted position, and a ghost keyed by the stable
   // index lands past the row's end — the aimed-kill crash.
   // `id` rides along too: the ghost card's art is keyed by it (`dyingCard` -> `enemyMarkup`),
-  // and without it every death ghost fell back to the jaw-worm sprite (SPRITES.jaw_worm).
+  // and without it every death ghost fell back to the cinder-maw sprite (SPRITES.cinder_maw).
   // `maxHp` rides along since the hp-trail slice: while a trail is armed for the victim,
   // its collapsing ghost carries the victim's own HP bar (the kill-hold's "its bar falls
   // to 0 at the lethal golpe"), and a bar width needs the max to be a width.
@@ -887,7 +895,7 @@ export function act(actionId, targetK = null) {
   // victory flip that ends the run (the last enemy falling to end-of-turn damage during
   // its own turn) keeps the old shape: no plan — the kill hold owns that beat.
   const seqBurst = after.phase === 'ended' && !defeatFlip ? null : fx.find((b) => b.kind === 'enemy-turn');
-  // A defeat flip that ALSO carries enemy deaths (Combust can clear the last foe inside
+  // A defeat flip that ALSO carries enemy deaths (Banked Coal can clear the last foe inside
   // the very endTurn that kills the hero — rules/act.js:439-447) runs the EXISTING kill
   // hold in render.js, not the defeat hold, and on that path the plan has no retirement
   // timer: it would sit armed forever, reporting busyReason 'enemy-turn' over the
@@ -1043,6 +1051,10 @@ export function newGame(seed = null, opts = {}) {
   setRunEvents([]);
   resetRunOutcome();
   clearFxTimers();
+  // WAAPI embers own no fx-layer timer, so the sweep above cannot reach them: cancel
+  // them by name BEFORE the layer is emptied (their records would otherwise outlive
+  // their nodes for the rest of the particle life).
+  cancelEmberParticles();
   if (fxEl && fxEl.replaceChildren) fxEl.replaceChildren();
   setFlash({ hp: false, energy: false, block: false, hits: [], n: 0, blockEat: false });
   setBursts([]);
@@ -1065,6 +1077,9 @@ export function newGame(seed = null, opts = {}) {
   setEnteredIds(new Set());
   setHeroMoveHold(null);
   setStrikeSeq(null);
+  // the impact bundle's hold is run-scoped motion state like the rest: a restart must
+  // not let a dead run's window resume a squash on the new run's first paint.
+  setImpactHold(null);
   // barra de vida por golpe: run-scoped motion state like the rest — a restart drops the
   // trail without the retire's snap (the fresh run repaints from its own snapshot), and
   // any held ghosts with it.

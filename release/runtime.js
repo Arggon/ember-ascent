@@ -73,6 +73,17 @@ export function bumpAnimGen() { animGen += 1; return animGen; }
  */
 export let heroMoveHold = null; // { pose, start, dur } — the pose to keep painting, and its window
 export function setHeroMoveHold(hold) { heroMoveHold = hold; }
+/**
+ * THE IMPACT BUNDLE's hold, the same family of holds with resume as `heroMoveHold`:
+ * `{ key, start, until }` where `key` is the unit the bundle is playing on ('p' or
+ * `e<index>` — the hpTrail key namespace). fx.js arms it when a golpe's freeze window
+ * opens and a repaint inside the window (a hover, the input gate's own release paint)
+ * re-adds `is-impact` on the rebuilt figure with a negative animation-delay — the exact
+ * resume mechanism the pose hold uses. Armed only when motion is on (never under
+ * reduced motion or »), cleared by `skipAnim` and by the run reset.
+ */
+export let impactHold = null;
+export function setImpactHold(hold) { impactHold = hold; }
 
 /* --------------------------------------------------- UX-4: the deal clock ---------
  * The hand's deal is an EVENT the player must SEE: cards landing one by one, not eight
@@ -140,12 +151,44 @@ export const STRIKE_SEQ = { beat: 500, slam: 640, impactAt: 0.46, floatMs: 950 }
  * same pre-factor base as STRIKE_SEQ. The attack path keeps its own three figures
  * untouched; this is one extra number, not a second timing system: the plan's tail is the
  * non-attack steps in kernel order, one slot each, played AFTER the last slam (so a
- * `thrash` A7 B5 reads as strike then guard). 560ms is the spec's §4.2 `power` beat — the
+ * `coil_thrash` A7 B5 reads as strike then guard). 560ms is the spec's §4.2 `power` beat — the
  * middle of guard 480 / power 560 / hex 640 — because 9c's per-kind pose durations are the
  * refinement, and a plan that already carries the kind can be re-slotted there without
  * touching the event grouping again. `animMs` paces it exactly like every other beat.
  */
 export const TURN_STEP = { ms: 560 };
+/**
+ * THE IMPACT RECIPE's base timings, pre-factor base milliseconds, paced by `animMs`/
+ * `--pace` exactly like STRIKE_SEQ (slice: the impact recipe). `freezeMs[0]` is 60, not
+ * 50, on arithmetic: the first golpe's float lands at base 294 (fx.js impact =
+ * animMs(round(slam * impactAt)) = animMs(294)), so the light window anchored at 240
+ * must close at or after 294 — 240+50=290 misses it, 240+60=300 holds the numbers
+ * inside the frozen frame. Every weight closes at or past it: 300/310/335 base.
+ * `midDealt`/`heavyDealt` are the same ladder the floats tier on (floats.js,
+ * actions.js); `recoilPx(Heavy)` feed the `--impact-recoil` knob the recoil keyframe
+ * reads; `squashMs + recoilMs` is the 0.46s base the `fig-impact` keyframes span.
+ */
+export const IMPACT_FEEL = {
+  lead: 240, // freeze anchor after dispatch (the feel-queue lead; the hpTrail pre invariant names it)
+  freezeMs: [60, 70, 95], // light / mid / heavy window lengths, base ms
+  squashMs: 260,
+  recoilMs: 200, // keyframe base 0.46s = squashMs + recoilMs
+  recoilPx: 6,
+  recoilPxHeavy: 8,
+  midDealt: 8,
+  heavyDealt: 16,
+};
+/**
+ * THE WAAPI EMBER PARTICLES' base figures (fx-particles.js), pre-factor base
+ * milliseconds and px, paced exactly like the tables above: `lifeMs` goes through
+ * `animMs` (so 1x halves the SPEED of the flight and 2x restores the classic pace
+ * while the DISTANCE stays fixed — the heelburst ember's own convention,
+ * `calc(0.5s * var(--pace, 1))` with a fixed `--ex/--ey`), and `speedMin`/`speedMax`
+ * are the px-per-second band each particle's travel distance is drawn from at the
+ * BASE life. `count` bursts per golpe, `countHeavy` for a weight-2 (killing/heavy)
+ * golpe; the emitter clamps every ask into 12..30 so no caller can flood the layer.
+ */
+export const PARTICLES = { count: 16, countHeavy: 24, lifeMs: 700, speedMin: 200, speedMax: 400 };
 /**
  * Where THIS enemy sits in the playing sequence, or null. `delay` is what its .fig's
  * animation-delay should be RIGHT NOW: positive (waiting for its turn — `fill: both`
@@ -175,7 +218,7 @@ export function strikeSlot(index) {
   }
   return null;
 }
-export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800, uppercut: 700, hammerfall: 560, quench: 620, bellowspush: 640, snapcast: 480, fanflames: 700, arccut: 620, collarline: 680, headbutt: 600, surge: 760, haftjab: 520, forgeclap: 780, wildflail: 740, bellowsflex: 560, dropkick: 820, bloodhammer: 900, castaside: 640, truetemper: 700, fitplate: 660, kilncry: 620, vent: 600, heattrance: 760, hailblows: 880, climbcut: 720, veintap: 560, reapsweep: 1000, heatwash: 900, bracelock: 800, flameward: 760, cindershroud: 720, stoke: 640, scaleup: 700, bankcoal: 680, ashembrace: 720, cinderskin: 660, lockdown: 900, overtemper: 820, tithe: 780, splitseam: 700 };
+export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800, uppercut: 700, hammerfall: 560, quench: 620, bellowspush: 640, snapcast: 480, fanflames: 700, arccut: 620, collarline: 680, browstrike: 600, surge: 760, haftjab: 520, forgeclap: 780, wildflail: 740, bellowsflex: 560, heeldrop: 820, bloodhammer: 900, castaside: 640, truetemper: 700, fitplate: 660, kilncry: 620, vent: 600, heattrance: 760, hailblows: 880, climbcut: 720, veintap: 560, ashsweep: 1000, heatwash: 900, bracelock: 800, flameward: 760, cindershroud: 720, stoke: 640, scaleup: 700, bankcoal: 680, ashembrace: 720, cinderskin: 660, lockdown: 900, overtemper: 820, tithe: 780, splitseam: 700 };
 
 /* ------------------------------------------- barra de vida por golpe: hpTrail ---
  * The HP bar must FOLLOW the hits, not lead them. The kernel resolves an action in one
@@ -271,7 +314,7 @@ function hpSnapshotHp(key) {
  * @param {string} key
  * @returns {any|null}
  */
-function hpUnitHost(key) {
+export function hpUnitHost(key) {
   if (!stageEl || !stageEl.querySelector) return null;
   if (key === 'p') return stageEl.querySelector('.fight .hero') ?? null;
   const m = HP_UNIT_ENEMY.exec(key);
@@ -597,8 +640,14 @@ export function animMs(ms) {
   return Math.max(0, Math.round((ms * SLOW_FACTOR) / animSpeed));
 }
 export function clearHitstop() {
-  if (stageEl && stageEl.classList) stageEl.classList.remove('hitstop');
-  if (fxEl && fxEl.classList) fxEl.classList.remove('hitstop');
+  if (stageEl && stageEl.classList) {
+    stageEl.classList.remove('hitstop');
+    stageEl.classList.remove('hitstop-heavy');
+  }
+  if (fxEl && fxEl.classList) {
+    fxEl.classList.remove('hitstop');
+    fxEl.classList.remove('hitstop-heavy');
+  }
 }
 export function revealFloats() {
   if (!stageEl || !stageEl.querySelectorAll) return;
@@ -608,6 +657,9 @@ export function revealFloats() {
 export function skipAnim() {
   animGen += 1;
   clearHitstop();
+  // the impact bundle rides the same lifetimes as the rest of the queue: skipping
+  // retires its hold so no repaint re-adds a squash the skip just took off stage.
+  setImpactHold(null);
   // » also retires a playing strike sequence: the remaining beats never fire, and the
   // next paint drops the slam poses (the past floats stay until their own removal timers).
   setStrikeSeq(null);
@@ -624,6 +676,9 @@ export function skipAnim() {
   setInputLock(null);
   setDealClock(null);
   revealFloats();
+  // WAAPI embers ride no fx-layer timer, so the generation bump above cannot retire
+  // them — the hook cancels every live one outright (fx-particles.js).
+  onSkipFx();
 }
 
 /**
@@ -751,7 +806,7 @@ export function setPrevEnemies(list) { prevEnemies = list; }
  * The enemy ids whose entrance beat has ALREADY been played, for this run. A repaint for an
  * unrelated reason — hovering an enemy calls render() many times a second — must not replay
  * the entrance, so the beat is consumed once per id. `newGame()` clears it, which is what
- * makes a restart animate again. `id` is the kernel's encounter id (`the_guardian`,
+ * makes a restart animate again. `id` is the kernel's encounter id (`slag_warden`,
  * `nob`): static identity, not a stat, so this reads no rule.
  */
 export let enteredIds = new Set();
@@ -854,3 +909,10 @@ export function setRepaint(fn) { repaint = fn; }
 /** The targeting state reset, registered by targeting.js; actions.js ends steps through it. */
 export let notifyEndTargeting = () => {};
 export function setEndTargeting(fn) { notifyEndTargeting = fn; }
+
+/** The skip-side FX cancellation, registered by fx-particles.js at module load. WAAPI
+ *  particles own no `later()` timer (clearFxTimers could never reach them), so skipAnim
+ *  calls THIS to cancel every live ember animation — the same discipline the rest of
+ *  the queue gets from the generation bump. Calls before registration are no-ops. */
+export let onSkipFx = () => {};
+export function setOnSkipFx(fn) { onSkipFx = fn; }

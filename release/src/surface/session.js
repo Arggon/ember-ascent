@@ -30,6 +30,7 @@ import {
   canonical,
   ENGINE_VERSION,
   FORMAT_VERSION,
+  migrateLegacySave,
 } from '../kernel/index.js';
 
 /** Exit-code classes, mirroring the frozen R8 table. */
@@ -187,6 +188,10 @@ export function saveText(session) {
 /**
  * Restore a session from an untrusted parsed save object.
  * Version-incompatible or structurally invalid saves are refused, not repaired.
+ * After validation, the DE-STS rename shim maps every legacy id onto the Ember id
+ * BEFORE the restored state reaches any table lookup (src/kernel/legacy-ids.js) —
+ * a pre-rename save loads, plays and re-derives its identity from the migrated
+ * state; it does not keep its old hash.
  * @param {unknown} raw
  * @returns {{ok: true, session: any} | {ok: false, problems: string[]}}
  */
@@ -202,7 +207,8 @@ export function loadObject(raw) {
   // A save file carries the actions but never the event stream (the save format is
   // frozen), so a restored session starts with an empty one. That is honest: a run
   // restored mid-play cannot report kills it did not observe after the restore.
-  return { ok: true, session: { state: raw.state, submitted: raw.actions.slice(), events: [] } };
+  const migrated = migrateLegacySave(raw);
+  return { ok: true, session: { state: migrated.state, submitted: raw.actions.slice(), events: [] } };
 }
 
 /** Log header line object for a session's originating run. */
@@ -243,7 +249,7 @@ export function logHeader(session) {
 export function replay(header, entries) {
   let session = begin({
     seed: header.seed,
-    character: header.character ?? 'ironclad',
+    character: header.character ?? 'ashwright',
     difficulty: header.difficulty ?? 0,
     kindling: header.kindling === true,
     tempers: header.tempers === true,

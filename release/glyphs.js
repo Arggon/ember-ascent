@@ -31,7 +31,7 @@ import { el } from './dom.js';
 const MARKS = {
   // --- card types: crossed blades / shield / star / hourglass / skull ---
   // --- decorative art-band outlines (design rev 2): no gameplay meaning, so no TYPE_GLYPH ---
-  cleave: { box: '0 0 20 20', body: '<path class="m" d="M3 3 L17 17"/><path class="m" d="M14 3 L17 3 L17 6"/><path class="m" d="M3 14 L3 17 L6 17"/>' },
+  arc_cut: { box: '0 0 20 20', body: '<path class="m" d="M3 3 L17 17"/><path class="m" d="M14 3 L17 3 L17 6"/><path class="m" d="M3 14 L3 17 L6 17"/>' },
   sweep: { box: '0 0 20 20', body: '<path class="m" d="M3 16 C6 10 14 10 17 4"/><path class="m" d="M3 11 C6 6 12 6 14 3"/>' },
   ward: { box: '0 0 20 20', body: '<circle class="m" cx="10" cy="10" r="6"/><path class="m" d="M10 1 V5"/><path class="m" d="M10 15 V19"/>' },
   blade: { box: '0 0 20 20', body: '<path class="m" d="M4 16 L15 5"/><path class="m" d="M11 4 L16 4 L16 9"/><path class="m" d="M3 17 L6 14"/>' },
@@ -101,7 +101,7 @@ const MARKS = {
   //     (`.cb` cold flame) is the Cyan Lantern's — the quenched-temper cold blue
   //     precedent (the card temper class ships #8fd0f2). Constant
   //     markup, no interpolation; an unknown relic id falls back per RELIC_GLYPH below. ---
-  'r-burning_blood': { box: '0 0 100 100', body: '<path class="b" d="M50 84 C22 62 15 40 29 28 C40 19 50 27 50 38 C50 27 60 19 71 28 C85 40 78 62 50 84 Z"/><path class="r" d="M50 84 C22 62 15 40 29 28 C40 19 50 27 50 38"/><path class="r" d="M50 44 L46 52 L53 59 L48 67"/><circle class="g" cx="44" cy="40" r="3.4"/><circle class="g" cx="57" cy="35" r="2.4"/><path class="g" d="M62 80 C65 84.5 66 87.5 64.6 89.8 C63.2 92 59.8 92 58.8 89.8 C57.8 87.5 59.4 84.5 62 80 Z"/><path class="gr" d="M8 95 H92"/>' },
+  'r-kindled_heart': { box: '0 0 100 100', body: '<path class="b" d="M50 84 C22 62 15 40 29 28 C40 19 50 27 50 38 C50 27 60 19 71 28 C85 40 78 62 50 84 Z"/><path class="r" d="M50 84 C22 62 15 40 29 28 C40 19 50 27 50 38"/><path class="r" d="M50 44 L46 52 L53 59 L48 67"/><circle class="g" cx="44" cy="40" r="3.4"/><circle class="g" cx="57" cy="35" r="2.4"/><path class="g" d="M62 80 C65 84.5 66 87.5 64.6 89.8 C63.2 92 59.8 92 58.8 89.8 C57.8 87.5 59.4 84.5 62 80 Z"/><path class="gr" d="M8 95 H92"/>' },
   'r-cyan_lantern': { box: '0 0 100 100', body: '<path class="b" d="M38 14 H62 L58 24 H42 Z"/><path class="b" d="M42 78 H58 V86 H42 Z"/><path class="cb" d="M50 32 C56 40 58.5 46 58.5 52 C58.5 58.5 54.8 62.5 50 62.5 C45.2 62.5 41.5 58.5 41.5 52 C41.5 46 44 40 50 32 Z"/><path class="r" d="M50 5 V14"/><path class="r" d="M42 24 L38.5 64 C38.5 73 43.5 78 50 78 C56.5 78 61.5 73 61.5 64 L58 24"/><path class="r" d="M45 26 L43.5 77 M55 26 L56.5 77 M39 34 H61"/>' },
   'r-forge_iron': { box: '0 0 100 100', body: '<path class="b" d="M20 42 H80 L88 64 H12 Z"/><path class="r" d="M20 42 H80"/><path class="r" d="M12 64 L20 42"/><circle class="r" cx="30" cy="53" r="2.6"/><circle class="r" cx="50" cy="53" r="2.6"/><circle class="r" cx="70" cy="53" r="2.6"/><path class="g" d="M36 64 H64 L62 68 H38 Z"/><path class="gr" d="M8 92 H92"/>' },
   'r-whetted_edge': { box: '0 0 100 100', body: '<path class="b" d="M14 62 H86 L80 82 H20 Z"/><path class="r" d="M14 62 H86"/><path class="b" d="M16 56 L82 22 L86 28 L22 62 Z"/><path class="r" d="M22 62 L86 28"/><path class="g" d="M88 14 l4 3 -4 2z"/><path class="g" d="M76 8 l3.5 2.5 -3.5 2z"/><path class="g" d="M92 34 l3 2 -3 2z"/><path class="gr" d="M8 90 H92"/>' },
@@ -149,9 +149,9 @@ const MARKS = {
   //     creature: `.b` body (near-black iron), `.r` rim light (currentColor = the creature's
   //     tint), `.g` ember glow (eyes, cores, cracks). Constant markup, no interpolation. ---
   'e-worm': { box: '0 0 100 100', body: '<path class="b" d="M10 92 C8 70 14 52 30 44 C42 38 56 40 64 30 C70 22 80 20 88 26 L84 36 C78 32 72 34 68 40 C60 52 46 54 38 60 C28 68 26 80 30 92 Z"/><path class="r" d="M10 92 C8 70 14 52 30 44 C42 38 56 40 64 30 C70 22 80 20 88 26"/><path class="r" d="M18 72 L28 76 M22 60 L32 66 M34 50 L40 58 M48 44 L50 52"/><path class="b" d="M66 30 L92 18 L84 34 L94 40 L70 42 Z"/><path class="r" d="M66 30 L92 18 L84 34 L94 40 L70 42"/><path class="g" d="M84 24 l3 3 -3 1z M74 36 l3 0 -1 3z"/><circle class="g" cx="76" cy="26" r="2.6"/><path class="gr" d="M4 94 H96"/>' },
-  'e-louse': { box: '0 0 100 100', body: '<path class="r" d="M26 56 L8 46 M26 66 L6 70 M30 76 L14 88 M74 56 L92 46 M74 66 L94 70 M70 76 L86 88"/><ellipse class="b" cx="50" cy="62" rx="28" ry="24"/><path class="r" d="M22 62 C22 48 34 38 50 38 C66 38 78 48 78 62 C78 76 66 86 50 86 C34 86 22 76 22 62 Z"/><path class="r" d="M28 54 C40 48 60 48 72 54 M26 66 C40 60 60 60 74 66 M30 77 C42 72 58 72 70 77"/><path class="b" d="M38 40 C38 30 62 30 62 40 Z"/><path class="r" d="M38 40 C38 30 62 30 62 40 M42 32 L32 14 M58 32 L68 14"/><circle class="g" cx="44" cy="36" r="2.6"/><circle class="g" cx="56" cy="36" r="2.6"/>' },
+  'e-mite': { box: '0 0 100 100', body: '<path class="r" d="M26 56 L8 46 M26 66 L6 70 M30 76 L14 88 M74 56 L92 46 M74 66 L94 70 M70 76 L86 88"/><ellipse class="b" cx="50" cy="62" rx="28" ry="24"/><path class="r" d="M22 62 C22 48 34 38 50 38 C66 38 78 48 78 62 C78 76 66 86 50 86 C34 86 22 76 22 62 Z"/><path class="r" d="M28 54 C40 48 60 48 72 54 M26 66 C40 60 60 60 74 66 M30 77 C42 72 58 72 70 77"/><path class="b" d="M38 40 C38 30 62 30 62 40 Z"/><path class="r" d="M38 40 C38 30 62 30 62 40 M42 32 L32 14 M58 32 L68 14"/><circle class="g" cx="44" cy="36" r="2.6"/><circle class="g" cx="56" cy="36" r="2.6"/>' },
   'e-slime': { box: '0 0 100 100', body: '<path class="b" d="M12 88 C12 66 20 50 30 40 C38 32 44 22 50 14 C56 22 62 32 70 40 C80 50 88 66 88 88 Z"/><path class="r" d="M12 88 C12 66 20 50 30 40 C38 32 44 22 50 14 C56 22 62 32 70 40 C80 50 88 66 88 88"/><path class="r" d="M30 88 C30 94 26 96 24 92 M64 88 C64 96 70 97 70 91"/><circle class="r" cx="62" cy="56" r="5"/><circle class="r" cx="34" cy="70" r="3.4"/><circle class="r" cx="56" cy="76" r="2.4"/><path class="g" d="M38 54 l8 4 -8 3z M62 66 l-8 -4 8 -3z" transform="translate(0 -6)"/><path class="gr" d="M6 89 H94"/>' },
-  'e-cultist': { box: '0 0 100 100', body: '<path class="b" d="M50 10 C64 12 70 28 68 42 L80 92 H20 L32 42 C30 28 36 12 50 10 Z"/><path class="r" d="M50 10 C64 12 70 28 68 42 L80 92 H20 L32 42 C30 28 36 12 50 10 Z"/><path class="b" d="M40 30 C40 22 60 22 60 30 L58 44 H42 Z"/><path class="r" d="M50 44 V92 M34 60 C42 56 58 56 66 60"/><circle class="g" cx="45" cy="34" r="2.3"/><circle class="g" cx="55" cy="34" r="2.3"/><path class="r" d="M80 92 L86 20"/><path class="g" d="M86 8 C90 14 90 18 86 20 C82 18 82 14 86 8 Z"/>' },
+  'e-cantor': { box: '0 0 100 100', body: '<path class="b" d="M50 10 C64 12 70 28 68 42 L80 92 H20 L32 42 C30 28 36 12 50 10 Z"/><path class="r" d="M50 10 C64 12 70 28 68 42 L80 92 H20 L32 42 C30 28 36 12 50 10 Z"/><path class="b" d="M40 30 C40 22 60 22 60 30 L58 44 H42 Z"/><path class="r" d="M50 44 V92 M34 60 C42 56 58 56 66 60"/><circle class="g" cx="45" cy="34" r="2.3"/><circle class="g" cx="55" cy="34" r="2.3"/><path class="r" d="M80 92 L86 20"/><path class="g" d="M86 8 C90 14 90 18 86 20 C82 18 82 14 86 8 Z"/>' },
   'e-brute': { box: '0 0 100 100', body: '<path class="b" d="M50 22 C70 22 84 34 86 52 L90 92 H10 L14 52 C16 34 30 22 50 22 Z"/><path class="r" d="M50 22 C70 22 84 34 86 52 L90 92 H10 L14 52 C16 34 30 22 50 22 Z"/><path class="r" d="M34 26 C24 18 20 8 22 2 C30 6 36 14 40 22 M66 26 C76 18 80 8 78 2 C70 6 64 14 60 22"/><path class="r" d="M30 50 C40 46 60 46 70 50 M38 62 L50 70 L62 62"/><path class="g" d="M36 40 l8 3 -8 2z M64 40 l-8 3 8 2z"/><path class="gc" d="M22 70 L30 78 L26 88 M78 70 L72 80 L76 88"/>' },
   'e-sentinel': { box: '0 0 100 100', body: '<path class="b" d="M50 4 L84 16 L90 50 C86 72 70 86 50 96 C30 86 14 72 10 50 L16 16 Z"/><path class="r" d="M50 4 L84 16 L90 50 C86 72 70 86 50 96 C30 86 14 72 10 50 L16 16 Z"/><path class="r" d="M50 14 L74 24 L78 50 C74 66 64 76 50 84 C36 76 26 66 22 50 L26 24 Z"/><path class="r" d="M30 40 H70 M50 14 V30 M50 64 V84"/><path class="gc" d="M36 30 L42 36 L38 40 M64 30 L58 36 L62 40 M22 60 L30 62 M78 60 L70 62"/><circle class="g" cx="50" cy="52" r="8"/><circle class="r" cx="50" cy="52" r="12"/>' },
   'e-rune': { box: '0 0 100 100', body: '<path class="b" d="M50 12 L86 50 L50 88 L14 50 Z"/><path class="r" d="M50 12 L86 50 L50 88 L14 50 Z"/><circle class="g" cx="50" cy="50" r="7"/><circle class="r" cx="50" cy="50" r="14"/>' },
@@ -207,7 +207,7 @@ export const POTION_GLYPH = {
  *    * spoils chip -> the generic `relic` heart (the pre-art chip mark, unchanged).
  *  Both are the glyphBox/glyphMarkup rune-fallback model: unknown in, known shape out. */
 export const RELIC_GLYPH = {
-  burning_blood: 'r-burning_blood',
+  kindled_heart: 'r-kindled_heart',
   cyan_lantern: 'r-cyan_lantern',
   forge_iron: 'r-forge_iron',
   whetted_edge: 'r-whetted_edge',
@@ -312,12 +312,12 @@ export const NODE_WORDS = {
  */
 export function enemyLook(id) {
   const table = {
-    jaw_worm: { art: 'e-worm', hue: 1 },
-    cultist: { art: 'e-cultist', hue: 4 },
-    red_louse: { art: 'e-louse', hue: 1 },
-    acid_slime: { art: 'e-slime', hue: 3 },
-    gremlin_nob: { art: 'e-brute', elite: true, hue: 2 },
-    the_guardian: { art: 'e-sentinel', boss: true, hue: 1 },
+    cinder_maw: { art: 'e-worm', hue: 1 },
+    ash_cantor: { art: 'e-cantor', hue: 4 },
+    kiln_mite: { art: 'e-mite', hue: 1 },
+    slag_ooze: { art: 'e-slime', hue: 3 },
+    cinder_brute: { art: 'e-brute', elite: true, hue: 2 },
+    slag_warden: { art: 'e-sentinel', boss: true, hue: 1 },
     // UX-9 D2: the Cinder Mines roster. The `boss`/`elite` flags are what drive the framing
     // (border + boss name font); the sprites resolve by `e.id` in stage-art.js, so no glyph
     // class is invented here for the unused `art` field.

@@ -105,7 +105,7 @@ function playCard(state, action, content) {
   // shows the card back). Exhaust wins if the card also exhausted (nothing shipped
   // carries both; the exhaust branch keeps first claim). Two dormant shapes to know
   // about, both unreachable today: a perPlay+retain card would return the hand copy
-  // with the perPlay it LEFT as (rampage's growth lives on the deck instance — refresh
+  // with the perPlay it LEFT as (climbing_heat's growth lives on the deck instance — refresh
   // the returned instance from the deck if ever combined), and a card that reached
   // combat.exhaust without a definition exhaust verb would vanish entirely (no hand,
   // no discard). Zero draws either way: the card simply does not move, and replaying
@@ -125,7 +125,7 @@ function playCard(state, action, content) {
     next = { ...next, combat: { ...next.combat, exhaust: [...next.combat.exhaust, { uid: card.uid, cardId: card.cardId }] } };
   }
 
-  // Exhaust hooks (Feel No Pain / Dark Embrace) fire per exhausted card.
+  // Exhaust hooks (Cinder Skin / Ash Embrace) fire per exhausted card.
   if (exhausted) {
     const hook = fireHook(next, 'on_exhaust', { rng });
     next = hook.state;

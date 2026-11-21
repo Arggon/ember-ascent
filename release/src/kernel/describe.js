@@ -3,7 +3,7 @@
 // WHY THIS FILE EXISTS: `effectSummary()` in observe.js is an *agent-facing* payload.
 // It is measured, budgeted and frozen (`A6`, `HP3`, `PWRx2`), and it is fine for an
 // agent that has read the glossary. It is NOT fine for a new human player: `HP3` on
-// Bloodletting means *lose 3 HP*, and a first-timer reads it as "heal 3" or "has 3 HP".
+// Vein Tap means *lose 3 HP*, and a first-timer reads it as "heal 3" or "has 3 HP".
 //
 // So there are two renderings of the same card and both live in the kernel:
 //   effectSummary(def)  -> terse, for the CLI payload (UNCHANGED, do not edit)
@@ -14,7 +14,7 @@
 // Presentation stays in the renderer; MEANING stays here.
 //
 // Every sentence below was written against the effect handlers, not against the card
-// names: `bloodletting` calls loseHp(player, 3) (src/kernel/rules/effects/index.js),
+// names: `vein_tap` calls loseHp(player, 3) (src/kernel/rules/effects/index.js),
 // so it says "Lose 3 HP" — never "take 3 damage" (loseHp ignores Block and floors HP
 // at 1) and never "heal".
 import { ENEMIES } from './rules/encounters.js';
@@ -238,18 +238,18 @@ const STATUS_MEANING_ES = {
 
 /** Plain English for one persistent power key. */
 const POWER_MEANING = {
-  combust: { label: 'Banked Coal', per: 'at the end of each turn: deal 1 damage to ALL enemies and lose 1 HP' },
-  dark_embrace: { label: 'Ash Embrace', per: 'whenever a card is exhausted: draw 1 card' },
-  feel_no_pain: { label: 'Cinder Skin', per: 'whenever a card is exhausted: gain 1 Block' },
-  rupture: { label: 'Split Seam', per: 'whenever a card makes you lose HP: gain 1 Strength' },
+  banked_coal: { label: 'Banked Coal', per: 'at the end of each turn: deal 1 damage to ALL enemies and lose 1 HP' },
+  ash_embrace: { label: 'Ash Embrace', per: 'whenever a card is exhausted: draw 1 card' },
+  cinder_skin: { label: 'Cinder Skin', per: 'whenever a card is exhausted: gain 1 Block' },
+  split_seam: { label: 'Split Seam', per: 'whenever a card makes you lose HP: gain 1 Strength' },
 };
 
 /** The same power rows in Spanish (I18N-1). */
 const POWER_MEANING_ES = {
-  combust: { label: 'Carbón Guardado', per: 'al final de cada turno: infliges 1 de daño a TODOS los enemigos y pierdes 1 HP' },
-  dark_embrace: { label: 'Abrazo de Ceniza', per: 'cada vez que una carta se agota: robas 1 carta' },
-  feel_no_pain: { label: 'Piel de Ascuas', per: 'cada vez que una carta se agota: ganas 1 de Bloqueo' },
-  rupture: { label: 'Costura Abierta', per: 'cada vez que una carta te hace perder HP: ganas 1 de Fuerza' },
+  banked_coal: { label: 'Carbón Guardado', per: 'al final de cada turno: infliges 1 de daño a TODOS los enemigos y pierdes 1 HP' },
+  ash_embrace: { label: 'Abrazo de Ceniza', per: 'cada vez que una carta se agota: robas 1 carta' },
+  cinder_skin: { label: 'Piel de Ascuas', per: 'cada vez que una carta se agota: ganas 1 de Bloqueo' },
+  split_seam: { label: 'Costura Abierta', per: 'cada vez que una carta te hace perder HP: ganas 1 de Fuerza' },
 };
 
 /** Every power lasts for the rest of the fight, so one shared note says so. */
@@ -292,7 +292,7 @@ function statusClause(key, stacks, who = 'player', lang = 'en') {
 
 /**
  * Plain-language sentence for one persistent power counter.
- * @param {string} key power key, e.g. 'combust'
+ * @param {string} key power key, e.g. 'banked_coal'
  * @param {number} stacks
  * @param {string} [lang]
  * @returns {string}
@@ -323,8 +323,8 @@ export const statusName = (key, lang = 'en') => {
 // STATUS_MEANING's label, player clause and detail verbatim, so a chip popover and a
 // status pill can never disagree about what Strength does.
 //
-// `custom`-verb effects take NO chip on purpose: their meaning is bespoke (Bloodletting
-// pays HP, Rampage grows), and a generic icon would claim a rule the handler does not
+// `custom`-verb effects take NO chip on purpose: their meaning is bespoke (Vein Tap
+// pays HP, Climbing Heat grows), and a generic icon would claim a rule the handler does not
 // have. A card whose effects are not fully chip-expressible therefore KEEPS its visible
 // sentence beside its chips — `chipsCover(def)` is the flag the renderer reads.
 
@@ -435,7 +435,7 @@ export function chipVerbLabel(verb, lang = 'en') {
  * are plain data (`{verb, status?, amount, num, label, explain}` plus `hits` on a folded
  * multi-hit damage run): JSON-safe, publishable in any snapshot.
  *
- * Repeated identical damage effects are folded onto `hits` (Pummel's four `{damage,2}`
+ * Repeated identical damage effects are folded onto `hits` (Hail of Blows's four `{damage,2}`
  * entries read as ONE "2×4" chip, the same fold describeCard applies to its sentence), and
  * `custom` verbs emit NO row — their meaning is bespoke, so the card's own sentence speaks
  * for them (see chipsCover).
@@ -562,33 +562,33 @@ export function describeCardType(type, lang = 'en') {
  * @type {Record<string, string>}
  */
 const CUSTOM_SENTENCE = {
-  bloodletting: 'Lose 3 HP. Gain 2 Energy.',
-  hemokinesis: 'Lose 2 HP. Deal 15 damage.',
-  reaper: 'Deal 4 damage to ALL enemies. Heal HP equal to the damage dealt.',
-  limit_break: 'Double your current Strength. Does nothing if you have no Strength.',
-  offering: 'Lose 6 HP. Gain 2 Energy. Draw 3 cards.',
-  combust: 'Gain Combust: at the end of each turn, deal 1 damage to ALL enemies and lose 1 HP.',
-  dark_embrace: 'Gain Dark Embrace: whenever a card is exhausted, draw 1 card.',
-  feel_no_pain: 'Gain Feel No Pain: whenever a card is exhausted, gain 1 Block.',
-  rupture: 'Gain Rupture: whenever a card makes you lose HP, gain 1 Strength.',
-  entrench: 'Double your current Block. Does nothing if you have no Block.',
-  rampage: 'Deal 8 damage. This card gains +5 damage permanently each time you play it.',
+  vein_tap: 'Lose 3 HP. Gain 2 Energy.',
+  blood_hammer: 'Lose 2 HP. Deal 15 damage.',
+  ash_harvest: 'Deal 4 damage to ALL enemies. Heal HP equal to the damage dealt.',
+  overtemper: 'Double your current Strength. Does nothing if you have no Strength.',
+  blood_tithe: 'Lose 6 HP. Gain 2 Energy. Draw 3 cards.',
+  banked_coal: 'Gain Banked Coal: at the end of each turn, deal 1 damage to ALL enemies and lose 1 HP.',
+  ash_embrace: 'Gain Ash Embrace: whenever a card is exhausted, draw 1 card.',
+  cinder_skin: 'Gain Cinder Skin: whenever a card is exhausted, gain 1 Block.',
+  split_seam: 'Gain Split Seam: whenever a card makes you lose HP, gain 1 Strength.',
+  brace: 'Double your current Block. Does nothing if you have no Block.',
+  climbing_heat: 'Deal 8 damage. This card gains +5 damage permanently each time you play it.',
 };
 
 /** The same handler sentences in Spanish (I18N-1). The power names reuse the es labels
  *  of POWER_MEANING_ES, so a card and its pill can never disagree in either language. */
 const CUSTOM_SENTENCE_ES = {
-  bloodletting: 'Pierdes 3 HP. Ganas 2 de Energía.',
-  hemokinesis: 'Pierdes 2 HP. Infliges 15 de daño.',
-  reaper: 'Infliges 4 de daño a TODOS los enemigos. Recuperas HP igual al daño infligido.',
-  limit_break: 'Duplicas tu Fuerza actual. No hace nada si no tienes Fuerza.',
-  offering: 'Pierdes 6 HP. Ganas 2 de Energía. Robas 3 cartas.',
-  combust: `Ganas ${POWER_MEANING_ES.combust.label}: al final de cada turno, infliges 1 de daño a TODOS los enemigos y pierdes 1 HP.`,
-  dark_embrace: `Ganas ${POWER_MEANING_ES.dark_embrace.label}: cada vez que una carta se agota, robas 1 carta.`,
-  feel_no_pain: `Ganas ${POWER_MEANING_ES.feel_no_pain.label}: cada vez que una carta se agota, ganas 1 de Bloqueo.`,
-  rupture: `Ganas ${POWER_MEANING_ES.rupture.label}: cada vez que una carta te hace perder HP, ganas 1 de Fuerza.`,
-  entrench: 'Duplicas tu Bloqueo actual. No hace nada si no tienes Bloqueo.',
-  rampage: 'Infliges 8 de daño. Esta carta gana +5 de daño de forma permanente cada vez que la juegas.',
+  vein_tap: 'Pierdes 3 HP. Ganas 2 de Energía.',
+  blood_hammer: 'Pierdes 2 HP. Infliges 15 de daño.',
+  ash_harvest: 'Infliges 4 de daño a TODOS los enemigos. Recuperas HP igual al daño infligido.',
+  overtemper: 'Duplicas tu Fuerza actual. No hace nada si no tienes Fuerza.',
+  blood_tithe: 'Pierdes 6 HP. Ganas 2 de Energía. Robas 3 cartas.',
+  banked_coal: `Ganas ${POWER_MEANING_ES.banked_coal.label}: al final de cada turno, infliges 1 de daño a TODOS los enemigos y pierdes 1 HP.`,
+  ash_embrace: `Ganas ${POWER_MEANING_ES.ash_embrace.label}: cada vez que una carta se agota, robas 1 carta.`,
+  cinder_skin: `Ganas ${POWER_MEANING_ES.cinder_skin.label}: cada vez que una carta se agota, ganas 1 de Bloqueo.`,
+  split_seam: `Ganas ${POWER_MEANING_ES.split_seam.label}: cada vez que una carta te hace perder HP, ganas 1 de Fuerza.`,
+  brace: 'Duplicas tu Bloqueo actual. No hace nada si no tienes Bloqueo.',
+  climbing_heat: 'Infliges 8 de daño. Esta carta gana +5 de daño de forma permanente cada vez que la juegas.',
 };
 
 /**
@@ -618,7 +618,7 @@ const CUSTOM_SENTENCE_ES = {
  * has exactly one source. `allowVuln` is the unambiguity gate: the ×3/2 folds into ONE
  * number only when every hit lands on the same vulnerable body — a single target, or an
  * AOE whose fold context says exactly one enemy is alive and Vulnerable (`fold.vuln`).
- * A mixed target set (Reaper over healthy neighbours) still refuses the clause.
+ * A mixed target set (Ash Harvest over healthy neighbours) still refuses the clause.
  * @param {any} fold live-combat fold context (plain numbers)
  * @param {number} printed the effect's printed amount
  * @param {string} lang
@@ -742,7 +742,7 @@ export function describeEffect(effect, def = {}, lang = 'en', fold = null) {
 /**
  * Consecutive identical `damage` effects folded into one sentence.
  *
- * Pummel is four separate `{verb:'damage',amount:2}` entries (one per hit), so the naive
+ * Hail of Blows is four separate `{verb:'damage',amount:2}` entries (one per hit), so the naive
  * read is "Deal 2 damage" four times. Four hits of 2 are exactly "2 damage 4 times" —
  * identical numbers, identical Block interaction — and one sentence a player can read.
  * Folding is presentation only; no rule is inferred.
@@ -770,7 +770,7 @@ function foldRepeatedDamage(effects) {
  * Each returns null when no number would move, so the static CUSTOM_SENTENCE keeps
  * rendering byte-identically for a clean state.
  * @param {any} e the custom effect entry
- * @param {any} instance the hand instance (Rampage's perPlay bonus)
+ * @param {any} instance the hand instance (Climbing Heat's perPlay bonus)
  * @param {{strength: number, weak: number, dexterity: number, vuln: boolean}} fold
  * @param {string} lang
  * @returns {string|null}
@@ -778,18 +778,18 @@ function foldRepeatedDamage(effects) {
 function customFold(e, instance, fold, lang) {
   const es = langOf(lang) === 'es';
   switch (e.handler) {
-    case 'hemokinesis': {
+    case 'blood_hammer': {
       const rider = damageRider(fold, 15, lang, true);
       return rider ? (es ? `Pierdes 2 HP. Infliges 15 de daño — ${rider}.` : `Lose 2 HP. Deal 15 damage — ${rider}.`) : null;
     }
-    case 'reaper': {
+    case 'ash_harvest': {
       // AOE obeys the same unambiguity gate as the plain verbs: the Vulnerable clause
       // speaks only when the fold says every hit lands on the one vulnerable body
       // (`fold.vuln`); over a mixed set the amplification is not one number, so it drops.
       const rider = damageRider(fold, 4, lang, fold.vuln);
       return rider ? (es ? `Infliges 4 de daño a TODOS los enemigos — ${rider} a cada uno.` : `Deal 4 damage to ALL enemies — ${rider} each.`) : null;
     }
-    case 'rampage': {
+    case 'climbing_heat': {
       const base = 8 + (instance?.perPlay ?? 0);
       const rider = damageRider(fold, base, lang, true);
       if (!rider) return null;
@@ -809,7 +809,7 @@ function customFold(e, instance, fold, lang) {
  *
  * @param {any} def card definition from content (cards.json shape)
  * @param {{perPlay?: number}} [instance] runtime instance, when one is available:
- *   Rampage's damage depends on how often it has been played this run.
+ *   Climbing Heat's damage depends on how often it has been played this run.
  * @param {string} [lang] 'en' (default) or 'es'
  * @param {{strength: number, weak: number, dexterity: number, vuln: boolean}} [fold]
  *        live-combat fold numbers (snapshotHand only); omitted/null keeps the printed card
@@ -823,17 +823,17 @@ export function describeCard(def, instance = {}, lang = 'en', fold = null) {
   const parts = effects.map((e) => {
     // Live-combat fold for the Strength-folding custom handlers; null keeps the static
     // sentence so a clean state renders byte-identically to the printed card. This runs
-    // BEFORE Rampage's instance early return below: once its first play moves the number,
+    // BEFORE Climbing Heat's instance early return below: once its first play moves the number,
     // the grown sentence must still carry the same Strength/Weak/Vulnerable rider as the
     // plain verbs — returning early would drop the fold the moment it had something to say.
     if (e.verb === 'custom' && fold) {
       const folded = customFold(e, instance, fold, lang);
       if (folded) return folded;
     }
-    // Rampage is the one handler whose numbers move with the instance. Without a fold
+    // Climbing Heat is the one handler whose numbers move with the instance. Without a fold
     // (collection surfaces — codex, deck sheet) there is no combat to read, but the
     // grown base is still the card's true number, so it prints the moved sentence.
-    if (e.verb === 'custom' && e.handler === 'rampage' && instance.perPlay) {
+    if (e.verb === 'custom' && e.handler === 'climbing_heat' && instance.perPlay) {
       return langOf(lang) === 'es'
         ? `Infliges ${8 + instance.perPlay} de daño (+5 más cada vez que la juegas).`
         : `Deal ${8 + instance.perPlay} damage (+5 more each time you play it).`;

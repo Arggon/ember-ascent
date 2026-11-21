@@ -19,6 +19,7 @@
 import { el, placeAt } from './dom.js';
 import { animGen, animMs, later, stageEl } from './runtime.js';
 import { fxAdd } from './fx-add.js';
+import { EMBER_PALETTE, emberBurst } from './fx-particles.js';
 import { THROW_MS } from './hero-moves.js';
 
 
@@ -137,7 +138,7 @@ export function fxQuenchveil(fire, lane, b, sigMs, gen) {
 
         // Bellows Gust: a cone of wind sweeps the WHOLE enemy row — it is sized to the
         // row's measured span (a targeted lane would miss an all-row hit) — and the row
-        // leans back under it (a `blown` class on each figure, one gust, then gone).
+        // leans back under it (a `blown` class on each figure, one bellows_gust, then gone).
 export function fxGustcone(fire, lane, b, sigMs, gen) {
   fire(() => {
     const cards = stageEl && stageEl.querySelectorAll
@@ -231,7 +232,7 @@ export function fxFlarefan(fire, lane, b, sigMs, gen) {
 
         // ==== LOTE 2 — ataques comunes I: each common attack draws its own mark. ====
         // Arc Cut: ONE horizontal luminous arc crosses the WHOLE enemy row, side to
-        // side — sized to the row's measured span (like the gust cone), never to a
+        // side — sized to the row's measured span (like the bellows_gust cone), never to a
         // single lane, because the card hits all enemies.
 export function fxArcspan(fire, lane, b, sigMs, gen) {
   fire(() => {
@@ -308,7 +309,7 @@ export function fxSlagwave(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.3)) || 1);
 }
 
-        // Haft Jab: the pommel's blunt cap cracks against the target, and a card is
+        // Haft Jab: the haft_jab's blunt cap cracks against the target, and a card is
         // PULLED out of the foe — it flies FROM the enemy toward the hero's hand.
 export function fxJabpull(fire, lane, b, sigMs, gen) {
   fire(() => {
@@ -334,7 +335,7 @@ export function fxJabpull(fire, lane, b, sigMs, gen) {
         // ==== LOTE 3 — ataques comunes II: each common attack draws its own mark. ====
         // Forgeclap: TWO hammer heads rise and MEET overhead — the clash point is ABOVE
         // the hero (measured hero box), and the shock ring plus the vulnerable cracks
-        // span the WHOLE row (measured row span, like the gust cone: every enemy is hit).
+        // span the WHOLE row (measured row span, like the bellows_gust cone: every enemy is hit).
 export function fxForgering(fire, lane, b, sigMs, gen) {
   fire(() => {
     const hero = stageEl && stageEl.querySelector ? stageEl.querySelector('.fight .hero') : null;
@@ -402,18 +403,20 @@ export function fxChestpulse(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.18)) || 1);
 }
 
-        // Heel Drop: the heels land — embers burst at the impact point, and the
+        // Heel Drop: the heels land — embers burst at the impact point (the WAAPI
+        // emitter's low-and-sideways fan, the heelburst embers' own palette), and the
         // refunded energy is a spark that rides FROM the burst INTO the energy orb
         // (the flarefan's spark flies hero→orb; this one flies lane→orb).
 export function fxHeelburst(fire, lane, b, sigMs, gen) {
   fire(() => {
     const burst = el('div', { cls: `fx-heelburst ${b.side || 'side-none'}`, attrs: { 'aria-hidden': 'true' } },
-      el('span', { cls: 'fx-heelburst-core' }),
-      el('span', { cls: 'fx-heelburst-ember' }),
-      el('span', { cls: 'fx-heelburst-ember fx-heelburst-ember-2' }),
-      el('span', { cls: 'fx-heelburst-ember fx-heelburst-ember-3' }));
+      el('span', { cls: 'fx-heelburst-core' }));
     if (lane) placeAt(burst, lane, -40, -34);
     fxAdd(burst, animMs(560) || 560);
+    // The scatter the three fixed ember spans used to draw by stylesheet: a fan held low
+    // and sideways around the impact point (bias 0 = straight down, ±55°), the same
+    // palette. The emitter's own gates (motion, speed, measurable point) apply.
+    emberBurst(lane, { count: 12, lifeMs: 500, spreadDeg: 110, biasDeg: 0, palette: EMBER_PALETTE, gen });
     const orb = stageEl && stageEl.querySelector ? stageEl.querySelector('.energy-orb') : null;
     if (lane && orb) {
       const or2 = orb.getBoundingClientRect();
@@ -445,7 +448,7 @@ export function fxBloodcondense(fire, lane, b, sigMs, gen) {
 }
 
         // ==== LOTE 4 — skills comunes: each common skill draws its own mark. ====
-        // Cast Aside: the shrug tosses a spare plate OVER the shoulder — it rises behind
+        // Cast Aside: the cast_aside tosses a spare plate OVER the shoulder — it rises behind
         // the hero's back and drops away (measured hero box) — and the DRAWN card slides
         // from the chest into the hand (the hand measured, like the jab's pulled card).
 export function fxPlatefly(fire, lane, b, sigMs, gen) {
@@ -644,7 +647,7 @@ export function fxVeindrip(fire, lane, b, sigMs, gen) {
 }
 
         // Ash Harvest: a scythe of ash sweeps the WHOLE row (sized to the row's
-        // measured span, like the gust cone — the card hits every enemy) and one ash
+        // measured span, like the bellows_gust cone — the card hits every enemy) and one ash
         // mote per enemy DRAINS from its card back toward the hero.
 export function fxAshscythe(fire, lane, b, sigMs, gen) {
   fire(() => {
@@ -916,7 +919,7 @@ export function fxPlatestack(fire, lane, b, sigMs, gen) {
 
         // Overtemper: the forge heart BLOOMS at the chest — a white-gold core flares
         // and FIVE petals open outward around it, lifting away as they fade. A
-        // flowering with NO ring: the shockwave's expanding circle is Maul's mark,
+        // flowering with NO ring: the heat_wash's expanding circle is Maul's mark,
         // never this one's. Hero-measured at the chest, like the chest pulse.
 export function fxHeartbloom(fire, lane, b, sigMs, gen) {
   fire(() => {
@@ -988,7 +991,7 @@ export function fxSelfseam(fire, lane, b, sigMs, gen) {
  */
 export const SIG_FX = {
   shake: fxShake,
-  shockwave: fxShockwave,
+  heat_wash: fxShockwave,
   anvil: fxAnvil,
   twin: fxTwin,
   rend: fxRend,
@@ -1132,7 +1135,7 @@ export function fxAshCone(fire, lane, b, sigMs, gen) {
     animMs(Math.round((sigMs || 640) * 0.2)) || 1);
 }
 
-/* ---- 5.3 Kiln Mite: a 460ms dart with one twitch; grow TIGHTENS (≤1.04), never enlarges. ---- */
+/* ---- 5.3 Kiln Mite: a 460ms dart with one twitch; mite_grow TIGHTENS (≤1.04), never enlarges. ---- */
 export function fxMiteDart(fire, lane, b, sigMs) {
   const foe = foeLane(b);
   const mark = markLane();
@@ -1311,29 +1314,29 @@ export function fxCeilingSlab(fire, lane, b, sigMs, gen) {
  */
 export const ENEMY_SIG_FX = {
   // 5.1: overshoot windup then snap; the plate lands mid-bite. Bellow inhales instead of biting.
-  jaw_worm: { attack: fxMawBite, power: fxMawInhale },
-  // 5.2 scripted: the rite column (incantation PWR3), then the ash cone that falls across the
-  // stage INSTEAD of a lunge (dark_strike A6). She never touches the hero.
-  cultist: { power: fxRiteColumn, attack: fxAshCone },
-  // 5.3: 460ms dart with the 85% twitch; grow tightens, never enlarges.
-  red_louse: { attack: fxMiteDart, power: fxMiteTighten },
-  // 5.4: compress then lunge (tackle A10); the acid arc drips to the hero's feet (lick WK1).
-  acid_slime: {
+  cinder_maw: { attack: fxMawBite, power: fxMawInhale },
+  // 5.2 scripted: the rite column (ritual PWR3), then the ash cone that falls across the
+  // stage INSTEAD of a lunge (hex_strike A6). She never touches the hero.
+  ash_cantor: { power: fxRiteColumn, attack: fxAshCone },
+  // 5.3: 460ms dart with the 85% twitch; mite_grow tightens, never enlarges.
+  kiln_mite: { attack: fxMiteDart, power: fxMiteTighten },
+  // 5.4: compress then lunge (ooze_tackle A10); the acid arc drips to the hero's feet (acid_lick WK1).
+  slag_ooze: {
     attack: (fire, lane, b, sigMs) => { fxOozeCompress(fire, lane, b, sigMs); fxOozeLunge(fire, lane, b, sigMs); },
     hex: fxAcidArc,
   },
-  // 5.5: 900ms charge + stage shake (rush A14); skull_bash's vulnerable half is its `hex` beat
-  // (short charge + ring); enrage glows the seams and holds `is-enraged` at paint time.
-  gremlin_nob: {
+  // 5.5: 900ms charge + stage shake (brute_rush A14); brute_smash's vulnerable half is its `hex` beat
+  // (short charge + ring); fury glows the seams and holds `is-enraged` at paint time.
+  cinder_brute: {
     attack: fxBruteCharge,
     hex: fxVulnRing,
     power: fxBruteSeams,
   },
   // 5.6: defense is the flourish. Three-plate wall on B20; the piston (with its pocket)
   // is the per-golpe attack mark — the dispatcher fires it once per strike now, and the
-  // pocket inside it is nudged by the golpe index (fxWardenPockets); vent_steam is a
+  // pocket inside it is nudged by the golpe index (fxWardenPockets); steam_vent is a
   // steam wash, no travel.
-  the_guardian: {
+  slag_warden: {
     guard: fxWardenWall,
     attack: fxWardenPockets,
     hex: fxSteamWash,
@@ -1345,7 +1348,7 @@ export const ENEMY_SIG_FX = {
     guard: fxCrawlerHex,
     attack: fxCrawlerClaws,
   },
-  // 5.8: zero travel. Wail thins in place and rings at the hero; drain crosses as a streak;
+  // 5.8: zero travel. Wail thins in place and rings at the hero; soul_drain crosses as a streak;
   // drift bobs and never moves horizontally (its block half is the shared guard shimmer).
   ash_wraith: {
     hex: (fire, lane, b, sigMs) => { fxWraithThin(fire, lane, b, sigMs); fxWailRings(fire, lane, b, sigMs); },

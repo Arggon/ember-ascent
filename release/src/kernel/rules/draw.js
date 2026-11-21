@@ -3,8 +3,8 @@
 // WHY THIS MODULE EXISTS
 // The loop below (reshuffle the discard when the draw pile empties, decorate the
 // instance, cap the hand at 10 and overflow to the discard) used to exist in FOUR
-// places: the turn draw (act.js), the `draw` verb (vocabulary.js), Offering
-// (rules/effects/index.js) and Dark Embrace (rules/powers.js). card-instance.js had
+// places: the turn draw (act.js), the `draw` verb (vocabulary.js), Blood Tithe
+// (rules/effects/index.js) and Ash Embrace (rules/powers.js). card-instance.js had
 // already fixed one defect that bred in those copies (hand cards without `cost`);
 // this module finishes the job by making the LOOP itself single-sourced, so the
 // reshuffle rule and the hand cap each have exactly one home.
@@ -14,7 +14,7 @@
 // index a reshuffle consumes, and a behavior-preserving extraction must keep both:
 //   - the turn draw (act.js) reshuffles at the LIVE counter, reading the state this
 //     loop has produced so far;
-//   - the card-driven sites (vocabulary.js `draw`, Offering, Dark Embrace) reshuffle
+//   - the card-driven sites (vocabulary.js `draw`, Blood Tithe, Ash Embrace) reshuffle
 //     through ctx.rng, whose closure binds the draw index the enclosing play held
 //     when the effect started.
 // Both are exact; passing the current state to the callback lets each caller encode

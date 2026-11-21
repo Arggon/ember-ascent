@@ -55,7 +55,7 @@ export const DEBUFFS = Object.freeze(
 );
 
 /** Persistent powers, each with finite stacks, fired from hooks in rules/powers.js. */
-export const POWERS = ['combust', 'dark_embrace', 'feel_no_pain', 'rupture'];
+export const POWERS = ['banked_coal', 'ash_embrace', 'cinder_skin', 'split_seam'];
 
 /** Registry of custom handlers, filled by rules/effects/*.js via registerEffect(). */
 const CUSTOM = new Map();
@@ -85,7 +85,7 @@ const clamp = (v, max) => Math.max(0, Math.min(v, max));
  * enemy's strikeDamage stops at `Math.max(0, dmg - 2)` and never floors its multiplier.
  *
  * WHY A HELPER: the fold used to live only inside the `damage` verb, and the exotic
- * handlers (hemokinesis, reaper, rampage) re-derived their Strength line by hand — the
+ * handlers (blood_hammer, ash_harvest, climbing_heat) re-derived their Strength line by hand — the
  * player's Weak was never applied anywhere, so the status text's promise ("your attacks
  * deal 25% less damage") was a lie whenever an enemy debuffed the hero. One helper, one
  * order, every player attack through it.

@@ -81,7 +81,7 @@
 // no interface tokens either way — measured with the repo's own countWorst, `p2 1` and
 // `p2_1` are both 4 tokens, over the full census:
 //   $ node scripts/dev/measure-action-shapes.mjs
-//   7 PASS "p10 sword_boomerang"   <- current single-enemy line, unchanged
+//   7 PASS "p10 returning_brand"   <- current single-enemy line, unchanged
 //   ...
 //
 // A DEAD OR OUT-OF-RANGE TARGET IS NEVER EMITTED. That is what makes rule 2 hold without

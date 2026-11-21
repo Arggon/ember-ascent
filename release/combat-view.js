@@ -8,8 +8,10 @@
 // played (hero-moves.js), never only by its type.
 
 import { BIOMES, DEFAULT_BIOME, describeTile, intentChips, loadContent } from './src/kernel/index.js';
+import { audioState, setSfxMuted } from './audio.js';
 import {
   HERO_POSE_MS,
+  IMPACT_FEEL,
   SPEED_KEY,
   STRIKE_SEQ,
   animMs,
@@ -19,6 +21,7 @@ import {
   dealClock,
   dyingThisPaint,
   enteringIds,
+  impactHold,
   flash,
   heroMoveHold,
   hpDisplay,
@@ -55,7 +58,7 @@ import { currentLang, t } from './i18n.js';
 const busyText = (reason, which) => t(`busy.${reason}.${which}`) || t(`busy.fight.${which === 'tile' ? 'animatingTile' : 'animating'}`);
 
 export function heroPose() {  // Precedence: getting hit outranks the card's own movement — a hero who just lost HP
-  // flinches, even while playing an attack (and HP-cost cards like bloodletting always
+  // flinches, even while playing an attack (and HP-cost cards like vein_tap always
   // read as hurt, never as their HERO_MOVES entry).
   if (bursts.some((b) => b.kind === 'hero-float' && b.tone === 'dmg')) {
     setHeroMoveHold(null);
@@ -112,7 +115,7 @@ export function heroFigure() {
   const shown = hpDisplay('p') ?? p.hp;
   const ratio = p.maxHp > 0 ? shown / p.maxHp : 1;
   const pose = heroPose();
-  const isBellows = snap.character === 'bellows';
+  const isBellows = snap.character === 'bellows_keeper';
   const node = el('div', {
     cls: 'hero' + (ratio <= 0.35 ? ' is-low' : '') + (isBellows ? ' is-bellows' : ''),
     attrs: { role: 'group', 'aria-label': t('combat.hero.aria', { name: snap.characterName || 'Ashwright', hp: p.hp, max: p.maxHp, block: p.block }) },
@@ -178,6 +181,43 @@ export function heroFigure() {
       }
     }
   }
+  // THE IMPACT BUNDLE's resume: a repaint that lands inside the bundle's window (a
+  // hover, the input gate's own release paint) re-adds the squash on this rebuilt
+  // figure, resumed with a negative animation-delay — the exact mechanism the pose
+  // hold above uses. The direction/width knobs ride the hold (restartImpact pinned
+  // them on the replaced node), so the resumed recoil keeps the victim's own direction
+  // and weight instead of the stylesheet fallbacks a fresh node would inherit. The
+  // stylesheet rule's :not chain keeps a death/launch figure immune to the class, and
+  // the rule leaves animation-delay undeclared precisely so this inline delay can win
+  // while the rest of the animation stays paced. The hold is only ever armed while
+  // motion is on (fx.js gates it), so no extra dock gate here.
+  const impact = impactHold;
+  if (impact && impact.key === 'p' && Date.now() < impact.until) {
+    const elapsed = Math.max(0, Date.now() - impact.start);
+    const dur = animMs(IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs)
+      || (IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs);
+    if (elapsed < dur) {
+      fig.classList.add('is-impact');
+      if (fig.style) {
+        if (fig.style.setProperty) {
+          fig.style.setProperty('--impact-dir', impact.dir || '1');
+          fig.style.setProperty('--impact-recoil', impact.recoil || `${IMPACT_FEEL.recoilPx}px`);
+        }
+        fig.style.animationDuration = `${dur}ms`;
+        fig.style.animationDelay = `-${elapsed}ms`;
+      }
+      // The white silhouette lives on the .spr CHILD (hit-white), and animation-delay
+      // is not inherited — phase the children with the figure (the markup above already
+      // painted them), exactly like the pose hold's sweep, or every repaint inside the
+      // window re-blooms solid white from 0%.
+      for (const child of fig.children ?? []) {
+        if (child.style) {
+          child.style.animationDuration = `${dur}ms`;
+          child.style.animationDelay = `-${elapsed}ms`;
+        }
+      }
+    }
+  }
   node.append(fig);
   node.append(el('div', { cls: 'hero-name', text: snap.characterName || 'Ashwright' }));
   node.append(el('div', { cls: 'ehp', text: `${shown}/${p.maxHp}` }));
@@ -193,7 +233,7 @@ export function heroFigure() {
   // juice-in diff is unchanged (`freshStatusKeys` diffs against the PREVIOUS paint,
   // which render.js records before this view is built) — the entrance class moves onto
   // the chip, and the reduced-motion block neutralizes it there like it does the pills.
-  // Powers (run-long counters: Combust, Rupture, …) STAY on the HUD: they outlive the
+  // Powers (run-long counters: Banked Coal, Split Seam, …) STAY on the HUD: they outlive the
   // fight, and this card exists only in combat.
   const freshHero = freshStatusKeys(p.statuses || []);
   const heroStatuses = (p.statuses || []).map((s) => chipNode(
@@ -224,17 +264,17 @@ export function heroFigure() {
  */
 const ENEMY_POSES = {
   // §5.1 — the overshoot windup is the POSE; the snap is the shared slam.
-  jaw_worm: { attack: 'maw-wind', power: 'maw-inhale' },
+  cinder_maw: { attack: 'maw-wind', power: 'maw-inhale' },
   // §5.2 — she never advances: the rite and the cone are columns, not dashes.
-  cultist: { power: 'cantor-rite', attack: 'cantor-cast' },
-  // §5.3 — a 460ms dart; grow TIGHTENS.
-  red_louse: { attack: 'mite-dart', power: 'mite-tighten' },
+  ash_cantor: { power: 'cantor-rite', attack: 'cantor-cast' },
+  // §5.3 — a 460ms dart; mite_grow TIGHTENS.
+  kiln_mite: { attack: 'mite-dart', power: 'mite-tighten' },
   // §5.4 — compress then lunge; the arc is a drip from a body that stays put.
-  acid_slime: { attack: 'ooze-lunge', hex: 'ooze-drip' },
+  slag_ooze: { attack: 'ooze-lunge', hex: 'ooze-drip' },
   // §5.5 — long charge, then the enraged seam glow holds.
-  gremlin_nob: { attack: 'brute-charge', hex: 'brute-bash', power: 'brute-enrage' },
+  cinder_brute: { attack: 'brute-charge', hex: 'brute-bash', power: 'brute-enrage' },
   // §5.6 — the wall is the guard pose; the piston is the heavy slam.
-  the_guardian: { guard: 'warden-wall', attack: 'warden-piston', hex: 'warden-steam' },
+  slag_warden: { guard: 'warden-wall', attack: 'warden-piston', hex: 'warden-steam' },
   // §5.7 — hex shell hardens; claws dart; ram pushes low.
   slag_crawler: { guard: 'crawler-hex', attack: 'crawler-dart' },
   // §5.8 — zero travel, ever: thin / streak / bob.
@@ -246,32 +286,47 @@ const ENEMY_POSES = {
 };
 
 /**
- * The beat kind the playing plan says THIS enemy is on, or null.
+ * The tail slot the plan clock is CURRENTLY in for this enemy, or null. Shared core of
+ * beatPose() and enemyCard's frame-resume writer: both need the same answer about the
+ * same clock, so the arithmetic lives once and a repaint mid-slot re-derives it, never
+ * restarts it. `slotStart` is the epoch ms this slot opened (the same start/tailAt/stepMs
+ * the CSS delays ride).
  *
  * `strikeSeq.tail` is the turn's non-attack steps in kernel order, one TURN_STEP slot each,
  * starting where the last slam ended. A single attacker's beats are therefore positional:
- * its step i plays in tail slot i. The pose the card wears is the kind of the step whose
- * slot the clock is currently in — computed from the same `start`/`stepMs` the CSS delays
- * use, so a repaint mid-beat re-derives the same answer instead of restarting anything.
- * Only the FIRST attacker is served positionally: with several foes the tail's slots are
- * not their individual beats, and a wrong pose is worse than the generic one, so a
- * multi-enemy turn keeps the shared §4 behaviour.
+ * its step i plays in tail slot i. Only the FIRST attacker is served positionally: with
+ * several foes the tail's slots are not their individual beats, and a wrong pose is worse
+ * than the generic one, so a multi-enemy turn keeps the shared §4 behaviour.
  */
-function beatPose(e) {
+function tailSlot(e) {
   const plan = strikeSeq;
   if (!plan || !Array.isArray(plan.tail) || plan.tail.length === 0) return null;
   if (plan.attacks && plan.attacks.length > 1) return null;
-  const table = ENEMY_POSES[e.id];
-  if (!table) return null;
   const elapsed = Date.now() - plan.start;
   const i = Math.floor((elapsed - plan.tailAt) / Math.max(1, plan.stepMs));
   if (i < 0 || i >= plan.tail.length) return null;
   const step = plan.tail[i];
   if (step.enemy !== e.index && step.owner !== e.index) return null;
+  return { step, slotStart: plan.start + plan.tailAt + i * plan.stepMs };
+}
+
+/**
+ * The beat kind the playing plan says THIS enemy is on, or null.
+ *
+ * The pose the card wears is the kind of the step whose slot the clock is currently in —
+ * computed from the same `start`/`stepMs` the CSS delays use, so a repaint mid-beat
+ * re-derives the same answer instead of restarting anything (the slot arithmetic is
+ * tailSlot's, shared with the frame-resume writer below).
+ */
+function beatPose(e) {
+  const slot = tailSlot(e);
+  if (!slot) return null;
+  const table = ENEMY_POSES[e.id];
+  if (!table) return null;
   // GOLPES DISCRETOS: a tick step (the turn-closing poison) is a hex fact landing on
   // that body — HP straight off — so it wears the hex pose, never the attack's slam.
-  const kind = step.kind === 'block' ? 'guard'
-    : step.kind === 'status' || step.kind === 'tick' ? 'hex'
+  const kind = slot.step.kind === 'block' ? 'guard'
+    : slot.step.kind === 'status' || slot.step.kind === 'tick' ? 'hex'
       : 'attack';
   return table[kind] ?? null;
 }
@@ -356,6 +411,28 @@ export function speedDock() {
   add(1, '1×', t('combat.speed.1'));
   add(2, '2×', t('combat.speed.2'));
   add(0, '»', t('combat.speed.skip'));
+  // The SFX toggle (the audio slice's own control). `is-on` reads like the dock's other
+  // buttons — gold marks the state that is live — so it marks SOUND ON, not muted.
+  // setSfxMuted persists under ea.sfxMuted; the repaint redraws the dock (and every
+  // other dock paint, the defeat hold's included) from audioState's own truth.
+  const muted = audioState().muted;
+  dock.append(el('button', {
+    cls: 'btn ghost speed-btn sfx-btn' + (muted ? '' : ' is-on'),
+    text: t('combat.sfx.label'),
+    attrs: {
+      type: 'button',
+      'aria-pressed': muted ? 'false' : 'true',
+      'aria-label': t('combat.sfx.aria'),
+      title: muted ? t('combat.sfx.unmute.title') : t('combat.sfx.mute.title'),
+    },
+    on: {
+      click: (ev) => {
+        consumeClick(ev);
+        setSfxMuted(!audioState().muted);
+        repaint();
+      },
+    },
+  }));
   return dock;
 }
 
@@ -528,10 +605,10 @@ export function enemyCard(e, position) {
     || Boolean(bursts.find((x) => x.kind === 'enemy-turn' && x.attacks.some((a) => a.enemy === e.index)));
   const beat = reducedMotion ? null
     : (ENEMY_POSES[e.id] && ENEMY_POSES[e.id].attack && striking ? ENEMY_POSES[e.id].attack : beatPose(e));
-  // §5.5: the enrage persists while its Strength stands. Paint-time and reduced-motion
+  // §5.5: the fury persists while its Strength stands. Paint-time and reduced-motion
   // gated — the seams are already a transition-bearing class, and the Strength chip states
   // the same fact statically (AC-11).
-  const enraged = !reducedMotion && e.id === 'gremlin_nob'
+  const enraged = !reducedMotion && e.id === 'cinder_brute'
     && (e.statuses || []).some((x) => x.key === 'strength');
   const cls = 'enemy' + ` eh-${look.hue}` + (look.boss ? ' e-boss' : '') + (look.elite ? ' e-elite' : '')
     + (beat ? ` epose-${beat}` : '')
@@ -588,6 +665,30 @@ export function enemyCard(e, position) {
     }
     card.classList.add('is-striking');
   }
+  // The ENEMY FRAME RESUME (the hero-figure lesson, slice 1): the frame layers are the
+  // .fig's CHILDREN painted fresh by enemyMarkup, and the stage tree is rebuilt on every
+  // repaint — an unphased layer restarts its cross-fade from 0% on a mid-beat hover. The
+  // stylesheet's eframe rules resume every layer from --eframe-resume: the SIGNED ms
+  // until this beat's slot opens, derived from the same clocks beatPose reads (no new
+  // timer, the strike loop untouched). Attack branch: the plan's per-attacker window —
+  // strikeSlot's `delay` is relative to NOW (runtime.js), so the window opened at
+  // now + delay (== plan.start + beatMs * i); the value is POSITIVE while the window is
+  // still ahead, and `fill: both` holds the layer at its 0% frame for the wait — the
+  // cross-fade then opens exactly WITH the window, the same clock --seq-delay rides.
+  // Clamping that wait to 0 would burn the whole cross-fade before the beat arrives.
+  // Tail branch: the slot's own open (the arithmetic tailSlot shares with beatPose) is
+  // never in the future, so the value there is NEGATIVE — a resume from the same
+  // mid-beat instant a repaint re-derives, never a restart. The burst form (no plan
+  // armed) has no clock, so nothing is written and the layer starts at 0% — the same
+  // fresh start the card's own epose animation gets there. Reduced motion never reaches
+  // this (beat is null above), matching the stylesheet's reduced-motion block that
+  // keeps the layers unlit.
+  if (beat && card.style && card.style.setProperty) {
+    const beatOpen = seq ? Date.now() + seq.delay : (tailSlot(e)?.slotStart ?? null);
+    if (beatOpen != null) {
+      card.style.setProperty('--eframe-resume', `${Math.round(beatOpen - Date.now())}ms`);
+    }
+  }
   // UX-9 D3: the chip juices off THIS enemy's own previous status keys (per-index), not
   // off the player's list, which made an enemy chip animate whenever the player gained one.
   // Statuses read as CHIPS now — mark + stacks, no visible sentence (the user's ask):
@@ -631,7 +732,38 @@ export function enemyCard(e, position) {
       fig.style.animationDelay = `${seq.delay}ms`;
     }
   }
+  // THE IMPACT BUNDLE's resume (the hero figure's carries the longer comment): a repaint
+  // inside the bundle's window re-adds the squash on this rebuilt victim figure,
+  // resumed with a negative animation-delay, and re-pins the direction/width knobs the
+  // hold carries. The victim never carries the slam inline above (a struck enemy wears
+  // pose-hurt, not the plan's slam), so the two resume writers cannot collide on one
+  // node. It runs AFTER the markup below: the white silhouette lives on the .spr CHILD
+  // (hit-white), and the sweep that phases the children with the figure can only happen
+  // once the markup has painted them — without it, any repaint inside the window
+  // re-blooms solid white from 0%.
+  const impact = impactHold;
+  const resumeImpact = impact && impact.key === `e${e.index}` && Date.now() < impact.until;
+  const impactElapsed = resumeImpact ? Math.max(0, Date.now() - impact.start) : -1;
+  const impactDur = animMs(IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs)
+    || (IMPACT_FEEL.squashMs + IMPACT_FEEL.recoilMs);
   fig.innerHTML = enemyMarkup(e.id);
+  if (resumeImpact && impactElapsed < impactDur) {
+    fig.classList.add('is-impact');
+    if (fig.style) {
+      if (fig.style.setProperty) {
+        fig.style.setProperty('--impact-dir', impact.dir || '1');
+        fig.style.setProperty('--impact-recoil', impact.recoil || `${IMPACT_FEEL.recoilPx}px`);
+      }
+      fig.style.animationDuration = `${impactDur}ms`;
+      fig.style.animationDelay = `-${impactElapsed}ms`;
+    }
+    for (const child of fig.children ?? []) {
+      if (child.style) {
+        child.style.animationDuration = `${impactDur}ms`;
+        child.style.animationDelay = `-${impactElapsed}ms`;
+      }
+    }
+  }
   // THE ENEMY'S OWN HEADLINE sits ABOVE the figure, where the retired intent badge used
   // to float (the user's ask): the ACTIONS row (the `.e-intent` chips — what the enemy is
   // about to do) topmost, then the enemy's own BUFFS (`.e-statuses.e-buffs`, from the
