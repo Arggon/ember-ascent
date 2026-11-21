@@ -1,7 +1,7 @@
 # Agent Play Guide — `dlb`
 
 **What this is:** how an AI agent (or a human, or a script) plays the deckbuilder from a terminal, at the lowest practical token cost.
-**Status:** vertical slice complete — 70 cards (S8 content scale), two acts, two wardens, two characters (the Ashwright and the Bellows Keeper; the CLI's internal ids remain `ironclad` and `bellows`). **Mechanically verified; the human fun gate is still open.**
+**Status:** vertical slice complete — 70 cards (S8 content scale), two acts, two wardens, two characters (the Ashwright and the Bellows Keeper; the CLI's internal ids remain `ashwright` and `bellows_keeper`). **Mechanically verified; the human fun gate is still open.**
 **Every command and output below was run and captured, not described.**
 
 ---
@@ -38,13 +38,13 @@ dlb play <id> --run run.json        # act
 
 ### Verified session (seed 42, stdin closed, no TTY)
 
-*(Re-run 2026-10-24 after the module refactor: byte-identical output, including the run hash.)*
+*(Re-run 2026-11-21 for the 0.5.0 id rename: same seed, same shape, hash moved deliberately — see docs/specs/NAMES.md.)*
 
 ```
 $ dlb new --seed 42 --run run.json < /dev/null
-new run: seed 42 character ironclad difficulty 0
+new run: seed 42 character ashwright difficulty 0
 saved to run.json
-hash sha256:11020de6ed24cc04e3c7bfa9ec85805242dcd73fea65a79c3e17f84d0bb572af
+hash sha256:39c011a778b485aa372ec0c771b4a3f4f09a5c2a57bcb14b3ad5ccef5a078868
 ```
 
 ```
@@ -75,11 +75,11 @@ ENEMY
 
 ```
 $ dlb actions --run run.json
-p1 defend
-p2 strike
-p3 strike
-p4 strike
-p5 defend
+p1 quench
+p2 hammerfall
+p3 hammerfall
+p4 hammerfall
+p5 quench
 e1 end
 ```
 
@@ -109,7 +109,7 @@ T1 | HP 60/60 | EN 3/3 | BLK 0 | draw5 disc0
 
 - `A6` = attack 6 · `B5` = block 5 · `A8+V2` = attack 8 plus 2 vulnerable · `PWR+2` = gain 2 strength
 - `EN2` = costs 2 energy (shown in the hand; **not** repeated on action lines)
-- Enemy line: `Cinder Maw  HP 40/40  A7 B5` → intent this turn is 7 attack + 5 block. The words are the display name; action ids and enemy ids are unchanged (`strike`, `jaw_worm`).
+- Enemy line: `Cinder Maw  HP 40/40  A7 B5` → intent this turn is 7 attack + 5 block. The words are the display name; ids are the Ember ids since 0.5.0 (`hammerfall`, `cinder_maw`) — a pre-rename id still resolves through the NAMES.md shim.
 - `draw5 disc0` lets the agent see deck cycling without a pile dump. `--verbose` adds pile contents.
 
 ### Action IDs
@@ -147,14 +147,14 @@ IDs are **stable within a state** and are the only thing an agent must emit to a
 | `state` dump (42 card fixtures) | 88 | 250 | **PASS** |
 | `state` dump (worst live run, `--verbose`) | 156 | 250 | **PASS** |
 | `state` dump (`sim` headline) | 116 | 250 | **PASS** |
-| Action line (worst live, `s2 sword_boomerang`) | 7 | 8 | **PASS** |
+| Action line (worst live, `s2 returning_brand`) | 7 | 8 | **PASS** |
 | Action line (`sim`, 307 lines) | 5 | 8 | **PASS** |
 
 **A full decision therefore costs roughly 5 tokens out and 116 in ≈ ~121 tokens**, and the ceilings are enforced by an automated test (`tests/budget.test.js`) so content growth cannot silently breach them.
 
 **Design choices that produce this:**
 
-1. **Cost is not repeated on action lines.** An earlier draft had `3 bash A8+V2 EN2` — measured at **9 tokens, breaching the ≤8 ceiling**. The ceiling won and cost was dropped, because the agent already holds cost from the state dump. Repeating it would cost ~25% more per decision to restate known information.
+1. **Cost is not repeated on action lines.** An earlier draft had `3 anvil_blow A8+V2 EN2` — measured at **9 tokens, breaching the ≤8 ceiling**. The ceiling won and cost was dropped, because the agent already holds cost from the state dump. Repeating it would cost ~25% more per decision to restate known information.
 2. **Action lines are `p<n> <card_id>`, bounded by construction.** Name-plus-effect summaries measured up to **15 tokens** on 12 of 40 cards. The id form holds at ≤7 as content grows.
 3. **One dump, no history.** The dump is the complete observation, so nothing accumulates in context. Anthropic measured an **84% token reduction** in a 100-turn evaluation by clearing stale results — the way to get that benefit is to never carry history in the first place.
 
@@ -203,14 +203,14 @@ boss arrival: HP 36.1 | deck 15.3 (atk 9.9 blk 4.8 pow 0.6) | block points 20.4
 boss HP remaining at death 61.3/240 over 97 boss deaths
 
 card                     offered picked pickRate inWins presence
-bludgeon                      58     58    1.000      5    0.333
-carnage                       82     79    0.963      7    0.467
-uppercut                      63     56    0.889      9    0.600
-clothesline                   76     62    0.816      7    0.467
-pommel                        64     49    0.766      4    0.267
+maul                      58     58    1.000      5    0.333
+sunder                       82     79    0.963      7    0.467
+rising_blow                      63     56    0.889      9    0.600
+collar_check                   76     62    0.816      7    0.467
+haft_jab                        64     49    0.766      4    0.267
 ```
 
-`bludgeon` is picked **100%** of the time and appears in **5 of the 15 winning decks** — the
+`maul` is picked **100%** of the time and appears in **5 of the 15 winning decks** — the
 strongest "this card is a trap, or the policy is wrong about it" signal in the current data. This
 output also demonstrates the **provenance label** (`heuristic`), which is mandatory: these are not
 human numbers. *(Re-captured 2026-10-24 after the module refactor — the table gained a `presence`

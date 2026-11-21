@@ -477,7 +477,7 @@ test('reduced motion and » arm no trail (invariant c: instant truth)', async ()
  * an event choice's toll (events.js) travel as `hp_cost { amount }`, paid BEFORE the
  * play's own effects. The trail's running hero model must pay it on the PRE beat and
  * stay anchored on the kernel's truth — without the branch the anchor sat 2 HP high,
- * and a later HP fact of the same stream (the burning_blood heal a killing stroke
+ * and a later HP fact of the same stream (the kindled_heart heal a killing stroke
  * arrives with) lifted the bar ABOVE the snapshot for the retire to snap back down:
  * the owner's "the bar rises, then falls again" report. These pins drive the REAL
  * act() through the fake-DOM harness with a wrapper that reports a PINNED stream while
@@ -576,7 +576,7 @@ test('hp_cost pays on the pre-beat and the heal stays anchored: the retire snaps
     { t: 'hp_cost', amount: 2, source: 'temper' },
     { t: 'damage', source: 'player', target: foeIdx, raw: 4, dealt: 4, blocked: 0, hp: 4 },
     { t: 'damage', source: 'player', target: foeIdx, raw: 4, dealt: 4, blocked: 0, hp: 0 },
-    { t: 'heal', who: 'player', amount: 6, source: 'burning_blood' },
+    { t: 'heal', who: 'player', amount: 6, source: 'kindled_heart' },
   ];
   const trailWarns = await withoutTrailWarns(async () => {
     playCardById(api, 'cinder_flick');

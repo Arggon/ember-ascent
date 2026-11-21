@@ -109,7 +109,7 @@ export async function playRun(opts) {
   // state is reduced to the record: an enemy that is absent (not a boss fight, or the
   // boss already dead) yields null rather than a misleading 0.
   if (bossArrival !== null && session.state.combat?.nodeType === 'boss') {
-    const seen = session.state.combat.enemies.filter((e) => e.id === 'the_guardian');
+    const seen = session.state.combat.enemies.filter((e) => e.id === 'slag_warden');
     if (seen.length > 0) {
       bossHpRemaining = seen.reduce((s, e) => s + Math.max(0, e.hp), 0);
       bossArrival.bossMaxHp = seen.reduce((s, e) => s + e.maxHp, 0);

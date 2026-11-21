@@ -60,7 +60,7 @@ export function renderHud() {
   // PARITY: combat statuses (Vulnerable, Weak, …) moved DOWN to the hero's own card
   // (combat-view heroFigure) — the same place an enemy's statuses sit — because up here
   // a landing debuff read as faint legend chrome. The HUD keeps only the POWERS:
-  // run-long counters (Combust, Rupture, …) that outlive the fight, which the combat
+  // run-long counters (Banked Coal, Split Seam, …) that outlive the fight, which the combat
   // card never shows. The juice diff is powers-only now, against the same previous-paint
   // record render.js keeps.
   const freshSelf = freshStatusKeys(p.powers || []);

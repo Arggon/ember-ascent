@@ -18,10 +18,10 @@ const UNKNOWN = 'no_such_card';
 
 test('a reward offer with an unknown id snapshots as a placeholder row beside real ones', () => {
   const base = newRun({ seed: 7 });
-  const snap = snapshot({ ...base, reward: { cards: ['ironwave', UNKNOWN] } });
+  const snap = snapshot({ ...base, reward: { cards: ['slag_surge', UNKNOWN] } });
   assert.equal(snap.reward.cards.length, 2, 'no reward row is dropped');
   const real = snap.reward.cards[0];
-  assert.equal(real.cardId, 'ironwave');
+  assert.equal(real.cardId, 'slag_surge');
   assert.equal(real.name, 'Slag Surge');
   assert.equal(real.summary, 'B5 A5');
   const ghost = snap.reward.cards[1];
@@ -54,7 +54,7 @@ test('a rest offer with an unknown TEMPER key renders in both dump and snapshot 
   // through snapshot() because restBody — the dump beside which it renders — threw on
   // the same state (the backlog note). Both renderings now tolerate the raw key.
   const base = newRun({ seed: 7, tempers: true });
-  const state = { ...base, phase: 'rest', temperOffers: [{ cardId: 'strike', temper: 'no_such_temper' }] };
+  const state = { ...base, phase: 'rest', temperOffers: [{ cardId: 'hammerfall', temper: 'no_such_temper' }] };
   const snap = snapshot(state);
   assert.equal(snap.rest.tempers.length, 1);
   assert.equal(snap.rest.tempers[0].temper, 'no_such_temper', 'the raw key stays visible');
@@ -62,7 +62,7 @@ test('a rest offer with an unknown TEMPER key renders in both dump and snapshot 
   assert.equal(snap.rest.tempers[0].text, '');
   const dump = observe(state);
   assert.match(dump, /TEMPER \(instead of healing\)/);
-  assert.match(dump, new RegExp(`t1 strike no_such_temper`), 'the dump renders the raw key where the label would sit');
+  assert.match(dump, new RegExp(`t1 hammerfall no_such_temper`), 'the dump renders the raw key where the label would sit');
   assert.doesNotThrow(() => snapshot(state), 'the snapshot never throws on a stale temper key');
 });
 
@@ -75,7 +75,7 @@ test('an unknown id in a pile renders by name-slot without throwing, counts inta
       ...base.combat,
       active: true,
       hand: [],
-      draw: [{ uid: 'z1', cardId: UNKNOWN }, { uid: 'z2', cardId: 'strike' }],
+      draw: [{ uid: 'z1', cardId: UNKNOWN }, { uid: 'z2', cardId: 'hammerfall' }],
       discard: [],
       exhaust: [],
     },

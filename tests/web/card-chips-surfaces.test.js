@@ -113,7 +113,7 @@ const factory = new Function('__ctl', '__mods', `
 const bootRun = ctlMod.createController({ run: { seed: 11 } });
 const MAP_STATE = JSON.parse(JSON.stringify(bootRun.state));
 assert.equal(MAP_STATE.phase, 'map', 'the fixture is a map-phase run');
-const strikeUids = MAP_STATE.deck.filter((c) => c.cardId === 'strike').map((c) => c.uid);
+const strikeUids = MAP_STATE.deck.filter((c) => c.cardId === 'hammerfall').map((c) => c.uid);
 assert.ok(strikeUids.length >= 1, 'the starting deck holds at least one Hammerfall to temper');
 
 /** LOCAL lookups only: this harness's querySelector falls back to a document-wide search,
@@ -173,17 +173,17 @@ test('the real codex modal paints its tiles the same chips', () => {
   const api = bootSheet();
   const panel = api.codexPanel();
   assert.ok(Boolean(localFind(panel, '.codex-modal')), 'the REAL codex panel builder ran');
-  const bellows = tileByName(panel, 'Bellows');
-  assert.ok(bellows, 'the codex lists Bellows (a draft-pool common)');
-  assert.deepEqual(chipNums(bellows), ['+2'], 'the codex tile\u2019s strength chip reads +2');
-  assert.match(chipsOf(bellows)[0].attrs.title,
+  const bellowsCard = tileByName(panel, 'Bellows');
+  assert.ok(bellowsCard, 'the codex lists Bellows (a draft-pool common)');
+  assert.deepEqual(chipNums(bellowsCard), ['+2'], 'the codex tile\u2019s strength chip reads +2');
+  assert.match(chipsOf(bellowsCard)[0].attrs.title,
     /your attacks deal 2 more damage/, 'the chip title is the kernel sentence');
   const kiln = tileByName(panel, 'Kiln Cry');
   assert.ok(kiln, 'the codex lists Kiln Cry');
   assert.deepEqual(chipNums(kiln), ['+1', '1'], 'the codex tile shows Draw +1 and Discard 1');
   // And a fully covered tile drops the sentence here too — the same face everywhere.
-  assert.ok(!localFind(bellows, '.cdesc'), 'the covered codex tile drops the visible sentence');
-  assert.match(bellows.attrs['aria-label'], /Gain 2 Strength/, 'the sentence stays in its aria-label');
+  assert.ok(!localFind(bellowsCard, '.cdesc'), 'the covered codex tile drops the visible sentence');
+  assert.match(bellowsCard.attrs['aria-label'], /Gain 2 Strength/, 'the sentence stays in its aria-label');
 });
 
 test('the real reward screen paints its tiles the same chips', () => {
@@ -191,14 +191,14 @@ test('the real reward screen paints its tiles the same chips', () => {
   const state = {
     ...JSON.parse(JSON.stringify(MAP_STATE)),
     phase: 'reward',
-    reward: { cards: ['flex', 'warcry'], relicOffers: [], boss: false, gold: 10 },
+    reward: { cards: ['bellows', 'kiln_cry'], relicOffers: [], boss: false, gold: 10 },
   };
   const ctl = ctlMod.createController({ session: { state, submitted: [], events: [] } });
   const api = factory(ctl, importedModules);
   const view = api.rewardView();
-  const bellows = tileByName(view, 'Bellows');
-  assert.ok(bellows, 'the reward tile for Bellows is painted');
-  assert.deepEqual(chipNums(bellows), ['+2'], 'the reward tile\u2019s strength chip rides the snapshot row');
+  const bellowsCard = tileByName(view, 'Bellows');
+  assert.ok(bellowsCard, 'the reward tile for Bellows is painted');
+  assert.deepEqual(chipNums(bellowsCard), ['+2'], 'the reward tile\u2019s strength chip rides the snapshot row');
   const kiln = tileByName(view, 'Kiln Cry');
   assert.deepEqual(chipNums(kiln), ['+1', '1'], 'Draw +1 and Discard 1 on the reward face too');
 });
@@ -208,7 +208,7 @@ test('the real shop screen paints its shelves and its removal tiles the same chi
   const state = {
     ...JSON.parse(JSON.stringify(MAP_STATE)),
     phase: 'shop',
-    shop: { offers: [{ cardId: 'flex', price: 45 }], removal: { price: 75, sold: false, done: false }, removing: false },
+    shop: { offers: [{ cardId: 'bellows', price: 45 }], removal: { price: 75, sold: false, done: false }, removing: false },
   };
   const ctl = ctlMod.createController({ session: { state, submitted: [], events: [] } });
   const api = factory(ctl, importedModules);

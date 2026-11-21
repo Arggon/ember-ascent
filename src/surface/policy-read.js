@@ -120,17 +120,17 @@ export function intentLabelsFromDump(dump) {
  * "this card is worthless".
  */
 export const CUSTOM_READING = {
-  bloodletting: { selfDamage: 3, energy: 2 },
-  hemokinesis: { selfDamage: 2, damage: 15 },
-  offering: { selfDamage: 6, energy: 2, draw: 3 },
-  reaper: { aoePerTarget: 4, healPerDamage: 1 },
-  limit_break: { doublesStrength: true },
-  entrench: { doublesBlock: true },
-  combust: { power: 1 },
-  dark_embrace: { power: 1 },
-  feel_no_pain: { power: 1 },
-  rupture: { power: 1 },
-  rampage: { damage: 8, growsBy: 5 },
+  vein_tap: { selfDamage: 3, energy: 2 },
+  blood_hammer: { selfDamage: 2, damage: 15 },
+  blood_tithe: { selfDamage: 6, energy: 2, draw: 3 },
+  ash_harvest: { aoePerTarget: 4, healPerDamage: 1 },
+  overtemper: { doublesStrength: true },
+  brace: { doublesBlock: true },
+  banked_coal: { power: 1 },
+  ash_embrace: { power: 1 },
+  cinder_skin: { power: 1 },
+  split_seam: { power: 1 },
+  climbing_heat: { damage: 8, growsBy: 5 },
 };
 
 /**

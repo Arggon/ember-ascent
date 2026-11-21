@@ -23,7 +23,7 @@ Work top to bottom. Checked boxes are things already done and verified in this r
       2026-11-18) — the Kindling screen no longer offers a hero or a path
       picker; every run begins as Ashwright on The Foundry. Bellows Keeper and
       The Cinder Mines stay in the game, seeded exactly as before by
-      `?hero=bellows` / `?biome=mines` (and the CLI flags), pinned by
+      `?hero=bellows_keeper` / `?biome=mines` (and the CLI flags), pinned by
       tests/kernel/fixed-start.test.js; kernel content untouched. The
       onboarding tour drops its heroes step (five steps, first anchored on the
       boon list). Pre-push ritual held: two deterministic rebuilds at the same

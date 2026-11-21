@@ -21,14 +21,14 @@ const HEADER = () => ({
   format: 'dlb-log',
   v: 1,
   seed: 0,
-  contentVersion: 'dlb-0.3.0-act1',
-  character: 'ironclad',
+  contentVersion: 'dlb-0.5.0-dests',
+  character: 'ashwright',
   difficulty: 0,
 });
 
 /** Drive a session live and record the run identity. */
 function drive(seed, entries) {
-  let session = begin({ seed, character: 'ironclad', difficulty: 0 });
+  let session = begin({ seed, character: 'ashwright', difficulty: 0 });
   const hashes = [];
   for (const e of entries) {
     session = submit(session, 'reject' in e ? e.reject : e.act).session;
@@ -40,7 +40,7 @@ function drive(seed, entries) {
 /** Play one full run with a built-in policy, capturing the submitted action list. */
 function selfPlay(seed, policyName) {
   const policy = makePolicy(policyName);
-  let session = begin({ seed, character: 'ironclad', difficulty: 0 });
+  let session = begin({ seed, character: 'ashwright', difficulty: 0 });
   const memory = {};
   let steps = 0;
   while (session.state.phase !== 'ended' && steps < 5000) {

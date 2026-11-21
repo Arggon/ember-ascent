@@ -114,32 +114,32 @@ test('a narrowed run publishes its own pool, and the lookup table covers every i
 });
 
 test('the in-deck tally sums the kernel\'s deck rows per cardId (tempered copies included)', () => {
-  // A doctored deck: the ironclad start (5 strikes, 4 defends, 1 bash) plus two more
+  // A doctored deck: the ashwright start (5 strikes, 4 defends, 1 anvil_blow) plus two more
   // strikes and one Maul, with one original strike tempered red-hot. The kernel's rows
   // split the tempered copy onto its own row; the tally is what merges it back.
   const base = newRun({ seed: 2, tempers: true });
-  const strike = base.deck.find((c) => c.cardId === 'strike');
+  const strike = base.deck.find((c) => c.cardId === 'hammerfall');
   const state = {
     ...base,
     deck: [...base.deck,
-      { uid: 'x1', cardId: 'strike' },
-      { uid: 'x2', cardId: 'strike' },
-      { uid: 'x3', cardId: 'bludgeon' }],
+      { uid: 'x1', cardId: 'hammerfall' },
+      { uid: 'x2', cardId: 'hammerfall' },
+      { uid: 'x3', cardId: 'maul' }],
     tempers: { [strike.uid]: 'redhot' },
   };
   const snap = snapshot(state);
   assert.deepEqual(
-    snap.deckCards.filter((r) => r.cardId === 'strike').map((r) => [r.tempered, r.count]),
+    snap.deckCards.filter((r) => r.cardId === 'hammerfall').map((r) => [r.tempered, r.count]),
     [[false, 6], [true, 1]],
     'the kernel keeps the tempered copy on its own row',
   );
 
   const tally = inDeckCounts(snap.deckCards);
-  assert.equal(tally.get('strike'), 7, 'five starter strikes + two injected, tempered copy included');
-  assert.equal(tally.get('defend'), 4);
-  assert.equal(tally.get('bash'), 1);
-  assert.equal(tally.get('bludgeon'), 1, 'a draft-pool card the deck owns shows one copy');
-  assert.equal(tally.get('ironwave') ?? 0, 0, 'a pool card the deck does not own counts as no chip');
+  assert.equal(tally.get('hammerfall'), 7, 'five starter strikes + two injected, tempered copy included');
+  assert.equal(tally.get('quench'), 4);
+  assert.equal(tally.get('anvil_blow'), 1);
+  assert.equal(tally.get('maul'), 1, 'a draft-pool card the deck owns shows one copy');
+  assert.equal(tally.get('slag_surge') ?? 0, 0, 'a pool card the deck does not own counts as no chip');
 });
 
 test('the tally of an empty or absent deck rows list is empty, never a crash', () => {

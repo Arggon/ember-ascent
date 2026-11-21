@@ -9,7 +9,7 @@
 //
 // This mattered beyond the display: the number shown to the player is the number of turns
 // the debuff will apply, so a never-decaying debuff was strictly stronger than the card
-// text implied, and Shockwave's entire premise (a LONGER debuff) was meaningless.
+// text implied, and Heat Wash's entire premise (a LONGER debuff) was meaningless.
 //
 // Semantics pinned here, mirroring the player side exactly:
 //   * the player is decayed at the end of the PLAYER turn
@@ -56,7 +56,7 @@ const endTurn = (state) => {
 };
 
 test('an ENEMY debuff ticks down each turn instead of lasting the whole fight', () => {
-  const got = playStatusCard(1, /bash|shockwave|thunderclap|uppercut/);
+  const got = playStatusCard(1, /anvil_blow|heat_wash|forgeclap|rising_blow/);
   assert.ok(got, 'a debuff card was played in some run');
 
   const applied = snapshot(got.state).enemies.filter((e) => e.hp > 0);
@@ -110,7 +110,7 @@ test('the player still decays too, so the two sides stay symmetric', () => {
 test('a debuff still APPLIES on the turn it is played and the turn after', () => {
   // The decrease must come after the debuff has been useful, not before. Applied Vulnerable 2
   // should give two turns of +50%: the current turn and the next.
-  const got = playStatusCard(1, /bash|shockwave|thunderclap|uppercut/);
+  const got = playStatusCard(1, /anvil_blow|heat_wash|forgeclap|rising_blow/);
   assert.ok(got, 'a debuff card was played');
   const before = snapshot(got.state).enemies.filter((e) => e.hp > 0);
   const target = before.find((e) => e.statuses.some((s) => s.key === 'vulnerable'));

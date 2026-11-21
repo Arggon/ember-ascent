@@ -13,8 +13,8 @@
 //     build in the repo. These pins exist to keep it that way.
 //
 //   * The MIRROR side was broken — the player's Weak was folded NOWHERE: the `damage`
-//     verb added Strength but ignored Weak, and the three exotic handlers (hemokinesis,
-//     reaper, rampage) re-derived their Strength line by hand the same way. An enemy's
+//     verb added Strength but ignored Weak, and the three exotic handlers (blood_hammer,
+//     ash_harvest, climbing_heat) re-derived their Strength line by hand the same way. An enemy's
 //     Weak applied to its own attacks (strikeDamage) while the hero's never did, so the
 //     status text's own promise — "Weak — your attacks deal 25% less damage" — was a lie
 //     whenever an enemy debuffed the hero. Fixed here with ONE shared helper
@@ -50,7 +50,7 @@ const endTurn = (state) => step(state, 'e1');
 test('an enemy with +2 Strength announcing 9 hits for 11 — the printed number is not the dealt number', async () => {
   // The Cinder Foreman's pick_swing is the only move printed as 9 (label A9x2); its
   // survey gives exactly +2 Strength — the user's report numbers, as a pin.
-  const state = freezeDeep(await combatState('defend', {
+  const state = freezeDeep(await combatState('quench', {
     enemyId: 'cinder_foreman',
     enemyOver: { moveIndex: 1, statuses: { strength: 2 } },
   }));
@@ -77,10 +77,10 @@ test('an enemy with +2 Strength announcing 9 hits for 11 — the printed number 
 
 test('an intent built AFTER a strength buff shows the buffed number — intents re-read live statuses', async () => {
   // The Ash Cantor opens with its buff (script), so turn 2's intent is the first one
-  // built after Strength 3 has landed: dark_strike printed 6 must announce 9. The state
+  // built after Strength 3 has landed: hex_strike printed 6 must announce 9. The state
   // stands where a real fight's SECOND turn begins — the opening intent already chosen
   // (intentStep 1), the buff move still to be resolved.
-  let state = freezeDeep(await combatState('defend', { enemyId: 'cultist', enemyOver: { moveIndex: 0, intentStep: 1 } }));
+  let state = freezeDeep(await combatState('quench', { enemyId: 'ash_cantor', enemyOver: { moveIndex: 0, intentStep: 1 } }));
 
   const buffTurn = endTurn(state);
   assert.deepEqual(
@@ -108,13 +108,13 @@ test('an enemy with Weak deals less — add Strength, THEN multiply by 3/4, floo
   // Chomp printed 11, Weak 1: floor(11 × 3/4) = 8. With Strength 2 too, the order pin:
   // add first (13), then floor(13 × 3/4) = 9 — multiplying the printed damage first
   // would give 8 + 2 = 10 instead.
-  const weakOnly = endTurn(await combatState('defend', {
-    enemyId: 'jaw_worm', enemyOver: { moveIndex: 0, statuses: { weak: 1 } },
+  const weakOnly = endTurn(await combatState('quench', {
+    enemyId: 'cinder_maw', enemyOver: { moveIndex: 0, statuses: { weak: 1 } },
   }));
   assert.equal(weakOnly.events.find((e) => e.t === 'enemy_attack').raw, 8);
 
-  const weakAndStrong = endTurn(await combatState('defend', {
-    enemyId: 'jaw_worm', enemyOver: { moveIndex: 0, statuses: { weak: 1, strength: 2 } },
+  const weakAndStrong = endTurn(await combatState('quench', {
+    enemyId: 'cinder_maw', enemyOver: { moveIndex: 0, statuses: { weak: 1, strength: 2 } },
   }));
   assert.equal(weakAndStrong.events.find((e) => e.t === 'enemy_attack').raw, 9, 'add, then multiply');
 });
@@ -123,7 +123,7 @@ test('the enemy_attack event carries the block split honestly', async () => {
   // 5 Block against the Cantor's buffed 9: the event must say raw 9, blocked 5, dealt 4,
   // and the hero's HP must move by exactly dealt. The block is placed AFTER the Cantor's
   // opening buff turn (a new turn resets the hero's block to 0 before the fight starts).
-  const state = freezeDeep(await combatState('defend', { enemyId: 'cultist', enemyOver: { moveIndex: 0, intentStep: 1 } }));
+  const state = freezeDeep(await combatState('quench', { enemyId: 'ash_cantor', enemyOver: { moveIndex: 0, intentStep: 1 } }));
   const afterBuff = endTurn(state).state;
   const armed = freezeDeep({ ...afterBuff, player: { ...afterBuff.player, block: 5 } });
   const res = endTurn(armed);
@@ -153,7 +153,7 @@ test('a same-move "gain Strength, then strike" lands the buff on ITS OWN strike'
   try {
     // BEFORE the buff lands, the intent already announces the post-buff number:
     // (9 + 2) — the announced number is the number the strike will land.
-    const intentState = await combatState('defend', { enemyId: probe, enemyOver: { moveIndex: 0 } });
+    const intentState = await combatState('quench', { enemyId: probe, enemyOver: { moveIndex: 0 } });
     assert.equal(intentDamage(intentState.combat.enemies[0]), 11, 'the intent folds the pending buff');
     assert.equal(snapshot(intentState).enemies[0].intent.damage, 11);
 
@@ -181,9 +181,9 @@ test('a same-move "gain Strength, then strike" lands the buff on ITS OWN strike'
 
 test('a WEAKENED hero attacks for less — the status text\'s own promise, now kept', async () => {
   // Strike printed 6, Weak 1: floor(6 × 3/4) = 4. Before the fix the verb ignored Weak
-  // and dealt 6 — the Acid Slime's WK1, the Warden's WK2 and the Foreman's WK2 were
+  // and dealt 6 — the Slag Ooze's WK1, the Warden's WK2 and the Foreman's WK2 were
   // offensive no-ops.
-  const res = step(await combatState('strike', { statuses: { weak: 1 } }), 'p1');
+  const res = step(await combatState('hammerfall', { statuses: { weak: 1 } }), 'p1');
   const hit = res.events.find((e) => e.t === 'damage');
   assert.equal(hit.raw, 4, 'the raw number carries the Weak fold');
   assert.equal(hit.dealt, 4);
@@ -192,14 +192,14 @@ test('a WEAKENED hero attacks for less — the status text\'s own promise, now k
 test('the Weak fold applies AFTER Strength — add, then multiply, on the player side too', async () => {
   // Strike 6 + Strength 2 = 8, then floor(8 × 3/4) = 6. Multiplying first would read
   // floor(6 × 3/4) + 2 = 6 — the two orders disagree exactly here, so this pins order.
-  const res = step(await combatState('strike', { statuses: { weak: 1, strength: 2 } }), 'p1');
+  const res = step(await combatState('hammerfall', { statuses: { weak: 1, strength: 2 } }), 'p1');
   assert.equal(res.events.find((e) => e.t === 'damage').raw, 6);
 });
 
-test('the exotic handlers fold the hero\'s Weak through the same helper — hemokinesis', async () => {
+test('the exotic handlers fold the hero\'s Weak through the same helper — blood_hammer', async () => {
   // 15 printed, Weak 1: floor(15 × 3/4) = 11. The handler used to hand-add Strength and
   // skip Weak entirely.
-  const res = step(await combatState('hemokinesis', { statuses: { weak: 1 }, hp: 40 }), 'p1');
+  const res = step(await combatState('blood_hammer', { statuses: { weak: 1 }, hp: 40 }), 'p1');
   const hit = res.events.find((e) => e.t === 'damage');
   assert.equal(hit.raw, 11);
   assert.equal(res.state.player.hp, 38, 'the 2-HP cost still landed first');
@@ -222,7 +222,7 @@ test('an enemy block move folds the enemy\'s own Dexterity, like the player\'s b
     noRepeat: 2,
   };
   try {
-    const res = endTurn(await combatState('defend', {
+    const res = endTurn(await combatState('quench', {
       enemyId: probe, enemyOver: { moveIndex: 0, statuses: { dexterity: 2 } },
     }));
     assert.deepEqual(
@@ -240,8 +240,8 @@ test('the hero\'s Vulnerable amplifies ENEMY attacks at the hero (×3/2, floored
   // Vulnerable 2, not 1: the shipped decay semantics tick the hero's debuffs at the END
   // of the hero's own turn — BEFORE the enemy acts — so the first swing after the debuff
   // lands sees one stack remaining and amplifies off it.
-  const res = endTurn(await combatState('defend', {
-    enemyId: 'jaw_worm', enemyOver: { moveIndex: 0 }, statuses: { vulnerable: 2 },
+  const res = endTurn(await combatState('quench', {
+    enemyId: 'cinder_maw', enemyOver: { moveIndex: 0 }, statuses: { vulnerable: 2 },
   }));
   const attack = res.events.find((e) => e.t === 'enemy_attack');
   assert.equal(attack.raw, 11, 'the enemy\'s own buffs fold first');
@@ -249,9 +249,9 @@ test('the hero\'s Vulnerable amplifies ENEMY attacks at the hero (×3/2, floored
 });
 
 test('an ENEMY status chip speaks the enemy variant of the meaning, not the player\'s', async () => {
-  const en = await combatState('defend', { enemyId: 'cultist', enemyOver: { moveIndex: 0, statuses: { strength: 3 } } });
+  const en = await combatState('quench', { enemyId: 'ash_cantor', enemyOver: { moveIndex: 0, statuses: { strength: 3 } } });
   assert.equal(snapshot(en).enemies[0].statuses[0].text, 'Strength 3 — its attacks deal 3 more damage');
-  const es = await combatState('defend', { enemyId: 'cultist', enemyOver: { moveIndex: 0, statuses: { strength: 3 } } });
+  const es = await combatState('quench', { enemyId: 'ash_cantor', enemyOver: { moveIndex: 0, statuses: { strength: 3 } } });
   assert.equal(snapshot(es, { lang: 'es' }).enemies[0].statuses[0].text, 'Fuerza 3 — sus ataques infligen 3 de daño más');
 });
 
@@ -262,8 +262,8 @@ test('each snapshot status row publishes its kind (the one buff/debuff classific
   // derives from) is what the row carries. Additive metadata only: every existing field is
   // untouched, and the compact dump reads statuses through statusLine, so no dump byte
   // moves (the goldens pin that separately).
-  const st = await combatState('defend', {
-    enemyId: 'jaw_worm', enemyOver: { moveIndex: 0, statuses: { strength: 2, dexterity: 1, metallicize: 3, vulnerable: 2, weak: 1, parry: 6, bleed: 3, poison: 4 } },
+  const st = await combatState('quench', {
+    enemyId: 'cinder_maw', enemyOver: { moveIndex: 0, statuses: { strength: 2, dexterity: 1, metallicize: 3, vulnerable: 2, weak: 1, parry: 6, bleed: 3, poison: 4 } },
   });
   const kinds = Object.fromEntries(snapshot(st).enemies[0].statuses.map((r) => [r.key, r.kind]));
   assert.deepEqual(kinds, {
@@ -272,10 +272,10 @@ test('each snapshot status row publishes its kind (the one buff/debuff classific
   }, 'the golpes-discretos trio is classified once, in the ONE table');
 });
 
-test('a BLEED-RIDER strike keeps its damage fold — the Ash Matriarch\u2019s soulfire (A7x2 BLEED2)', async () => {
+test('a BLEED-RIDER strike keeps its damage fold — the Ash Matriarch\u2019s ember_soulfire (A7x2 BLEED2)', async () => {
   // The rider is additive to the golpe, not a replacement of its fold: the strike still
   // folds Strength/Weak into `raw`, and each LANDED strike leaves the hero Bleeding.
-  const res = endTurn(await combatState('defend', {
+  const res = endTurn(await combatState('quench', {
     enemyId: 'ash_wraith_elite', enemyOver: { moveIndex: 1, intentStep: 1, statuses: { strength: 1 } },
   }));
   const hits = res.events.filter((e) => e.t === 'enemy_attack');

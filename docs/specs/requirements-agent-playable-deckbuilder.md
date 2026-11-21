@@ -249,12 +249,12 @@ The System Architect returned six ADRs and three feasibility flags that change *
 
 ### 8.5 Token ceiling takes precedence over my own example — PM ruling
 
-**The measurement gate caught the spec author's error.** The executor measured the action line from my own brief — `3 bash A8+V2 EN2` — at **9 tokens**, breaching the frozen **≤8** ceiling in both `o200k_base` and `cl100k_base`. Required shape `3 bash A8+V2` measures **7**. This is precisely why R9a is "measured, never asserted": an asserted ceiling would have shipped a violation.
+**The measurement gate caught the spec author's error.** The executor measured the action line from my own brief — `3 anvil_blow A8+V2 EN2` — at **9 tokens**, breaching the frozen **≤8** ceiling in both `o200k_base` and `cl100k_base`. Required shape `3 anvil_blow A8+V2` measures **7**. This is precisely why R9a is "measured, never asserted": an asserted ceiling would have shipped a violation.
 
 **Ruling — the ceiling is the requirement; the example was illustrative.**
 
 1. **≤8 tokens per action line stays frozen.** Do not move it. R5's purpose is to constrain the *action space* so an agent's choice is cheap and unambiguous (arXiv:2408.02442: constrain the action token space, do not constrain the state vocabulary).
-2. **Cost is omitted from the action line.** Accepted as implemented: `p1 bash A8+V2`. Rationale: cost is decision-relevant information the agent **already holds** from the R4 state dump. Duplicating it on every action line spends tokens to repeat information already in context. Legality is still gated by cost inside the kernel.
+2. **Cost is omitted from the action line.** Accepted as implemented: `p1 anvil_blow A8+V2`. Rationale: cost is decision-relevant information the agent **already holds** from the R4 state dump. Duplicating it on every action line spends tokens to repeat information already in context. Legality is still gated by cost inside the kernel.
 3. **No information is lost.** The HAND section of R4 shows cost; the action line carries id + name + effect magnitude. An agent reads cost once from state and selects by ID.
 4. **The brief's example is superseded.** Where this document's §3 example conflicts with the measured ceiling, the ceiling wins.
 
@@ -291,7 +291,7 @@ Three attempts, all measured at 2000 seeds against the same control:
 | `smart` (over-defensive) | 14.3% | 74.6% | 19.2% |
 | `smart` (partial correction) | 10.4% | 68.5% | 15.3% |
 
-**Decision: stop. `smart` stays in the tree but is not the default, and is documented as an experiment that measurably loses to the baseline.** The engineering effort was not wasted — it produced the R10 evidence that card values are sound, and the bug it fixed (`impervious` picked 0 times in 742 offers, because the reward scorer passed `incoming: 0` so every Block card scored exactly 0) was a real defect.
+**Decision: stop. `smart` stays in the tree but is not the default, and is documented as an experiment that measurably loses to the baseline.** The engineering effort was not wasted — it produced the R10 evidence that card values are sound, and the bug it fixed (`unbroken` picked 0 times in 742 offers, because the reward scorer passed `incoming: 0` so every Block card scored exactly 0) was a real defect.
 
 **The lesson to carry forward:** a heuristic that is *conceptually* better loses to a crude one when the crude one optimises the only thing that decides the fight — ending it. `greedy` races; `smart` builds a 44-block-point deck that survives longer and kills less, arriving at the boss with **less** HP (36.7 vs 39.1) despite twice the Block.
 
@@ -309,7 +309,7 @@ Three attempts, all measured at 2000 seeds against the same control:
 - The word "target" appears nowhere in this document as a scoped decision. It was silently never specified.
 - An executor status note had flagged it ("the action space has no target parameter… not expressible") and I failed to act on it. **PM error, recorded rather than explained away.**
 
-**Why it matters:** 4 of 7 encounters are multi-enemy (`weak_3`, `strong_1`, `strong_2`, `strong_3`). Without targeting the player cannot finish off a nearly-dead enemy to prevent its damage, cannot prioritise a buffing Cultist, and has no meaningful choice in a multi-enemy fight.
+**Why it matters:** 4 of 7 encounters are multi-enemy (`weak_3`, `strong_1`, `strong_2`, `strong_3`). Without targeting the player cannot finish off a nearly-dead enemy to prevent its damage, cannot prioritise a buffing Ash Cantor, and has no meaningful choice in a multi-enemy fight.
 
 ### 11.2 The revision (frozen)
 
@@ -349,7 +349,7 @@ Three attempts, all measured at 2000 seeds against the same control:
 player: { ...state.player, block: 0, energy: BASE_ENERGY }   // statuses carried over
 ```
 
-So one early `Inflame` compounded for the whole run. Measured before the fix: Strength **4 at floor 3 → 6 at floor 5 → 8, 10, 12 by floor 7**, ending the run at 12 (and 34 for a human who plays it better).
+So one early `Stoke` compounded for the whole run. Measured before the fix: Strength **4 at floor 3 → 6 at floor 5 → 8, 10, 12 by floor 7**, ending the run at 12 (and 34 for a human who plays it better).
 
 **This contradicted the game's own documentation.** `describe.js` prints Strength as *"Lasts the whole fight. Added to every attack you play."* The card text was a lie. [FETCHED: the glossary line and the `startCombat` assignment, both read directly]
 
@@ -369,7 +369,7 @@ Combat-only statuses (Strength, Dexterity, Weak, Vulnerable, Metallicize) are no
 | Win rate | 22.1% | **14.2%** |
 | Reaches boss | 63.8% | 61.3% |
 | Boss kill rate | 34.6% | **23.2%** |
-| Peak Strength in a run with one early Inflame | unbounded (12–34) | **4** |
+| Peak Strength in a run with one early Stoke | unbounded (12–34) | **4** |
 
 **The game is now materially harder and the 22.1% baseline is superseded.** [INFERRED] The prior figure was inflated by the same defect — a player who found an early Strength card effectively could not lose, which is consistent with the owner winning 3 of 3. **14.2% is the first honest machine baseline for this slice**, and it is a reasonable target to tune against rather than a number to restore.
 
@@ -390,7 +390,7 @@ BEFORE:  Bash applies Vulnerable 2  ->  2, 2, 2, 2 ... for the whole fight
 AFTER:   Bash applies Vulnerable 2  ->  2, 1, 0, 0 ... expires correctly
 ```
 
-**Why this was more than a display bug:** because the number *is* the duration, a never-decaying debuff was strictly stronger than the card text implied, and **Shockwave's entire premise — a longer debuff — was meaningless**, since Vulnerable 1 and Vulnerable 3 both persisted forever. Enemy Weak had the same defect.
+**Why this was more than a display bug:** because the number *is* the duration, a never-decaying debuff was strictly stronger than the card text implied, and **Heat Wash's entire premise — a longer debuff — was meaningless**, since Vulnerable 1 and Vulnerable 3 both persisted forever. Enemy Weak had the same defect.
 
 **Fix:** enemies decay at the **end of their own turn**, symmetric with the player decaying at the end of theirs, so the stacks displayed during the player's turn are the ones that will apply to their attacks.
 
@@ -408,7 +408,7 @@ The owner chose **option 2** — surface the meaning where the player actually l
 | Reaches boss | 63.8% | **55.7%** |
 | Boss kill rate | 34.6% | **13.0%** |
 
-**Decision: difficulty is accepted as the game's style. No further tuning.** Treat **7.2% as a floor, not the true difficulty** — [INFERRED] the machine policies do not time debuff windows, so a human who exploits a 3-turn Vulnerable will do considerably better. `Inflame` (2 Strength, one fight only) is the most likely candidate to be underpowered and is parked here as a known watch item rather than a change.
+**Decision: difficulty is accepted as the game's style. No further tuning.** Treat **7.2% as a floor, not the true difficulty** — [INFERRED] the machine policies do not time debuff windows, so a human who exploits a 3-turn Vulnerable will do considerably better. `Stoke` (2 Strength, one fight only) is the most likely candidate to be underpowered and is parked here as a known watch item rather than a change.
 
 ### 15.4 Process note: the win-rate figure was revised three times
 
@@ -432,7 +432,7 @@ The owner chose to **remove the badge from the shipped build**. Rationale: (a) a
 |---|---|---|
 | `T1 \| HP 60/60 \| EN 3/3 \| BLK 0 \| draw5 disc0` | 24 | 33 |
 | ` 1 Strike       A6` | 6 | 7 |
-| ` Jaw Worm  HP 40/40  A7 B5` | 13 | 18 |
+| ` Cinder Maw  HP 40/40  A7 B5` | 13 | 18 |
 
 **They do not match**, so the table would have produced a confidently wrong number on screen. Recording this because "close enough" here would have been a fabricated metric in a project whose whole discipline is that numbers carry evidence.
 

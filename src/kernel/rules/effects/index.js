@@ -7,14 +7,14 @@
 import { registerEffect, damageEnemy, playerStrike, addStatus, addPower, loseHp } from '../vocabulary.js';
 import { drawIntoHand } from '../draw.js';
 
-/** Bloodletting: pay 3 HP, gain 2 energy. */
-registerEffect('bloodletting', (state, _ctx, _params) => {
+/** Vein Tap: pay 3 HP, gain 2 energy. */
+registerEffect('vein_tap', (state, _ctx, _params) => {
   const player = { ...loseHp(state.player, 3), energy: state.player.energy + 2 };
   return { state: { ...state, player }, events: [{ t: 'self_damage', amount: 3 }, { t: 'energy', amount: 2 }] };
 });
 
-/** Hemokinesis: pay 2 HP, deal 15 damage. */
-registerEffect('hemokinesis', (state, ctx, _params) => {
+/** Blood Hammer: pay 2 HP, deal 15 damage. */
+registerEffect('blood_hammer', (state, ctx, _params) => {
   const player = loseHp(state.player, 2);
   const idx = ctx.targetEnemyIndex ?? 0;
   const target = state.combat.enemies[idx];
@@ -32,8 +32,8 @@ registerEffect('hemokinesis', (state, ctx, _params) => {
   };
 });
 
-/** Reaper: deal 4 damage to ALL enemies, heal HP equal to unblocked damage dealt. */
-registerEffect('reaper', (state, ctx, _params) => {
+/** Ash Harvest: deal 4 damage to ALL enemies, heal HP equal to unblocked damage dealt. */
+registerEffect('ash_harvest', (state, ctx, _params) => {
   let healed = 0;
   const events = [];
   const enemies = state.combat.enemies.map((e, i) => {
@@ -48,8 +48,8 @@ registerEffect('reaper', (state, ctx, _params) => {
   return { state: { ...state, player, combat: { ...state.combat, enemies } }, events };
 });
 
-/** Limit Break: double current Strength (no-op without Strength). */
-registerEffect('limit_break', (state, _ctx, _params) => {
+/** Overtemper: double current Strength (no-op without Strength). */
+registerEffect('overtemper', (state, _ctx, _params) => {
   const cur = state.player.statuses?.strength ?? 0;
   if (cur <= 0) return { state, events: [{ t: 'noop', reason: 'no_strength' }] };
   return {
@@ -58,8 +58,8 @@ registerEffect('limit_break', (state, _ctx, _params) => {
   };
 });
 
-/** Offering: pay 6 HP, gain 2 energy, draw 3. */
-registerEffect('offering', (state, ctx, _params) => {
+/** Blood Tithe: pay 6 HP, gain 2 energy, draw 3. */
+registerEffect('blood_tithe', (state, ctx, _params) => {
   const player = { ...loseHp(state.player, 6), energy: state.player.energy + 2 };
   // Same ctx.rng-bound shuffle as the `draw` verb (see rules/draw.js): the stream
   // semantics of the old inline loop are preserved exactly.
@@ -74,31 +74,31 @@ registerEffect('offering', (state, ctx, _params) => {
   };
 });
 
-/** Combust: gain the Combust power (damage at end of turn, self-damage each turn). */
-registerEffect('combust', (state, _ctx, _params) => {
-  return { state: addPower(state, 'combust', 1), events: [{ t: 'power', power: 'combust', stacks: 1 }] };
+/** Banked Coal: gain the Banked Coal power (damage at end of turn, self-damage each turn). */
+registerEffect('banked_coal', (state, _ctx, _params) => {
+  return { state: addPower(state, 'banked_coal', 1), events: [{ t: 'power', power: 'banked_coal', stacks: 1 }] };
 });
 
-/** Dark Embrace: gain the Dark Embrace power (draw when a card is exhausted). */
-registerEffect('dark_embrace', (state, _ctx, _params) => {
-  return { state: addPower(state, 'dark_embrace', 1), events: [{ t: 'power', power: 'dark_embrace', stacks: 1 }] };
+/** Ash Embrace: gain the Ash Embrace power (draw when a card is exhausted). */
+registerEffect('ash_embrace', (state, _ctx, _params) => {
+  return { state: addPower(state, 'ash_embrace', 1), events: [{ t: 'power', power: 'ash_embrace', stacks: 1 }] };
 });
 
-/** Feel No Pain: gain the Feel No Pain power (block when a card is exhausted). */
-registerEffect('feel_no_pain', (state, _ctx, _params) => {
-  return { state: addPower(state, 'feel_no_pain', 1), events: [{ t: 'power', power: 'feel_no_pain', stacks: 1 }] };
+/** Cinder Skin: gain the Cinder Skin power (block when a card is exhausted). */
+registerEffect('cinder_skin', (state, _ctx, _params) => {
+  return { state: addPower(state, 'cinder_skin', 1), events: [{ t: 'power', power: 'cinder_skin', stacks: 1 }] };
 });
 
-/** Rupture: gain the Rupture power (Strength whenever you lose HP from a card). */
-registerEffect('rupture', (state, _ctx, _params) => {
-  return { state: addPower(state, 'rupture', 1), events: [{ t: 'power', power: 'rupture', stacks: 1 }] };
+/** Split Seam: gain the Split Seam power (Strength whenever you lose HP from a card). */
+registerEffect('split_seam', (state, _ctx, _params) => {
+  return { state: addPower(state, 'split_seam', 1), events: [{ t: 'power', power: 'split_seam', stacks: 1 }] };
 });
 
 /**
- * Entrench: double current block.
+ * Brace: double current block.
  * Implemented here rather than as a verb because doubling is a card-unique shape.
  */
-registerEffect('entrench', (state, _ctx, _params) => {
+registerEffect('brace', (state, _ctx, _params) => {
   const gain = state.player.block;
   if (gain <= 0) return { state, events: [{ t: 'noop', reason: 'no_block' }] };
   return {
@@ -108,11 +108,11 @@ registerEffect('entrench', (state, _ctx, _params) => {
 });
 
 /**
- * Rampage: deal 8 + `perPlay` bonus, and this card permanently gains +5 for the run.
+ * Climbing Heat: deal 8 + `perPlay` bonus, and this card permanently gains +5 for the run.
  * The bonus lives on the card INSTANCE in the deck, so it survives reshuffles —
  * that persistent growth is the entire point of the card.
  */
-registerEffect('rampage', (state, ctx, _params) => {
+registerEffect('climbing_heat', (state, ctx, _params) => {
   const idx = ctx.targetEnemyIndex ?? 0;
   const target = state.combat.enemies[idx];
   const bonus = ctx.card?.perPlay ?? 0;

@@ -54,7 +54,7 @@ function ironSkinRun(character) {
 /** A won-combat state for resolveVictory, the gold.test fixture: FULL belt (the potion
  *  drop is suppressed at 0 draws) so the victory chain's draws stay readable. */
 function wonState(over = {}) {
-  const base = newRun({ seed: over.seed ?? 7, character: over.character ?? 'ironclad' });
+  const base = newRun({ seed: over.seed ?? 7, character: over.character ?? 'ashwright' });
   const reward = over.rewardOverride ?? 'card';
   const s = {
     ...base,
@@ -93,7 +93,7 @@ function relicCombat(relics, over = {}) {
       nodeType: over.nodeType ?? 'combat_weak',
       turn: over.turn ?? 1,
       enemies: (over.hps ?? [40]).map((hp, i) => ({
-        id: 'jaw_worm', index: i, name: `Worm ${i}`, hp, maxHp: 44,
+        id: 'cinder_maw', index: i, name: `Worm ${i}`, hp, maxHp: 44,
         block: 0, statuses: {}, moveIndex: 0, moveHistory: [], intentStep: 0, dead: false,
       })),
       draw: [], hand: [], discard: [], exhaust: [],
@@ -115,11 +115,11 @@ test('relic effects are not keyed on relic names in the act rules', () => {
 });
 
 test('the Iron Skin offer names the hero\'s own relic', () => {
-  const keeper = ironSkinRun('bellows');
+  const keeper = ironSkinRun('bellows_keeper');
   const kb = snapshot(keeper.r).kindling.boons.find((b) => b.id === 'ironskin');
   assert.match(kb.text, /Cyan Lantern/);
   assert.doesNotMatch(kb.text, /Kindled Heart/);
-  const ash = ironSkinRun('ironclad');
+  const ash = ironSkinRun('ashwright');
   const ab = snapshot(ash.r).kindling.boons.find((b) => b.id === 'ironskin');
   assert.match(ab.text, /Kindled Heart/);
 });
@@ -144,7 +144,7 @@ test('the grown table: 13 relics, three full tiers, closed hooks, self-describin
   }
   assert.deepEqual(census, { common: 5, uncommon: 3, rare: 5 }, 'the tier census (5/3/5 — five rares, so act 2 offers a real three)');
   // The constants are the rows' numbers — one source, no copy drift.
-  assert.equal(RELICS.burning_blood.healAfterFight, RELIC_HEAL);
+  assert.equal(RELICS.kindled_heart.healAfterFight, RELIC_HEAL);
   assert.equal(RELICS.cyan_lantern.firstTurnEnergy, LANTERN_ENERGY);
   assert.equal(RELICS.forge_iron.combatStartBlock, FORGE_IRON_BLOCK);
   assert.equal(RELICS.whetted_edge.combatStartStrength, WHETTED_EDGE_STRENGTH);
@@ -157,16 +157,16 @@ test('the grown table: 13 relics, three full tiers, closed hooks, self-describin
   assert.equal(RELICS.slag_crown.combatStartStrength, SLAG_CROWN_STRENGTH);
   // The starters keep their content names (the kindling text reads them from content).
   const content = contentForProfile(null).characters;
-  assert.equal(RELICS[content.get('ironclad').startingRelic].name, content.get('ironclad').relicName);
-  assert.equal(RELICS[content.get('bellows').startingRelic].name, content.get('bellows').relicName);
+  assert.equal(RELICS[content.get('ashwright').startingRelic].name, content.get('ashwright').relicName);
+  assert.equal(RELICS[content.get('bellows_keeper').startingRelic].name, content.get('bellows_keeper').relicName);
 });
 
 /* --------------------------------------------------------------------- state -- */
 
 test('newRun carries the starting relic array; the singular relic field is gone', () => {
   const ash = newRun({ seed: 4 });
-  assert.deepEqual(ash.relics, ['burning_blood']);
-  const bel = newRun({ seed: 4, character: 'bellows' });
+  assert.deepEqual(ash.relics, ['kindled_heart']);
+  const bel = newRun({ seed: 4, character: 'bellows_keeper' });
   assert.deepEqual(bel.relics, ['cyan_lantern']);
   assert.equal('relic' in ash, false, 'the B4 singular field no longer exists on fresh states');
   assert.equal(ash.relics[0], relicList(ash)[0], 'relics[0] is the starter relicId reads');
@@ -174,16 +174,16 @@ test('newRun carries the starting relic array; the singular relic field is gone'
 
 test('legacy saves read as exactly their B4 relic (tolerance, never a throw)', () => {
   // A pre-S7 Bellows save: singular `state.relic`, no `relics` array.
-  const legacyBellows = { ...newRun({ seed: 4, character: 'bellows' }), relic: 'cyan_lantern' };
+  const legacyBellows = { ...newRun({ seed: 4, character: 'bellows_keeper' }), relic: 'cyan_lantern' };
   delete legacyBellows.relics;
   assert.deepEqual(relicList(legacyBellows), ['cyan_lantern']);
   // A pre-B4 Ashwright save: no relic field at all.
   const ancient = { ...newRun({ seed: 4 }) };
   delete ancient.relics;
   delete ancient.relic;
-  assert.deepEqual(relicList(ancient), ['burning_blood']);
+  assert.deepEqual(relicList(ancient), ['kindled_heart']);
   // Both survive validateSave (the field is optional) and observe/snapshot.
-  const save = { formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 4, character: 'bellows', difficulty: 0, stepIndex: 0, rngDraws: 0, state: { ...legacyBellows, phase: 'map', player: legacyBellows.player, act: 1, floor: -1, contentVersion: 'x' } };
+  const save = { formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 4, character: 'bellows_keeper', difficulty: 0, stepIndex: 0, rngDraws: 0, state: { ...legacyBellows, phase: 'map', player: legacyBellows.player, act: 1, floor: -1, contentVersion: 'x' } };
   assert.deepEqual(validateSave(save), []);
   assert.doesNotThrow(() => observe(ancient));
   assert.doesNotThrow(() => snapshot(ancient));
@@ -192,13 +192,13 @@ test('legacy saves read as exactly their B4 relic (tolerance, never a throw)', (
 test('validateSave: relics is an optional array of strings; duplicates are refused', () => {
   const base = { ...newRun({ seed: 4 }) };
   const save = (relics) => ({
-    formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 4, character: 'ironclad',
+    formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 4, character: 'ashwright',
     difficulty: 0, stepIndex: 0, rngDraws: 0,
     state: { ...base, relics, phase: 'map', act: 1, floor: -1, contentVersion: 'x' },
   });
   assert.deepEqual(validateSave(save(undefined)), [], 'absent (legacy) is fine');
-  assert.deepEqual(validateSave(save(['burning_blood'])), []);
-  assert.deepEqual(validateSave(save(['burning_blood', 'forge_iron'])), [], 'two distinct relics is fine');
+  assert.deepEqual(validateSave(save(['kindled_heart'])), []);
+  assert.deepEqual(validateSave(save(['kindled_heart', 'forge_iron'])), [], 'two distinct relics is fine');
   assert.deepEqual(validateSave(save(['ghost_relic'])), [], 'an UNKNOWN id is tolerated (surfaces degrade)');
   assert.ok(validateSave(save('relic')).some((p) => p.includes('"relics" must be an array')), 'a non-array is refused');
   assert.ok(validateSave(save([42])).some((p) => p.includes('must be a string')), 'a non-string element is refused');
@@ -261,13 +261,13 @@ test('coexistence: two Energy relics BOTH fire, in acquisition order; relicOff h
 });
 
 test('victory heals stack per relic: Kindled Heart 6 then Ash Crown 3, two events, held order', () => {
-  const s = wonState({ relics: ['burning_blood', 'ash_crown'], player: { hp: 40 }, rewardOverride: 'heal' });
+  const s = wonState({ relics: ['kindled_heart', 'ash_crown'], player: { hp: 40 }, rewardOverride: 'heal' });
   const out = resolveVictory(s, null);
   const heals = out.events.filter((e) => e.t === 'heal');
-  assert.deepEqual(heals.map((e) => [e.source, e.amount]), [['burning_blood', 6], ['ash_crown', 3]]);
+  assert.deepEqual(heals.map((e) => [e.source, e.amount]), [['kindled_heart', 6], ['ash_crown', 3]]);
   assert.equal(out.state.player.hp, 49);
   // The clamp still holds: a near-full run heals only what is missing, relic by relic.
-  const tight = wonState({ relics: ['burning_blood', 'ash_crown'], player: { hp: 57 }, rewardOverride: 'heal' });
+  const tight = wonState({ relics: ['kindled_heart', 'ash_crown'], player: { hp: 57 }, rewardOverride: 'heal' });
   const tightOut = resolveVictory(tight, null);
   assert.equal(tightOut.state.player.hp, 60, 'heal 6 then heal 3, clamped at the max');
   assert.deepEqual(tightOut.events.filter((e) => e.t === 'heal').map((e) => e.amount), [3, 0].slice(0, 1), 'only the first relic finds HP to mend');
@@ -308,7 +308,7 @@ test('Hearth Ash and Ash Crown: the rest bonus stacks (8 + 8) into the ONE rest 
   assert.deepEqual(healed.events.filter((e) => e.t === 'heal'),
     [{ t: 'heal', who: 'player', amount: healed.state.player.hp - rested.hp, source: 'rest' }]);
   // Control: the same site without the relics heals plain REST_HEAL.
-  const plain = step({ ...rested.state, relics: ['burning_blood'] }, 'c');
+  const plain = step({ ...rested.state, relics: ['kindled_heart'] }, 'c');
   assert.equal(plain.state.player.hp, Math.min(rested.hp + 8, plain.state.player.maxHp));
 });
 
@@ -329,7 +329,7 @@ test('Flask Grip: quaffing a potion gains 2 Block, AFTER the potion resolves', (
 test('gainRelic is the ONE acquisition path: it appends in order and applies Ember Heart once', () => {
   const s = newRun({ seed: 5 });
   const out = gainRelic(s, 'ember_heart', 'elite');
-  assert.deepEqual(out.state.relics, ['burning_blood', 'ember_heart'], 'appended in acquisition order');
+  assert.deepEqual(out.state.relics, ['kindled_heart', 'ember_heart'], 'appended in acquisition order');
   assert.equal(out.state.player.maxHp, s.player.maxHp + EMBER_HEART_HP, '+12 max HP at acquisition');
   assert.equal(out.state.player.hp, Math.min(out.state.player.maxHp, s.player.hp + EMBER_HEART_HP), 'gaining max HP heals it');
   assert.deepEqual(out.events, [{ t: 'relic_gained', relic: 'ember_heart', source: 'elite' }]);
@@ -512,7 +512,7 @@ test('a torn held relic degrades everywhere: raw id, no hooks, nothing throws', 
   assert.equal(relicSum(s, 'firstTurnEnergy'), 0);
   assert.equal(activeRelicDefs(s).length, 0);
   // A non-array relics field (deeper torn shape) falls back to the legacy read.
-  assert.deepEqual(relicList({ ...s, relics: 'garbage' }), ['burning_blood']);
+  assert.deepEqual(relicList({ ...s, relics: 'garbage' }), ['kindled_heart']);
 });
 
 test('torn boss offers render without throwing: raw ids stay visible, no ids invented', () => {
@@ -545,7 +545,7 @@ test('the surfaces: header count, snapshot rows, boss reward lines, elite spoils
   assert.match(observe(r), /RELICS 1/);
   assert.equal(snapshot(r).relics.length, 1);
   assert.equal(snapshot(r).relics[0].name, 'Kindled Heart');
-  assert.equal(snapshot(r).relics[0].text, RELICS.burning_blood.text, 'the sentence is the kernel\u2019s, verbatim');
+  assert.equal(snapshot(r).relics[0].text, RELICS.kindled_heart.text, 'the sentence is the kernel\u2019s, verbatim');
   // Elite spoils line, like the gold one beside it.
   const elite = resolveVictory(wonState({ nodeType: 'elite' }), null);
   const name = RELICS[elite.state.reward.relic].name;
@@ -598,12 +598,12 @@ test('a real run through an elite drop and a boss pick replays hash-for-hash', (
     return session;
   };
   let picked = null;
-  for (let seed = 1; seed <= 200 && !picked; seed += 1) {
+  for (let seed = 1; seed <= 400 && !picked; seed += 1) {
     const run = driver(seed);
     const eliteDrop = run.events.some((e) => e.t === 'relic_gained' && e.source === 'elite');
     if (eliteDrop && run.state.outcome === 'win') picked = run;
   }
-  assert.ok(picked, 'some seed in 1..200 kills an elite, drops its relic, and takes the warden\u2019s');
+  assert.ok(picked, 'some seed in 1..400 kills an elite, drops its relic, and takes the warden\u2019s');
   const parsed = parseLog(renderLog(picked));
   assert.equal(parsed.ok, true, `log parses: ${JSON.stringify(parsed.problems ?? [])}`);
   const result = assertReplay(parsed);

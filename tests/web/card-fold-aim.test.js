@@ -138,7 +138,7 @@ const VULN_9 = 'Deal 6 damage to the enemy — 9 against Vulnerable.';
 const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
 
 /**
- * Boot the surface on two Jaw Worms — the SECOND one Vulnerable — with `hand` dealt.
+ * Boot the surface on two Cinder Maws — the SECOND one Vulnerable — with `hand` dealt.
  * The controller is the real one; only the state it is loaded from is a plain object, so
  * every sentence below still comes from the kernel.
  * @param {number} [cards] how many copies of Strike to deal (1 unless a test needs a neighbour)
@@ -146,10 +146,10 @@ const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
 async function startFight(cards = 1) {
   // A RETURNING player: the first-run Help sheet would otherwise paint over the stage.
   globalThis.localStorage._d[HELP_SEEN_KEY] = '1';
-  const def = (await content()).cards.get('strike');
-  const hand = Array.from({ length: cards }, (_, i) => ({ uid: `H${i + 1}`, cardId: 'strike', cost: def.cost, perPlay: 0 }));
-  const state = await combatState('strike', {
-    enemies: [makeEnemy(ENEMIES.jaw_worm), makeEnemy(ENEMIES.jaw_worm, { statuses: VULN })],
+  const def = (await content()).cards.get('hammerfall');
+  const hand = Array.from({ length: cards }, (_, i) => ({ uid: `H${i + 1}`, cardId: 'hammerfall', cost: def.cost, perPlay: 0 }));
+  const state = await combatState('hammerfall', {
+    enemies: [makeEnemy(ENEMIES.cinder_maw), makeEnemy(ENEMIES.cinder_maw, { statuses: VULN })],
     hand,
   });
   const ctl = ctlMod.createController({ session: { state, submitted: [], events: [] } });

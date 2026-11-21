@@ -196,7 +196,7 @@ test('the real module graph survives a full run and paints the restart menu', as
   {
     const ctl = globalThis.window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `mg-walk-${i}`, cardId: 'bludgeon' });
+    for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `mg-walk-${i}`, cardId: 'maul' });
     const res = ctl.load(save);
     assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
   }

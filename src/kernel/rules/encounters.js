@@ -10,87 +10,87 @@ import { NODE_TYPES } from './map.js';
 
 /** Act-1 enemy definitions. `moves[].damage` is the printed intent number. */
 export const ENEMIES = {
-  jaw_worm: {
-    id: 'jaw_worm',
+  cinder_maw: {
+    id: 'cinder_maw',
     name: 'Cinder Maw',
     // I18N-2: the Spanish display twins. `stateName` is deliberately NOT twinned — it is
     // copied into run state and therefore into the content hash (the NAMES.md contract),
     // so every save and every golden fixture keeps verifying whatever the language.
     name_es: 'Fauce de Ascuas',
     // Copied into run state and therefore into the content hash. Do not edit.
-    stateName: 'Jaw Worm',
+    stateName: 'Cinder Maw',
     maxHp: [40, 44],
     moves: [
-      { id: 'chomp', label: 'A11', kind: 'attack', damage: 11 },
-      { id: 'thrash', label: 'A7 B5', kind: 'attack', damage: 7, block: 5 },
-      { id: 'bellow', label: 'PWR3 B6', kind: 'buff', strength: 3, block: 6 },
+      { id: 'maw_chomp', label: 'A11', kind: 'attack', damage: 11 },
+      { id: 'coil_thrash', label: 'A7 B5', kind: 'attack', damage: 7, block: 5 },
+      { id: 'ash_bellow', label: 'PWR3 B6', kind: 'buff', strength: 3, block: 6 },
     ],
     noRepeat: 2,
   },
-  cultist: {
-    id: 'cultist',
+  ash_cantor: {
+    id: 'ash_cantor',
     name: 'Ash Cantor',
     name_es: 'El Cantor de Ceniza',
-    stateName: 'Cultist',
+    stateName: 'Ash Cantor',
     maxHp: [48, 54],
     moves: [
-      { id: 'incantation', label: 'PWR3', kind: 'buff', strength: 3 },
-      { id: 'dark_strike', label: 'A6', kind: 'attack', damage: 6 },
+      { id: 'ritual', label: 'PWR3', kind: 'buff', strength: 3 },
+      { id: 'hex_strike', label: 'A6', kind: 'attack', damage: 6 },
     ],
-    // The cultist always opens with its buff — that opening is the whole fight's shape.
-    script: ['incantation', 'dark_strike', 'dark_strike', 'dark_strike'],
+    // The ash_cantor always opens with its buff — that opening is the whole fight's shape.
+    script: ['ritual', 'hex_strike', 'hex_strike', 'hex_strike'],
   },
-  red_louse: {
-    id: 'red_louse',
+  kiln_mite: {
+    id: 'kiln_mite',
     name: 'Kiln Mite',
     name_es: 'Ácaro del Horno',
-    stateName: 'Red Louse',
+    stateName: 'Kiln Mite',
     maxHp: [10, 15],
     moves: [
-      { id: 'bite', label: 'A6', kind: 'attack', damage: 6 },
-      { id: 'grow', label: 'PWR2', kind: 'buff', strength: 2 },
+      { id: 'mite_bite', label: 'A6', kind: 'attack', damage: 6 },
+      { id: 'mite_grow', label: 'PWR2', kind: 'buff', strength: 2 },
     ],
     noRepeat: 2,
   },
-  acid_slime: {
-    id: 'acid_slime',
+  slag_ooze: {
+    id: 'slag_ooze',
     name: 'Slag Ooze',
     name_es: 'Babosa de Escoria',
-    stateName: 'Acid Slime',
+    stateName: 'Slag Ooze',
     maxHp: [28, 32],
     moves: [
-      { id: 'tackle', label: 'A10', kind: 'attack', damage: 10 },
-      { id: 'lick', label: 'WK1', kind: 'debuff', weak: 1 },
+      { id: 'ooze_tackle', label: 'A10', kind: 'attack', damage: 10 },
+      { id: 'acid_lick', label: 'WK1', kind: 'debuff', weak: 1 },
     ],
   },
-  gremlin_nob: {
-    id: 'gremlin_nob',
+  cinder_brute: {
+    id: 'cinder_brute',
     name: 'Cinder Brute',
     name_es: 'El Bruto de Ascuas',
-    stateName: 'Gremlin Nob',
+    stateName: 'Cinder Brute',
     maxHp: [82, 86],
     elite: true,
     moves: [
-      { id: 'rush', label: 'A14', kind: 'attack', damage: 14 },
-      { id: 'skull_bash', label: 'A6 VULN2', kind: 'attack', damage: 6, vulnerable: 2 },
-      { id: 'enrage', label: 'PWR3', kind: 'buff', strength: 3 },
+      { id: 'brute_rush', label: 'A14', kind: 'attack', damage: 14 },
+      { id: 'brute_smash', label: 'A6 VULN2', kind: 'attack', damage: 6, vulnerable: 2 },
+      { id: 'fury', label: 'PWR3', kind: 'buff', strength: 3 },
     ],
   },
-  the_guardian: {
-    id: 'the_guardian',
+  slag_warden: {
+    id: 'slag_warden',
     name: 'Slag Warden',
     name_es: 'El Guardián de Escoria',
-    stateName: 'The Guardian',
+    stateName: 'Slag Warden',
     maxHp: [110, 110],
     boss: true,
     moves: [
-      { id: 'charging_up', label: 'B20', kind: 'block', block: 20 },
-      { id: 'fierce_bash', label: 'A32', kind: 'attack', damage: 32 },
-      { id: 'vent_steam', label: 'VULN2 WK2', kind: 'debuff', vulnerable: 2, weak: 2 },
-      { id: 'whirlwind', label: 'A5x3', kind: 'attack', damage: 5, hits: 3 },
+      { id: 'plating_up', label: 'B20', kind: 'block', block: 20 },
+      { id: 'piston_bash', label: 'A32', kind: 'attack', damage: 32 },
+      { id: 'steam_vent', label: 'VULN2 WK2', kind: 'debuff', vulnerable: 2, weak: 2 },
+      { id: 'shield_spin', label: 'A5x3', kind: 'attack', damage: 5, hits: 3 },
     ],
     // Opens by armouring up; then alternates pressure and defence.
-    script: ['charging_up', 'fierce_bash', 'whirlwind', 'vent_steam', 'fierce_bash', 'whirlwind'],
+    script: ['plating_up', 'piston_bash', 'shield_spin', 'steam_vent', 'piston_bash', 'shield_spin'],
   },
 
   // ---- B5 The Cinder Mines (opt-in biome). Only a `biome: 'mines'` run spawns these. ----
@@ -118,11 +118,11 @@ export const ENEMIES = {
     maxHp: [24, 28],
     // Fragile but sapping: it always opens by weakening you, then drains.
     moves: [
-      { id: 'wail', label: 'WK2', kind: 'debuff', weak: 2 },
-      { id: 'drain', label: 'A8', kind: 'attack', damage: 8 },
+      { id: 'sorrow_wail', label: 'WK2', kind: 'debuff', weak: 2 },
+      { id: 'soul_drain', label: 'A8', kind: 'attack', damage: 8 },
       { id: 'drift', label: 'PWR1 B6', kind: 'buff', strength: 1, block: 6 },
     ],
-    script: ['wail'],
+    script: ['sorrow_wail'],
     noRepeat: 2,
   },
   ash_wraith_elite: {
@@ -131,17 +131,17 @@ export const ENEMIES = {
     name_es: 'Matriarca de Ceniza',
     maxHp: [74, 78],
     elite: true,
-    // A fixed rhythm the player can learn: shroud, double strike, curse, reap.
-    // Soulfire carries the slice's BLEED RIDER ("A7x2 BLEED2"): every soulfire golpe
+    // A fixed rhythm the player can learn: cinder_shroud, double strike, curse, grave_swing.
+    // Soulfire carries the slice's BLEED RIDER ("A7x2 BLEED2"): every ember_soulfire golpe
     // that lands leaves 2 Bleed on the hero, whose own attacks then tick it (the attack
     // runner's move.bleed rider; a fully parried strike delivers no hex).
     moves: [
-      { id: 'shroud', label: 'PWR2 B12', kind: 'buff', strength: 2, block: 12 },
-      { id: 'soulfire', label: 'A7x2 BLEED2', kind: 'attack', damage: 7, hits: 2, bleed: 2 },
-      { id: 'grief', label: 'VULN2 WK2', kind: 'debuff', vulnerable: 2, weak: 2 },
-      { id: 'reap', label: 'A14', kind: 'attack', damage: 14 },
+      { id: 'cinder_shroud', label: 'PWR2 B12', kind: 'buff', strength: 2, block: 12 },
+      { id: 'ember_soulfire', label: 'A7x2 BLEED2', kind: 'attack', damage: 7, hits: 2, bleed: 2 },
+      { id: 'mourning_hex', label: 'VULN2 WK2', kind: 'debuff', vulnerable: 2, weak: 2 },
+      { id: 'grave_swing', label: 'A14', kind: 'attack', damage: 14 },
     ],
-    script: ['shroud', 'soulfire', 'grief', 'reap', 'shroud', 'soulfire', 'grief', 'reap'],
+    script: ['cinder_shroud', 'ember_soulfire', 'mourning_hex', 'grave_swing', 'cinder_shroud', 'ember_soulfire', 'mourning_hex', 'grave_swing'],
   },
   cinder_foreman: {
     id: 'cinder_foreman',
@@ -165,15 +165,15 @@ export const ENEMIES = {
  * `tier` orders them by difficulty inside an act.
  */
 export const ENCOUNTERS = {
-  weak_1: { id: 'weak_1', name: 'Cinder Maw', stateName: 'Jaw Worm', tier: 1, enemies: ['jaw_worm'] },
-  weak_2: { id: 'weak_2', name: 'Ash Cantor', stateName: 'Cultist', tier: 1, enemies: ['cultist'] },
-  weak_3: { id: 'weak_3', name: 'Twin Mites', stateName: 'Two Lice', tier: 1, enemies: ['red_louse', 'red_louse'] },
-  weak_4: { id: 'weak_4', name: 'Slag Ooze', stateName: 'Acid Slime', tier: 1, enemies: ['acid_slime'] },
-  strong_1: { id: 'strong_1', name: 'Mite and Ooze', stateName: 'Louse + Slime', tier: 2, enemies: ['red_louse', 'acid_slime'] },
-  strong_2: { id: 'strong_2', name: 'Maw and Mite', stateName: 'Jaw Worm + Louse', tier: 2, enemies: ['jaw_worm', 'red_louse'] },
-  strong_3: { id: 'strong_3', name: 'Cantor and Ooze', stateName: 'Cultist + Slime', tier: 2, enemies: ['cultist', 'acid_slime'] },
-  elite_1: { id: 'elite_1', name: 'Cinder Brute', stateName: 'Gremlin Nob', tier: 3, elite: true, enemies: ['gremlin_nob'] },
-  boss_1: { id: 'boss_1', name: 'Slag Warden', stateName: 'The Guardian', tier: 4, boss: true, enemies: ['the_guardian'] },
+  weak_1: { id: 'weak_1', name: 'Cinder Maw', stateName: 'Cinder Maw', tier: 1, enemies: ['cinder_maw'] },
+  weak_2: { id: 'weak_2', name: 'Ash Cantor', stateName: 'Ash Cantor', tier: 1, enemies: ['ash_cantor'] },
+  weak_3: { id: 'weak_3', name: 'Twin Mites', stateName: 'Twin Mites', tier: 1, enemies: ['kiln_mite', 'kiln_mite'] },
+  weak_4: { id: 'weak_4', name: 'Slag Ooze', stateName: 'Slag Ooze', tier: 1, enemies: ['slag_ooze'] },
+  strong_1: { id: 'strong_1', name: 'Mite and Ooze', stateName: 'Mite and Ooze', tier: 2, enemies: ['kiln_mite', 'slag_ooze'] },
+  strong_2: { id: 'strong_2', name: 'Maw and Mite', stateName: 'Maw and Mite', tier: 2, enemies: ['cinder_maw', 'kiln_mite'] },
+  strong_3: { id: 'strong_3', name: 'Cantor and Ooze', stateName: 'Cantor and Ooze', tier: 2, enemies: ['ash_cantor', 'slag_ooze'] },
+  elite_1: { id: 'elite_1', name: 'Cinder Brute', stateName: 'Cinder Brute', tier: 3, elite: true, enemies: ['cinder_brute'] },
+  boss_1: { id: 'boss_1', name: 'Slag Warden', stateName: 'Slag Warden', tier: 4, boss: true, enemies: ['slag_warden'] },
   // B5 The Cinder Mines.
   mines_weak_1: { id: 'mines_weak_1', name: 'Slag Crawler', tier: 1, enemies: ['slag_crawler'] },
   mines_weak_2: { id: 'mines_weak_2', name: 'Ash Wraith', tier: 1, enemies: ['ash_wraith'] },
@@ -184,19 +184,19 @@ export const ENCOUNTERS = {
   mines_boss_1: { id: 'mines_boss_1', name: 'Cinder Foreman', tier: 4, boss: true, enemies: ['cinder_foreman'] },
 
   // ---- S9 The Kiln Deeps (act 2). No new enemies: every row re-mixes the EXISTING
-  // roster into bigger, harder pools — the act-1 opener (Jaw Worm) returns as a BASELINE
+  // roster into bigger, harder pools — the act-1 opener (Cinder Maw) returns as a BASELINE
   // fight, singles become pairs and trios, and the elite fights are PAIRS (an act-1
   // elite plus a tag-along). The boss is the Cinder Foreman — the mines boss elevated
   // to the second act's summit. Spawn HP rolls exactly as everywhere else; the
   // difficulty comes from the mixes and their bigger total HP pools.
-  kiln_weak_1: { id: 'kiln_weak_1', name: 'Cinder Maw', stateName: 'Jaw Worm', tier: 1, enemies: ['jaw_worm'] },
+  kiln_weak_1: { id: 'kiln_weak_1', name: 'Cinder Maw', stateName: 'Cinder Maw', tier: 1, enemies: ['cinder_maw'] },
   kiln_weak_2: { id: 'kiln_weak_2', name: 'Slag Crawler', tier: 1, enemies: ['slag_crawler'] },
-  kiln_weak_3: { id: 'kiln_weak_3', name: 'Ooze and Mite', stateName: 'Slime + Louse', tier: 1, enemies: ['acid_slime', 'red_louse'] },
-  kiln_strong_1: { id: 'kiln_strong_1', name: 'Maw and Ooze', stateName: 'Jaw Worm + Slime', tier: 2, enemies: ['jaw_worm', 'acid_slime'] },
-  kiln_strong_2: { id: 'kiln_strong_2', name: 'Cantor and Crawler', stateName: 'Cultist + Crawler', tier: 2, enemies: ['cultist', 'slag_crawler'] },
-  kiln_strong_3: { id: 'kiln_strong_3', name: 'The Wraith Pack', stateName: 'Two Wraiths + Slime', tier: 2, enemies: ['ash_wraith', 'ash_wraith', 'acid_slime'] },
-  kiln_elite_1: { id: 'kiln_elite_1', name: 'Brute and Mite', stateName: 'Gremlin Nob + Louse', tier: 3, elite: true, enemies: ['gremlin_nob', 'red_louse'] },
-  kiln_elite_2: { id: 'kiln_elite_2', name: 'Matriarch and Wraith', stateName: 'Ash Matriarch + Wraith', tier: 3, elite: true, enemies: ['ash_wraith_elite', 'ash_wraith'] },
+  kiln_weak_3: { id: 'kiln_weak_3', name: 'Ooze and Mite', stateName: 'Ooze and Mite', tier: 1, enemies: ['slag_ooze', 'kiln_mite'] },
+  kiln_strong_1: { id: 'kiln_strong_1', name: 'Maw and Ooze', stateName: 'Maw and Ooze', tier: 2, enemies: ['cinder_maw', 'slag_ooze'] },
+  kiln_strong_2: { id: 'kiln_strong_2', name: 'Cantor and Crawler', stateName: 'Cantor and Crawler', tier: 2, enemies: ['ash_cantor', 'slag_crawler'] },
+  kiln_strong_3: { id: 'kiln_strong_3', name: 'The Wraith Pack', stateName: 'The Wraith Pack', tier: 2, enemies: ['ash_wraith', 'ash_wraith', 'slag_ooze'] },
+  kiln_elite_1: { id: 'kiln_elite_1', name: 'Brute and Mite', stateName: 'Brute and Mite', tier: 3, elite: true, enemies: ['cinder_brute', 'kiln_mite'] },
+  kiln_elite_2: { id: 'kiln_elite_2', name: 'Matriarch and Wraith', stateName: 'Matriarch and Wraith', tier: 3, elite: true, enemies: ['ash_wraith_elite', 'ash_wraith'] },
   kiln_boss_1: { id: 'kiln_boss_1', name: 'Cinder Foreman', stateName: 'Cinder Foreman', tier: 4, boss: true, enemies: ['cinder_foreman'] },
 };
 

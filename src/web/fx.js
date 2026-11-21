@@ -233,7 +233,7 @@ function restartImpact(key, gen, weight) {
     // The grace pin is for HURT-pose victims only: the inline `animation: none` would
     // beat the normal-specificity rules of the figures whose beats this bundle must
     // never own — the same closed enumeration the stylesheet's :not chain names (the
-    // hero's death combo, a launch mid-flight, a gust lean) — and kill their beats
+    // hero's death combo, a launch mid-flight, a Bellows Gust lean) — and kill their beats
     // outright. On those figures the class just comes off.
     const owned = fig.classList
       && (fig.classList.contains('is-hero-death') || fig.classList.contains('launched') || fig.classList.contains('blown'));
@@ -417,7 +417,7 @@ export function dispatchFx() {
     if (d.kind === 'death' && !(d.holdMs > 0)) sfx('enemy-death');
   }
   // barra de vida por golpe: the trail's `reveal` steps (HP costs, heals, and the hook
-  // damage Combust's sweep deals — facts with no golpe fire of their own) ride the
+  // damage Banked Coal's sweep deals — facts with no golpe fire of their own) ride the
   // feel-queue fire where the play's numbers land. An action that produced no burst of
   // its own (a belt quaff heals, nothing else moves) still has that fire to offer, so
   // the early return below stands down for it rather than leaving the bar unfired until

@@ -66,11 +66,11 @@ export function scoreCard(def, ctx) {
       case 'custom': {
         const h = e.handler;
         selfDamage += SELF_DAMAGE[h] ?? 0;
-        if (h === 'hemokinesis') damage += 15;
-        else if (h === 'reaper') aoe += 4 * Math.max(1, live.length);
-        else if (h === 'limit_break') strength += 2 * (p.statuses?.strength ?? 0);
-        else if (h === 'rampage') damage += 8 + 5 * (ctx.card?.perPlay ?? 0);
-        else if (h === 'offering') {
+        if (h === 'blood_hammer') damage += 15;
+        else if (h === 'ash_harvest') aoe += 4 * Math.max(1, live.length);
+        else if (h === 'overtemper') strength += 2 * (p.statuses?.strength ?? 0);
+        else if (h === 'climbing_heat') damage += 8 + 5 * (ctx.card?.perPlay ?? 0);
+        else if (h === 'blood_tithe') {
           draw += 3;
           energy += 2;
         } else power += 4;

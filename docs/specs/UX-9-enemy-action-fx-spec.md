@@ -54,7 +54,7 @@ Replace the attack-only grouping with a full per-turn plan, in kernel resolution
 | `player_status` | — | carries no enemy index `[FINDINGS]`; not read |
 
 - Burst shape (extension, not replacement): `{ kind: 'enemy-turn', beats: [{ enemy, kind, dealt?, blocked?, hits?, status?, stacks? }…], attacks, playerLost }` — `attacks` kept as today for the existing sequenced-float code.
-- Compounds need **no special casing**: `thrash` (A7 B5) resolves as `strike` then `guard`; `bellow` (PWR3 B6) as `power` then `guard`; `skull_bash` (A6 VULN2) as `strike` then `hex`; `drift` (PWR1 B6) as `power` then `guard` — order = event order `[INFERRED]`.
+- Compounds need **no special casing**: `coil_thrash` (A7 B5) resolves as `strike` then `guard`; `ash_bellow` (PWR3 B6) as `power` then `guard`; `brute_smash` (A6 VULN2) as `strike` then `hex`; `drift` (PWR1 B6) as `power` then `guard` — order = event order `[INFERRED]`.
 - **A turn with any `enemy_*` event produces the burst** — this is the silent-turn fix. The gate arms for the whole sequence, attack or not `[INFERRED]`.
 - Turn with zero `enemy_*` events (should not occur in combat): no burst, as today.
 
@@ -78,44 +78,44 @@ Replace the attack-only grouping with a full per-turn plan, in kernel resolution
 
 Ten types (`src/kernel/rules/encounters.js` — **actual path**, not `src/kernel/encounters.js`) `[READ]`. Each entry: the move kinds its roster actually contains; FX beyond the §4 defaults. Art class names marked (N) are new glyphs.
 
-### 5.1 Cinder Maw — `jaw_worm` (moves: chomp A11 `strike`; thrash A7 B5 `strike+guard`; bellow PWR3 B6 `power+guard`) `[READ]`
+### 5.1 Cinder Maw — `cinder_maw` (moves: maw_chomp A11 `strike`; coil_thrash A7 B5 `strike+guard`; ash_bellow PWR3 B6 `power+guard`) `[READ]`
 - **strike:** winds back too far (`epose-windup` overshoot, translateX −14 px over 60 % of the beat) then snaps. `.efx-maw-bite` arc wedge on the hero lane, `maw-bite-arc` 320 ms, impact on the slam clock. Shell plate shard `.efx-maw-plate` falls **mid-bite**, `maw-plate-fall` 240 ms.
-- **strike+guard (thrash):** as above, then shared guard shimmer; the plate lands *between* the two beats.
-- **power+guard (bellow):** `maw-inhale` 560 ms (scale 1 → 0.94 → 1.02) + guard; no bite.
+- **strike+guard (coil_thrash):** as above, then shared guard shimmer; the plate lands *between* the two beats.
+- **power+guard (ash_bellow):** `maw-inhale` 560 ms (scale 1 → 0.94 → 1.02) + guard; no mite_bite.
 
-### 5.2 Ash Cantor — `cultist` (scripted: incantation PWR3 `power`, then dark_strike A6 `strike`) `[READ]`
-- **power (incantation):** rite column `.efx-rite-col` rises beside her, `rite-col-rise` 560 ms. She never moves toward the hero.
-- **strike (dark_strike):** **no body lunge** — the column pulses and an ash cone `.efx-ash-cone` falls across the whole stage, `ash-cone-fall` 640 ms (scaleY from top, then dissolve); the hero float lands at the cone's ground touch.
+### 5.2 Ash Cantor — `ash_cantor` (scripted: ritual PWR3 `power`, then hex_strike A6 `strike`) `[READ]`
+- **power (ritual):** rite column `.efx-rite-col` rises beside her, `rite-col-rise` 560 ms. She never moves toward the hero.
+- **strike (hex_strike):** **no body lunge** — the column pulses and an ash cone `.efx-ash-cone` falls across the whole stage, `ash-cone-fall` 640 ms (scaleY from top, then dissolve); the hero float lands at the cone's ground touch.
 
-### 5.3 Kiln Mite — `red_louse` (bite A6 `strike`; grow PWR2 `power`) `[READ]`
+### 5.3 Kiln Mite — `kiln_mite` (mite_bite A6 `strike`; mite_grow PWR2 `power`) `[READ]`
 - **strike:** 460 ms dart — `mite-dart` (toward hero, back), one twitch keyframe (rotate 6°) at 85 %; impact dot on hero.
-- **power (grow):** tightening, not enlarging — `mite-tighten` 560 ms (scale 1.04 → 0.97 → 1.0, inner glow intensifies). Hard cap: no keyframe exceeds scale 1.04.
+- **power (mite_grow):** tightening, not enlarging — `mite-tighten` 560 ms (scale 1.04 → 0.97 → 1.0, inner glow intensifies). Hard cap: no keyframe exceeds scale 1.04.
 
-### 5.4 Slag Ooze — `acid_slime` (tackle A10 `strike`; lick WK1 `hex`) `[READ]`
+### 5.4 Slag Ooze — `slag_ooze` (ooze_tackle A10 `strike`; acid_lick WK1 `hex`) `[READ]`
 - **strike:** `ooze-compress` 300 ms (scaleY 0.8) then `ooze-lunge` 340 ms, squash-return.
-- **hex (lick):** acid arc `.efx-acid-arc` from the ooze to the **hero's feet**, `acid-arc-drip` 640 ms (stroke draw, then droplet) — the arc is what tells you who hexed you; the weak tint itself arrives via existing status paint.
+- **hex (acid_lick):** acid arc `.efx-acid-arc` from the ooze to the **hero's feet**, `acid-arc-drip` 640 ms (stroke draw, then droplet) — the arc is what tells you who hexed you; the weak tint itself arrives via existing status paint.
 
-### 5.5 Cinder Brute — `gremlin_nob`, elite (rush A14 `strike`; skull_bash A6 VULN2 `strike+hex`; enrage PWR3 `power`) `[READ]`
-- **strike (rush):** 900 ms charge — hold back, slam on the tail of the strike clock — plus stage shake `stage-shake` 240 ms (transform-only).
-- **strike+hex (skull_bash):** shorter 640 ms charge + hex beat (vulnerable ring `vuln-ring` 480 ms on the hero chip).
-- **power (enrage):** seams glow — `.efx-brute-seams` overlay, `brute-seams-glow` 720 ms double pulse; persistent `is-enraged` class (from snapshot statuses, paint-time) holds seams at 40 %.
+### 5.5 Cinder Brute — `cinder_brute`, elite (brute_rush A14 `strike`; brute_smash A6 VULN2 `strike+hex`; fury PWR3 `power`) `[READ]`
+- **strike (brute_rush):** 900 ms charge — hold back, slam on the tail of the strike clock — plus stage shake `stage-shake` 240 ms (transform-only).
+- **strike+hex (brute_smash):** shorter 640 ms charge + hex beat (vulnerable ring `vuln-ring` 480 ms on the hero chip).
+- **power (fury):** seams glow — `.efx-brute-seams` overlay, `brute-seams-glow` 720 ms double pulse; persistent `is-enraged` class (from snapshot statuses, paint-time) holds seams at 40 %.
 
-### 5.6 Slag Warden — `the_guardian`, boss (charging_up B20 `guard`; fierce_bash A32 `strike`; whirlwind A5x3 `strike×3`; vent_steam VULN2 WK2 `hex`; scripted opener `charging_up`) `[READ]`
+### 5.6 Slag Warden — `slag_warden`, boss (plating_up B20 `guard`; piston_bash A32 `strike`; shield_spin A5x3 `strike×3`; steam_vent VULN2 WK2 `hex`; scripted opener `plating_up`) `[READ]`
 Defense is the flourish:
 - **guard (B20):** three-plate wall `.efx-warden-wall` (3 `.plate` children), `warden-plate-rise` 3 × 160 ms staggered (480 ms), hold, absorb into body.
-- **strike (fierce_bash):** heavy single slam + `warden-piston` (translateY forward 10 px).
-- **strike ×3 (whirlwind):** triple-pocket impact — three `.efx-pocket` rings on the hero lane at 0 / beat / 2×beat, `pocket-ring` 240 ms each.
-- **hex (vent_steam):** steam wash `.efx-steam` across the hero row, `steam-wash` 640 ms; no travel.
+- **strike (piston_bash):** heavy single slam + `warden-piston` (translateY forward 10 px).
+- **strike ×3 (shield_spin):** triple-pocket impact — three `.efx-pocket` rings on the hero lane at 0 / beat / 2×beat, `pocket-ring` 240 ms each.
+- **hex (steam_vent):** steam wash `.efx-steam` across the hero row, `steam-wash` 640 ms; no travel.
 
 ### 5.7 Slag Crawler — `slag_crawler` (harden B9 `guard`; pincers A4x2 `strike×2`; ram A10 `strike`) `[READ]`
 - **guard (harden):** hexagonal shell geometry — `.efx-crawler-hex` hex outline draws around the body, `hex-draw` 480 ms; body dims.
 - **strike ×2 (pincers):** two mirrored claw darts `.efx-claw-l` / `.efx-claw-r`, `claw-dart` 320 ms each, second offset 200 ms, converging on the hero.
 - **strike (ram):** shared strike clock, `crawler-ram` low push (translateY 6 px).
 
-### 5.8 Ash Wraith — `ash_wraith` (wail WK2 `hex`; drain A8 `strike`; drift PWR1 B6 `power+guard`) `[READ]`
+### 5.8 Ash Wraith — `ash_wraith` (sorrow_wail WK2 `hex`; soul_drain A8 `strike`; drift PWR1 B6 `power+guard`) `[READ]`
 Zero travel, ever:
-- **hex (wail):** `wraith-thin` 480 ms (opacity 0.5, blur 1 px) in place + wail rings `.efx-wail-ring` expanding at the hero, `wail-ring` 480 ms.
-- **strike (drain):** thins (opacity 0 at 30 %), crosses as a streak `.efx-wraith-streak`, thickens at the hero lane — `wraith-streak` 460 ms; impact dot.
+- **hex (sorrow_wail):** `wraith-thin` 480 ms (opacity 0.5, blur 1 px) in place + sorrow_wail rings `.efx-wail-ring` expanding at the hero, `wail-ring` 480 ms.
+- **strike (soul_drain):** thins (opacity 0 at 30 %), crosses as a streak `.efx-wraith-streak`, thickens at the hero lane — `wraith-streak` 460 ms; impact dot.
 - **power+guard (drift):** `wraith-drift` 560 ms vertical bob ±4 px + shared guard shimmer; no horizontal motion.
 
 ### 5.9 Ash Matriarch — `ash_wraith_elite`, elite `[FINDINGS]`
@@ -161,11 +161,11 @@ The `boss`/`elite` flags drive the existing framing (border, boss name font) —
 - **AC-9 Deps:** `package.json` unchanged.
 - **AC-10 No test-only kernel hooks:** kernel sources and kernel test fixtures untouched.
 - **AC-11 Reduced motion:** with reduced motion on, `dispatchFx()` returns before scheduling any new node; no transition-bearing paint class is added; turns still resolve through existing floats/toasts.
-- **AC-12 Compound ordering:** thrash/bellow/skull_bash/drift captures show beat order matching kernel event order.
+- **AC-12 Compound ordering:** coil_thrash/ash_bellow/brute_smash/drift captures show beat order matching kernel event order.
 
 ## 9. Verification approach
 
-Pinned seed (`?seed=`, via the existing `seedFromUrl` `[READ]`) + full-fight capture per enemy type; acceptance judged from the captures, per AC-1/2/12. Four rosters are scripted (`cultist`, `the_guardian`, and the two wraiths `[FINDINGS]`) and reproduce turn-for-turn. The rest choose intents through `chooseIntent` (RNG) `[FINDINGS]`: pin a seed on which the target move occurs — **no test-only kernel hooks** (AC-10). Repeat per move kind.
+Pinned seed (`?seed=`, via the existing `seedFromUrl` `[READ]`) + full-fight capture per enemy type; acceptance judged from the captures, per AC-1/2/12. Four rosters are scripted (`ash_cantor`, `slag_warden`, and the two wraiths `[FINDINGS]`) and reproduce turn-for-turn. The rest choose intents through `chooseIntent` (RNG) `[FINDINGS]`: pin a seed on which the target move occurs — **no test-only kernel hooks** (AC-10). Repeat per move kind.
 
 ## 10. Out of scope (suggestions only)
 

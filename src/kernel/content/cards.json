@@ -1,40 +1,40 @@
 {
-  "contentVersion": "dlb-0.3.0-act1",
+  "contentVersion": "dlb-0.5.0-dests",
   "characters": {
-    "ironclad": {
+    "ashwright": {
       "name": "Ashwright",
       "maxHp": 60,
       "startingDeck": [
-        "strike",
-        "strike",
-        "strike",
-        "strike",
-        "strike",
-        "defend",
-        "defend",
-        "defend",
-        "defend",
-        "bash"
+        "hammerfall",
+        "hammerfall",
+        "hammerfall",
+        "hammerfall",
+        "hammerfall",
+        "quench",
+        "quench",
+        "quench",
+        "quench",
+        "anvil_blow"
       ],
-      "startingRelic": "burning_blood",
+      "startingRelic": "kindled_heart",
       "relicName": "Kindled Heart",
       "relicName_es": "Corazón Encendido"
     },
-    "bellows": {
+    "bellows_keeper": {
       "name": "Bellows Keeper",
       "name_es": "Custodio del Fuelle",
       "maxHp": 54,
       "startingDeck": [
-        "strike",
-        "strike",
-        "strike",
-        "strike",
-        "defend",
-        "defend",
-        "defend",
-        "defend",
-        "gust",
-        "fan_flames"
+        "hammerfall",
+        "hammerfall",
+        "hammerfall",
+        "hammerfall",
+        "quench",
+        "quench",
+        "quench",
+        "quench",
+        "bellows_gust",
+        "fan_the_flames"
       ],
       "startingRelic": "cyan_lantern",
       "relicName": "Cyan Lantern",
@@ -43,7 +43,7 @@
   },
   "cards": [
     {
-      "id": "strike",
+      "id": "hammerfall",
       "name": "Hammerfall",
       "name_es": "Martillazo",
       "cost": 1,
@@ -60,7 +60,7 @@
       "flavor_es": "La primera lección de la forja: golpea hasta que ceda."
     },
     {
-      "id": "defend",
+      "id": "quench",
       "name": "Quench",
       "name_es": "Enfriar",
       "cost": 1,
@@ -77,7 +77,7 @@
       "flavor_es": "El hierro frío aguanta."
     },
     {
-      "id": "bash",
+      "id": "anvil_blow",
       "name": "Anvil Blow",
       "name_es": "Golpe de Yunque",
       "cost": 2,
@@ -100,7 +100,7 @@
       "flavor_es": "El yunque responde más fuerte que el martillo."
     },
     {
-      "id": "gust",
+      "id": "bellows_gust",
       "name": "Bellows Gust",
       "name_es": "Soplo del Fuelle",
       "cost": 1,
@@ -116,10 +116,10 @@
       ],
       "flavor": "One long breath across the coals.",
       "flavor_es": "Un aliento largo sobre las brasas.",
-      "hero": "bellows"
+      "hero": "bellows_keeper"
     },
     {
-      "id": "fan_flames",
+      "id": "fan_the_flames",
       "name": "Fan the Flames",
       "name_es": "Abanica las Llamas",
       "cost": 0,
@@ -137,10 +137,10 @@
       ],
       "flavor": "Work the leather and the fire leans in.",
       "flavor_es": "Trabaja el cuero y el fuego se acerca.",
-      "hero": "bellows"
+      "hero": "bellows_keeper"
     },
     {
-      "id": "anger",
+      "id": "spark",
       "name": "Spark",
       "name_es": "Chispa",
       "cost": 0,
@@ -157,7 +157,7 @@
       "flavor_es": "Un calor pequeño, gastado de inmediato."
     },
     {
-      "id": "cleave",
+      "id": "arc_cut",
       "name": "Arc Cut",
       "name_es": "Tajo en Arco",
       "cost": 1,
@@ -175,7 +175,7 @@
       "flavor_es": "Un solo giro, todas las caras al fuego."
     },
     {
-      "id": "clothesline",
+      "id": "collar_check",
       "name": "Collar Check",
       "name_es": "Carga al Cuello",
       "cost": 2,
@@ -198,7 +198,7 @@
       "flavor_es": "La mandíbula encuentra el mango."
     },
     {
-      "id": "headbutt",
+      "id": "brow_strike",
       "name": "Brow Strike",
       "name_es": "Golpe de Frente",
       "cost": 1,
@@ -215,7 +215,7 @@
       "flavor_es": "Quien habla aquí es el yelmo."
     },
     {
-      "id": "ironwave",
+      "id": "slag_surge",
       "name": "Slag Surge",
       "name_es": "Marea de Escoria",
       "cost": 1,
@@ -236,7 +236,7 @@
       "flavor_es": "Un muro de metal que enfría, y luego el empuje."
     },
     {
-      "id": "pommel",
+      "id": "haft_jab",
       "name": "Haft Jab",
       "name_es": "Golpe de Culata",
       "cost": 1,
@@ -257,7 +257,7 @@
       "flavor_es": "El extremo romo también cuenta."
     },
     {
-      "id": "sword_boomerang",
+      "id": "returning_brand",
       "name": "Returning Brand",
       "name_es": "Fierro que Vuelve",
       "cost": 1,
@@ -275,7 +275,7 @@
       "flavor_es": "El calor que lanzaste regresa."
     },
     {
-      "id": "thunderclap",
+      "id": "forgeclap",
       "name": "Forgeclap",
       "name_es": "Estallido de Forja",
       "cost": 1,
@@ -300,7 +300,7 @@
       "flavor_es": "Toda la herrería se estremece."
     },
     {
-      "id": "twin_strike",
+      "id": "twin_hammers",
       "name": "Twin Hammers",
       "name_es": "Martillos Gemelos",
       "cost": 1,
@@ -321,7 +321,7 @@
       "flavor_es": "Izquierda, luego derecha, antes de que se apague el resplandor."
     },
     {
-      "id": "wild_strike",
+      "id": "untempered",
       "name": "Untempered",
       "name_es": "Sin Templar",
       "cost": 1,
@@ -338,7 +338,7 @@
       "flavor_es": "Sin forma. Todo peso."
     },
     {
-      "id": "flex",
+      "id": "bellows",
       "name": "Bellows",
       "name_es": "Fuelle",
       "cost": 0,
@@ -357,7 +357,7 @@
       "flavor_es": "Trabaja los pulmones de la forja."
     },
     {
-      "id": "shrug",
+      "id": "cast_aside",
       "name": "Cast Aside",
       "name_es": "A un Lado",
       "cost": 1,
@@ -378,7 +378,7 @@
       "flavor_es": "El golpe resbala en la hombrera."
     },
     {
-      "id": "true_grit",
+      "id": "true_temper",
       "name": "True Temper",
       "name_es": "Temple Verdadero",
       "cost": 1,
@@ -395,7 +395,7 @@
       "flavor_es": "Sostén el calor. No parpadees."
     },
     {
-      "id": "warcry",
+      "id": "kiln_cry",
       "name": "Kiln Cry",
       "name_es": "Grito del Horno",
       "cost": 0,
@@ -416,7 +416,7 @@
       "flavor_es": "El horno responde."
     },
     {
-      "id": "armaments",
+      "id": "fit_the_plate",
       "name": "Fit the Plate",
       "name_es": "Coloca la Placa",
       "cost": 1,
@@ -433,7 +433,7 @@
       "flavor_es": "Átate lo que el ascenso aún te debe."
     },
     {
-      "id": "havoc",
+      "id": "vent",
       "name": "Vent",
       "name_es": "Respiradero",
       "cost": 1,
@@ -454,7 +454,7 @@
       "flavor_es": "Abre la chimenea. La sala se llena de trabajo."
     },
     {
-      "id": "battle_trance",
+      "id": "heat_trance",
       "name": "Heat Trance",
       "name_es": "Trance de Calor",
       "cost": 0,
@@ -471,7 +471,7 @@
       "flavor_es": "El mundo se reduce al siguiente golpe."
     },
     {
-      "id": "bloodletting",
+      "id": "vein_tap",
       "name": "Vein Tap",
       "name_es": "Vena Abierta",
       "cost": 0,
@@ -481,14 +481,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "bloodletting"
+          "handler": "vein_tap"
         }
       ],
       "flavor": "Pay in blood. Take the breath back.",
       "flavor_es": "Paga en sangre. Recupera el aliento."
     },
     {
-      "id": "carnage",
+      "id": "sunder",
       "name": "Sunder",
       "name_es": "Quebranto",
       "cost": 2,
@@ -505,7 +505,7 @@
       "flavor_es": "Demasiado martillo para un solo cuerpo."
     },
     {
-      "id": "combust",
+      "id": "banked_coal",
       "name": "Banked Coal",
       "name_es": "Carbón Guardado",
       "cost": 1,
@@ -515,14 +515,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "combust"
+          "handler": "banked_coal"
         }
       ],
       "flavor": "Leave a coal in the grate. It works while you do.",
       "flavor_es": "Deja un carbón en la rejilla. Trabaja mientras tú trabajas."
     },
     {
-      "id": "dark_embrace",
+      "id": "ash_embrace",
       "name": "Ash Embrace",
       "name_es": "Abrazo de Ceniza",
       "cost": 2,
@@ -532,14 +532,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "dark_embrace"
+          "handler": "ash_embrace"
         }
       ],
       "flavor": "What burns away still warms the hands.",
       "flavor_es": "Lo que se quema todavía calienta las manos."
     },
     {
-      "id": "dropkick",
+      "id": "heel_drop",
       "name": "Heel Drop",
       "name_es": "Golpe de Talón",
       "cost": 1,
@@ -560,7 +560,7 @@
       "flavor_es": "La bota cae donde el martillo no llega."
     },
     {
-      "id": "entrench",
+      "id": "brace",
       "name": "Brace",
       "name_es": "Apoyo Firme",
       "cost": 2,
@@ -570,14 +570,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "entrench"
+          "handler": "brace"
         }
       ],
       "flavor": "Set your feet in the clinker.",
       "flavor_es": "Planta los pies en la escoria."
     },
     {
-      "id": "feel_no_pain",
+      "id": "cinder_skin",
       "name": "Cinder Skin",
       "name_es": "Piel de Ascuas",
       "cost": 1,
@@ -587,14 +587,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "feel_no_pain"
+          "handler": "cinder_skin"
         }
       ],
       "flavor": "The burn stops meaning anything.",
       "flavor_es": "La quemadura deja de significar algo."
     },
     {
-      "id": "flame_barrier",
+      "id": "flame_ward",
       "name": "Flame Ward",
       "name_es": "Velo de Fuego",
       "cost": 2,
@@ -611,7 +611,7 @@
       "flavor_es": "Una cortina de fuego que muerde de vuelta."
     },
     {
-      "id": "ghostly_armor",
+      "id": "cinder_shroud",
       "name": "Cinder Shroud",
       "name_es": "Sudario de Ascuas",
       "cost": 1,
@@ -628,7 +628,7 @@
       "flavor_es": "La ceniza recuerda la forma de la armadura."
     },
     {
-      "id": "hemokinesis",
+      "id": "blood_hammer",
       "name": "Blood Hammer",
       "name_es": "Martillo de Sangre",
       "cost": 1,
@@ -638,14 +638,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "hemokinesis"
+          "handler": "blood_hammer"
         }
       ],
       "flavor": "The swing costs a little of you.",
       "flavor_es": "El golpe cuesta un poco de ti."
     },
     {
-      "id": "inflame",
+      "id": "stoke",
       "name": "Stoke",
       "name_es": "Avivar",
       "cost": 1,
@@ -664,7 +664,7 @@
       "flavor_es": "Alimenta el fuego del brazo."
     },
     {
-      "id": "metallicize",
+      "id": "scale_up",
       "name": "Scale Up",
       "name_es": "Metalizado",
       "cost": 1,
@@ -683,7 +683,7 @@
       "flavor_es": "Las placas se tejen entre golpes."
     },
     {
-      "id": "pummel",
+      "id": "hail_of_blows",
       "name": "Hail of Blows",
       "name_es": "Lluvia de Golpes",
       "cost": 1,
@@ -715,7 +715,7 @@
       "flavor_es": "Cuatro golpes cortos, y nada queda."
     },
     {
-      "id": "rampage",
+      "id": "climbing_heat",
       "name": "Climbing Heat",
       "name_es": "Calor Ascendente",
       "cost": 1,
@@ -725,14 +725,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "rampage"
+          "handler": "climbing_heat"
         }
       ],
       "flavor": "Each swing teaches the next.",
       "flavor_es": "Cada golpe enseña al siguiente."
     },
     {
-      "id": "rupture",
+      "id": "split_seam",
       "name": "Split Seam",
       "name_es": "Costura Abierta",
       "cost": 1,
@@ -742,14 +742,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "rupture"
+          "handler": "split_seam"
         }
       ],
       "flavor": "When you bleed, the hammer gets heavier.",
       "flavor_es": "Cuando sangras, el martillo pesa más."
     },
     {
-      "id": "shockwave",
+      "id": "heat_wash",
       "name": "Heat Wash",
       "name_es": "Ola de Calor",
       "cost": 2,
@@ -776,7 +776,7 @@
       "flavor_es": "Una ola que los deja abiertos y débiles."
     },
     {
-      "id": "uppercut",
+      "id": "rising_blow",
       "name": "Rising Blow",
       "name_es": "Gancho Ascendente",
       "cost": 2,
@@ -805,7 +805,7 @@
       "flavor_es": "Desde el suelo del horno hacia arriba."
     },
     {
-      "id": "bludgeon",
+      "id": "maul",
       "name": "Maul",
       "name_es": "Maza",
       "cost": 3,
@@ -822,7 +822,7 @@
       "flavor_es": "Un solo golpe. El argumento termina."
     },
     {
-      "id": "impervious",
+      "id": "unbroken",
       "name": "Unbroken",
       "name_es": "Inquebrantable",
       "cost": 2,
@@ -842,7 +842,7 @@
       "flavor_es": "Nada pasa. Luego la placa se agota."
     },
     {
-      "id": "limit_break",
+      "id": "overtemper",
       "name": "Overtemper",
       "name_es": "Sobretemple",
       "cost": 1,
@@ -852,14 +852,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "limit_break"
+          "handler": "overtemper"
         }
       ],
       "flavor": "Past the point the metal was meant to hold.",
       "flavor_es": "Más allá del punto que el metal debía soportar."
     },
     {
-      "id": "offering",
+      "id": "blood_tithe",
       "name": "Blood Tithe",
       "name_es": "Diezmo de Sangre",
       "cost": 0,
@@ -869,14 +869,14 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "offering"
+          "handler": "blood_tithe"
         }
       ],
       "flavor": "Feed the kiln. It pays you back in breath and cards.",
       "flavor_es": "Alimenta el horno. Te paga en aliento y en cartas."
     },
     {
-      "id": "reaper",
+      "id": "ash_harvest",
       "name": "Ash Harvest",
       "name_es": "Cosecha de Ceniza",
       "cost": 2,
@@ -886,7 +886,7 @@
       "effects": [
         {
           "verb": "custom",
-          "handler": "reaper"
+          "handler": "ash_harvest"
         }
       ],
       "flavor": "What you cut comes back as heat in the chest.",

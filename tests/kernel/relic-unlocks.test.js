@@ -46,7 +46,7 @@ const TIERS = Object.freeze({ common: 0, uncommon: 1, rare: 2 });
 
 /** A staged post-combat state, the relics.test fixture shape, with a pool override. */
 function wonState(over = {}) {
-  const base = newRun({ seed: over.seed ?? 7, character: over.character ?? 'ironclad' });
+  const base = newRun({ seed: over.seed ?? 7, character: over.character ?? 'ashwright' });
   const s = {
     ...base,
     ...(over.relics ? { relics: over.relics } : {}),
@@ -88,7 +88,7 @@ test('RELIC_UNLOCK_TABLE covers every shipped relic exactly once, ascending, tie
   }
   assert.deepEqual(seen.sort(), Object.keys(RELICS).sort(), 'the table is the WHOLE table — a relic without a milestone can never unlock');
   const firstRow = RELIC_UNLOCK_TABLE[0];
-  assert.ok(firstRow.ids.includes('burning_blood') && firstRow.ids.includes('cyan_lantern'), 'row 0 carries BOTH starters');
+  assert.ok(firstRow.ids.includes('kindled_heart') && firstRow.ids.includes('cyan_lantern'), 'row 0 carries BOTH starters');
   assert.ok(firstRow.ids.every((id) => RELICS[id].tier === 'common'), 'row 0 is the common tier only — the act-1 basics');
   assert.equal(RELIC_TOTAL, 13);
 });
@@ -104,12 +104,12 @@ test('relicPoolFor: the documented milestones (5 wins -> 8 relics, 15 -> all 13)
   assert.equal(size(15), 13, 'ANCHOR: a 15-win player sees all 13');
   assert.equal(size(99), 13, 'beyond the last milestone nothing new exists');
   // The run's own starter ALWAYS leads, whatever the table does later.
-  const ash = relicPoolFor({ wins: 0 }, 'burning_blood');
+  const ash = relicPoolFor({ wins: 0 }, 'kindled_heart');
   const bel = relicPoolFor({ wins: 0 }, 'cyan_lantern');
-  assert.equal(ash[0], 'burning_blood');
+  assert.equal(ash[0], 'kindled_heart');
   assert.equal(bel[0], 'cyan_lantern');
   // Deterministic: the pool is a function of its arguments alone.
-  assert.deepEqual(relicPoolFor({ wins: 7 }, 'burning_blood'), relicPoolFor({ wins: 7 }, 'burning_blood'));
+  assert.deepEqual(relicPoolFor({ wins: 7 }, 'kindled_heart'), relicPoolFor({ wins: 7 }, 'kindled_heart'));
   // Garbage wins degrade to the fresh pool; the profile's other fields are unread.
   assert.deepEqual(relicPoolFor(null), relicPoolFor({ wins: 0 }));
   assert.deepEqual(relicPoolFor({ wins: -4 }), relicPoolFor({ wins: 0 }));
@@ -120,7 +120,7 @@ test('relicPoolFor: the documented milestones (5 wins -> 8 relics, 15 -> all 13)
 test('fullyUnlockedProfile carries the relic milestones, derived from the table', () => {
   const full = fullyUnlockedProfile();
   assert.equal(full.wins, Math.max(...RELIC_UNLOCK_TABLE.map((r) => r.at)));
-  assert.deepEqual(relicPoolFor(full, 'burning_blood'), relicPoolFor({ wins: full.wins }, 'burning_blood'));
+  assert.deepEqual(relicPoolFor(full, 'kindled_heart'), relicPoolFor({ wins: full.wins }, 'kindled_heart'));
   assert.equal(relicPoolFor(full).length, RELIC_TOTAL, '?pool=full still means FULL');
 });
 
@@ -128,10 +128,10 @@ test('fullyUnlockedProfile carries the relic milestones, derived from the table'
 
 test('newRun({wins}) derives the pool: starter first, unlock order, zero draws, frozen', () => {
   const gated = newRun({ seed: 7, wins: 0 });
-  assert.deepEqual(gated.relicPool, ['burning_blood', 'cyan_lantern', 'forge_iron', 'whetted_edge', 'hearth_ash']);
+  assert.deepEqual(gated.relicPool, ['kindled_heart', 'cyan_lantern', 'forge_iron', 'whetted_edge', 'hearth_ash']);
   const plain = newRun({ seed: 7 });
   assert.equal(gated.rngDraws, plain.rngDraws, 'the derivation consumes NO draws — profile-derived, not rolled');
-  const bel = newRun({ seed: 7, character: 'bellows', wins: 0 });
+  const bel = newRun({ seed: 7, character: 'bellows_keeper', wins: 0 });
   assert.equal(bel.relicPool[0], 'cyan_lantern', 'each hero\u2019s own starter leads its pool');
   assert.ok(Object.isFrozen(gated) && Object.isFrozen(gated.relicPool), 'the pool is frozen with the state');
   // A veteran's pool is exactly what the table says at that count.
@@ -142,7 +142,7 @@ test('newRun({wins}) derives the pool: starter first, unlock order, zero draws, 
   // Refusals (the difficulty precedent): shape errors are code 3, never a silent gate.
   assert.throws(() => newRun({ seed: 7, wins: -1 }), (e) => e.code === 3);
   assert.throws(() => newRun({ seed: 7, wins: 1.5 }), (e) => e.code === 3);
-  assert.throws(() => newRun({ seed: 7, relicPool: 'burning_blood' }), (e) => e.code === 3);
+  assert.throws(() => newRun({ seed: 7, relicPool: 'kindled_heart' }), (e) => e.code === 3);
   assert.throws(() => newRun({ seed: 7, relicPool: [42] }), (e) => e.code === 3);
 });
 
@@ -161,7 +161,7 @@ test('a fresh profile\u2019s elite CANNOT drop an unlocked-later relic — 200 s
   const commons = RELIC_UNLOCK_TABLE[0].ids;
   let sawCommon = 0;
   for (let seed = 0; seed < 200; seed += 1) {
-    const s = wonState({ seed, nodeType: 'elite', relicPool: relicPoolFor({ wins: 0 }, 'burning_blood') });
+    const s = wonState({ seed, nodeType: 'elite', relicPool: relicPoolFor({ wins: 0 }, 'kindled_heart') });
     assert.deepEqual(dropPool(s, 'uncommon'), [], `seed ${seed}: the gated uncommon pool is empty`);
     const roll = rollEliteRelicDrop(s);
     assert.equal(roll.draws, 2, `seed ${seed}: the exhausted tier falls to common at no extra draw`);
@@ -219,7 +219,7 @@ test('the down-tier fill order is tier-first, uniform within a tier, and never p
   // the rare leads, the uncommons fill, three offers, three draws.
   const oneRare = wonState({
     nodeType: 'boss',
-    relics: ['burning_blood', 'ash_crown', 'slag_crown', 'cinder_ward', 'ash_ledger', 'gold_vein'],
+    relics: ['kindled_heart', 'ash_crown', 'slag_crown', 'cinder_ward', 'ash_ledger', 'gold_vein'],
   });
   const out = rollBossRelicOffers(oneRare);
   assert.deepEqual(out.offers.map((id) => RELICS[id].tier), ['rare', 'uncommon', 'uncommon']);
@@ -228,7 +228,7 @@ test('the down-tier fill order is tier-first, uniform within a tier, and never p
   // the last uncommon + 2 common fills — the order crosses into the common tier.
   const noRares = wonState({
     nodeType: 'boss',
-    relics: ['burning_blood', 'deep_well', 'ash_crown', 'slag_crown', 'cinder_ward', 'ash_ledger', 'gold_vein', 'ember_heart'],
+    relics: ['kindled_heart', 'deep_well', 'ash_crown', 'slag_crown', 'cinder_ward', 'ash_ledger', 'gold_vein', 'ember_heart'],
   });
   const out2 = rollBossRelicOffers(noRares);
   assert.deepEqual(out2.offers.map((id) => RELICS[id].tier), ['uncommon', 'common', 'common']);
@@ -259,8 +259,8 @@ test('a fully exhausted vault is still the honest zero (reachable on a fresh eli
   // shape. The fixture builds the same state directly (small pool, both ids held).
   const s = wonState({
     nodeType: 'boss',
-    relicPool: ['burning_blood', 'cyan_lantern'],
-    relics: ['burning_blood', 'cyan_lantern'],
+    relicPool: ['kindled_heart', 'cyan_lantern'],
+    relics: ['kindled_heart', 'cyan_lantern'],
   });
   const out = resolveVictory(s, null);
   assert.equal(out.state.phase, 'reward');
@@ -303,7 +303,7 @@ test('LEGACY: an absent or torn relicPool reads as the FULL table at every drop 
   assert.deepEqual(relicPoolList({ ...s, relicPool: 'garbage' }), Object.keys(RELICS), 'a torn non-array degrades the same way');
   // A pre-S10 save loads, observes and plays (validateSave keeps the field optional).
   const save = {
-    formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 7, character: 'ironclad',
+    formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 7, character: 'ashwright',
     difficulty: 0, stepIndex: 0, rngDraws: 0,
     state: { ...s, phase: 'map', act: 1, floor: -1, contentVersion: 'x' },
   };
@@ -315,14 +315,14 @@ test('LEGACY: an absent or torn relicPool reads as the FULL table at every drop 
 test('validateSave: relicPool is an optional array of strings; duplicates are refused', () => {
   const base = newRun({ seed: 4 });
   const save = (relicPool) => ({
-    formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 4, character: 'ironclad',
+    formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 4, character: 'ashwright',
     difficulty: 0, stepIndex: 0, rngDraws: 0,
     state: { ...base, relicPool, phase: 'map', act: 1, floor: -1, contentVersion: 'x' },
   });
   assert.deepEqual(validateSave(save(undefined)), [], 'absent (legacy) is fine');
-  assert.deepEqual(validateSave(save(['burning_blood', 'deep_well'])), [], 'a real pool is fine');
+  assert.deepEqual(validateSave(save(['kindled_heart', 'deep_well'])), [], 'a real pool is fine');
   assert.deepEqual(validateSave(save(['ghost_relic'])), [], 'UNKNOWN ids are tolerated (membership-only filtering)');
-  assert.ok(validateSave(save('burning_blood')).some((p) => p.includes('"relicPool" must be an array')), 'a non-array is refused');
+  assert.ok(validateSave(save('kindled_heart')).some((p) => p.includes('"relicPool" must be an array')), 'a non-array is refused');
   assert.ok(validateSave(save([42])).some((p) => p.includes('must be a string')), 'a non-string element is refused');
   assert.ok(validateSave(save(['deep_well', 'deep_well'])).some((p) => p.includes('duplicate')), 'a duplicate is refused — the derivation can never produce one');
 });
@@ -366,7 +366,7 @@ test('a pool-gated run replays hash-for-hash; the log header carries the pool ve
     return session;
   };
   let picked = null;
-  for (let seed = 1; seed <= 200 && !picked; seed += 1) {
+  for (let seed = 1; seed <= 400 && !picked; seed += 1) {
     const run = driver(seed);
     // The gated elite only drops commons — the event trail must agree with the pool.
     const eliteDrops = run.events.filter((e) => e.t === 'relic_gained' && e.source === 'elite');

@@ -507,15 +507,15 @@ process.stdout.write('\n== I. renderer-level checks on synthetic snapshots where
   });
   const snapshotWith = (enemies) => ({
     phase: 'combat', outcome: null, stepIndex: 1, floor: 0, turn: 1, energyPerTurn: 3,
-    character: 'ironclad', difficulty: 0, seed: 1,
+    character: 'ashwright', difficulty: 0, seed: 1,
     player: { hp: 50, maxHp: 80, energy: 2, block: 0, statuses: [], powers: [] },
-    hand: [{ slot: 'p1', cardId: 'strike', name: 'Hammerfall', cost: 1, type: 'attack', rarity: 'starter', typeLabel: 'Attack', summary: 'A6', description: 'Deal 6 damage.', playable: true, hint: '' }],
+    hand: [{ slot: 'p1', cardId: 'hammerfall', name: 'Hammerfall', cost: 1, type: 'attack', rarity: 'starter', typeLabel: 'Attack', summary: 'A6', description: 'Deal 6 damage.', playable: true, hint: '' }],
     piles: { draw: 4, discard: 1, exhaust: 0 },
     enemies,
     map: { floor: 0, floorCount: 8, current: null, rows: [], currentRow: [] },
     reward: null, rest: null, ended: null,
     cardTypes: [], glossary: [], glossarySections: [], help: [],
-    actions: [{ id: 'p1', kind: 'play', cardId: 'strike' }, { id: 'e1', kind: 'end_turn' }],
+    actions: [{ id: 'p1', kind: 'play', cardId: 'hammerfall' }, { id: 'e1', kind: 'end_turn' }],
     actionLines: [], text: 'synthetic',
   });
 

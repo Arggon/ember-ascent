@@ -177,7 +177,7 @@ test('Sleeping Forge — stoke pays HP through the loseHp path and appends a poo
   let s = step(s0, 'v1').state;
   assert.equal(s.rngDraws - pre.rngDraws, 1, 'the stoke consumed exactly one draw');
   assert.equal(s.deck.length, deck0 + 1, 'the deck grew by the card');
-  assert.ok(s.deck.at(-1).cardId !== 'strike', 'the gained card comes from the draft pool, not the starters');
+  assert.ok(s.deck.at(-1).cardId !== 'hammerfall', 'the gained card comes from the draft pool, not the starters');
   assert.equal(C.cards.get(s.deck.at(-1).cardId).rarity, 'uncommon', 'the gained card is Uncommon');
   assert.equal(s.player.hp, Math.max(1, hp0 - FORGE_HP), `the coals took ${FORGE_HP} HP (floored at 1, never killing)`);
   assert.ok(s.event.resolved, 'the phase moved to the resolved beat');
@@ -257,8 +257,8 @@ test('Ash Peddler — the bottle costs 40 and lands a table potion; a full belt 
 });
 
 test('Ash Peddler — the sale removes one seeded Common/Uncommon instance for exactly 50 gold, above the deck floor only', () => {
-  // Fixture: a deck of starters plus two sellable instances (anger = Common).
-  const deck = [...newRun({ seed: 8 }).deck, { uid: 'sell-1', cardId: 'anger' }, { uid: 'sell-2', cardId: 'cleave' }];
+  // Fixture: a deck of starters plus two sellable instances (spark = Common).
+  const deck = [...newRun({ seed: 8 }).deck, { uid: 'sell-1', cardId: 'spark' }, { uid: 'sell-2', cardId: 'arc_cut' }];
   const s0 = eventOf('ash_peddler', { base: newRun({ seed: 8 }), state: { deck }, floor: 1, from: 'r1n0' });
   const pre = { ...s0 };
   const purse0 = s0.player.gold;
@@ -280,13 +280,13 @@ test('Ash Peddler — the sale removes one seeded Common/Uncommon instance for e
   assert.equal(gone2.uid, gone.uid, 'the seeded pick is the same instance');
 
   // The deck floor: after the removal the deck must still hold MORE than 6 cards.
-  const thinDeck = newRun({ seed: 8 }).deck.slice(0, 6).concat([{ uid: 'sell-1', cardId: 'anger' }]); // 7 cards -> 6 after: refused
+  const thinDeck = newRun({ seed: 8 }).deck.slice(0, 6).concat([{ uid: 'sell-1', cardId: 'spark' }]); // 7 cards -> 6 after: refused
   const thin = eventOf('ash_peddler', { base: newRun({ seed: 8 }), state: { deck: thinDeck }, floor: 1, from: 'r1n0' });
   const thinChoice = snapshot(thin).event.choices.find((c) => c.slug === 'sell');
   assert.equal(thinChoice.offered, false);
   assert.equal(thinChoice.reason, `your deck must stay above ${EVENT_DECK_FLOOR} cards`);
   assert.ok(!actions(thin).some((a) => a.slug === 'sell'));
-  const okDeck = newRun({ seed: 8 }).deck.slice(0, 6).concat([{ uid: 'sell-1', cardId: 'anger' }, { uid: 'sell-2', cardId: 'cleave' }]); // 8 -> 7 after: offered
+  const okDeck = newRun({ seed: 8 }).deck.slice(0, 6).concat([{ uid: 'sell-1', cardId: 'spark' }, { uid: 'sell-2', cardId: 'arc_cut' }]); // 8 -> 7 after: offered
   const ok = eventOf('ash_peddler', { base: newRun({ seed: 8 }), state: { deck: okDeck }, floor: 1, from: 'r1n0' });
   assert.ok(actions(ok).some((a) => a.slug === 'sell'), 'eight cards may sell down to seven');
 
@@ -450,7 +450,7 @@ test('the snapshot publishes the beat\u2019s card refs parallel to its lines (th
         choice: 1,
         lines: [
           { slug: 'toll', who: { en: 'forge', es: 'La forja' }, n: 8 },
-          { slug: 'card_joined', cardId: 'strike' },
+          { slug: 'card_joined', cardId: 'hammerfall' },
         ],
       },
     },
@@ -460,7 +460,7 @@ test('the snapshot publishes the beat\u2019s card refs parallel to its lines (th
     '- The forge took its due: 8 HP.',
     '- The coals give up a card: Hammerfall joins your deck.',
   ], 'the sentences render byte-identical to the pre-cards wording');
-  assert.deepEqual(beat.cards, [null, { cardId: 'strike' }], 'one ref per line, null where the line names no card');
+  assert.deepEqual(beat.cards, [null, { cardId: 'hammerfall' }], 'one ref per line, null where the line names no card');
 
   // The REAL stoke resolution carries the same shape: the toll first (null), the
   // joined card second (its id straight off the stored beat, never re-derived).
@@ -490,7 +490,7 @@ test('the snapshot publishes the beat\u2019s card refs parallel to its lines (th
   // numbers the tempered copy actually plays, never the base card's 5-only face.
   const quenched = {
     ...s0,
-    event: { ...s0.event, resolved: { choice: null, lines: [{ slug: 'temper_done', cardId: 'defend', temper: 'quenched' }] } },
+    event: { ...s0.event, resolved: { choice: null, lines: [{ slug: 'temper_done', cardId: 'quench', temper: 'quenched' }] } },
   };
   const qRef = snapshot(quenched).event.resolved.cards[0];
   assert.equal(qRef.name, 'Quench', 'the tempered face names the card');
@@ -501,12 +501,12 @@ test('the snapshot publishes the beat\u2019s card refs parallel to its lines (th
   // The smith's OFFERS publish the same tempered face per pick (the ONE helper,
   // temperedCardRow): a pick tile shows what the tempered copy will actually play.
   const smith0 = eventOf('wandering_smith', { tempers: true });
-  const quenchUid = smith0.deck.find((c) => c.cardId === 'defend')?.uid ?? smith0.deck[0].uid;
+  const quenchUid = smith0.deck.find((c) => c.cardId === 'quench')?.uid ?? smith0.deck[0].uid;
   const smithModal = {
     ...smith0,
     event: { ...smith0.event, tempering: true, offers: [
-      { uid: quenchUid, cardId: 'defend', temper: 'quenched' },
-      { uid: 'c9_staged', cardId: 'bludgeon', temper: 'balanced' },
+      { uid: quenchUid, cardId: 'quench', temper: 'quenched' },
+      { uid: 'c9_staged', cardId: 'maul', temper: 'balanced' },
     ] },
   };
   const offers = snapshot(smithModal).event.offers;
@@ -526,7 +526,7 @@ test('the snapshot publishes the beat\u2019s card refs parallel to its lines (th
 
   // And the REST SITE's forge list publishes the same row shape from the same helper —
   // the two surfaces read ONE publisher and cannot disagree.
-  const forge = { ...newRun({ seed: 2, tempers: true }), phase: 'rest', temperOffers: [{ uid: quenchUid, cardId: 'defend', temper: 'quenched' }] };
+  const forge = { ...newRun({ seed: 2, tempers: true }), phase: 'rest', temperOffers: [{ uid: quenchUid, cardId: 'quench', temper: 'quenched' }] };
   const forgeRow = snapshot(forge).rest.tempers[0];
   assert.equal(forgeRow.actionId, 't1', 'the forge pick keeps its id');
   assert.deepEqual(forgeRow.chips.map((c) => c.amount), [5, 3], 'the forge publishes the same tempered face');
@@ -540,9 +540,9 @@ test('the snapshot publishes the beat\u2019s card refs parallel to its lines (th
   assert.deepEqual(snapshot(legacy).event.resolved.lines, ['- Baked old sentence.']);
   const tornTemper = {
     ...s0,
-    event: { ...s0.event, resolved: { choice: null, lines: [{ slug: 'temper_done', cardId: 'strike', temper: 'deleted_temper' }] } },
+    event: { ...s0.event, resolved: { choice: null, lines: [{ slug: 'temper_done', cardId: 'hammerfall', temper: 'deleted_temper' }] } },
   };
-  assert.deepEqual(snapshot(tornTemper).event.resolved.cards, [{ cardId: 'strike' }],
+  assert.deepEqual(snapshot(tornTemper).event.resolved.cards, [{ cardId: 'hammerfall' }],
     'an unknown temper id publishes the bare card ref');
 });
 
@@ -572,11 +572,11 @@ test('torn saves degrade, never throw, and never strand the run inside the phase
 
   // A torn temper MODAL: a garbage offer is never enumerated (the S4.1 ruling), and a
   // modal with no valid offer degrades to the continue instead of stranding the run.
-  const tornModal = { ...base, phase: 'event', floor: 1, mapNodeId: 'r2n1', tempers: {}, event: { id: 'wandering_smith', nodeId: 'r2n1', resolved: null, tempering: true, offers: [{ junk: true }, { uid: 7 }, { uid: 'c0', cardId: 'strike', temper: 'deleted_temper' }] } };
+  const tornModal = { ...base, phase: 'event', floor: 1, mapNodeId: 'r2n1', tempers: {}, event: { id: 'wandering_smith', nodeId: 'r2n1', resolved: null, tempering: true, offers: [{ junk: true }, { uid: 7 }, { uid: 'c0', cardId: 'hammerfall', temper: 'deleted_temper' }] } };
   assert.deepEqual(actions(tornModal).map((a) => a.id), ['v0'], 'no valid offer, no refused id');
   assert.equal(step(tornModal, 'v0').state.phase, 'map');
   // A modal with one valid offer beside garbage: only the valid pick exists, and it resolves.
-  const mixed = { ...base, phase: 'event', floor: 1, mapNodeId: 'r2n1', tempers: {}, event: { id: 'wandering_smith', nodeId: 'r2n1', resolved: null, tempering: true, offers: [{ junk: 1 }, { uid: 'c0', cardId: 'strike', temper: 'redhot' }] } };
+  const mixed = { ...base, phase: 'event', floor: 1, mapNodeId: 'r2n1', tempers: {}, event: { id: 'wandering_smith', nodeId: 'r2n1', resolved: null, tempering: true, offers: [{ junk: 1 }, { uid: 'c0', cardId: 'hammerfall', temper: 'redhot' }] } };
   assert.deepEqual(actions(mixed).map((a) => a.id), ['t2'], 'the valid offer keeps its slot index');
   const picked = step(mixed, 't2').state;
   assert.equal(picked.tempers.c0, 'redhot');
@@ -680,14 +680,14 @@ test('a torn temper modal (offers = [null], offers = [42]) degrades in BOTH rend
     assert.ok(!/ t1 /.test(dump), `no t-id is rendered for a ${name}`);
     // And a valid offer BESIDE the garbage keeps its true index and its pick: the row
     // numbering here is the same numbering the action ids use.
-    const mixed = { ...s, event: { ...s.event, offers: [offers[0], { uid: 'c0', cardId: 'strike', temper: 'redhot' }] } };
+    const mixed = { ...s, event: { ...s.event, offers: [offers[0], { uid: 'c0', cardId: 'hammerfall', temper: 'redhot' }] } };
     assert.deepEqual(actions(mixed).map((a) => a.id), ['t2'], 'the valid offer keeps its slot index');
     const mixedSnap = snapshot(mixed).event.offers;
     assert.equal(mixedSnap.length, 1, 'one row for the one valid offer');
     assert.equal(mixedSnap[0].actionId, 't2', 'resolved from the ORIGINAL index');
     assert.equal(mixedSnap[0].temperName, 'Red-hot');
     assert.doesNotThrow(() => observe(mixed), 'the dump survives the mixed modal');
-    assert.match(observe(mixed), / t2 strike RH/);
+    assert.match(observe(mixed), / t2 hammerfall RH/);
     assert.equal(step(mixed, 't2').state.tempers.c0, 'redhot', 'the valid pick still resolves');
   }
 });

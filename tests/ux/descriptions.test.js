@@ -1,7 +1,7 @@
 // tests/ux/descriptions.test.js — the plain-English layer must cover EVERY card.
 //
 // The defect this file guards: `effectSummary()` emits compact tokens (`HP3`, `E2`,
-// `PWRx2`, `BLKx2`, `A4xall`) that a new player cannot decode, and `HP3` on Bloodletting
+// `PWRx2`, `BLKx2`, `A4xall`) that a new player cannot decode, and `HP3` on Vein Tap
 // means LOSE 3 HP — a first-timer reads it as "heal 3". The browser now renders
 // `describeCard()` instead, so this test is what stops that text from having holes:
 //
@@ -68,22 +68,22 @@ test('every shipped card has a complete, placeholder-free description', () => {
 });
 
 test('the dangerous case: the card whose compact summary was HP3 describes LOSING HP', () => {
-  const bloodletting = C.cards.get('bloodletting');
-  assert.ok(bloodletting, 'bloodletting is in the bundle');
-  assert.equal(effectSummary(bloodletting), 'HP3 E2', 'the compact summary is the one the player complained about');
+  const vein_tap = C.cards.get('vein_tap');
+  assert.ok(vein_tap, 'vein_tap is in the bundle');
+  assert.equal(effectSummary(vein_tap), 'HP3 E2', 'the compact summary is the one the player complained about');
 
-  const text = D.describeCard(bloodletting);
+  const text = D.describeCard(vein_tap);
   assert.match(text, /Lose 3 HP/, `must say it LOSES HP, got "${text}"`);
   // The engine's loseHp() floors HP at 1 and ignores Block, so "damage" would be a lie.
   assert.doesNotMatch(text, /heal|gain 3 hp|take 3 damage|3 HP more/i, `must not read as healing: "${text}"`);
 
   // The handler really does lose HP — asserted against the engine, not the prose.
-  assert.match(String(CUSTOM_SUMMARY.bloodletting), /^HP3/);
+  assert.match(String(CUSTOM_SUMMARY.vein_tap), /^HP3/);
   const before = { hp: 60, energy: 3 };
   const after = K.newRun({ seed: 3 });
   void after;
-  const shim = { verb: 'custom', handler: 'bloodletting' };
-  assert.equal(shim.handler, 'bloodletting');
+  const shim = { verb: 'custom', handler: 'vein_tap' };
+  assert.equal(shim.handler, 'vein_tap');
   // Direct handler check through the vocabulary dispatch, with a frozen input.
   const state = { player: { hp: 60, energy: 3 }, combat: { hand: [], discard: [], draw: [] }, powers: {} };
   const FROZEN = Object.freeze(state);
@@ -191,7 +191,7 @@ test('status, power and first-run help text is complete and plain English', () =
     assert.ok(!text.includes('undefined'), `status ${key} is placeholder-free`);
     assert.match(text, /2/, `status ${key} shows the stack count`);
   }
-  for (const power of ['combust', 'dark_embrace', 'feel_no_pain', 'rupture']) {
+  for (const power of ['banked_coal', 'ash_embrace', 'cinder_skin', 'split_seam']) {
     const text = D.describePower(power, 1);
     assert.ok(text.length > 0 && !text.includes('undefined'), `power ${power} has a sentence`);
   }
@@ -210,7 +210,7 @@ test('status, power and first-run help text is complete and plain English', () =
 
 test('enemy intent reads as a sentence, from the kernel\'s own numbers', () => {
   const seen = new Set();
-  for (const id of ['jaw_worm', 'cultist', 'red_louse', 'acid_slime', 'gremlin_nob', 'the_guardian']) {
+  for (const id of ['cinder_maw', 'ash_cantor', 'kiln_mite', 'slag_ooze', 'cinder_brute', 'slag_warden']) {
     const raw = { id, index: 0, name: ENC.ENEMIES[id].name, hp: 10, maxHp: 10, block: 0, statuses: {}, moveIndex: 0, moveHistory: [], intentStep: 0, dead: false };
     const text = D.describeIntent(raw);
     assert.ok(text.trim().length > 0 && /[.!]$/.test(text), `${id}: intent is a sentence — "${text}"`);
@@ -223,19 +223,19 @@ test('enemy intent reads as a sentence, from the kernel\'s own numbers', () => {
 test('the compact summaries did not move while the wording did', () => {
   // The CLI contract. If this changes, tests/budget.test.js will also change — and that
   // would be a CLI change, which this task is forbidden to make.
-  assert.equal(effectSummary(C.cards.get('strike')), 'A6');
-  assert.equal(effectSummary(C.cards.get('defend')), 'B5');
-  assert.equal(effectSummary(C.cards.get('bloodletting')), 'HP3 E2');
-  assert.equal(effectSummary(C.cards.get('offering')), 'HP6 E2 D3');
-  assert.equal(effectSummary(C.cards.get('hemokinesis')), 'A15 HP2');
-  assert.equal(effectSummary(C.cards.get('pummel')), 'A2 A2 A2 A2 EXH');
-  assert.equal(effectSummary(C.cards.get('entrench')), 'BLKx2');
-  assert.equal(effectSummary(C.cards.get('rampage')), 'A8+5');
+  assert.equal(effectSummary(C.cards.get('hammerfall')), 'A6');
+  assert.equal(effectSummary(C.cards.get('quench')), 'B5');
+  assert.equal(effectSummary(C.cards.get('vein_tap')), 'HP3 E2');
+  assert.equal(effectSummary(C.cards.get('blood_tithe')), 'HP6 E2 D3');
+  assert.equal(effectSummary(C.cards.get('blood_hammer')), 'A15 HP2');
+  assert.equal(effectSummary(C.cards.get('hail_of_blows')), 'A2 A2 A2 A2 EXH');
+  assert.equal(effectSummary(C.cards.get('brace')), 'BLKx2');
+  assert.equal(effectSummary(C.cards.get('climbing_heat')), 'A8+5');
 });
 
 test('snapshot() carries the plain-English fields next to the compact ones', async () => {
   const { combatState } = await import('../helpers/harness.mjs');
-  const state = await combatState('bloodletting');
+  const state = await combatState('vein_tap');
   const snap = snapshot(state);
   assert.equal(snap.hand[0].summary, 'HP3 E2', 'compact form still present for the CLI');
   assert.match(snap.hand[0].description, /Lose 3 HP/, 'plain English alongside it');
@@ -256,7 +256,7 @@ test('the browser surface reaches the descriptions through the controller alone'
   assert.ok(Array.isArray(d.glossary) && d.glossary.length > 0, 'controller exposes the glossary');
   assert.ok(Array.isArray(d.help) && d.help.length >= 5, 'controller exposes the first-run help');
   assert.equal(typeof ctl.describe().card, 'function', 'controller exposes the describe functions');
-  const tile = ctl.describe().tile(C.cards.get('strike'), { cost: 1 }, 3);
+  const tile = ctl.describe().tile(C.cards.get('hammerfall'), { cost: 1 }, 3);
   assert.equal(tile.name, 'Hammerfall');
   assert.equal(tile.cost, 1);
   assert.match(tile.description, /Deal 6 damage/);

@@ -7,7 +7,7 @@
 // WHAT THIS PINS, against the REAL surface code driven by the fake-DOM harness:
 //   * an enemy card renders NO visible intent sentence (.ilabel is gone when chips
 //     exist) and NO visible status sentence — the pills' inline text is gone;
-//   * the intent row carries the kernel's attack/block chips (thrash: 7 and 5) with the
+//   * the intent row carries the kernel's attack/block chips (coil_thrash: 7 and 5) with the
 //     sentence as the row's title and aria-label;
 //   * a Vulnerable status chip, clicked, opens the shared popover with the kernel
 //     sentence and closes on Escape;
@@ -120,14 +120,14 @@ assert.equal(bootRun.snapshot().phase, 'combat', 'the reference run opens on a f
 const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
 
 /**
- * Boot on the reference fight with the FIRST enemy carrying a status and jaw_worm's
- * thrash move (attack 7 + block 5) — the richest intent shape the act-1 roster has.
+ * Boot on the reference fight with the FIRST enemy carrying a status and cinder_maw's
+ * coil_thrash move (attack 7 + block 5) — the richest intent shape the act-1 roster has.
  */
 function startFight({ enemyStatuses = { vulnerable: 2 } } = {}) {
   globalThis.localStorage._d[HELP_SEEN_KEY] = '1';
   const state = JSON.parse(JSON.stringify(FIRST_FIGHT));
   state.combat.enemies = state.combat.enemies.map((e, i) => (i === 0
-    ? { ...e, id: 'jaw_worm', statuses: { ...enemyStatuses }, moveIndex: 1 }
+    ? { ...e, id: 'cinder_maw', statuses: { ...enemyStatuses }, moveIndex: 1 }
     : e));
   const ctl = ctlMod.createController({ session: { state, submitted: [], events: [] } });
   const api = factory(ctl, importedModules);
@@ -160,7 +160,7 @@ test('the enemy card speaks in chips: no visible intent sentence, no visible sta
   assert.ok(intentRow, 'the enemy paints an intent row');
   const ichips = chipsIn(intentRow);
   assert.deepEqual(ichips.map((c) => c.querySelector('.cfx-num').txt), ['7', '5'],
-    'thrash reads as attack 7 and block 5');
+    'coil_thrash reads as attack 7 and block 5');
   assert.ok(!localFind(intentRow, '.ilabel'), 'NO visible intent sentence on the card');
   assert.match(intentRow.attrs['aria-label'], /Will attack for 7 and block 5/,
     'the sentence stays in the intent row\u2019s aria-label');

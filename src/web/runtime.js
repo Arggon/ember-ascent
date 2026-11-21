@@ -151,7 +151,7 @@ export const STRIKE_SEQ = { beat: 500, slam: 640, impactAt: 0.46, floatMs: 950 }
  * same pre-factor base as STRIKE_SEQ. The attack path keeps its own three figures
  * untouched; this is one extra number, not a second timing system: the plan's tail is the
  * non-attack steps in kernel order, one slot each, played AFTER the last slam (so a
- * `thrash` A7 B5 reads as strike then guard). 560ms is the spec's §4.2 `power` beat — the
+ * `coil_thrash` A7 B5 reads as strike then guard). 560ms is the spec's §4.2 `power` beat — the
  * middle of guard 480 / power 560 / hex 640 — because 9c's per-kind pose durations are the
  * refinement, and a plan that already carries the kind can be re-slotted there without
  * touching the event grouping again. `animMs` paces it exactly like every other beat.
@@ -218,7 +218,7 @@ export function strikeSlot(index) {
   }
   return null;
 }
-export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800, uppercut: 700, hammerfall: 560, quench: 620, bellowspush: 640, snapcast: 480, fanflames: 700, arccut: 620, collarline: 680, headbutt: 600, surge: 760, haftjab: 520, forgeclap: 780, wildflail: 740, bellowsflex: 560, dropkick: 820, bloodhammer: 900, castaside: 640, truetemper: 700, fitplate: 660, kilncry: 620, vent: 600, heattrance: 760, hailblows: 880, climbcut: 720, veintap: 560, reapsweep: 1000, heatwash: 900, bracelock: 800, flameward: 760, cindershroud: 720, stoke: 640, scaleup: 700, bankcoal: 680, ashembrace: 720, cinderskin: 660, lockdown: 900, overtemper: 820, tithe: 780, splitseam: 700 };
+export const HERO_POSE_MS = { strike: 320, heavy: 720, flurry: 660, sweep: 550, guard: 550, channel: 600, brace: 280, throw: 900, twinthrow: 1100, rend: 800, uppercut: 700, hammerfall: 560, quench: 620, bellowspush: 640, snapcast: 480, fanflames: 700, arccut: 620, collarline: 680, browstrike: 600, surge: 760, haftjab: 520, forgeclap: 780, wildflail: 740, bellowsflex: 560, heeldrop: 820, bloodhammer: 900, castaside: 640, truetemper: 700, fitplate: 660, kilncry: 620, vent: 600, heattrance: 760, hailblows: 880, climbcut: 720, veintap: 560, ashsweep: 1000, heatwash: 900, bracelock: 800, flameward: 760, cindershroud: 720, stoke: 640, scaleup: 700, bankcoal: 680, ashembrace: 720, cinderskin: 660, lockdown: 900, overtemper: 820, tithe: 780, splitseam: 700 };
 
 /* ------------------------------------------- barra de vida por golpe: hpTrail ---
  * The HP bar must FOLLOW the hits, not lead them. The kernel resolves an action in one
@@ -806,7 +806,7 @@ export function setPrevEnemies(list) { prevEnemies = list; }
  * The enemy ids whose entrance beat has ALREADY been played, for this run. A repaint for an
  * unrelated reason — hovering an enemy calls render() many times a second — must not replay
  * the entrance, so the beat is consumed once per id. `newGame()` clears it, which is what
- * makes a restart animate again. `id` is the kernel's encounter id (`the_guardian`,
+ * makes a restart animate again. `id` is the kernel's encounter id (`slag_warden`,
  * `nob`): static identity, not a stat, so this reads no rule.
  */
 export let enteredIds = new Set();

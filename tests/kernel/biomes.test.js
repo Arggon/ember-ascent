@@ -52,7 +52,7 @@ test('no other file keeps its own biome list or biome name', () => {
 
 test('Iron Skin switches off the Cyan Lantern in the Mines too', () => {
   for (let seed = 0; seed < 80; seed += 1) {
-    const r = newRun({ seed, character: 'bellows', biome: 'mines', kindling: true });
+    const r = newRun({ seed, character: 'bellows_keeper', biome: 'mines', kindling: true });
     const a = actions(r).find((x) => x.boon === 'ironskin');
     if (!a) continue;
     const fight = step(step(r, a.id).state, 'n1').state;

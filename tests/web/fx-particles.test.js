@@ -2,7 +2,7 @@
 // by the fake-DOM harness (the same bundle trick impact-feel.test.js uses):
 //   * the emitter clamps every ask into 12..30 particles (default the PARTICLES table's
 //     16) and leaves NOTHING behind: every spawned span carries one element.animate()
-//     whose finish removes the node and drops the record — 10+ bursts in a row drain
+//     whose finish removes the node and drops the record — 10+ bursts in a row soul_drain
 //     back to zero (AC1);
 //   * the wiring scatters on the struck unit only: a golpe window fires one burst on the
 //     window's own key; a golpe-less play (an empty strikes list — how a heal flies), a
@@ -18,7 +18,7 @@
 //
 // The WAAPI stub is honest about the two halves that matter here: finish() fires
 // onfinish, cancel() fires oncancel (both record who was asked), and every call lands
-// in a registry the tests drain — the real compositor timing is the e2e's business
+// in a registry the tests soul_drain — the real compositor timing is the e2e's business
 // (tests/web/e2e.browser.spec.js), the same split AC7 accepts.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -138,7 +138,7 @@ class FakeAnim {
 
 /** Every animation the app asked for, oldest first; drained by the tests. */
 const waapi = [];
-const drain = () => { while (waapi.length) waapi.pop().finish(); };
+const soul_drain = () => { while (waapi.length) waapi.pop().finish(); };
 
 /** One selector match, DESCENDANT-AWARE — the extension over impact-feel's matcher that
  *  lets hpUnitHost's own selectors resolve ('.fight .hero', '.enemy[data-target-index="1"]'),
@@ -265,19 +265,19 @@ const flickList = (hp) => [{ kind: 'card-fly', side: 'side-0', strikes: strike0(
 
 /* --------------------------------------------------------------- the contract */
 
-test('AC1: the ask clamps to 12..30 (default the PARTICLES count), and 10+ bursts drain to zero', () => {
+test('AC1: the ask clamps to 12..30 (default the PARTICLES count), and 10+ bursts soul_drain to zero', () => {
   const { api } = startRun(11);
   const at = { x: 200, y: 340 };
   assert.equal(api.emberBurst(at, { count: 5 }), 12, 'a small ask clamps UP to 12');
   assert.equal(api.liveEmberCount(), 12, 'every clamped particle is a live record');
-  drain();
-  assert.equal(api.liveEmberCount(), 0, 'the drain removes the records');
+  soul_drain();
+  assert.equal(api.liveEmberCount(), 0, 'the soul_drain removes the records');
   assert.equal(api.emberBurst(at, { count: 50 }), 30, 'a flood clamps DOWN to 30');
-  drain();
+  soul_drain();
   assert.equal(api.emberBurst(at), api.PARTICLES.count, 'the unshaped ask bursts the table count');
   assert.equal(api.PARTICLES.count, 16, 'the table default is 16');
-  drain();
-  // 10 bursts in a row: every particle animated, every node on the layer, and the drain
+  soul_drain();
+  // 10 bursts in a row: every particle animated, every node on the layer, and the soul_drain
   // (the onfinish path) takes the whole scatter back off.
   for (let i = 0; i < 10; i += 1) api.emberBurst(at, { count: 16 });
   assert.equal(api.liveEmberCount(), 160, 'ten bursts of 16 stay alive with no retire between them');
@@ -288,9 +288,9 @@ test('AC1: the ask clamps to 12..30 (default the PARTICLES count), and 10+ burst
     assert.ok(Array.isArray(a.frames) && a.frames.length === 3, 'three keyframes per flight');
     assert.equal(typeof a.opts.duration, 'number', 'the duration is the paced life');
   }
-  drain();
-  assert.equal(api.liveEmberCount(), 0, 'zero records after the drain — no leak');
-  assert.equal(emberNodes(), 0, 'zero nodes after the drain — no leak');
+  soul_drain();
+  assert.equal(api.liveEmberCount(), 0, 'zero records after the soul_drain — no leak');
+  assert.equal(emberNodes(), 0, 'zero nodes after the soul_drain — no leak');
 });
 
 test('AC2: a golpe window scatters on the struck unit; golpe-less, tail-only and all-parried plays scatter none', async () => {
@@ -302,7 +302,7 @@ test('AC2: a golpe window scatters on the struck unit; golpe-less, tail-only and
   // The window's fire lands at animMs(240); the embers spawn inside that fire.
   await sleep(api.animMs(240) + 150);
   assert.ok(emberNodes() >= 12, `the golpe's window must scatter embers (got ${emberNodes()})`);
-  drain();
+  soul_drain();
 
   // A golpe-less play (an EMPTY strikes list — how a heal flies) keeps its single freeze
   // window on key null, and a null key fires no burst.
@@ -330,7 +330,7 @@ test('AC2: a golpe window scatters on the struck unit; golpe-less, tail-only and
   // Harness hygiene: this instance's pending feel-queue timers (float landings, window
   // closes) measure the SHARED fake stage — kill them so a later test's accounting is its own.
   api.clearFxTimers();
-  drain();
+  soul_drain();
 });
 
 test('AC3: skipAnim cancels every live ember; a newer action retires the previous generation', () => {
@@ -344,7 +344,7 @@ test('AC3: skipAnim cancels every live ember; a newer action retires the previou
   assert.equal(emberNodes(), 0, 'the skip removes the nodes');
   assert.equal(waapi.length, 16);
   assert.ok(waapi.every((a) => a.canceled), 'every animation was cancelled, none finished');
-  drain();
+  soul_drain();
 
   // The generation half: embers of gen 1 survive a same-generation retire and die when
   // the NEXT action's dispatchFx captures a new generation.
@@ -355,7 +355,7 @@ test('AC3: skipAnim cancels every live ember; a newer action retires the previou
   api.dispatchFx(); // captures gen 2 and retires gen 1's embers before its own spawn
   assert.equal(api.liveEmberCount(), 0, 'the new generation retires the old burst');
   api.clearFxTimers(); // same hygiene: this dispatch's windows must not measure later tests
-  drain();
+  soul_drain();
 });
 
 test('AC4: reduced motion and the » dock both gate the emitter to zero spawns', () => {
@@ -368,7 +368,7 @@ test('AC4: reduced motion and the » dock both gate the emitter to zero spawns',
   api.injectBursts(flickList(29));
   api.dispatchFx();
   assert.equal(emberNodes(), 0, 'reduced motion scatters no embers through dispatchFx either');
-  drain();
+  soul_drain();
 
   // The » dock: speed 0 is the other half of the gate (a NOT-reduced instance).
   const { api: api2 } = startRun(11);
@@ -390,7 +390,7 @@ test('AC5: the dock paces the particle life through animMs and the WAAPI duratio
   api.emberBurst({ x: 50, y: 50 }, { count: 12, lifeMs: api.PARTICLES.lifeMs });
   assert.equal(waapi.length, 12);
   for (const a of waapi) assert.equal(a.opts.duration, 700, 'the WAAPI duration is animMs(lifeMs) at 2x');
-  drain();
+  soul_drain();
   // Distance does NOT ride the dock: the spread band is drawn at the BASE life
   // (200..400 px/s over 0.7s base = 140..280 px), varied per particle.
   api.setAnimSpeed(1);
@@ -401,14 +401,14 @@ test('AC5: the dock paces the particle life through animMs and the WAAPI duratio
   });
   assert.ok(reaches.every((d) => d >= 138 && d <= 282), `reaches inside the band (got ${reaches.map((d) => Math.round(d)).join(', ')})`);
   assert.ok(new Set(reaches.map((d) => Math.round(d))).size >= 2, 'distances vary per particle within the band');
-  drain();
+  soul_drain();
   // The heelburst fan's own invariant, on the knob's exact shape (bias 0 points straight
   // down, ±55° of spread): dy = cos(angle) * dist with |angle| ≤ 55° is ALWAYS positive —
   // no particle of that fan can fly up, whatever the random draw (deterministic).
   api.emberBurst({ x: 50, y: 50 }, { count: 12, lifeMs: 500, spreadDeg: 110, biasDeg: 0 });
   const fan = waapi.map((a) => Number(/translate\((-?\d+)px, (-?\d+)px\)/.exec(a.frames[2].transform)[2]));
   assert.ok(fan.every((dy) => dy > 0), `the fan never points up (dys ${fan.join(', ')})`);
-  drain();
+  soul_drain();
 });
 
 test('AC6: keyframes carry only transform/opacity on the heelburst curve; geometry measured once per burst', async () => {
@@ -420,7 +420,7 @@ test('AC6: keyframes carry only transform/opacity on the heelburst curve; geomet
   api.emberBurst({ x: 240, y: 340 }, { count: 12 });
   const after = [...root._all()].map((n) => n.rectCalls).reduce((a, b) => a + b, 0);
   assert.equal(after, before, 'the emitter measures nothing — the caller brings the point');
-  drain();
+  soul_drain();
 
   // The wiring: one golpe = one window fire = ONE measurement of the struck card for the
   // burst. The golpe float's own landing (throwLane, a fire later) measures the same
@@ -441,5 +441,5 @@ test('AC6: keyframes carry only transform/opacity on the heelburst curve; geomet
     assert.equal(a.opts.easing, 'cubic-bezier(0.2, 0.8, 0.4, 1)', 'the heelburst curve');
     assert.ok(a.opts.fill === 'both', 'the flight holds its last frame until removal');
   }
-  drain();
+  soul_drain();
 });

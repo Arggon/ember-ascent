@@ -165,7 +165,7 @@ test('the resolved beat renders the card as a TILE under its sentence, and the r
     choice: 1,
     lines: [
       { slug: 'toll', who: { en: 'forge', es: 'La forja' }, n: 8 },
-      { slug: 'card_joined', cardId: 'strike' },
+      { slug: 'card_joined', cardId: 'hammerfall' },
     ],
   };
   const api = bootOn(state);
@@ -202,14 +202,14 @@ test('a tempered beat wears the deck sheet\u2019s trim and forged stamp', () => 
   const state = eventState();
   state.event.resolved = {
     choice: null,
-    lines: [{ slug: 'temper_done', cardId: 'strike', temper: 'redhot' }],
+    lines: [{ slug: 'temper_done', cardId: 'hammerfall', temper: 'redhot' }],
   };
   const api = bootOn(state);
   const view = api.eventView();
   const row = localFind(view, '.has-card');
   assert.ok(row, 'the temper line is a card row');
   assert.equal(localFind(row, '.event-card-caption').txt,
-    'The smith takes strike to the anvil. It comes back changed.',
+    'The smith takes hammerfall to the anvil. It comes back changed.',
     'the beat sentence (the en column\u2019s raw-id form) stays the caption');
   const tile = localFind(localFind(row, '.event-cards'), '.card');
   assert.ok(tile, 'the tempered card renders as a tile');
@@ -230,7 +230,7 @@ test('the tempered face is the tile\u2019s face: the Quenched Quench tile shows 
   const state = eventState();
   state.event.resolved = {
     choice: null,
-    lines: [{ slug: 'temper_done', cardId: 'defend', temper: 'quenched' }],
+    lines: [{ slug: 'temper_done', cardId: 'quench', temper: 'quenched' }],
   };
   const api = bootOn(state);
   const view = api.eventView();
@@ -302,7 +302,7 @@ test('the smith\u2019s modal renders clickable tempered tiles, and a click commi
 test('the rest site\u2019s forge renders the same clickable tempered tiles', () => {
   const base = K.newRun({ seed: 3, tempers: true });
   const forge = { ...JSON.parse(JSON.stringify(base)), phase: 'rest', temperOffers: [
-    { uid: base.deck[0].uid, cardId: 'defend', temper: 'quenched' },
+    { uid: base.deck[0].uid, cardId: 'quench', temper: 'quenched' },
   ] };
   const api = bootOn(forge);
   assert.equal(api.snapNow().phase, 'rest', 'the crafted state stands at the forge');

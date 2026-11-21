@@ -5,7 +5,7 @@
 // 2. align: scale the cut content to the idle's alpha-bbox height, anchor BOTTOM edges
 //    (feet/base) and horizontal content centers, pad onto the idle's EXACT canvas W×H
 // 3. save WebP ≤150KB (same quality search as sprite-cutout.py)
-// Enemy idles each have their OWN canvas (jaw_worm 640x284, guardian 446x512) — never
+// Enemy idles each have their OWN canvas (cinder_maw 640x284, warden 446x512) — never
 // assume 555x512: that is the hero's shared canvas only.
 // Runs only in dev (uv + pillow + numpy + scipy); nothing here ships or gates. `magick`
 // (present on this machine) could do steps 2-3 by hand, but the PIL route keeps the
@@ -142,7 +142,7 @@ sys.exit(0 if ok else 1)
 
 const argv = process.argv.slice(2);
 if (argv[0] === '--fixture') {
-  fixture(argv[1] ?? 'src/web/assets/sprites/jaw_worm.webp');
+  fixture(argv[1] ?? 'src/web/assets/sprites/cinder_maw.webp');
 } else if (argv.length === 3) {
   run(...argv);
 } else {

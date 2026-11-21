@@ -41,7 +41,7 @@ export const SPECS = {
   new: {
     ...COMMON,
     '--seed': { type: 'int', default: 0 },
-    '--character': { type: 'string', default: 'ironclad' },
+    '--character': { type: 'string', default: 'ashwright' },
     '--difficulty': { type: 'int', default: 0 },
     '--kindling': { type: 'bool', default: false },
     '--tempers': { type: 'bool', default: false },
@@ -72,7 +72,7 @@ const USAGE = `dlb — agent-playable deckbuilder, headless CLI
 usage: dlb <command> [flags]
 
 commands
-  new --seed N --character S --difficulty N   start a run, write --run (S: ironclad | bellows)
+  new --seed N --character S --difficulty N   start a run, write --run (S: ashwright | bellows_keeper)
       [--kindling] [--tempers]                opt in to act-start boons (k<n>) / rest tempers (t<n>)
       [--quests]                              opt in to three seeded ember quests (side goals)
       [--biome mines]                         the Cinder Mines: alternate backdrop and enemy set
@@ -93,7 +93,7 @@ global: --help [--json]
 ${EXIT_TABLE}
 
 copy-pasteable full run
-  $ dlb new --seed 7 --character ironclad --difficulty 0
+  $ dlb new --seed 7 --character ashwright --difficulty 0
   $ dlb state
   $ dlb actions
   $ dlb play n1
@@ -181,7 +181,7 @@ export function helpJson(cmd) {
       exitCodes: { ok: 0, internal: 1, illegal_action: 2, usage: 3, corrupt_save: 4, replay_mismatch: 5, timeout: 6 },
       common: COMMON,
       example: [
-        'dlb new --seed 7 --character ironclad --difficulty 0',
+        'dlb new --seed 7 --character ashwright --difficulty 0',
         'dlb state',
         'dlb actions',
         'dlb play n1',

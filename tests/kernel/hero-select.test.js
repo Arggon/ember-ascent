@@ -127,7 +127,7 @@ const actCards = () => fxAdded.filter((c) => c === 'fx-act-card').length;
 
 test('fixed start: a run opens on kindling with one title card, a boon list, and no pickers', () => {
   assert.equal(api.snapGet().phase, 'kindling');
-  assert.equal(api.snapGet().character ?? 'ironclad', 'ironclad', 'every run starts as the same hero');
+  assert.equal(api.snapGet().character ?? 'ashwright', 'ashwright', 'every run starts as the same hero');
   assert.equal(actCards(), 1, 'the run opens with its act title card');
   assert.equal(byId.stage.querySelectorAll('.hero-pick').length, 0, 'no hero picker is painted');
   assert.equal(byId.stage.querySelectorAll('.biome-pick').length, 0, 'no path picker is painted');

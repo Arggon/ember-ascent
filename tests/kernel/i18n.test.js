@@ -29,7 +29,7 @@ function combat() {
 }
 
 test('a damage card reads as the pinned Spanish sentence', () => {
-  const def = C.cards.get('strike'); // Hammerfall — the starter attack
+  const def = C.cards.get('hammerfall'); // Hammerfall — the starter attack
   assert.equal(def.name, 'Hammerfall');
   assert.equal(describeCard(def, {}, 'es'), 'Infliges 6 de daño al enemigo.');
   assert.equal(describeCard(def, {}), 'Deal 6 damage to the enemy.', 'the default stays English');
@@ -47,24 +47,24 @@ test('a multi-hit and an ALL-enemies attack read as one Spanish sentence each', 
 });
 
 test('a block card and a status card read as pinned Spanish sentences', () => {
-  assert.equal(describeCard(C.cards.get('defend'), {}, 'es'), 'Ganas 5 de Bloqueo.');
+  assert.equal(describeCard(C.cards.get('quench'), {}, 'es'), 'Ganas 5 de Bloqueo.');
   assert.equal(
-    describeCard(C.cards.get('bash'), {}, 'es'),
+    describeCard(C.cards.get('anvil_blow'), {}, 'es'),
     'Infliges 8 de daño al enemigo. Aplicas 2 de Vulnerable al enemigo — recibe 50% más de daño de los ataques.',
   );
   assert.equal(
-    describeCard(C.cards.get('inflame'), {}, 'es'),
+    describeCard(C.cards.get('stoke'), {}, 'es'),
     'Ganas 2 de Fuerza — tus ataques infligen 2 de daño más.',
   );
 });
 
 test('a power card reads its Spanish custom sentence, matching its es power label', () => {
   assert.equal(
-    describeCard(C.cards.get('combust'), {}, 'es'),
+    describeCard(C.cards.get('banked_coal'), {}, 'es'),
     'Ganas Carbón Guardado: al final de cada turno, infliges 1 de daño a TODOS los enemigos y pierdes 1 HP.',
   );
   // The card's words and the status pill's words must name the power identically.
-  const pill = describePower('combust', 1, 'es');
+  const pill = describePower('banked_coal', 1, 'es');
   assert.match(pill, /^Carbón Guardado 1 — /);
   assert.match(pill, /Permanece por el resto del combate\.$/);
 });
@@ -74,27 +74,27 @@ test('snapshot({lang:"es"}) renders Spanish hand descriptions, statuses and inte
   const es = snapshot(state, { lang: 'es' });
   const en = snapshot(state, { lang: 'en' });
 
-  const hammerfall = es.hand.find((c) => c.cardId === 'strike');
+  const hammerfall = es.hand.find((c) => c.cardId === 'hammerfall');
   assert.ok(hammerfall, 'the starter attack is in the opening hand (seed 1)');
   assert.equal(hammerfall.description, 'Infliges 6 de daño al enemigo.');
   assert.equal(hammerfall.typeLabel, 'Ataque');
-  const defend = es.hand.find((c) => c.cardId === 'defend');
-  if (defend) assert.equal(defend.description, 'Ganas 5 de Bloqueo.');
+  const quench = es.hand.find((c) => c.cardId === 'quench');
+  if (quench) assert.equal(quench.description, 'Ganas 5 de Bloqueo.');
 
   assert.equal(es.enemies.length > 0, true);
   assert.match(es.enemies[0].intent.text, /^(Atacará|Ganará|Te aplicará|Se potenciará)/, 'the intent sentence is Spanish');
   assert.notEqual(es.enemies[0].intent.text, en.enemies[0].intent.text);
 
   // The English snapshot of the SAME state is unchanged, sentence for sentence.
-  assert.equal(en.hand.find((c) => c.cardId === 'strike').description, 'Deal 6 damage to the enemy.');
-  assert.equal(en.hand.find((c) => c.cardId === 'strike').typeLabel, 'Attack');
+  assert.equal(en.hand.find((c) => c.cardId === 'hammerfall').description, 'Deal 6 damage to the enemy.');
+  assert.equal(en.hand.find((c) => c.cardId === 'hammerfall').typeLabel, 'Attack');
 });
 
 test('snapshot({lang:"es"}) localizes relic, potion and temper words via the _es twins', () => {
   const state = combat();
   const es = snapshot(state, { lang: 'es' });
   const starter = es.relics[0];
-  assert.equal(starter.relicId, 'burning_blood');
+  assert.equal(starter.relicId, 'kindled_heart');
   assert.equal(starter.name, 'Corazón Encendido');
   assert.equal(starter.text, 'Después de cada combate, recuperas 6 HP.');
   // The compact summary stays the agent-facing English code, in either language.
@@ -106,7 +106,7 @@ test('snapshot({lang:"es"}) localizes relic, potion and temper words via the _es
   assert.equal(esBelt.belt[0].text, 'Inflige 20 de daño a un enemigo.');
   assert.equal(esBelt.belt[1].name, 'Frasco Purgador');
 
-  const tempered = { ...state, phase: 'rest', temperOffers: [{ cardId: 'strike', temper: 'redhot' }] };
+  const tempered = { ...state, phase: 'rest', temperOffers: [{ cardId: 'hammerfall', temper: 'redhot' }] };
   const esRest = snapshot(tempered, { lang: 'es' });
   assert.equal(esRest.rest.tempers[0].temperName, 'Al rojo vivo');
   assert.equal(esRest.rest.tempers[0].text, 'Al rojo vivo: +50% de daño. Pierdes 2 HP al jugarla.');
@@ -224,7 +224,7 @@ test('content validation accepts optional es twins and refuses an empty one', as
   const { loadContent } = K;
   const base = {
     contentVersion: 'test',
-    characters: { ironclad: { name: 'X', maxHp: 10, startingDeck: ['es_test'], startingRelic: 'burning_blood' } },
+    characters: { ashwright: { name: 'X', maxHp: 10, startingDeck: ['es_test'], startingRelic: 'kindled_heart' } },
     cards: [{
       id: 'es_test', name: 'Test', name_es: 'Prueba', flavor_es: 'Sabor', cost: 1,
       type: 'attack', rarity: 'starter', target: 'enemy', effects: [{ verb: 'damage', amount: 1 }],

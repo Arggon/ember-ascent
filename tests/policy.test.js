@@ -9,9 +9,9 @@
 //   1. determinism   — same seed + same state => the same action, always
 //   2. legality      — it never names an action the kernel did not offer
 //   3. energy        — it does not idle while a useful card is playable
-//   4. the regression — `impervious` out-ranks `strike` in a hand holding both
+//   4. the regression — `unbroken` out-ranks `strike` in a hand holding both
 //
-// (4) is the exact defect from the report: `impervious` was offered 742 times and
+// (4) is the exact defect from the report: `unbroken` was offered 742 times and
 // picked 0 times, because the reward valuation credited Block as
 // min(block, incoming - player.block) and asked with incoming = 0.
 import test from 'node:test';
@@ -51,7 +51,7 @@ test('smart is deterministic: the same seed yields the same action list twice', 
 
 test('smart is deterministic step by step: same state => same choice', async () => {
   const policy = makePolicy('smart');
-  const state = await combatState('strike');
+  const state = await combatState('hammerfall');
   const call = () => policy.choose({ session: { state }, state, legal: actions(state), stepIndex: state.stepIndex, memory: {}, dump: observe(state) }).id;
   assert.equal(call(), call(), 'a pure chooser must return the same id on repeat');
 });
@@ -110,21 +110,21 @@ test('smart spends Energy instead of idling while a useful card is playable', as
   }
 });
 
-test('the regression: impervious out-ranks strike in a hand holding both', async () => {
-  // The exact defect. A hand of [strike, impervious] with an 11-damage intent must
-  // play impervious: 5 Block covers none of it, 30 Block covers all of it.
+test('the regression: unbroken out-ranks strike in a hand holding both', async () => {
+  // The exact defect. A hand of [strike, unbroken] with an 11-damage intent must
+  // play unbroken: 5 Block covers none of it, 30 Block covers all of it.
   const policy = makePolicy('smart');
-  const state = await combatState('strike', {
+  const state = await combatState('hammerfall', {
     energy: 3,
     hand: [
-      { uid: 'H1', cardId: 'strike', cost: 1, perPlay: 0 },
-      { uid: 'H2', cardId: 'impervious', cost: 2, perPlay: 0 },
+      { uid: 'H1', cardId: 'hammerfall', cost: 1, perPlay: 0 },
+      { uid: 'H2', cardId: 'unbroken', cost: 2, perPlay: 0 },
     ],
   });
   const legalIds = actions(state).map((a) => a.id);
   assert.ok(legalIds.includes('p1') && legalIds.includes('p2'), `both cards must be legal, got ${legalIds.join(', ')}`);
   const choice = policy.choose({ session: { state }, state, legal: actions(state), stepIndex: state.stepIndex, memory: {}, dump: observe(state) });
-  assert.equal(choice.id, 'p2', `expected impervious (p2), chose ${choice.id}`);
+  assert.equal(choice.id, 'p2', `expected unbroken (p2), chose ${choice.id}`);
 });
 
 test('the regression, at the reward table: a defence-poor deck is offered Block', async () => {
@@ -132,11 +132,11 @@ test('the regression, at the reward table: a defence-poor deck is offered Block'
   const fresh = newRun({ seed: 1 });
   const needs = deckNeeds(fresh.deck);
   assert.ok(needs.blockNeed > 1, `the starter deck must read as short on Block, got ${needs.blockNeed}`);
-  const impervious = smartRewardScore(c.cards.get('impervious'), fresh);
-  const strike = smartRewardScore(c.cards.get('strike'), fresh);
-  const bludgeon = smartRewardScore(c.cards.get('bludgeon'), fresh);
-  assert.ok(impervious.key > strike.key, `impervious (${impervious.key.toFixed(2)}) must beat strike (${strike.key.toFixed(2)})`);
-  // Deliberately NOT asserting impervious > bludgeon here. Measured at 2000 seeds,
+  const unbroken = smartRewardScore(c.cards.get('unbroken'), fresh);
+  const strike = smartRewardScore(c.cards.get('hammerfall'), fresh);
+  const maul = smartRewardScore(c.cards.get('maul'), fresh);
+  assert.ok(unbroken.key > strike.key, `unbroken (${unbroken.key.toFixed(2)}) must beat strike (${strike.key.toFixed(2)})`);
+  // Deliberately NOT asserting unbroken > maul here. Measured at 2000 seeds,
   // ranking pure Block above a 3-cost 32-damage attack is exactly the over-correction
   // that made `smart` lose to `greedy` (14.3% vs 22.1%): it built 44 block points of
   // deck and still could not kill the boss. Block is ranked correctly by value PER
@@ -147,21 +147,21 @@ test('the regression, at the reward table: a defence-poor deck is offered Block'
 test('30 Block for 2 Energy beats a 6-damage attack on value per Energy', async () => {
   const c = await contentFixture();
   const fresh = newRun({ seed: 1 });
-  const impervious = smartRewardScore(c.cards.get('impervious'), fresh);
-  const strike = smartRewardScore(c.cards.get('strike'), fresh);
+  const unbroken = smartRewardScore(c.cards.get('unbroken'), fresh);
+  const strike = smartRewardScore(c.cards.get('hammerfall'), fresh);
   // 30/2 = 15 per Energy vs 6/1 = 6 per Energy. The report named this comparison
   // explicitly, so it is pinned here rather than left to the blended ranking.
-  assert.ok(impervious.perEnergy > strike.perEnergy, `impervious ${impervious.perEnergy.toFixed(2)}/EN must beat strike ${strike.perEnergy.toFixed(2)}/EN`);
+  assert.ok(unbroken.perEnergy > strike.perEnergy, `unbroken ${unbroken.perEnergy.toFixed(2)}/EN must beat strike ${strike.perEnergy.toFixed(2)}/EN`);
 });
 
 test('kill-first: a lethal attack is taken over Block when the enemy can die now', async () => {
   const policy = makePolicy('smart');
-  const state = await combatState('strike', {
+  const state = await combatState('hammerfall', {
     energy: 3,
     enemyOver: { hp: 5, maxHp: 44 },
     hand: [
-      { uid: 'H1', cardId: 'strike', cost: 1, perPlay: 0 },
-      { uid: 'H2', cardId: 'impervious', cost: 2, perPlay: 0 },
+      { uid: 'H1', cardId: 'hammerfall', cost: 1, perPlay: 0 },
+      { uid: 'H2', cardId: 'unbroken', cost: 2, perPlay: 0 },
     ],
   });
   const choice = policy.choose({ session: { state }, state, legal: actions(state), stepIndex: state.stepIndex, memory: {}, dump: observe(state) });
@@ -172,26 +172,26 @@ test('no-waste: a Block card with nothing incoming is not played', async () => {
   const policy = makePolicy('smart');
   // An enemy whose intent is a buff (B20-style block move) deals 0 this turn, so the
   // only card in hand accomplishes nothing and must be held.
-  const state = await combatState('defend', {
+  const state = await combatState('quench', {
     energy: 3,
-    enemyId: 'the_guardian',
-    enemyOver: { moveIndex: 0 }, // charging_up — B20, zero damage
-    hand: [{ uid: 'H1', cardId: 'impervious', cost: 2, perPlay: 0 }],
+    enemyId: 'slag_warden',
+    enemyOver: { moveIndex: 0 }, // plating_up — B20, zero damage
+    hand: [{ uid: 'H1', cardId: 'unbroken', cost: 2, perPlay: 0 }],
   });
   const threat = enemyThreats(state, observe(state)).reduce((a, b) => a + b, 0);
-  assert.equal(threat, 0, `Guardian's charging_up must announce no damage, got ${threat}`);
+  assert.equal(threat, 0, `Slag Warden's plating_up must announce no damage, got ${threat}`);
   const choice = policy.choose({ session: { state }, state, legal: actions(state), stepIndex: state.stepIndex, memory: {}, dump: observe(state) });
   assert.equal(choice.id, 'e1', `expected end_turn (e1) rather than a no-op Block, chose ${choice.id}`);
 });
 
 test('effectProfile reads Block, multi-hit, area and custom handlers without hardcoding ids', async () => {
   const c = await contentFixture();
-  assert.equal(effectProfile(c.cards.get('impervious')).block, 30, 'impervious is 30 Block');
-  assert.equal(effectProfile(c.cards.get('pummel')).damage, 8, 'pummel is four 2-damage hits');
-  assert.equal(effectProfile(c.cards.get('cleave')).aoePerTarget, 4, 'cleave hits every enemy for 4');
-  assert.equal(effectProfile(c.cards.get('reaper')).aoePerTarget, 4, 'reaper reads its number from the handler table');
-  assert.equal(effectProfile(c.cards.get('reaper')).handlerUnknown, false, 'every shipped custom handler must be known');
-  assert.equal(effectProfile(c.cards.get('offering')).selfDamage, 6, 'offering costs 6 HP');
+  assert.equal(effectProfile(c.cards.get('unbroken')).block, 30, 'unbroken is 30 Block');
+  assert.equal(effectProfile(c.cards.get('hail_of_blows')).damage, 8, 'hail_of_blows is four 2-damage hits');
+  assert.equal(effectProfile(c.cards.get('arc_cut')).aoePerTarget, 4, 'arc_cut hits every enemy for 4');
+  assert.equal(effectProfile(c.cards.get('ash_harvest')).aoePerTarget, 4, 'ash_harvest reads its number from the handler table');
+  assert.equal(effectProfile(c.cards.get('ash_harvest')).handlerUnknown, false, 'every shipped custom handler must be known');
+  assert.equal(effectProfile(c.cards.get('blood_tithe')).selfDamage, 6, 'blood_tithe costs 6 HP');
 });
 
 test('every shipped card with a custom handler is covered by the policy reading table', async () => {

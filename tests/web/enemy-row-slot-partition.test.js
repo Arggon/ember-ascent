@@ -3,7 +3,7 @@
 // seed 273/kiln): a fight whose kernel enemy list still carries a dead row at stable
 // index 0 — the kernel keeps dead enemies, snapshots omit them (snapshotEnemies filters
 // !e.dead) — so the two survivors sit at stable indices 1 and 2 but paint at row
-// positions 0 and 1. Killing the acid_slime (stable 2, painted position 1) used to push a
+// positions 0 and 1. Killing the slag_ooze (stable 2, painted position 1) used to push a
 // death burst keyed `enemy: 2` — the STABLE index — and combatView mapped ghosts to slots
 // by that field: the ghost landed at slot 2, past the row's end (slots = 1 living + 1
 // dying = 2), the last slot fell through to `snap.enemies[1]` = undefined, and
@@ -135,7 +135,7 @@ function guardSpy() {
  * Boot the surface on the repro fight's EXACT shape: a kernel enemy list that still
  * carries a dead ash_wraith at stable index 0 (the earlier death that shifted every
  * later stable index above its painted position), the wraith survivor at stable 1 and
- * the acid_slime at stable 2, and a hand holding carnage (Sunder, 20 damage, single
+ * the slag_ooze at stable 2, and a hand holding sunder (Sunder, 20 damage, single
  * target) — the fuzzer's aimed-kill state, as a plain object the real controller loads.
  * The enemy rows copy the kernel's own row shape (the fields playCard and the snapshot
  * read); hp values are the save's, so the blow is deterministic.
@@ -152,9 +152,9 @@ function startReproFight() {
     enemies: [
       row({ index: 0, hp: 0, dead: true }),                                        // the compacted death
       row({ index: 1, hp: 2, maxHp: 26 }),                                         // survivor, painted position 0
-      row({ id: 'acid_slime', index: 2, hp: 17, maxHp: 29, name: 'Acid Slime', moveHistory: [1, 0, 0, 0] }), // victim, painted position 1
+      row({ id: 'slag_ooze', index: 2, hp: 17, maxHp: 29, name: 'Slag Ooze', moveHistory: [1, 0, 0, 0] }), // victim, painted position 1
     ],
-    hand: [{ uid: 'repro-carnage', cardId: 'carnage', cost: 2 }],
+    hand: [{ uid: 'repro-sunder', cardId: 'sunder', cost: 2 }],
   };
   state.player = { ...state.player, energy: 3 };
   const ctl = ctlMod.createController({ session: { state, submitted: [], events: [] } });
@@ -186,7 +186,7 @@ test('the aimed kill against a compacted row pushes a death burst carrying BOTH 
     api.act('p1_2', 2);
 
     const after = api.snapNow();
-    assert.equal(after.enemies.length, 1, 'the acid_slime died and left the snapshot');
+    assert.equal(after.enemies.length, 1, 'the slag_ooze died and left the snapshot');
     assert.equal(after.enemies[0].index, 1, 'the wraith survivor keeps its stable index 1');
     assert.equal(after.phase, 'combat', 'the fight continues, so the kill repaints combatView itself');
 

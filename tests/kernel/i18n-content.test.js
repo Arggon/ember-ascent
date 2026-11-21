@@ -53,13 +53,13 @@ test('every shipped card carries a non-empty Spanish name and flavor', () => {
 
 test('the hand tile and the codex render the Spanish name and flavor', () => {
   const es = snapshot(combat(), { lang: 'es' });
-  const hammerfall = es.hand.find((c) => c.cardId === 'strike');
+  const hammerfall = es.hand.find((c) => c.cardId === 'hammerfall');
   assert.equal(hammerfall.name, 'Martillazo');
   const en = snapshot(combat(), { lang: 'en' });
-  assert.equal(en.hand.find((c) => c.cardId === 'strike').name, 'Hammerfall', 'the English name is untouched');
+  assert.equal(en.hand.find((c) => c.cardId === 'hammerfall').name, 'Hammerfall', 'the English name is untouched');
   const esPool = K.cardPool({ lang: 'es' });
-  const def = C.cards.get('bludgeon');
-  assert.equal(esPool.find((c) => c.cardId === 'bludgeon').name, def.name_es);
+  const def = C.cards.get('maul');
+  assert.equal(esPool.find((c) => c.cardId === 'maul').name, def.name_es);
 });
 
 test('the forge voice translates the SENTIMENT: every es flavor differs from the English one', () => {
@@ -97,11 +97,11 @@ test('every enemy carries a Spanish display name, and the hashed stateName is un
     assert.ok(nonEmpty(def.name_es), `enemy "${def.id}" is missing name_es`);
   }
   // The warden words (the S9 deliberate English, translated by I18N-2's ruling):
-  assert.equal(ENEMIES.the_guardian.name_es, 'El Guardián de Escoria');
+  assert.equal(ENEMIES.slag_warden.name_es, 'El Guardián de Escoria');
   assert.equal(ENEMIES.cinder_foreman.name_es, 'El Capataz de Ascuas');
   // stateName enters run state and therefore the content hash — it never localizes.
-  assert.equal(ENEMIES.the_guardian.stateName, 'The Guardian');
-  assert.equal(ENEMIES.jaw_worm.stateName, 'Jaw Worm');
+  assert.equal(ENEMIES.slag_warden.stateName, 'Slag Warden');
+  assert.equal(ENEMIES.cinder_maw.stateName, 'Cinder Maw');
 });
 
 test('snapshot enemies render the Spanish name; the state keeps the English one', () => {
@@ -119,12 +119,12 @@ test('every biome and both characters carry Spanish twins; Ashwright stays a pro
   assert.equal(BIOMES.foundry.name_es, 'La Fundición');
   assert.equal(BIOMES.kiln.name_es, 'Las Hondonadas del Horno');
 
-  const ashwright = C.characters.get('ironclad');
-  const bellows = C.characters.get('bellows');
+  const ashwright = C.characters.get('ashwright');
+  const bellows_keeper = C.characters.get('bellows_keeper');
   assert.equal(ashwright.name, 'Ashwright');
   assert.equal(ashwright.name_es, undefined, 'Ashwright is a proper noun — no twin, the honest fallback renders it');
-  assert.ok(nonEmpty(bellows.name_es));
-  assert.ok(nonEmpty(ashwright.relicName_es) && nonEmpty(bellows.relicName_es));
+  assert.ok(nonEmpty(bellows_keeper.name_es));
+  assert.ok(nonEmpty(ashwright.relicName_es) && nonEmpty(bellows_keeper.relicName_es));
   assert.equal(ashwright.relicName_es, 'Corazón Encendido');
 });
 
@@ -134,9 +134,9 @@ test('the snapshot localizes the biome, the Bellows Keeper and the starter relic
   assert.equal(es.biomeName, 'La Fundición');
   assert.equal(es.characterName, 'Ashwright', 'the proper noun renders in either language');
   assert.equal(es.relicName, 'Corazón Encendido');
-  const bellowsRun = newRun({ seed: 1, character: 'bellows' });
+  const bellowsRun = newRun({ seed: 1, character: 'bellows_keeper' });
   const esBellows = snapshot(bellowsRun, { lang: 'es' });
-  assert.equal(esBellows.characterName, C.characters.get('bellows').name_es);
+  assert.equal(esBellows.characterName, C.characters.get('bellows_keeper').name_es);
   assert.equal(esBellows.relicName, 'Farol Cian');
   const enBellows = snapshot(bellowsRun, { lang: 'en' });
   assert.equal(enBellows.characterName, 'Bellows Keeper');
@@ -225,7 +225,7 @@ test('the PERSISTED record stays language-independent: scoreRun and badgesForRun
     outcome: 'win', floor: 5, steps: 3, hp: 10, maxHp: 60, deckSize: 10, deck: [], rejected: 0,
     actions: [{ act: 'p1' }],
     events: [
-      { t: 'combat_start', node: 'r1n0', encounter: 'boss_1', enemies: [{ id: 'the_guardian', hp: 110 }] },
+      { t: 'combat_start', node: 'r1n0', encounter: 'boss_1', enemies: [{ id: 'slag_warden', hp: 110 }] },
       { t: 'damage', target: 0, hp: 0 },
       { t: 'combat_won' },
     ],
@@ -280,13 +280,13 @@ test('the resolved beat is stored as structured slugs, rendered English byte-ide
 
 test('a card-name beat renders the card\u2019s Spanish face name in es and the English one in en', () => {
   const defs = C.cards;
-  const beat = { slug: 'card_joined', cardId: 'strike' };
+  const beat = { slug: 'card_joined', cardId: 'hammerfall' };
   assert.equal(renderEventLine(beat, 'en', defs), '- The coals give up a card: Hammerfall joins your deck.');
   assert.equal(renderEventLine(beat, 'es', defs), '- Las ascuas entregan una carta: Martillazo se une a tu mazo.');
   // The temper beat keeps its historical raw-id form in English (the agent dump) and
   // names the card properly in Spanish.
-  const temper = { slug: 'temper_done', cardId: 'strike' };
-  assert.equal(renderEventLine(temper, 'en', defs), '- The smith takes strike to the anvil. It comes back changed.');
+  const temper = { slug: 'temper_done', cardId: 'hammerfall' };
+  assert.equal(renderEventLine(temper, 'en', defs), '- The smith takes hammerfall to the anvil. It comes back changed.');
   assert.equal(renderEventLine(temper, 'es', defs), '- El herrero lleva Martillazo al yunque. Vuelve cambiada.');
 });
 
@@ -298,7 +298,7 @@ test('every beat slug carries BOTH languages, and the en column matches the lega
     assert.ok(typeof beat.es === 'function', `beat "${slug}" is missing its es column`);
     // Probe params: a number, the toll's actor word, and a card name — the three holes
     // the templates fill.
-    const p = { n: 1, who: { en: 'forge', es: 'La forja' }, cardId: 'strike' };
+    const p = { n: 1, who: { en: 'forge', es: 'La forja' }, cardId: 'hammerfall' };
     const en = beat.en(p, 'Hammerfall');
     const es = beat.es(p, 'Martillazo');
     assert.ok(nonEmpty(en) && en.startsWith('- '), `beat "${slug}": the en column is a beat sentence`);

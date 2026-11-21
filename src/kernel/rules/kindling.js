@@ -40,21 +40,21 @@ export const BOONS = Object.freeze({
     label: 'ADD 2 Spark HP-6',
     text: 'Add 2 Spark to your deck. Lose 6 HP.',
     text_es: 'Añades 2 Chispa a tu mazo. Pierdes 6 HP.',
-    add: ['anger', 'anger'], hp: -6,
+    add: ['spark', 'spark'], hp: -6,
   },
   purge: {
     name: 'Ash Purge', name_es: 'Purga de Ceniza',
     label: 'DEL 2 Hammerfall MAXHP-6',
     text: 'Remove 2 Hammerfall from your deck. Lose 6 max HP.',
     text_es: 'Quitas 2 Martillazo de tu mazo. Pierdes 6 de HP máximo.',
-    remove: ['strike', 'strike'], maxHp: -6,
+    remove: ['hammerfall', 'hammerfall'], maxHp: -6,
   },
   stoke: {
     name: 'Banked Coals', name_es: 'Brasas Guardadas',
     label: 'ADD Stoke HP-15',
     text: 'Add Stoke to your deck. Lose 15 HP.',
     text_es: 'Añades Avivar a tu mazo. Pierdes 15 HP.',
-    add: ['inflame'], hp: -15,
+    add: ['stoke'], hp: -15,
   },
 });
 

@@ -41,7 +41,7 @@ const FALLBACK = (key) =>
   `<img class="spr spr-${key}" src="assets/sprites/${key}.webp" alt="" draggable="false" decoding="async">`;
 
 /** The resolved sprite key enemyMarkup paints for an id (stage-art.js's own rule). */
-const spriteKeyOf = (id) => (SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id] : SPRITES.jaw_worm);
+const spriteKeyOf = (id) => (SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id] : SPRITES.cinder_maw);
 
 /** One balanced-brace block of `text`, from the first `{` at or after `from`. */
 function blockAfter(text, from) {
@@ -95,24 +95,24 @@ test('AC1: every table id stacks idle first, then one .spr-frame layer per decla
 test('AC1 pin: windup ships on all ten encounter ids; guard only on the six whose non-attack beats paint an epose', () => {
   // The C3 cut: `guard` exists only where a block/hex step actually paints — beatPose
   // serves `guard` (block), `hex` (status/tick) and `attack`; the `power` eposes are
-  // never painted, so jaw_worm / cultist / red_louse / cinder_foreman are windup-only.
+  // never painted, so cinder_maw / ash_cantor / kiln_mite / cinder_foreman are windup-only.
   const windupIds = Object.keys(ENEMY_FRAMES).filter((id) => 'windup' in ENEMY_FRAMES[id]).sort();
   const guardIds = Object.keys(ENEMY_FRAMES).filter((id) => 'guard' in ENEMY_FRAMES[id]).sort();
   assert.equal(windupIds.length, 10, 'windup ships on all ten encounter ids');
-  assert.deepEqual(windupIds, ['acid_slime', 'ash_wraith', 'ash_wraith_elite', 'cinder_foreman', 'cultist', 'gremlin_nob', 'jaw_worm', 'red_louse', 'slag_crawler', 'the_guardian']);
+  assert.deepEqual(windupIds, ['ash_cantor', 'ash_wraith', 'ash_wraith_elite', 'cinder_brute', 'cinder_foreman', 'cinder_maw', 'kiln_mite', 'slag_crawler', 'slag_ooze', 'slag_warden']);
   assert.equal(guardIds.length, 6, 'guard ships on exactly six ids');
-  assert.deepEqual(guardIds, ['acid_slime', 'ash_wraith', 'ash_wraith_elite', 'gremlin_nob', 'slag_crawler', 'the_guardian'], 'guard only where a block/hex beat paints (the four windup-only ids stay windup-only)');
+  assert.deepEqual(guardIds, ['ash_wraith', 'ash_wraith_elite', 'cinder_brute', 'slag_crawler', 'slag_ooze', 'slag_warden'], 'guard only where a block/hex beat paints (the four windup-only ids stay windup-only)');
 });
 
-test('AC1: the captured strings are byte-for-byte (the undefined fallback, the bellows_keeper alias, cultist and the elite with their 3b layers)', () => {
+test('AC1: the captured strings are byte-for-byte (the undefined fallback, the bellows_keeper alias, ash_cantor and the elite with their 3b layers)', () => {
   // Captured from `node -e "import('./src/web/stage-art.js')…"` on the layered code.
   assert.equal(
-    enemyMarkup('cultist'),
-    '<span class="sh" aria-hidden="true"></span><img class="spr spr-cultist" src="assets/sprites/cultist.webp" alt="" draggable="false" decoding="async"><img class="spr-frame spr-frame-windup" src="assets/sprites/cultist-windup.webp" alt="" draggable="false" decoding="async">',
+    enemyMarkup('ash_cantor'),
+    '<span class="sh" aria-hidden="true"></span><img class="spr spr-ash_cantor" src="assets/sprites/ash_cantor.webp" alt="" draggable="false" decoding="async"><img class="spr-frame spr-frame-windup" src="assets/sprites/ash_cantor-windup.webp" alt="" draggable="false" decoding="async">',
   );
   assert.equal(
     enemyMarkup(undefined),
-    '<span class="sh" aria-hidden="true"></span><img class="spr spr-jaw_worm" src="assets/sprites/jaw_worm.webp" alt="" draggable="false" decoding="async">',
+    '<span class="sh" aria-hidden="true"></span><img class="spr spr-cinder_maw" src="assets/sprites/cinder_maw.webp" alt="" draggable="false" decoding="async">',
   );
   // The death-ghost pin (death-ghost-art.test.js) leans on this fallback identity.
   assert.equal(enemyMarkup('bellows_keeper'), enemyMarkup(undefined));
@@ -125,21 +125,21 @@ test('AC1: the captured strings are byte-for-byte (the undefined fallback, the b
 });
 
 test('AC1: an entry stacks idle first, then one .spr-frame layer per pose, in declaration order (the heroMarkup pattern)', () => {
-  // Since 3b the DEFAULT frames for jaw_worm are the table's own entry, so the bare-idle
+  // Since 3b the DEFAULT frames for cinder_maw are the table's own entry, so the bare-idle
   // base for these exact-pattern assertions is the explicit empty-frames call.
-  const idle = enemyMarkup('jaw_worm', {});
-  const one = enemyMarkup('jaw_worm', { windup: 'maw-wind' });
+  const idle = enemyMarkup('cinder_maw', {});
+  const one = enemyMarkup('cinder_maw', { windup: 'maw-wind' });
   assert.ok(one.startsWith(idle), 'the idle sprite still paints first, so the figure box keeps its measured size');
   assert.equal(
     one.slice(idle.length),
-    '<img class="spr-frame spr-frame-windup" src="assets/sprites/jaw_worm-windup.webp" alt="" draggable="false" decoding="async">',
+    '<img class="spr-frame spr-frame-windup" src="assets/sprites/cinder_maw-windup.webp" alt="" draggable="false" decoding="async">',
     'one layer, the exact attribute pattern heroMarkup emits',
   );
-  const two = enemyMarkup('jaw_worm', { windup: 'maw-wind', inhale: 'maw-inhale' });
+  const two = enemyMarkup('cinder_maw', { windup: 'maw-wind', inhale: 'maw-inhale' });
   assert.equal(
     two.slice(idle.length),
-    '<img class="spr-frame spr-frame-windup" src="assets/sprites/jaw_worm-windup.webp" alt="" draggable="false" decoding="async">' +
-    '<img class="spr-frame spr-frame-inhale" src="assets/sprites/jaw_worm-inhale.webp" alt="" draggable="false" decoding="async">',
+    '<img class="spr-frame spr-frame-windup" src="assets/sprites/cinder_maw-windup.webp" alt="" draggable="false" decoding="async">' +
+    '<img class="spr-frame spr-frame-inhale" src="assets/sprites/cinder_maw-inhale.webp" alt="" draggable="false" decoding="async">',
     'two layers in declaration order',
   );
   // I3: the FILE path follows the resolved sprite key, not the encounter id — the elite

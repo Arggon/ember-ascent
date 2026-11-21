@@ -14,14 +14,14 @@ const shadow = (rx = 34, cx = 60) => `<ellipse class="sh" cx="${cx}" cy="152" rx
    raw, so innerHTML stays safe. Decoration only (alt=""). Exported read-only so the
    enemy-frames test can walk every id without re-declaring the table. */
 export const SPRITES = {
-  hero: 'hero', jaw_worm: 'jaw_worm', cultist: 'cultist', red_louse: 'red_louse',
-  acid_slime: 'acid_slime', gremlin_nob: 'gremlin_nob', the_guardian: 'the_guardian',
+  hero: 'hero', cinder_maw: 'cinder_maw', ash_cantor: 'ash_cantor', kiln_mite: 'kiln_mite',
+  slag_ooze: 'slag_ooze', cinder_brute: 'cinder_brute', slag_warden: 'slag_warden',
   bellows_keeper: 'bellows_keeper',
   slag_crawler: 'slag_crawler', ash_wraith: 'ash_wraith', ash_wraith_elite: 'ash_wraith', cinder_foreman: 'cinder_foreman',
 };
 
 /** Hero sprite per character id (fixed table; unknown ids fall back to the Ashwright). */
-const HERO_SPRITES = { ironclad: 'hero', bellows: 'bellows_keeper' };
+const HERO_SPRITES = { ashwright: 'hero', bellows_keeper: 'bellows_keeper' };
 
 /**
  * Combat pose frames for the Ashwright, generated from the idle hero.webp (image-to-image,
@@ -29,7 +29,7 @@ const HERO_SPRITES = { ironclad: 'hero', bellows: 'bellows_keeper' };
  * OTHER heroes have no frame set and keep the single-sprite CSS motion. Values are sprite
  * keys under assets/sprites/: `hero-<pose>.webp`.
  */
-const HERO_FRAMES = { ironclad: ['windup', 'strike', 'guard', 'channel'] };
+const HERO_FRAMES = { ashwright: ['windup', 'strike', 'guard', 'channel'] };
 
 /**
  * Enemy frame layers, the mirror of HERO_FRAMES keyed by ENCOUNTER id (the ENEMY_POSES
@@ -41,23 +41,23 @@ const HERO_FRAMES = { ironclad: ['windup', 'strike', 'guard', 'channel'] };
  * local assets, so an entry without its file is a 404 on every paint (the
  * enemy-frames test imposes entry ⇔ file). The sprite key for the file path is the
  * resolved one (`SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id]
- * : SPRITES.jaw_worm`), so a variant (ash_wraith_elite) can reuse its base art's files
+ * : SPRITES.cinder_maw`), so a variant (ash_wraith_elite) can reuse its base art's files
  * while its OWN eposes drive the lighting.
  *
  * Slice 3b fills it: every id with a PAINTABLE beat ships a frame. `windup` lights on
  * the attack epose (the strike shortcut or the attack beat — every id paints one);
  * `guard` lights on the block/hex beats and ships only for the six ids whose non-attack
- * steps paint an epose (jaw_worm, cultist, red_louse and cinder_foreman have none, so
+ * steps paint an epose (cinder_maw, ash_cantor, kiln_mite and cinder_foreman have none, so
  * their guard webps stay on disk unused). The dead eposes (`power`, the held glows) get
  * NO layer rules: a frame pose whose epose class no enemy paints must not be declared.
  */
 export const ENEMY_FRAMES = Object.freeze({
-  jaw_worm: { windup: 'maw-wind' },
-  cultist: { windup: 'cantor-cast' },
-  red_louse: { windup: 'mite-dart' },
-  acid_slime: { windup: 'ooze-lunge', guard: 'ooze-drip' },
-  gremlin_nob: { windup: 'brute-charge', guard: 'brute-bash' },
-  the_guardian: { windup: 'warden-piston', guard: 'warden-wall' },
+  cinder_maw: { windup: 'maw-wind' },
+  ash_cantor: { windup: 'cantor-cast' },
+  kiln_mite: { windup: 'mite-dart' },
+  slag_ooze: { windup: 'ooze-lunge', guard: 'ooze-drip' },
+  cinder_brute: { windup: 'brute-charge', guard: 'brute-bash' },
+  slag_warden: { windup: 'warden-piston', guard: 'warden-wall' },
   slag_crawler: { windup: 'crawler-dart', guard: 'crawler-hex' },
   ash_wraith: { windup: 'wraith-streak', guard: 'wraith-thin' },
   ash_wraith_elite: { windup: 'matriarch-veil', guard: 'wraith-drift' },
@@ -74,7 +74,7 @@ const sprite = (key) =>
  * cross-fades between the layers during a combat move; the layers never change the
  * layout because they are absolutely positioned inside the existing `.fig` box.
  */
-export function heroMarkup(character = 'ironclad') {
+export function heroMarkup(character = 'ashwright') {
   const key = HERO_SPRITES[character] ?? SPRITES.hero;
   const frames = HERO_FRAMES[character];
   if (!frames) return sprite(key);
@@ -94,7 +94,7 @@ export function heroMarkup(character = 'ironclad') {
  * live path. An id without an entry keeps the exact single-sprite markup it always had.
  */
 export function enemyMarkup(id, frames = ENEMY_FRAMES[id]) {
-  const key = SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id] : SPRITES.jaw_worm;
+  const key = SPRITES[id] && id !== 'hero' && id !== 'bellows_keeper' ? SPRITES[id] : SPRITES.cinder_maw;
   if (!frames) return sprite(key);
   const layers = Object.keys(frames)
     .map((f) => `<img class="spr-frame spr-frame-${f}" src="assets/sprites/${key}-${f}.webp" alt="" draggable="false" decoding="async">`)

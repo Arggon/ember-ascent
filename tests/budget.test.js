@@ -30,9 +30,9 @@ test('every state dump fits the 250-token ceiling (worst of both encodings)', as
     if (n.worst > worst.n) worst = { id, n: n.worst, o: n.o200k_base, c: n.cl100k_base };
   }
   // The verbose dump (pile lists, deck count) is the real worst case; measure it too.
-  const verbose = observe(await combatState('pummel'), { verbose: true });
+  const verbose = observe(await combatState('hail_of_blows'), { verbose: true });
   const vn = countWorst(verbose);
-  if (vn.worst > worst.n) worst = { id: 'pummel --verbose', n: vn.worst, o: vn.o200k_base, c: vn.cl100k_base };
+  if (vn.worst > worst.n) worst = { id: 'hail_of_blows --verbose', n: vn.worst, o: vn.o200k_base, c: vn.cl100k_base };
 
   assert.ok(
     worst.n <= CEILINGS.stateDump,
@@ -64,7 +64,7 @@ test('every action line fits the 8-token ceiling (worst of both encodings)', asy
 
 test('the ceiling really does bite: a line one token over is rejected by the same check', async () => {
   // Guards against a test that passes because the measurement is inert.
-  const over = 'p1 sword_boomerang extra_words_that_do_not_belong_here_at_all';
+  const over = 'p1 returning_brand extra_words_that_do_not_belong_here_at_all';
   const n = countWorst(over);
   assert.ok(n.worst > CEILINGS.actionLine, `injected line must breach the ceiling, got ${n.worst}`);
 });

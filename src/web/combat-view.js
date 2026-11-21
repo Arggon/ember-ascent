@@ -58,7 +58,7 @@ import { currentLang, t } from './i18n.js';
 const busyText = (reason, which) => t(`busy.${reason}.${which}`) || t(`busy.fight.${which === 'tile' ? 'animatingTile' : 'animating'}`);
 
 export function heroPose() {  // Precedence: getting hit outranks the card's own movement — a hero who just lost HP
-  // flinches, even while playing an attack (and HP-cost cards like bloodletting always
+  // flinches, even while playing an attack (and HP-cost cards like vein_tap always
   // read as hurt, never as their HERO_MOVES entry).
   if (bursts.some((b) => b.kind === 'hero-float' && b.tone === 'dmg')) {
     setHeroMoveHold(null);
@@ -115,7 +115,7 @@ export function heroFigure() {
   const shown = hpDisplay('p') ?? p.hp;
   const ratio = p.maxHp > 0 ? shown / p.maxHp : 1;
   const pose = heroPose();
-  const isBellows = snap.character === 'bellows';
+  const isBellows = snap.character === 'bellows_keeper';
   const node = el('div', {
     cls: 'hero' + (ratio <= 0.35 ? ' is-low' : '') + (isBellows ? ' is-bellows' : ''),
     attrs: { role: 'group', 'aria-label': t('combat.hero.aria', { name: snap.characterName || 'Ashwright', hp: p.hp, max: p.maxHp, block: p.block }) },
@@ -233,7 +233,7 @@ export function heroFigure() {
   // juice-in diff is unchanged (`freshStatusKeys` diffs against the PREVIOUS paint,
   // which render.js records before this view is built) — the entrance class moves onto
   // the chip, and the reduced-motion block neutralizes it there like it does the pills.
-  // Powers (run-long counters: Combust, Rupture, …) STAY on the HUD: they outlive the
+  // Powers (run-long counters: Banked Coal, Split Seam, …) STAY on the HUD: they outlive the
   // fight, and this card exists only in combat.
   const freshHero = freshStatusKeys(p.statuses || []);
   const heroStatuses = (p.statuses || []).map((s) => chipNode(
@@ -264,17 +264,17 @@ export function heroFigure() {
  */
 const ENEMY_POSES = {
   // §5.1 — the overshoot windup is the POSE; the snap is the shared slam.
-  jaw_worm: { attack: 'maw-wind', power: 'maw-inhale' },
+  cinder_maw: { attack: 'maw-wind', power: 'maw-inhale' },
   // §5.2 — she never advances: the rite and the cone are columns, not dashes.
-  cultist: { power: 'cantor-rite', attack: 'cantor-cast' },
-  // §5.3 — a 460ms dart; grow TIGHTENS.
-  red_louse: { attack: 'mite-dart', power: 'mite-tighten' },
+  ash_cantor: { power: 'cantor-rite', attack: 'cantor-cast' },
+  // §5.3 — a 460ms dart; mite_grow TIGHTENS.
+  kiln_mite: { attack: 'mite-dart', power: 'mite-tighten' },
   // §5.4 — compress then lunge; the arc is a drip from a body that stays put.
-  acid_slime: { attack: 'ooze-lunge', hex: 'ooze-drip' },
+  slag_ooze: { attack: 'ooze-lunge', hex: 'ooze-drip' },
   // §5.5 — long charge, then the enraged seam glow holds.
-  gremlin_nob: { attack: 'brute-charge', hex: 'brute-bash', power: 'brute-enrage' },
+  cinder_brute: { attack: 'brute-charge', hex: 'brute-bash', power: 'brute-enrage' },
   // §5.6 — the wall is the guard pose; the piston is the heavy slam.
-  the_guardian: { guard: 'warden-wall', attack: 'warden-piston', hex: 'warden-steam' },
+  slag_warden: { guard: 'warden-wall', attack: 'warden-piston', hex: 'warden-steam' },
   // §5.7 — hex shell hardens; claws dart; ram pushes low.
   slag_crawler: { guard: 'crawler-hex', attack: 'crawler-dart' },
   // §5.8 — zero travel, ever: thin / streak / bob.
@@ -605,10 +605,10 @@ export function enemyCard(e, position) {
     || Boolean(bursts.find((x) => x.kind === 'enemy-turn' && x.attacks.some((a) => a.enemy === e.index)));
   const beat = reducedMotion ? null
     : (ENEMY_POSES[e.id] && ENEMY_POSES[e.id].attack && striking ? ENEMY_POSES[e.id].attack : beatPose(e));
-  // §5.5: the enrage persists while its Strength stands. Paint-time and reduced-motion
+  // §5.5: the fury persists while its Strength stands. Paint-time and reduced-motion
   // gated — the seams are already a transition-bearing class, and the Strength chip states
   // the same fact statically (AC-11).
-  const enraged = !reducedMotion && e.id === 'gremlin_nob'
+  const enraged = !reducedMotion && e.id === 'cinder_brute'
     && (e.statuses || []).some((x) => x.key === 'strength');
   const cls = 'enemy' + ` eh-${look.hue}` + (look.boss ? ' e-boss' : '') + (look.elite ? ' e-elite' : '')
     + (beat ? ` epose-${beat}` : '')

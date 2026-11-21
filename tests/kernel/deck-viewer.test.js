@@ -50,26 +50,26 @@ function expectedStartingDeck(characterId) {
 }
 
 test('at run start deckCards is the character\'s starting deck, aggregated and sorted', () => {
-  for (const characterId of ['ironclad', 'bellows']) {
+  for (const characterId of ['ashwright', 'bellows_keeper']) {
     const snap = snapshot(newRun({ seed: 7, character: characterId }));
     assert.equal(snap.deckCount, C.characters.get(characterId).startingDeck.length);
     assert.deepEqual(snap.deckCards, expectedStartingDeck(characterId));
     // The brief's own example, spelled out: the starter strikes render under their FACE
     // name, duplicates counted, nothing tempered.
-    const strike = snap.deckCards.find((r) => r.cardId === 'strike');
+    const strike = snap.deckCards.find((r) => r.cardId === 'hammerfall');
     assert.equal(strike.name, 'Hammerfall');
-    assert.equal(strike.count, C.characters.get(characterId).startingDeck.filter((id) => id === 'strike').length);
+    assert.equal(strike.count, C.characters.get(characterId).startingDeck.filter((id) => id === 'hammerfall').length);
     assert.equal(strike.tempered, false);
   }
 });
 
 test('the temper flag propagates: tempered copies split into their own row', () => {
   const base = newRun({ seed: 2, tempers: true });
-  const strikes = base.deck.filter((c) => c.cardId === 'strike').map((c) => c.uid);
+  const strikes = base.deck.filter((c) => c.cardId === 'hammerfall').map((c) => c.uid);
   const tempers = Object.fromEntries(strikes.slice(0, 2).map((u) => [u, 'redhot']));
   const snap = snapshot({ ...base, tempers });
 
-  const rows = snap.deckCards.filter((r) => r.cardId === 'strike');
+  const rows = snap.deckCards.filter((r) => r.cardId === 'hammerfall');
   assert.deepEqual(rows.map((r) => [r.tempered, r.count]), [[false, 3], [true, 2]]);
   const hot = rows.find((r) => r.tempered);
   assert.equal(hot.temper, 'redhot');
@@ -83,10 +83,10 @@ test('the temper flag propagates: tempered copies split into their own row', () 
 
 test('two DISTINCT tempers on the same card split into two rows, Quenched sorting before Red-hot', () => {
   const base = newRun({ seed: 2, tempers: true });
-  const strikes = base.deck.filter((c) => c.cardId === 'strike').map((c) => c.uid);
+  const strikes = base.deck.filter((c) => c.cardId === 'hammerfall').map((c) => c.uid);
   const snap = snapshot({ ...base, tempers: { [strikes[0]]: 'redhot', [strikes[1]]: 'quenched' } });
 
-  const rows = snap.deckCards.filter((r) => r.cardId === 'strike');
+  const rows = snap.deckCards.filter((r) => r.cardId === 'hammerfall');
   assert.deepEqual(rows.map((r) => [r.tempered, r.count]), [[false, 3], [true, 1], [true, 1]],
     'each temper is its own row; only identical (cardId, temper) pairs aggregate');
   // Cost and name tie, so the temper key decides — code-unit 'q' < 'r'.
@@ -130,7 +130,7 @@ test('a deck entry the content no longer knows snapshots as a placeholder row, w
 
 test('rows sort deterministically: cost, then face name, then temper', () => {
   const base = newRun({ seed: 2, tempers: true });
-  const strike = base.deck.find((c) => c.cardId === 'strike');
+  const strike = base.deck.find((c) => c.cardId === 'hammerfall');
   const snap = snapshot({ ...base, tempers: { [strike.uid]: 'redhot' } });
   /** True when row a must not come after row b (cost, then name, then temper key). */
   const inOrder = (a, b) =>
@@ -144,7 +144,7 @@ test('rows sort deterministically: cost, then face name, then temper', () => {
       `rows out of order at ${i}: ${snap.deckCards[i - 1].name} then ${snap.deckCards[i].name}`);
   }
   // A tempered Hammerfall sits after its untempered copies (same cost, same name).
-  const rows = snap.deckCards.filter((r) => r.cardId === 'strike');
+  const rows = snap.deckCards.filter((r) => r.cardId === 'hammerfall');
   assert.deepEqual(rows.map((r) => r.tempered), [false, true]);
   // Same input, same rows: the sort is a pure function of the deck.
   assert.deepEqual(snapshot({ ...base, tempers: { [strike.uid]: 'redhot' } }).deckCards, snap.deckCards);
@@ -164,10 +164,10 @@ test('a deck row carries the TEMPERED describe sentence — the sheet can never 
   // tempered copy ("Deal 6 damage" under a Red-hot stamp; the hand's tile said 9). The
   // row now publishes the same describeCard(def, instance) the hand tile reads.
   const base = newRun({ seed: 2, tempers: true });
-  const strike = base.deck.find((c) => c.cardId === 'strike');
+  const strike = base.deck.find((c) => c.cardId === 'hammerfall');
   const snap = snapshot({ ...base, tempers: { [strike.uid]: 'redhot' } });
   const hot = snap.deckCards.find((r) => r.tempered);
   assert.match(hot.description, /9/, 'the tempered copy prints the tempered number');
-  const plain = snap.deckCards.find((r) => r.cardId === 'strike' && !r.tempered);
+  const plain = snap.deckCards.find((r) => r.cardId === 'hammerfall' && !r.tempered);
   assert.doesNotMatch(plain.description, /9/, 'the untempered copy keeps the base sentence');
 });

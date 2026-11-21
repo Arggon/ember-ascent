@@ -9,7 +9,7 @@
 #   ./scripts/play.sh                 start a new game at a random-ish seed
 #   ./scripts/play.sh --seed 42       start at a specific seed (seeds are reproducible)
 #   ./scripts/play.sh --auto          play itself, first legal action every turn (zero typing)
-#   ./scripts/play.sh --character ironclad --difficulty 0
+#   ./scripts/play.sh --character ashwright --difficulty 0
 #
 # Inside a game:
 #   type an action id (p1, e1, c, s2, n1) and press Enter
@@ -26,7 +26,7 @@ DLB="${DLB:-node bin/dlb}"
 RUN_FILE="${RUN_FILE:-./play-run.json}"
 SEED=""
 AUTO=0
-CHARACTER="ironclad"
+CHARACTER="ashwright"
 DIFFICULTY=0
 RESUME=0
 

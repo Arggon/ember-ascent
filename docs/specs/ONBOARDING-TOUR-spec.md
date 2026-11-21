@@ -13,7 +13,7 @@
 The boot lands on a **boon/kindling screen, not combat** `[READ, executed]`: the browser's boot is `newGame()`, which builds the controller with `kindling: true` (`src/web/actions.js:584`), and the kernel answers `phase: 'kindling'`, `stepIndex: 0` for a fresh run. Measured this run:
 
 ```
-$ node -e "import('./src/kernel/index.js').then(k => console.log(k.newRun({ seed: 7, kindling: true, character: 'ironclad' }).phase))"
+$ node -e "import('./src/kernel/index.js').then(k => console.log(k.newRun({ seed: 7, kindling: true, character: 'ashwright' }).phase))"
 phase: kindling
 ```
 
@@ -231,7 +231,7 @@ All new tests carry **`tour`** in the title, use the file's existing helpers (`f
 10. **`tour: Replay from the map lands on the map step`** — a veteran climbs to the map, replays from Help, and `startTour` resolves the standing phase to its OWN first step ("Step 2 of 5", `{ open: true, step: 1 }`), not a kindling lecture.
 11. **`tour: the language card stays centred and every control click-reachable with motion normal`** — review round 1's bug, pinned at the MECHANISM: with `reduce: false` at 1280×800, 390×844 and 640×460 the resting card is fully inside the viewport, centred within 1px, and `elementFromPoint` at each control's centre returns it (both `.tour-lang` buttons, `.tour-next`, `.tour-skip`) — the inline `translateX(-50%)` the entrance keyframes used to stomp is gone (§3.5).
 12. **`tour: taking a boon under the still-open language pre-step persists the default and follows the phase`** — §3.5's act-exit, pinned: with the pre-step still at `{ open: true, step: -1 }` a real boon click on the UNDIMMED kindling screen writes `dlb.lang='en'` and lands "Step 2 of 5" over the map with the ring up — the persistence-on-every-exit rule includes the player's own act.
-13. **`fixed start: the seeded other hero (?hero=bellows) names himself in the HUD, in English and in Spanish after the toggle`** — the fixed-start hard constraint in the browser: a `freshPage` seeded `?hero=bellows` shows 'Bellows Keeper' in `.hud-char` (kernel-side `characterName`), and after the HUD language toggle 'Custodio del Fuelle' with `dlb.lang='es'` persisted — the seeded hero lives on with NO picker anywhere (its own page: a toggle inside the language walk would poison that walk's English assertions).
+13. **`fixed start: the seeded other hero (?hero=bellows_keeper) names himself in the HUD, in English and in Spanish after the toggle`** — the fixed-start hard constraint in the browser: a `freshPage` seeded `?hero=bellows_keeper` shows 'Bellows Keeper' in `.hud-char` (kernel-side `characterName`), and after the HUD language toggle 'Custodio del Fuelle' with `dlb.lang='es'` persisted — the seeded hero lives on with NO picker anywhere (its own page: a toggle inside the language walk would poison that walk's English assertions).
 
 Compatibility pin: with `dlb.helpSeen.v1` seeded (every existing walk), **zero** existing test may see a `.tour-card` — if one does, the §4 rule regressed. The help-sheet guard test (`e2e.browser.spec.js:1913`) must keep passing unchanged; its first-run `!helpSeen` branch is what §4.4 deleted. The HUD language test (`e2e.browser.spec.js:2476`) boots through `freshPage` (helpSeen seeded) with locale `en-US`: the browser-default rule reads 'en', so its default-English and toggle claims hold untouched.
 

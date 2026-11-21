@@ -2,7 +2,7 @@
 // HERO'S OWN CARD, under her HP bar — mark + stacks, the card chips' own component, the
 // kernel's sentence as the title and one popover click away (never printed inline) — the
 // same place an enemy's statuses sit, and NOT in the top HUD bar, where a landing debuff
-// once read as faint legend chrome. Powers (Combust, …) stay up there as pills: they
+// once read as faint legend chrome. Powers (Banked Coal, …) stay up there as pills: they
 // outlive the fight, and the combat card never shows them.
 //
 // WHAT THIS PINS, against the REAL surface code driven by the fake-DOM harness:
@@ -201,7 +201,7 @@ test('the hero card carries the player statuses as chips under her own HP bar', 
 });
 
 test('the top HUD bar shows powers only — a combat status up there is the regression', () => {
-  const { api } = startCombat({ statuses: { vulnerable: 2, weak: 1 }, powers: { combust: 1 } });
+  const { api } = startCombat({ statuses: { vulnerable: 2, weak: 1 }, powers: { banked_coal: 1 } });
   // The same paint carries the statuses on the hero card, so the absence below is not
   // vacuous: the same facts are on screen, just on the card that owns them.
   assert.equal(heroStatusPills().length, 2, 'the statuses are painted on the hero card');

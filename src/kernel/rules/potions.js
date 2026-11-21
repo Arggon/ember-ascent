@@ -133,7 +133,7 @@ const POTION_VERBS = {
 
   /** potion_heal — restore `percent`% of the player's MAX HP, floored to an integer,
    *  capped at the max: the same clamp every other heal reads (`resolveVictory`,
-   *  reaper). The source names the potion so the event trail says what healed. */
+   *  ash_harvest). The source names the potion so the event trail says what healed. */
   potion_heal(state, params) {
     const amount = Math.min(Math.floor((state.player.maxHp * params.percent) / 100), state.player.maxHp - state.player.hp);
     if (amount <= 0) return { state, events: [] };

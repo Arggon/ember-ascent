@@ -1,7 +1,7 @@
 // DEATH GHOST ART: the collapsing card a kill leaves behind must show the enemy that
-// actually died, not the jaw-worm. The ghost's art is keyed by the death burst's `id`
+// actually died, not the cinder-maw. The ghost's art is keyed by the death burst's `id`
 // (`dyingCard` -> `enemyMarkup(id)`), and `enemyMarkup(undefined)` falls back to
-// SPRITES.jaw_worm — so a burst pushed without the id made EVERY death ghost (the
+// SPRITES.cinder_maw — so a burst pushed without the id made EVERY death ghost (the
 // combat-row one and the end-of-run hold render.js draws alike, both fed from the same
 // bursts) wear the Cinder Maw's body.
 //
@@ -9,7 +9,7 @@
 //   * the REAL act() push site in actions.js stamps the dying enemy's own `id` onto the
 //     `death` burst (read back through the burst objects render() handed to the fx layer);
 //   * the ghost card the REAL render() paints from that burst (`.enemy.is-dying .fig`)
-//     carries THAT enemy's sprite markup and not the jaw-worm fallback.
+//     carries THAT enemy's sprite markup and not the cinder-maw fallback.
 import { readFileSync } from 'node:fs';
 
 let uid = 0;
@@ -121,7 +121,7 @@ const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
  * Boot the surface on a fight whose single enemy is an ASH WRAITH one hit from death.
  * The fight itself is the reference run's (seed 11), with only the enemy's identity and
  * its last point of HP rewritten: a one-hp wraith falls to the opening Hammerfall, so the
- * kill is deterministic and the dying enemy is guaranteed NOT the jaw-worm the fallback
+ * kill is deterministic and the dying enemy is guaranteed NOT the cinder-maw the fallback
  * would draw. The controller is the real one; the state it was loaded from is a plain
  * object, so the snapshot (and the ghost's name) still come from the kernel's tables.
  */
@@ -147,14 +147,14 @@ test('the death burst a kill pushes carries the dying enemy\'s own id', () => {
   const burst = dying[0];
   assert.equal(burst.kind, 'death', 'the burst is a death burst');
   assert.equal(burst.enemy, 0, 'the burst names the dead enemy by index');
-  // THE PIN: without `id` on the burst, the ghost's art falls back to SPRITES.jaw_worm
+  // THE PIN: without `id` on the burst, the ghost's art falls back to SPRITES.cinder_maw
   // for every enemy in the game.
   assert.equal(burst.id, 'ash_wraith', 'the burst carries the dying enemy\'s stable id');
   assert.equal(burst.name, 'Ash Wraith', 'the burst still carries the kernel\'s own name');
   api.clearFx();
 });
 
-test('the ghost card a kill paints wears the dead enemy\'s sprite, never the jaw-worm fallback', () => {
+test('the ghost card a kill paints wears the dead enemy\'s sprite, never the cinder-maw fallback', () => {
   const api = startDyingWraithFight();
   api.act('p1');
   // render() drew the end-of-run hold (the run ended on this blow), whose ghost row is
@@ -170,6 +170,6 @@ test('the ghost card a kill paints wears the dead enemy\'s sprite, never the jaw
   assert.ok(fig.innerHTML.includes('spr-ash_wraith'), 'the ghost\'s figure shows the ash-wraith sprite');
   // The exact regression this file exists to catch: the fallback art of the Cinder Maw
   // standing in for a wraith's body.
-  assert.ok(!fig.innerHTML.includes('spr-jaw_worm'), 'the ghost\'s figure is NOT the jaw-worm fallback');
+  assert.ok(!fig.innerHTML.includes('spr-cinder_maw'), 'the ghost\'s figure is NOT the cinder-maw fallback');
   api.clearFx();
 });

@@ -98,8 +98,8 @@ globalThis.document = {
 };
 // THE SEEDED BOOT — the whole point of this file: both params set, BEFORE the app bundle
 // evaluates (actions.js reads location.search once, at import time).
-globalThis.window = { addEventListener: () => {}, location: { search: '?seed=11&hero=bellows&biome=mines' } };
-globalThis.location = { search: '?seed=11&hero=bellows&biome=mines' };
+globalThis.window = { addEventListener: () => {}, location: { search: '?seed=11&hero=bellows_keeper&biome=mines' } };
+globalThis.location = { search: '?seed=11&hero=bellows_keeper&biome=mines' };
 globalThis.localStorage = { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = v; } };
 globalThis.URLSearchParams = URLSearchParams;
 globalThis.requestAnimationFrame = () => 0;
@@ -132,7 +132,7 @@ const actName = (card) => card._all().find((n) => n._cls === 'fx-act-name')?.txt
 
 test('the ?hero=/?biome= seeding still reaches the retired pickers\' content: a Bellows run in the Mines, kindling, no pickers', () => {
   assert.equal(api.snapGet().phase, 'kindling');
-  assert.equal(api.snapGet().character, 'bellows', 'the ?hero= seed made the run a Bellows-Keeper run');
+  assert.equal(api.snapGet().character, 'bellows_keeper', 'the ?hero= seed made the run a Bellows-Keeper run');
   assert.equal(api.snapGet().biome, 'mines', 'the ?biome= seed made the run a Mines run');
   assert.equal(actCards().length, 1, 'the seeded run opens with its one act title card');
   assert.equal(actName(actCards()[0]), 'The Cinder Mines', 'the title card names the seeded biome');
@@ -144,7 +144,7 @@ test('the ?hero=/?biome= seeding still reaches the retired pickers\' content: a 
 test('newGame() preserves the URL seeding (the choices are module-level state)', () => {
   const n = actCards().length;
   api.newGame();
-  assert.equal(api.snapGet().character, 'bellows', 'the hero seeding survives a plain new run');
+  assert.equal(api.snapGet().character, 'bellows_keeper', 'the hero seeding survives a plain new run');
   assert.equal(api.snapGet().biome, 'mines', 'the biome seeding survives a plain new run');
   assert.equal(actCards().length, n + 1, 'a genuinely new run plays its title card');
   assert.equal(actName(actCards()[actCards().length - 1]), 'The Cinder Mines', 'and the new card still names the seeded biome');

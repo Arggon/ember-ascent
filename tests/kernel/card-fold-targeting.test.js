@@ -23,8 +23,8 @@ import { combatState, makeEnemy, loadKernel, loadEncounters } from '../helpers/h
 const K = await loadKernel();
 const { ENEMIES } = await loadEncounters();
 
-/** A Jaw Worm; `over` carries the per-enemy statuses a case needs. */
-const worm = (over = {}) => makeEnemy(ENEMIES.jaw_worm, over);
+/** A Cinder Maw; `over` carries the per-enemy statuses a case needs. */
+const worm = (over = {}) => makeEnemy(ENEMIES.cinder_maw, over);
 
 /** Slot p1's tile in a combat state. */
 const tile = (state) => K.snapshot(state).hand[0];
@@ -34,7 +34,7 @@ const PLAIN = 'Deal 6 damage to the enemy.';
 const VULN_9 = 'Deal 6 damage to the enemy — 9 against Vulnerable.';
 
 test('2 alive, the SECOND Vulnerable: resting face on top, folded variant keyed 2', async () => {
-  const s = await combatState('strike', { enemies: [worm(), worm({ statuses: VULN })] });
+  const s = await combatState('hammerfall', { enemies: [worm(), worm({ statuses: VULN })] });
   const card = tile(s);
 
   // The top-level sentence is the honest no-vuln print — the player picks the target.
@@ -55,7 +55,7 @@ test('2 alive, the SECOND Vulnerable: resting face on top, folded variant keyed 
 });
 
 test('2 alive, the FIRST Vulnerable: the mirror case keys the fold to 1', async () => {
-  const s = await combatState('strike', { enemies: [worm({ statuses: VULN }), worm()] });
+  const s = await combatState('hammerfall', { enemies: [worm({ statuses: VULN }), worm()] });
   const card = tile(s);
 
   assert.equal(card.description, PLAIN);
@@ -65,7 +65,7 @@ test('2 alive, the FIRST Vulnerable: the mirror case keys the fold to 1', async 
 });
 
 test('Strength composes inside each variant, printed number first', async () => {
-  const s = await combatState('strike', {
+  const s = await combatState('hammerfall', {
     statuses: { strength: 3 },
     enemies: [worm(), worm({ statuses: VULN })],
   });
@@ -82,7 +82,7 @@ test('Strength composes inside each variant, printed number first', async () => 
 });
 
 test('a clean field adds zero payload: null, and the resting face', async () => {
-  const s = await combatState('strike', { enemies: [worm(), worm()] });
+  const s = await combatState('hammerfall', { enemies: [worm(), worm()] });
   const card = tile(s);
 
   assert.equal(card.descriptionsByTarget, null);
@@ -90,7 +90,7 @@ test('a clean field adds zero payload: null, and the resting face', async () => 
 });
 
 test('a dead middle enemy re-indexes the rows: keys follow the surviving aim slots', async () => {
-  const s = await combatState('strike', {
+  const s = await combatState('hammerfall', {
     enemies: [worm(), worm({ dead: true }), worm({ statuses: VULN })],
   });
   const card = tile(s);
@@ -114,11 +114,11 @@ test('a dead middle enemy re-indexes the rows: keys follow the surviving aim slo
 test('skills and AOE never carry variants and never claim Vulnerable', async () => {
   const field = [worm(), worm({ statuses: VULN })];
 
-  const defend = tile(await combatState('defend', { enemies: field }));
-  assert.equal(defend.descriptionsByTarget, null, 'a skill has no aim actions, so no per-target face');
-  assert.deepEqual(defend.targets, []);
-  assert.equal(defend.description, 'Gain 5 Block.');
-  assert.doesNotMatch(defend.description, /Vulnerable/);
+  const quench = tile(await combatState('quench', { enemies: field }));
+  assert.equal(quench.descriptionsByTarget, null, 'a skill has no aim actions, so no per-target face');
+  assert.deepEqual(quench.targets, []);
+  assert.equal(quench.description, 'Gain 5 Block.');
+  assert.doesNotMatch(quench.description, /Vulnerable/);
 
   const storm = tile(await combatState('cinder_storm', { enemies: field }));
   assert.equal(storm.descriptionsByTarget, null, 'one AOE number cannot speak for a mixed target set');

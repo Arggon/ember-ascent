@@ -53,8 +53,8 @@ for (let seed = seedStart; seed < seedStart + runs; seed += 1) {
       dmg += Math.max(0, beforeEnemyHp - sumHp(after));
       block += Math.max(0, after.player.block - beforeBlock);
       const cardId = act.cardId ?? '';
-      if (/impervious|defend|true_grit|ghostly|armaments|flame_barrier|entrench|shrug/.test(cardId)) agg.blockPlays += 1;
-      else if (/strike|bash|bludgeon|uppercut|cleave|pummel|twin|flex|shockwave|reaper|hemokinesis|rampage|limit_break|whirlwind|heavy/.test(cardId)) agg.attackPlays += 1;
+      if (/unbroken|quench|true_temper|ghostly|fit_the_plate|flame_ward|brace|cast_aside/.test(cardId)) agg.blockPlays += 1;
+      else if (/hammerfall|anvil_blow|maul|rising_blow|arc_cut|hail_of_blows|twin|bellows|heat_wash|ash_harvest|blood_hammer|climbing_heat|overtemper|shield_spin|heavy/.test(cardId)) agg.attackPlays += 1;
       else agg.otherPlays += 1;
     }
     if (inBoss && act?.kind === 'end_turn' && after.player.energy > 0) agg.turnsWithEnergyLeft += 1;

@@ -153,7 +153,7 @@ const HAND_SIZES = [
 ];
 // UX-3: the SEVEN-card guarantee — at every release-bar size (and every large-font size) a
 // 7-card hand must fit the viewport with every gem whole: 5-card hands compress
-// (flex 1 1 0), 6+ hands take the deliberate scroller below 1000px (<=620 since UX-1,
+// (bellows 1 1 0), 6+ hands take the deliberate scroller below 1000px (<=620 since UX-1,
 // 761-1000 since UX-3), and wide desktops compress. The fixture grows the real hand, so
 // every clone carries the real markup.
 const HAND7 = 7;
@@ -469,7 +469,7 @@ for (const [w, h, label, scale, handN] of SIZES_SEL) {
         lab.append(labHand);
         document.body.append(lab);
         const wraps = [...hand.querySelectorAll(':scope > .card-wrap')];
-        // Clone EVERY wrap before measuring any: flex shares the lab row across the whole
+        // Clone EVERY wrap before measuring any: bellows shares the lab row across the whole
         // hand, so a lone clone grows to its max-width cap instead of the realized width.
         const clones = wraps.map((w) => {
           const c = w.cloneNode(true);

@@ -8,7 +8,7 @@
 //   1. describeVerbChip() gives every covered verb and every shipped status a complete,
 //      non-empty EN and ES sentence, and a STATUS chip borrows STATUS_MEANING's own
 //      label/clause/detail verbatim — a chip popover and a status pill cannot disagree;
-//   2. cardChips() folds repeated damage (Pummel is four `{damage,2}` effects, one chip
+//   2. cardChips() folds repeated damage (Hail of Blows is four `{damage,2}` effects, one chip
 //      "2×4"), gives `custom` effects NO chip, and reports via chipsCover() whether the
 //      chips say the whole card (the tile's licence to drop the visible sentence);
 //   3. the SNAPSHOT publishes the chip list for hand cards (Bellows → strength +2,
@@ -75,30 +75,30 @@ test('status chips borrow STATUS_MEANING verbatim — pill and popover cannot di
 });
 
 test('Bellows reads as one Strength +2 chip; Kiln Cry as Draw +1 and Discard 1', () => {
-  const flex = cardChips(C.cards.get('flex'));
-  assert.equal(flex.length, 1, 'Bellows has exactly one chip');
-  assert.equal(flex[0].verb, 'status');
-  assert.equal(flex[0].status, 'strength');
-  assert.equal(flex[0].amount, 2);
-  assert.equal(flex[0].num, '+2');
-  assert.equal(flex[0].label, 'Strength');
-  assert.equal(flex[0].explain, describeVerbChip('status', 'strength', 2, 'en', 'player'));
+  const bellows = cardChips(C.cards.get('bellows'));
+  assert.equal(bellows.length, 1, 'Bellows has exactly one chip');
+  assert.equal(bellows[0].verb, 'status');
+  assert.equal(bellows[0].status, 'strength');
+  assert.equal(bellows[0].amount, 2);
+  assert.equal(bellows[0].num, '+2');
+  assert.equal(bellows[0].label, 'Strength');
+  assert.equal(bellows[0].explain, describeVerbChip('status', 'strength', 2, 'en', 'player'));
 
-  const es = cardChips(C.cards.get('flex'), 'es');
+  const es = cardChips(C.cards.get('bellows'), 'es');
   assert.equal(es[0].label, 'Fuerza', 'the es chip speaks the es status label');
   assert.match(es[0].explain, /^Fuerza — /, 'the es explainer leads with the es label');
 
-  const wc = cardChips(C.cards.get('warcry'));
+  const wc = cardChips(C.cards.get('kiln_cry'));
   assert.deepEqual(wc.map((c) => [c.verb, c.num]), [['draw', '+1'], ['discard', '1']],
     'Kiln Cry: the draw reads as a gain (+1), the discard as a plain cost');
-  assert.ok(chipsCover(C.cards.get('warcry')), 'Kiln Cry is fully chip-expressible');
-  assert.ok(chipsCover(C.cards.get('flex')), 'Bellows is fully chip-expressible');
+  assert.ok(chipsCover(C.cards.get('kiln_cry')), 'Kiln Cry is fully chip-expressible');
+  assert.ok(chipsCover(C.cards.get('bellows')), 'Bellows is fully chip-expressible');
 });
 
 test('a custom-only card gets NO chip and is NOT covered — its sentence stays on the face', () => {
-  const bl = cardChips(C.cards.get('bloodletting'));
+  const bl = cardChips(C.cards.get('vein_tap'));
   assert.deepEqual(bl, [], 'a bespoke handler claims no generic icon');
-  assert.equal(chipsCover(C.cards.get('bloodletting')), false, 'Bloodletting keeps its sentence');
+  assert.equal(chipsCover(C.cards.get('vein_tap')), false, 'Vein Tap keeps its sentence');
   // Every shipped card with a custom verb is uncovered; every fully plain one is covered.
   for (const [id, def] of C.cards) {
     const custom = def.effects.some((e) => e.verb === 'custom');
@@ -127,8 +127,8 @@ test('the golpes-discretos trio chips itself: Slag Barb is A4 + BLEED+3, Anvil G
   assert.match(fume[0].explain, /^Veneno — /);
 });
 
-test('repeated identical damage folds onto hits: Pummel is one 2×4 chip, not four', () => {
-  const chips = cardChips(C.cards.get('pummel'));
+test('repeated identical damage folds onto hits: Hail of Blows is one 2×4 chip, not four', () => {
+  const chips = cardChips(C.cards.get('hail_of_blows'));
   const dmg = chips.filter((c) => c.verb === 'damage');
   assert.equal(dmg.length, 1, 'the four identical damage effects read as ONE chip');
   assert.equal(dmg[0].num, '2×4');
@@ -145,9 +145,9 @@ test('the snapshot publishes the hand chips — Bellows strength +2, Kiln Cry dr
     combat: {
       ...combat.combat,
       hand: [
-        { uid: 't1', cardId: 'flex', cost: 0 },
-        { uid: 't2', cardId: 'warcry', cost: 0 },
-        { uid: 't3', cardId: 'bloodletting', cost: 0 },
+        { uid: 't1', cardId: 'bellows', cost: 0 },
+        { uid: 't2', cardId: 'kiln_cry', cost: 0 },
+        { uid: 't3', cardId: 'vein_tap', cost: 0 },
       ],
     },
   };
@@ -168,7 +168,7 @@ test('the snapshot publishes the hand chips — Bellows strength +2, Kiln Cry dr
   assert.match(es.hand[0].chips[0].explain, /tus ataques infligen 2 de daño más/);
   // The collection surfaces carry the same rows, so no surface derives its own chips.
   const pool = cardPool();
-  const poolFlex = pool.find((r) => r.cardId === 'flex');
+  const poolFlex = pool.find((r) => r.cardId === 'bellows');
   assert.deepEqual(poolFlex.chips, flexRow.chips, 'the codex table words the chips identically');
   assert.equal(poolFlex.chipsComplete, true);
 });
@@ -186,11 +186,11 @@ test('a SCOPED chip names its scope — the popover cannot narrow an AOE', () =>
   // Bellows Gust is a STARTER whose sentence ("Deal 4 damage to ALL enemies.") leaves
   // the face (fully covered): its chip explain must carry the same scope, or the popover
   // quietly misstates the rules.
-  const gust = cardChips(C.cards.get('gust'));
-  assert.equal(gust.length, 1);
-  assert.equal(gust[0].explain, 'Deal 4 damage to ALL enemies.');
-  assert.equal(chipsCover(C.cards.get('gust')), true, 'the scope rides the chip, so coverage keeps holding');
-  const es = cardChips(C.cards.get('gust'), 'es');
+  const bellows_gust = cardChips(C.cards.get('bellows_gust'));
+  assert.equal(bellows_gust.length, 1);
+  assert.equal(bellows_gust[0].explain, 'Deal 4 damage to ALL enemies.');
+  assert.equal(chipsCover(C.cards.get('bellows_gust')), true, 'the scope rides the chip, so coverage keeps holding');
+  const es = cardChips(C.cards.get('bellows_gust'), 'es');
   assert.equal(es[0].explain, 'Infliges 4 de daño a TODOS los enemigos.');
   // Every shipped ALL-enemies damage chip names its scope, in both languages.
   for (const [id, def] of C.cards) {
@@ -210,18 +210,18 @@ test('a SCOPED chip names its scope — the popover cannot narrow an AOE', () =>
   const rand = cardChips({ id: 'g', target: 'random_enemy', effects: [{ verb: 'damage', amount: 3 }] });
   assert.match(rand[0].explain, /a random enemy/);
   // And a single-target damage chip keeps the scopeless print.
-  assert.equal(cardChips(C.cards.get('strike'))[0].explain, 'Deal 6 damage to the enemy.'.replace(' to the enemy', ''),
+  assert.equal(cardChips(C.cards.get('hammerfall'))[0].explain, 'Deal 6 damage to the enemy.'.replace(' to the enemy', ''),
     'a plain strike chip says the plain fact');
 });
 
 test('an AOE STATUS chip scopes its applicator clause', () => {
-  // Thunderclap (Forgeclap) IS the shipped AOE debuff now: the origin line's PR #56
+  // Forgeclap (Forgeclap) IS the shipped AOE debuff now: the origin line's PR #56
   // made its Vulnerable hit every living enemy, and the 2026-11-17 merge landed that
   // ruling here — so its chip names the scope; the plain "the enemy" applicator would
   // quietly narrow a whole-row hit.
-  const chips = cardChips(C.cards.get('thunderclap'));
+  const chips = cardChips(C.cards.get('forgeclap'));
   const vuln = chips.find((c) => c.verb === 'status');
-  assert.ok(vuln, 'Thunderclap carries a Vulnerable chip');
+  assert.ok(vuln, 'Forgeclap carries a Vulnerable chip');
   assert.equal(vuln.explain,
     'Vulnerable on ALL enemies — it takes 50% more damage from attacks. Wears off by 1 at the end of each of your turns.');
   // The RULE, now that the shipped content carries the shape: an all-enemies status
@@ -239,7 +239,7 @@ test('an AOE STATUS chip scopes its applicator clause', () => {
   }, 'es');
   assert.match(es[0].explain, /^Vulnerable sobre TODOS los enemigos — /);
   // A granted (self) status keeps the player's own voice with no scope named.
-  assert.equal(cardChips(C.cards.get('flex'))[0].explain,
+  assert.equal(cardChips(C.cards.get('bellows'))[0].explain,
     'Strength — your attacks deal 2 more damage. Lasts the whole fight. Added to every attack you play.');
 });
 
@@ -247,7 +247,7 @@ test('a tempered hand row with an HP rider is NOT chip-covered — the cost stay
   const base = newRun({ seed: 2, tempers: true });
   const travel = actions(base).find((a) => a.kind === 'travel');
   const combat = step(base, travel.id).state;
-  const strikeUid = combat.combat.hand.find((c) => c.cardId === 'strike')?.uid;
+  const strikeUid = combat.combat.hand.find((c) => c.cardId === 'hammerfall')?.uid;
   const state = { ...combat, tempers: { [strikeUid]: 'redhot' } };
   const view = snapshot(state);
   const hot = view.hand.find((c) => c.temper === 'redhot');
@@ -256,7 +256,7 @@ test('a tempered hand row with an HP rider is NOT chip-covered — the cost stay
   assert.deepEqual(hot.chips[0].num, '9', 'the damage chip says the tempered 9');
   assert.equal(hot.chipsComplete, false,
     'the "Lose 2 HP when played." tail has no chip, so the sentence STAYS on the visible face');
-  const clean = view.hand.find((c) => c.cardId === 'strike' && c.temper === null);
+  const clean = view.hand.find((c) => c.cardId === 'hammerfall' && c.temper === null);
   assert.equal(clean.chipsComplete, true, 'an untempered copy of the same card stays fully covered');
 });
 
@@ -265,10 +265,10 @@ test('the reward and shop snapshot rows publish the same chip lists', () => {
   const rewardState = {
     ...map,
     phase: 'reward',
-    reward: { cards: ['flex', 'warcry'], relicOffers: [], boss: false, gold: 10 },
+    reward: { cards: ['bellows', 'kiln_cry'], relicOffers: [], boss: false, gold: 10 },
   };
   const view = snapshot(rewardState);
-  assert.equal(view.reward.cards[0].cardId, 'flex');
+  assert.equal(view.reward.cards[0].cardId, 'bellows');
   assert.deepEqual(view.reward.cards[0].chips.map((c) => [c.verb, c.num]), [['status', '+2']],
     'the reward row\u2019s chips are the hand\u2019s chips');
   assert.equal(view.reward.cards[0].chipsComplete, true);
@@ -276,7 +276,7 @@ test('the reward and shop snapshot rows publish the same chip lists', () => {
     ...map,
     phase: 'shop',
     shop: {
-      offers: [{ cardId: 'warcry', price: 45 }],
+      offers: [{ cardId: 'kiln_cry', price: 45 }],
       removal: { price: 75, sold: false, done: false },
       removing: false,
     },
@@ -286,6 +286,6 @@ test('the reward and shop snapshot rows publish the same chip lists', () => {
     'the shelf row\u2019s chips are the hand\u2019s chips');
   assert.equal(shop.shop.offers[0].chipsComplete, true);
   const removal = snapshot({ ...shopState, shop: { ...shopState.shop, removing: true } });
-  const row = removal.shop.deckInstances.find((d) => d.cardId === 'strike');
+  const row = removal.shop.deckInstances.find((d) => d.cardId === 'hammerfall');
   assert.ok(row && row.chips.length === 1 && row.chips[0].num === '6', 'the removal instance row carries its chip');
 });

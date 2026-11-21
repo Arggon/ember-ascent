@@ -73,10 +73,10 @@ test('a mines run plays, the header carries the biome, and replay matches the go
 });
 
 // Recomputed for UX-7 (attack-damage status folding): the mines roster carries Weak
-// moves (the Ash Wraith's wail, the Matriarch's grief), and a weakened hero's attacks
+// moves (the Ash Wraith's sorrow_wail, the Matriarch's mourning_hex), and a weakened hero's attacks
 // now resolve for 25% less — the drive diverges from the old hash at the first
 // weakened swing. Pure state math, no RNG change (same draw count, same 160-step drive).
-// Recomputed for the "golpes discretos NxM" slice: the Matriarch's soulfire carries
+// Recomputed for the "golpes discretos NxM" slice: the Matriarch's ember_soulfire carries
 // the BLEED2 rider and the crawler gained spur_set (PARRY20), so the mines intents and
-// the hero's bleed diverge from the UX-7 hash at the first soulfire strike.
-const GOLDEN = 'sha256:e3a952a00e5166a35a5f81cb1060b5badf88992fac4fde3c9f0953f493a4dbc0';
+// the hero's bleed diverge from the UX-7 hash at the first ember_soulfire strike.
+const GOLDEN = 'sha256:99126cf43eefbeb5642efbc02ddbd236ba8e865c39fbd5ba75a51260420c7173';

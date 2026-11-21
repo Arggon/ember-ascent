@@ -2238,13 +2238,13 @@ html, body {
   .stage-combat .fig.pose-fanflames,
   .stage-combat .fig.pose-arccut,
   .stage-combat .fig.pose-collarline,
-  .stage-combat .fig.pose-headbutt,
+  .stage-combat .fig.pose-browstrike,
   .stage-combat .fig.pose-surge,
   .stage-combat .fig.pose-haftjab,
   .stage-combat .fig.pose-forgeclap,
   .stage-combat .fig.pose-wildflail,
   .stage-combat .fig.pose-bellowsflex,
-  .stage-combat .fig.pose-dropkick,
+  .stage-combat .fig.pose-heeldrop,
   .stage-combat .fig.pose-bloodhammer,
   .stage-combat .fig.pose-castaside,
   .stage-combat .fig.pose-truetemper,
@@ -2255,7 +2255,7 @@ html, body {
   .stage-combat .fig.pose-hailblows,
   .stage-combat .fig.pose-climbcut,
   .stage-combat .fig.pose-veintap,
-  .stage-combat .fig.pose-reapsweep,
+  .stage-combat .fig.pose-ashsweep,
   .stage-combat .fig.pose-heatwash,
   .stage-combat .fig.pose-bracelock,
   .stage-combat .fig.pose-flameward,
@@ -3954,7 +3954,7 @@ html, body {
   100% { transform: none; }
 }
 /* Per-card hero movements: the pose is chosen from WHICH card was played (HERO_MOVES in
-   app.js), not just its type. Each is a distinct read of the same attack/defend beat. */
+   app.js), not just its type. Each is a distinct read of the same attack/quench beat. */
 @keyframes hero-heavy {
   0% { transform: none; }
   30% { transform: translate(-14px, 8px) rotate(7deg) scale(0.97); }
@@ -4389,7 +4389,7 @@ html, body {
   position: absolute; left: 12%; right: 12%; bottom: -5px; height: 12px; border-radius: 50%;
   background: radial-gradient(closest-side, rgba(0, 0, 0, 0.78), transparent);
 }
-.stage-combat .enemy .fig .spr-the_guardian { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
+.stage-combat .enemy .fig .spr-slag_warden { filter: drop-shadow(0 0 1px rgba(255, 196, 140, 0.6)) drop-shadow(0 0 14px rgba(255, 90, 30, 0.45)); }
 @keyframes spr-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.03); } }
 .stage-combat .fig.pose-idle .spr, .stage-combat .fig.pose-low .spr { animation: spr-breathe 3.1s ease-in-out infinite; }
 /* Hit flash: the ink goes white-hot for a beat. */
@@ -4466,7 +4466,7 @@ html, body {
 .stage-combat .fig.pose-throw .spr { animation: frame-idle-hide calc(0.9s * var(--pace, 1)) linear both; }
 /* COLOSSAL (Maul, per-card signature): the stroke of a 32-damage rare. A long, loaded
    windup, an enormous forward crash with a heavy overshoot, and a slow settle — the
-   whole pose runs 1.15s and the impact beat fires the stage shake + shockwave. */
+   whole pose runs 1.15s and the impact beat fires the stage shake + heat_wash. */
 .stage-combat .fig.pose-colossal { animation: hero-colossal calc(1.15s * var(--pace, 1)) cubic-bezier(0.32, 0.72, 0.28, 1); }
 .stage-combat .fig.pose-colossal .spr { animation: frame-idle-hide calc(1.15s * var(--pace, 1)) linear both; }
 .stage-combat .fig.pose-colossal .spr-frame-windup { animation: frame-colossal-a calc(1.15s * var(--pace, 1)) ease-in-out both; filter: brightness(1.5) drop-shadow(0 0 2px rgba(255, 220, 160, 0.85)) drop-shadow(0 0 22px rgba(255, 90, 30, 0.8)); }
@@ -4497,7 +4497,7 @@ html, body {
   72% { transform: translate(-3px, 1px); }
   86% { transform: translate(2px, -1px); }
 }
-/* Ember shockwave: a fast expanding ring + heat wash from the impact point. */
+/* Ember heat_wash: a fast expanding ring + heat wash from the impact point. */
 .fx-shockwave {
   position: absolute; z-index: 4; width: 70px; height: 70px; pointer-events: none;
   top: 34%;
@@ -4590,8 +4590,8 @@ html, body {
   74% { transform: translate(5px, 0) rotate(-1deg); }
   100% { transform: none; }
 }
-/* REND (Sunder, per-card signature): a tight vertical cleave — short pull-up, then a
-   hard straight-down crash, no lateral arc. The strike frame reads as the cleave. */
+/* REND (Sunder, per-card signature): a tight vertical arc_cut — short pull-up, then a
+   hard straight-down crash, no lateral arc. The strike frame reads as the arc_cut. */
 .stage-combat .fig.pose-rend { animation: hero-rend calc(0.8s * var(--pace, 1)) ease-in-out; }
 .stage-combat .fig.pose-rend .spr { animation: frame-idle-hide calc(0.8s * var(--pace, 1)) linear both; }
 .stage-combat .fig.pose-rend .spr-frame-strike { animation: frame-rend calc(0.8s * var(--pace, 1)) ease-in-out both; filter: brightness(1.55) drop-shadow(0 0 3px rgba(255, 230, 170, 0.9)) drop-shadow(0 0 22px rgba(255, 90, 30, 0.85)); }
@@ -4696,7 +4696,7 @@ html, body {
   72% { transform: translate(7px, 12px) rotate(-3deg) scale(0.98); }
   100% { transform: none; }
 }
-/* QUENCH (defend): a pouring gesture — the hero dips and tips like emptying a ladle of
+/* QUENCH (quench): a pouring gesture — the hero dips and tips like emptying a ladle of
    quench-water over itself. No frame swap: the calm gesture rides the idle sprite, and
    the blue-white steam veil IS the card's face. */
 .stage-combat .fig.pose-quench { animation: hero-quench calc(0.62s * var(--pace, 1)) ease-in-out; }
@@ -4707,7 +4707,7 @@ html, body {
   70% { transform: translate(-2px, 3px) rotate(5deg); }
   100% { transform: none; }
 }
-/* BELLOWS PUSH (gust): a deep gather backwards, then a two-armed shove forward that
+/* BELLOWS PUSH (bellows_gust): a deep gather backwards, then a two-armed shove forward that
    holds — the push is the whole card. Single sprite; the wind cone reads the direction. */
 .stage-combat .fig.pose-bellowspush { animation: hero-bellowspush calc(0.64s * var(--pace, 1)) cubic-bezier(0.3, 0.7, 0.3, 1); }
 @keyframes hero-bellowspush {
@@ -4718,7 +4718,7 @@ html, body {
   80% { transform: translate(6px, 0) rotate(1deg); }
   100% { transform: none; }
 }
-/* SNAPCAST (anger): a quick finger-snap cast — a short back-cock, one sharp forward
+/* SNAPCAST (spark): a quick finger-snap cast — a short back-cock, one sharp forward
    flick, a tiny rebound. The fastest pose in the deck. */
 .stage-combat .fig.pose-snapcast { animation: hero-snapcast calc(0.48s * var(--pace, 1)) ease-out; }
 @keyframes hero-snapcast {
@@ -4729,7 +4729,7 @@ html, body {
   68% { transform: translate(-2px, 1px) rotate(-1deg); }
   100% { transform: none; }
 }
-/* FANFLAMES (fan_flames): the furnace is fanned — the hero rocks back and works the
+/* FANFLAMES (fan_the_flames): the furnace is fanned — the hero rocks back and works the
    leather, one full side-to-side sweep and a settling push. */
 .stage-combat .fig.pose-fanflames { animation: hero-fanflames calc(0.7s * var(--pace, 1)) ease-in-out; }
 @keyframes hero-fanflames {
@@ -4741,7 +4741,7 @@ html, body {
   100% { transform: none; }
 }
 /* ==== LOTE 2 — ataques comunes I: one movement per common attack. ==== */
-/* ARCCUT (cleave): ONE wide horizontal swing that crosses the whole body — a coiled
+/* ARCCUT (arc_cut): ONE wide horizontal swing that crosses the whole body — a coiled
    load to the left, then a full sweep THROUGH with a long lateral follow-through. The
    windup frame holds the coil; the strike frame rides the sweep. */
 .stage-combat .fig.pose-arccut { animation: hero-arccut calc(0.62s * var(--pace, 1)) cubic-bezier(0.3, 0.7, 0.3, 1); }
@@ -4762,7 +4762,7 @@ html, body {
   76% { transform: translate(20px, -1px) rotate(9deg); }
   100% { transform: none; }
 }
-/* COLLARLINE (clothesline): a lateral arm-bar driven THROUGH at neck height — a short
+/* COLLARLINE (collar_check): a lateral arm-bar driven THROUGH at neck height — a short
    gather, a long lateral shove that holds a beat, then release. No dip, no drop: the
    line stays at the collar. */
 .stage-combat .fig.pose-collarline { animation: hero-collarline calc(0.68s * var(--pace, 1)) cubic-bezier(0.28, 0.75, 0.32, 1); }
@@ -4779,16 +4779,16 @@ html, body {
   80% { transform: translate(8px, -1px) rotate(2deg); }
   100% { transform: none; }
 }
-/* HEADBUTT (headbutt): a crouched load, then a HEADFIRST forward drive that BOUNCES
+/* HEADBUTT (browstrike): a crouched load, then a HEADFIRST forward drive that BOUNCES
    OFF — the recoil backwards is the card: the blow lands with the brow and the hero
    rocks back off it. */
-.stage-combat .fig.pose-headbutt { animation: hero-headbutt calc(0.6s * var(--pace, 1)) cubic-bezier(0.35, 0.6, 0.35, 1); }
-.stage-combat .fig.pose-headbutt .spr { animation: frame-idle-hide calc(0.6s * var(--pace, 1)) linear both; }
-.stage-combat .fig.pose-headbutt .spr-frame-strike { animation: frame-headbutt calc(0.6s * var(--pace, 1)) ease-in-out both; filter: brightness(1.5) drop-shadow(0 0 2px rgba(255, 220, 160, 0.85)) drop-shadow(0 0 18px rgba(255, 110, 30, 0.75)); }
-@keyframes frame-headbutt {
+.stage-combat .fig.pose-browstrike { animation: hero-browstrike calc(0.6s * var(--pace, 1)) cubic-bezier(0.35, 0.6, 0.35, 1); }
+.stage-combat .fig.pose-browstrike .spr { animation: frame-idle-hide calc(0.6s * var(--pace, 1)) linear both; }
+.stage-combat .fig.pose-browstrike .spr-frame-strike { animation: frame-browstrike calc(0.6s * var(--pace, 1)) ease-in-out both; filter: brightness(1.5) drop-shadow(0 0 2px rgba(255, 220, 160, 0.85)) drop-shadow(0 0 18px rgba(255, 110, 30, 0.75)); }
+@keyframes frame-browstrike {
   0% { opacity: 0; } 28% { opacity: 0; } 36% { opacity: 1; } 66% { opacity: 1; } 80%, 100% { opacity: 0; }
 }
-@keyframes hero-headbutt {
+@keyframes hero-browstrike {
   0% { transform: none; }
   20% { transform: translate(-8px, 9px) rotate(7deg) scale(0.96, 0.94); }
   38% { transform: translate(32px, -5px) rotate(-11deg) scale(1.05); }
@@ -4797,7 +4797,7 @@ html, body {
   86% { transform: translate(-4px, 1px) rotate(2deg); }
   100% { transform: none; }
 }
-/* SURGE (ironwave): a heavy GROUNDED roll — the hero dips low, then shoves forward in
+/* SURGE (slag_surge): a heavy GROUNDED roll — the hero dips low, then shoves forward in
    two rolling beats, slow and weighty. The idle sprite rides it; the glowing plate and
    the rolling slag wave ARE the card's face. */
 .stage-combat .fig.pose-surge { animation: hero-surge calc(0.76s * var(--pace, 1)) cubic-bezier(0.3, 0.65, 0.35, 1); }
@@ -4809,7 +4809,7 @@ html, body {
   76% { transform: translate(10px, 1px) rotate(-2deg); }
   100% { transform: none; }
 }
-/* HAFTJAB (pommel): a quick BACKHAND whip — the body coils away, then the pommel snaps
+/* HAFTJAB (haft_jab): a quick BACKHAND whip — the body coils away, then the haft_jab snaps
    across in a backhand arc and is pulled back at once. Sharper than the sweep, shorter
    than the swing. */
 .stage-combat .fig.pose-haftjab { animation: hero-haftjab calc(0.52s * var(--pace, 1)) cubic-bezier(0.32, 0.8, 0.3, 1); }
@@ -4827,7 +4827,7 @@ html, body {
   100% { transform: none; }
 }
 /* ==== LOTE 3 — ataques comunes II: one movement per common attack. ==== */
-/* FORGECLAP (thunderclap): BOTH hammers rise OVERHEAD and clash above the hero's head —
+/* FORGECLAP (forgeclap): BOTH hammers rise OVERHEAD and clash above the hero's head —
    a clap, not a swing: purely vertical, symmetric, no lateral arc (hammerfall owns the
    vertical drop, colossal the single stroke). The glow wears the vulnerable violet the
    clash leaves on the row. Windup frame holds the raised pair; strike frame the jolt. */
@@ -4849,7 +4849,7 @@ html, body {
   74% { transform: translate(0, 2px) scale(0.99); }
   100% { transform: none; }
 }
-/* WILDFLAIL (wild_strike): a double swing WITHOUT form — each stroke over-rotates past
+/* WILDFLAIL (untempered): a double swing WITHOUT form — each stroke over-rotates past
    its target, the body stumbles between the two, and only momentum stops the second.
    White-hot glow: the metal ran untempered. Nothing else in the deck stumbles. */
 .stage-combat .fig.pose-wildflail { animation: hero-wildflail calc(0.74s * var(--pace, 1)) cubic-bezier(0.35, 0.7, 0.35, 1); }
@@ -4885,20 +4885,20 @@ html, body {
   78% { transform: translate(-2px, 2px) scale(1.02, 1); }
   100% { transform: none; }
 }
-/* DROPKICK (dropkick): a FEET-FIRST launch — a deep crouch loads the springs, the hero
+/* DROPKICK (heeldrop): a FEET-FIRST launch — a deep crouch loads the springs, the hero
    leaves the ground leaning BACK with the heels leading, and lands heels-down. The only
    airborne pose in the deck, and the longest travel forward. */
-.stage-combat .fig.pose-dropkick { animation: hero-dropkick calc(0.82s * var(--pace, 1)) cubic-bezier(0.3, 0.8, 0.3, 1); }
-.stage-combat .fig.pose-dropkick .spr { animation: frame-idle-hide calc(0.82s * var(--pace, 1)) linear both; }
-.stage-combat .fig.pose-dropkick .spr-frame-windup { animation: frame-dropkick-wind calc(0.82s * var(--pace, 1)) ease-in-out both; filter: brightness(1.4) drop-shadow(0 0 2px rgba(255, 210, 150, 0.8)) drop-shadow(0 0 16px rgba(255, 110, 40, 0.7)); }
-.stage-combat .fig.pose-dropkick .spr-frame-strike { animation: frame-dropkick-strike calc(0.82s * var(--pace, 1)) ease-in-out both; filter: brightness(1.55) drop-shadow(0 0 3px rgba(255, 230, 170, 0.9)) drop-shadow(0 0 22px rgba(255, 140, 40, 0.8)); }
-@keyframes frame-dropkick-wind {
+.stage-combat .fig.pose-heeldrop { animation: hero-heeldrop calc(0.82s * var(--pace, 1)) cubic-bezier(0.3, 0.8, 0.3, 1); }
+.stage-combat .fig.pose-heeldrop .spr { animation: frame-idle-hide calc(0.82s * var(--pace, 1)) linear both; }
+.stage-combat .fig.pose-heeldrop .spr-frame-windup { animation: frame-heeldrop-wind calc(0.82s * var(--pace, 1)) ease-in-out both; filter: brightness(1.4) drop-shadow(0 0 2px rgba(255, 210, 150, 0.8)) drop-shadow(0 0 16px rgba(255, 110, 40, 0.7)); }
+.stage-combat .fig.pose-heeldrop .spr-frame-strike { animation: frame-heeldrop-strike calc(0.82s * var(--pace, 1)) ease-in-out both; filter: brightness(1.55) drop-shadow(0 0 3px rgba(255, 230, 170, 0.9)) drop-shadow(0 0 22px rgba(255, 140, 40, 0.8)); }
+@keyframes frame-heeldrop-wind {
   0% { opacity: 0; } 10% { opacity: 1; } 26% { opacity: 1; } 38%, 100% { opacity: 0; }
 }
-@keyframes frame-dropkick-strike {
+@keyframes frame-heeldrop-strike {
   0% { opacity: 0; } 34% { opacity: 0; } 42% { opacity: 1; } 76% { opacity: 1; } 88%, 100% { opacity: 0; }
 }
-@keyframes hero-dropkick {
+@keyframes hero-heeldrop {
   0% { transform: none; }
   16% { transform: translate(-4px, 12px) rotate(6deg) scale(0.94, 0.9); }
   36% { transform: translate(34px, -30px) rotate(-16deg) scale(1.06); }
@@ -4907,7 +4907,7 @@ html, body {
   80% { transform: translate(22px, 2px) rotate(-1deg) scale(0.98); }
   100% { transform: none; }
 }
-/* BLOODHAMMER (hemokinesis): the stroke is PAID for — the hero gathers low and HOLDS
+/* BLOODHAMMER (blood_hammer): the stroke is PAID for — the hero gathers low and HOLDS
    while the ember-blood clot condenses at the chest (fx-bloodcondense below), then a
    violent heave releases the flying hammer. The mid-pose hold IS the condensation, and
    the glow is blood red-violet: no other pose wears it. */
@@ -4932,7 +4932,7 @@ html, body {
   100% { transform: none; }
 }
 /* ==== LOTE 4 — skills comunes: one movement per common skill. ==== */
-/* CASTASIDE (shrug): a dismissive SHRUG — the shoulders lift and the body twists AWAY
+/* CASTASIDE (cast_aside): a dismissive SHRUG — the shoulders lift and the body twists AWAY
    (back-left, the only pose that turns its back on the row), then lets the whole lift
    go. No lunge, no swing: the blow slides off. Cool steel glow — a cast-off, not a
    strike. Windup frame holds the lift; strike frame the release. */
@@ -4954,7 +4954,7 @@ html, body {
   80% { transform: translate(1px, 0) rotate(1deg); }
   100% { transform: none; }
 }
-/* TRUETEMPER (true_grit): a ROOTED tempering hold — the body plants, the hammer stays
+/* TRUETEMPER (true_temper): a ROOTED tempering hold — the body plants, the hammer stays
    raised in the heat and the whole figure TREMBLES on the spot (a fine sub-pixel quiver
    no other pose has), then settles firm as the metal locks. Steel-white glow: the metal
    at tempering heat, not on fire. */
@@ -4978,9 +4978,9 @@ html, body {
   70% { transform: translate(0, 2px) scale(0.99, 0.985); }
   100% { transform: none; }
 }
-/* FITPLATE (armaments): the body SQUARES UP and locks — a small rise as the plate comes
+/* FITPLATE (fit_the_plate): the body SQUARES UP and locks — a small rise as the plate comes
    down, then a firm drop-settle (the squash-and-set of armor seating on the shoulder).
-   Purely vertical, deliberately heavier than the temper hold and shorter than the shrug.
+   Purely vertical, deliberately heavier than the temper hold and shorter than the cast_aside.
    Warm bronze glow: the clank the plate makes. */
 .stage-combat .fig.pose-fitplate { animation: hero-fitplate calc(0.66s * var(--pace, 1)) cubic-bezier(0.3, 0.7, 0.3, 1); }
 .stage-combat .fig.pose-fitplate .spr { animation: frame-idle-hide calc(0.66s * var(--pace, 1)) linear both; }
@@ -5001,7 +5001,7 @@ html, body {
   84% { transform: translate(0, 0) scale(1); }
   100% { transform: none; }
 }
-/* KILNCRY (warcry): the SHOUT — an inhale swell lifts the chest, then one violent
+/* KILNCRY (kiln_cry): the SHOUT — an inhale swell lifts the chest, then one violent
    forward rock throws the cry out (forward-down, the opposite lean of every wind-up),
    and the figure snaps back to its stance. Kiln-fire glow: the furnace answering. */
 .stage-combat .fig.pose-kilncry { animation: hero-kilncry calc(0.62s * var(--pace, 1)) cubic-bezier(0.32, 0.75, 0.3, 1); }
@@ -5023,7 +5023,7 @@ html, body {
   86% { transform: translate(1px, 0) rotate(1deg); }
   100% { transform: none; }
 }
-/* VENT (havoc): the TWIST-and-recoil — the body wrenches toward its own BACK (back-left,
+/* VENT (vent): the TWIST-and-recoil — the body wrenches toward its own BACK (back-left,
    where the jets blast) twice in quick succession, then uncoils. No arm swing anywhere:
    the movement is the pressure leaving. Cool steam-white glow, never ember. */
 .stage-combat .fig.pose-vent { animation: hero-vent calc(0.6s * var(--pace, 1)) ease-out; }
@@ -5046,7 +5046,7 @@ html, body {
   100% { transform: none; }
 }
 /* ==== LOTE 5 — ataques uncommon: one movement per uncommon card. ==== */
-/* HEATTRANCE (battle_trance): the ARMS CROSS — the body gathers inward and holds one
+/* HEATTRANCE (heat_trance): the ARMS CROSS — the body gathers inward and holds one
    slow breath (the cards fan open in the fx layer), then spreads INTO the cross, wider
    than the stance it started from. No lunge anywhere: a trance, not a swing. Pale
    ember-gold parchment glow — the cards drawn warm out of the deck. */
@@ -5068,7 +5068,7 @@ html, body {
   82% { transform: translate(1px, 0) rotate(1deg) scale(1.02); }
   100% { transform: none; }
 }
-/* HAILBLOWS (pummel): a BURST of four alternate blows — four tight body shuffles that
+/* HAILBLOWS (hail_of_blows): a BURST of four alternate blows — four tight body shuffles that
    snap left, right, left, right on one quick clock (four beats, tighter and faster than
    the flurry's three, and nothing like the twin salvo's two full throws). White-hot
    flash glow: each tick of the hail, not forge fire. */
@@ -5094,7 +5094,7 @@ html, body {
   86% { transform: translate(1px, 0) rotate(0deg); }
   100% { transform: none; }
 }
-/* CLIMBCUT (rampage): a DIAGONAL UPWARD stroke — the body sinks low and back, then
+/* CLIMBCUT (climbing_heat): a DIAGONAL UPWARD stroke — the body sinks low and back, then
    drives UP and to the right along the rising slash, hangs a beat at the top of the
    cut, and settles down. The only pose that travels the rising diagonal (uppercut goes
    straight up, rend straight down). Deep ember-to-gold glow: the heat climbing. */
@@ -5116,7 +5116,7 @@ html, body {
   76% { transform: translate(8px, -6px) rotate(4deg) scale(1.01); }
   100% { transform: none; }
 }
-/* VEINTAP (bloodletting): the SMALLEST movement on the stage — the forearm lifts, one
+/* VEINTAP (vein_tap): the SMALLEST movement on the stage — the forearm lifts, one
    quick tap, and a fine shudder runs out of the arm as the drops leave it. No stance
    change, no lunge: a vein tapped, not a blow thrown. Ember-crimson glow: the blood
    leaving, one bead at a time. */
@@ -5134,21 +5134,21 @@ html, body {
   72% { transform: translate(1px, 0) scale(0.995); }
   100% { transform: none; }
 }
-/* REAPSWEEP (reaper): the LONGEST stroke on the stage — a deep wind-up back-left with
+/* REAPSWEEP (ash_harvest): the LONGEST stroke on the stage — a deep wind-up back-left with
    the scythe cocked, then one WIDE arc thrown across the whole row (the biggest rotation
    of any pose), and a slow, heavy settle as the ash falls. Ash-silver glow: a cool grey
    harvest, deliberately NOT ember-orange — what is cut comes back as cinders. */
-.stage-combat .fig.pose-reapsweep { animation: hero-reapsweep calc(1s * var(--pace, 1)) cubic-bezier(0.34, 0.7, 0.3, 1); }
-.stage-combat .fig.pose-reapsweep .spr { animation: frame-idle-hide calc(1s * var(--pace, 1)) linear both; }
-.stage-combat .fig.pose-reapsweep .spr-frame-windup { animation: frame-reapsweep-wind calc(1s * var(--pace, 1)) ease-in-out both; filter: brightness(1.25) drop-shadow(0 0 2px rgba(226, 228, 240, 0.7)) drop-shadow(0 0 14px rgba(150, 150, 175, 0.55)); }
-.stage-combat .fig.pose-reapsweep .spr-frame-strike { animation: frame-reapsweep-strike calc(1s * var(--pace, 1)) ease-in-out both; filter: brightness(1.4) drop-shadow(0 0 3px rgba(238, 240, 250, 0.8)) drop-shadow(0 0 22px rgba(170, 170, 200, 0.7)); }
-@keyframes frame-reapsweep-wind {
+.stage-combat .fig.pose-ashsweep { animation: hero-ashsweep calc(1s * var(--pace, 1)) cubic-bezier(0.34, 0.7, 0.3, 1); }
+.stage-combat .fig.pose-ashsweep .spr { animation: frame-idle-hide calc(1s * var(--pace, 1)) linear both; }
+.stage-combat .fig.pose-ashsweep .spr-frame-windup { animation: frame-ashsweep-wind calc(1s * var(--pace, 1)) ease-in-out both; filter: brightness(1.25) drop-shadow(0 0 2px rgba(226, 228, 240, 0.7)) drop-shadow(0 0 14px rgba(150, 150, 175, 0.55)); }
+.stage-combat .fig.pose-ashsweep .spr-frame-strike { animation: frame-ashsweep-strike calc(1s * var(--pace, 1)) ease-in-out both; filter: brightness(1.4) drop-shadow(0 0 3px rgba(238, 240, 250, 0.8)) drop-shadow(0 0 22px rgba(170, 170, 200, 0.7)); }
+@keyframes frame-ashsweep-wind {
   0% { opacity: 0; } 14% { opacity: 1; } 36% { opacity: 1; } 48%, 100% { opacity: 0; }
 }
-@keyframes frame-reapsweep-strike {
+@keyframes frame-ashsweep-strike {
   0% { opacity: 0; } 46% { opacity: 0; } 56% { opacity: 1; } 84% { opacity: 1; } 94%, 100% { opacity: 0; }
 }
-@keyframes hero-reapsweep {
+@keyframes hero-ashsweep {
   0% { transform: none; }
   16% { transform: translate(-12px, 2px) rotate(-9deg) scale(0.99); }
   34% { transform: translate(-16px, 4px) rotate(-12deg) scale(0.98); }
@@ -5158,7 +5158,7 @@ html, body {
   100% { transform: none; }
 }
 /* ==== LOTE 6 — skills uncommon: one movement per uncommon skill. ==== */
-/* HEATWASH (shockwave): a LOW ARM SWEEP — the hero dips and drags the sweep along the
+/* HEATWASH (heat_wash): a LOW ARM SWEEP — the hero dips and drags the sweep along the
    ground across the row (the deepest low stroke in the deck, well under the belt line);
    the thermal wave itself does the row-wide wilting in the fx layer. */
 .stage-combat .fig.pose-heatwash { animation: hero-heatwash calc(0.9s * var(--pace, 1)) cubic-bezier(0.34, 0.6, 0.3, 1); }
@@ -5179,7 +5179,7 @@ html, body {
   76% { transform: translate(10px, 6px) rotate(4deg); }
   100% { transform: none; }
 }
-/* BRACELOCK (entrench): the stance SINKS — the whole figure presses DOWN into the
+/* BRACELOCK (brace): the stance SINKS — the whole figure presses DOWN into the
    ground, compresses as the plates lock, and holds the root through the double clank.
    Pure vertical: no lateral translation anywhere, the only pose that sinks. */
 .stage-combat .fig.pose-bracelock { animation: hero-bracelock calc(0.8s * var(--pace, 1)) ease-in-out; }
@@ -5200,7 +5200,7 @@ html, body {
   80% { transform: translateY(5px) scale(1.01, 0.97); }
   100% { transform: none; }
 }
-/* FLAMEWARD (flame_barrier): the hero draws a hand UP in front of them — a tall
+/* FLAMEWARD (flame_ward): the hero draws a hand UP in front of them — a tall
    gathering lift with a held beat while the curtain climbs, then an easy settle.
    Deliberately slow and vertical, nothing like the uppercut's explosive duck-and-jump. */
 .stage-combat .fig.pose-flameward { animation: hero-flameward calc(0.76s * var(--pace, 1)) cubic-bezier(0.3, 0.7, 0.34, 1); }
@@ -5221,7 +5221,7 @@ html, body {
   84% { transform: translate(0, -2px) rotate(-1deg); }
   100% { transform: none; }
 }
-/* CINDERSHROUD (ghostly_armor): the hero TURNS IN PLACE — a slow rotation wobble with
+/* CINDERSHROUD (cinder_shroud): the hero TURNS IN PLACE — a slow rotation wobble with
    no lateral travel at all, like something unseen wrapping around them while the ash
    cocoon spins up. The only pose whose motion is a turn, not a swing or a lean. */
 .stage-combat .fig.pose-cindershroud { animation: hero-cindershroud calc(0.72s * var(--pace, 1)) ease-in-out; }
@@ -5243,7 +5243,7 @@ html, body {
   100% { transform: none; }
 }
 /* ==== LOTE 7 — poderes uncommon: one movement per uncommon power. ==== */
-/* STOKE (inflame): a BELLOWS PULL — the chest draws in (compressing slightly) and then
+/* STOKE (stoke): a BELLOWS PULL — the chest draws in (compressing slightly) and then
    swells UP as the furnace fills, a breathing scale cycle with no lateral travel at
    all. Nothing like the flex's outward pump or the channel's static hold. */
 .stage-combat .fig.pose-stoke { animation: hero-stoke calc(0.64s * var(--pace, 1)) ease-in-out; }
@@ -5264,7 +5264,7 @@ html, body {
   84% { transform: translate(0, -2px) rotate(-1deg) scale(1.02, 1.03); }
   100% { transform: none; }
 }
-/* SCALEUP (metallicize): a slow STRAIGHTEN — the body weighs down for one beat as the
+/* SCALEUP (scale_up): a slow STRAIGHTEN — the body weighs down for one beat as the
    plates arrive, then rises taller and holds the height before settling. Vertical only,
    a rise: nothing like the bracelock's sink or the uppercut's explosive jump. */
 .stage-combat .fig.pose-scaleup { animation: hero-scaleup calc(0.7s * var(--pace, 1)) cubic-bezier(0.3, 0.6, 0.3, 1); }
@@ -5285,7 +5285,7 @@ html, body {
   86% { transform: translateY(-2px) scale(1.0, 1.02); }
   100% { transform: none; }
 }
-/* BANKCOAL (combust): a hand TIPS out over the row — a small forward lean right with a
+/* BANKCOAL (banked_coal): a hand TIPS out over the row — a small forward lean right with a
    tipping rotation, coals leaving the hand; the row itself does the receiving. A pour,
    not a sweep: the body barely travels (the heat wash owns the low drag). */
 .stage-combat .fig.pose-bankcoal { animation: hero-bankcoal calc(0.68s * var(--pace, 1)) ease-in-out; }
@@ -5306,7 +5306,7 @@ html, body {
   80% { transform: translate(2px, 1px) rotate(-2deg); }
   100% { transform: none; }
 }
-/* ASHEMBRACE (dark_embrace): the hero HUNCHES and draws IN — a centering compression
+/* ASHEMBRACE (ash_embrace): the hero HUNCHES and draws IN — a centering compression
    toward the chest while the tendrils wrap: the only pose whose whole motion is a
    shrink toward its own centre (an embrace, not a guard's brace or a shroud's turn). */
 .stage-combat .fig.pose-ashembrace { animation: hero-ashembrace calc(0.72s * var(--pace, 1)) ease-in-out; }
@@ -5327,7 +5327,7 @@ html, body {
   88% { transform: translateY(1px) scale(0.98, 0.99); }
   100% { transform: none; }
 }
-/* CINDERSKIN (feel_no_pain): the hero STIFFENS — near-still, a hardening hold with one
+/* CINDERSKIN (cinder_skin): the hero STIFFENS — near-still, a hardening hold with one
    tiny rigid shiver as the crust sets. The stillest movement in the deck: no travel,
    no swing, barely a breath of scale (the crust fx carries the change instead). */
 .stage-combat .fig.pose-cinderskin { animation: hero-cinderskin calc(0.66s * var(--pace, 1)) ease-in-out; }
@@ -5349,7 +5349,7 @@ html, body {
   100% { transform: none; }
 }
 /* ==== LOTE 8 — cartas raras: one movement per rare card. ==== */
-/* LOCKDOWN (impervious): the body SQUARES UP and LOCKS — four small compressive
+/* LOCKDOWN (unbroken): the body SQUARES UP and LOCKS — four small compressive
    beats timed to the plate drops, then a rigid, brighter clench at the seal. A brace
    that BUILDS: never the bracelock's one deep sink, never the guard's static hold. */
 .stage-combat .fig.pose-lockdown { animation: hero-lockdown calc(0.9s * var(--pace, 1)) ease-in-out; }
@@ -5373,7 +5373,7 @@ html, body {
   88% { transform: translateY(-1px) scale(1.01, 1.005) rotate(0deg); }
   100% { transform: none; }
 }
-/* OVERTEMPER (limit_break): the chest ARCHES BACK and UP as the forge heart
+/* OVERTEMPER (overtemper): the chest ARCHES BACK and UP as the forge heart
    overpressures — a slow overshoot past the metal's point, a shudder at the peak,
    then the settle. A back-bend, never the stoke's in-place breathe. */
 .stage-combat .fig.pose-overtemper { animation: hero-overtemper calc(0.82s * var(--pace, 1)) cubic-bezier(0.34, 0.5, 0.34, 1); }
@@ -5395,7 +5395,7 @@ html, body {
   82% { transform: translate(0, -6px) rotate(-2deg) scale(1.02, 1.04); }
   100% { transform: none; }
 }
-/* TITHE (offering): the hero DROPS TO ONE KNEE — a real fall onto the kneecap, held
+/* TITHE (blood_tithe): the hero DROPS TO ONE KNEE — a real fall onto the kneecap, held
    there while the motes rise, then the push back up. A deliberate kneel, not the
    hurt flinch's recoil and not the bracelock's sink. */
 .stage-combat .fig.pose-tithe { animation: hero-tithe calc(0.78s * var(--pace, 1)) cubic-bezier(0.4, 0, 0.4, 1); }
@@ -5416,7 +5416,7 @@ html, body {
   84% { transform: translate(1px, 4px) rotate(1deg) scale(0.99, 0.98); }
   100% { transform: none; }
 }
-/* SPLITSEAM (rupture): a sharp TWIST — the torso wrenches sideways as the seam opens
+/* SPLITSEAM (split_seam): a sharp TWIST — the torso wrenches sideways as the seam opens
    on its own front, hangs in the recoil, then recomposes. A rotation-only wrench:
    no drop, no swing, no arch. */
 .stage-combat .fig.pose-splitseam { animation: hero-splitseam calc(0.7s * var(--pace, 1)) cubic-bezier(0.3, 0.7, 0.3, 1); }
@@ -5475,7 +5475,7 @@ html, body {
 .fx-dustcrack.side-0 { left: 24vw; }
 .fx-dustcrack.side-1 { left: 70vw; }
 .fx-dustcrack.side-mid, .fx-dustcrack.side-none { left: 47vw; }
-/* QUENCHVEIL (defend's steam): a blue-white VEIL of steam that climbs the hero — three
+/* QUENCHVEIL (quench's steam): a blue-white VEIL of steam that climbs the hero — three
    soft columns rising at their own paces. Deliberately NOT a dome: it is open at the
    top and open at the sides, a shroud of quench-steam, not a barrier. */
 .fx-quenchveil {
@@ -5525,7 +5525,7 @@ html, body {
   25% { opacity: 1; }
   100% { transform: translateX(30%); opacity: 0; }
 }
-/* The row leans back under the gust (class toggled by dispatchFx, like `launched`):
+/* The row leans back under the bellows_gust (class toggled by dispatchFx, like `launched`):
    tipped onto its heels, held there while the cone crosses, then upright again. */
 .stage-combat .enemy .fig.blown { animation: foe-blown calc(0.6s * var(--pace, 1)) ease-out both; }
 @keyframes foe-blown {
@@ -5534,7 +5534,7 @@ html, body {
   60% { transform: translateX(10px) rotate(-5deg); }
   100% { transform: none; }
 }
-/* SPARKDART (anger): a small ember dart flies from the hero's fingers to the aimed
+/* SPARKDART (spark): a small ember dart flies from the hero's fingers to the aimed
    enemy, and a luminous mote peels away and drifts back to the hero's draw pile — the
    small heat spent, its memory kept. Both endpoints are measured (see dispatchFx). */
 .fx-sparkdart {
@@ -5571,7 +5571,7 @@ html, body {
   70% { opacity: 1; }
   100% { transform: translate(var(--mote-x), var(--mote-y)) scale(0.4); opacity: 0; }
 }
-/* FLAREFAN (fan_flames): three flame tongues open in a fan by the hero's furnace — the
+/* FLAREFAN (fan_the_flames): three flame tongues open in a fan by the hero's furnace — the
    fanning itself made visible — then one bright spark darts off to the energy orb. */
 .fx-flarefan {
   position: absolute; z-index: 4; width: 90px; height: 84px; pointer-events: none;
@@ -5626,10 +5626,10 @@ html, body {
    Five marks, one per common attack: the row-wide arc, the taut collar wire with its
    sagging weak marks, the brow's impact star, the rolling slag with its glowing plate,
    and the pulled card. Each silhouette, direction, colour and clock is its own. */
-/* ARCSPAN (cleave): ONE horizontal luminous arc that crosses the WHOLE enemy row, side
+/* ARCSPAN (arc_cut): ONE horizontal luminous arc that crosses the WHOLE enemy row, side
    to side — its width is the row's measured span (--arc-w, set by dispatchFx). A pale
    gold blade sweeps left→right in one pass over a soft under-glow; never a cone (the
-   gust's blue streaks) and never a vertical seam (the rend). */
+   bellows_gust's blue streaks) and never a vertical seam (the rend). */
 .fx-arcspan {
   position: absolute; z-index: 4; width: var(--arc-w, 60vw); height: 52px; pointer-events: none;
   transform-origin: 0 50%;
@@ -5667,7 +5667,7 @@ html, body {
   30% { opacity: 1; }
   100% { opacity: 0; }
 }
-/* COLLARLINE (clothesline): a TAUT wire flashes across the lane at NECK height —
+/* COLLARLINE (collar_check): a TAUT wire flashes across the lane at NECK height —
    steel-white, one bright pulse, then it snaps away — and two sagging weak marks droop
    in beneath it in the weak status's lavender: the arm-bar, then the sag it left. */
 .fx-collarline {
@@ -5700,7 +5700,7 @@ html, body {
   40% { opacity: 0.95; transform: translateY(0) scaleY(1); }
   100% { opacity: 0; transform: translateY(6px) scaleY(0.8); }
 }
-/* IMPACTSTAR (headbutt): an eight-point star bursts where the brow lands — two crossed
+/* IMPACTSTAR (browstrike): an eight-point star bursts where the brow lands — two crossed
    four-point blades, white-gold, one hard flash with a quarter-turn spin. Spiky where
    the hammer-hit flash is round. */
 .fx-impactstar {
@@ -5731,7 +5731,7 @@ html, body {
   20% { transform: scale(1.1) rotate(60deg); opacity: 0.7; }
   100% { transform: scale(1.7) rotate(90deg); opacity: 0; }
 }
-/* SLAGPLATE (ironwave, on the HERO): a molten plate rides the hero's front — dark iron
+/* SLAGPLATE (slag_surge, on the HERO): a molten plate rides the hero's front — dark iron
    crossed by seams that flare white-hot as the surge rolls, then cool and fade. */
 .fx-slagplate {
   position: absolute; z-index: 4; width: 44px; height: 64px; pointer-events: none;
@@ -5750,7 +5750,7 @@ html, body {
   72% { filter: brightness(1.1); }
   100% { opacity: 0; filter: brightness(0.8); transform: rotate(-7deg) scale(0.94); }
 }
-/* SLAGWAVE (ironwave, on the ground): a wave of molten slag that ROLLS along the
+/* SLAGWAVE (slag_surge, on the ground): a wave of molten slag that ROLLS along the
    ground from the hero's feet to the aimed lane — a crested blob, dark at the base,
    white-hot at the leading edge, wobbling as it travels (both endpoints measured). */
 .fx-slagwave {
@@ -5788,7 +5788,7 @@ html, body {
   30% { opacity: 1; }
   100% { opacity: 0.9; transform: translateX(6px); }
 }
-/* JABSPARK + JABCARD (pommel): the pommel's blunt cap cracks against the target — a
+/* JABSPARK + JABCARD (haft_jab): the haft_jab's blunt cap cracks against the target — a
    dense rounded-diamond flash, no spikes — and a CARD is pulled out of the foe: a small
    parchment card with an ember tip flies FROM the enemy toward the hero's hand (both
    endpoints measured; the flight arcs, like something tugged on a line). */
@@ -6202,7 +6202,7 @@ html, body {
 }
 /* CRYCONE (Kiln Cry's shout): a WEDGE of kiln heat cones out of the mouth — narrow at
    the lips, opening toward the row, three heat layers strobing out (orange core, deep
-   red base). A wedge from a POINT where the gust is a row-wide fan of blue streaks. */
+   red base). A wedge from a POINT where the bellows_gust is a row-wide fan of blue streaks. */
 .fx-crycone {
   position: absolute; z-index: 4; width: 150px; height: 64px; pointer-events: none;
   transform-origin: 0 50%;
@@ -6632,7 +6632,7 @@ html, body {
 /* ASHSWIRL (Cinder Shroud): a COCOON of ash spins UP AROUND the hero — two grey orbit
    ellipses turn opposite ways while three motes ride them in circles, then the whole
    shroud SETTLES: the shell compresses down onto the figure. Cool ash-silver, circular
-   motion only: never a drain, never a scythe, never a curtain. */
+   motion only: never a soul_drain, never a scythe, never a curtain. */
 .fx-ashswirl {
   position: absolute; z-index: 4; width: 160px; height: 190px; pointer-events: none;
 }
@@ -6776,7 +6776,7 @@ html, body {
    ground under it — its width and height are the row's measured span (--glow-w/-h, set
    by dispatchFx). Four dark coals drop, bounce off a rising mound, and the ground heat
    blooms under the pile. Charcoal with ember seams on a floor glow: never dust tan
-   (the crack owns that) and never the shockwave's ring. */
+   (the crack owns that) and never the heat_wash's ring. */
 .fx-bankedglow {
   position: absolute; z-index: 4; width: var(--glow-w, 320px); height: var(--glow-h, 250px); pointer-events: none;
 }
@@ -6968,7 +6968,7 @@ html, body {
 }
 /* HEARTBLOOM (Overtemper): the forge heart BLOOMS — a white-gold core flares at the
    chest and FIVE petals open outward around it, lifting away as they fade. A
-   flowering with NO ring of any kind: the shockwave's expanding circle is Maul's
+   flowering with NO ring of any kind: the heat_wash's expanding circle is Maul's
    mark, never this one's. */
 .fx-heartbloom {
   position: absolute; z-index: 4; width: 96px; height: 110px; pointer-events: none;

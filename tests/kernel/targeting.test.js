@@ -133,7 +133,7 @@ test('determinism survives targeted actions', () => {
  * (`p1_1`, `p1_2`) while its hand slot stayed the bare `p1`. `snapshot()` matched on the
  * exact action id, so `playableSlots` contained `p1_1`/`p1_2` and the lookup for `p1`
  * missed — marking EVERY attackable card unplayable with energy to spare, while
- * non-target cards (Defend) stayed fine. Reported by the owner as "i cant even attack now".
+ * non-target cards (Quench) stayed fine. Reported by the owner as "i cant even attack now".
  */
 test('REGRESSION: a targetable card is playable, not greyed out', () => {
   const state = toMultiEnemy(SEED);

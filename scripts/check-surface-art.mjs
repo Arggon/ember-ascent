@@ -128,7 +128,7 @@ function classesFromOptions(src) {
 // emit, i.e. the built-ins plus every movement value in HERO_MOVES (src/web/hero-moves.js).
 // Adding a
 // movement there means adding it here AND a `.fig.pose-*` rule that really animates.
-const POSE_VALUES = ['idle', 'strike', 'brace', 'hurt', 'low', 'windup', 'heavy', 'flurry', 'sweep', 'guard', 'channel', 'throw', 'slam', 'colossal', 'twinthrow', 'rend', 'uppercut', 'hammerfall', 'quench', 'bellowspush', 'snapcast', 'fanflames', 'arccut', 'collarline', 'headbutt', 'surge', 'haftjab', 'forgeclap', 'wildflail', 'bellowsflex', 'dropkick', 'bloodhammer', 'castaside', 'truetemper', 'fitplate', 'kilncry', 'vent', 'heattrance', 'hailblows', 'climbcut', 'veintap', 'reapsweep', 'heatwash', 'bracelock', 'flameward', 'cindershroud', 'stoke', 'scaleup', 'bankcoal', 'ashembrace', 'cinderskin', 'lockdown', 'overtemper', 'tithe', 'splitseam'];
+const POSE_VALUES = ['idle', 'strike', 'brace', 'hurt', 'low', 'windup', 'heavy', 'flurry', 'sweep', 'guard', 'channel', 'throw', 'slam', 'colossal', 'twinthrow', 'rend', 'uppercut', 'hammerfall', 'quench', 'bellowspush', 'snapcast', 'fanflames', 'arccut', 'collarline', 'browstrike', 'surge', 'haftjab', 'forgeclap', 'wildflail', 'bellowsflex', 'heeldrop', 'bloodhammer', 'castaside', 'truetemper', 'fitplate', 'kilncry', 'vent', 'heattrance', 'hailblows', 'climbcut', 'veintap', 'ashsweep', 'heatwash', 'bracelock', 'flameward', 'cindershroud', 'stoke', 'scaleup', 'bankcoal', 'ashembrace', 'cinderskin', 'lockdown', 'overtemper', 'tithe', 'splitseam'];
 function variants(src) {
   const out = new Set();
   if (/card type-\$\{card\.type\}/.test(src)) {
@@ -141,7 +141,7 @@ function variants(src) {
     for (const t of ['attack', 'block', 'buff', 'debuff']) out.add(`kind-${t}`);
   }
   if (/pill \$\{s\.key\}/.test(src) || /pill \$\{/.test(src)) {
-    for (const k of ['strength', 'vulnerable', 'weak', 'dexterity', 'metallicize', 'power']) out.add(k);
+    for (const k of ['strength', 'vulnerable', 'weak', 'dexterity', 'scale_up', 'power']) out.add(k);
   }
   if (/stat \$\{kind\}/.test(src)) {
     for (const k of ['hp', 'energy', 'block', 'dim']) out.add(k);

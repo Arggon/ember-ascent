@@ -43,9 +43,9 @@ test('every boon applies its upside and its cost', () => {
       switch (a.boon) {
         case 'bellows': assert.equal(t.energyPerTurn, 4); assert.equal(t.player.maxHp, 48); break;
         case 'ironskin': assert.equal(t.player.maxHp, 75); assert.equal(t.player.hp, 75); assert.equal(t.relicOff, true); break;
-        case 'sparkfall': assert.equal(count(t, 'anger'), 2); assert.equal(t.player.hp, 54); break;
-        case 'purge': assert.equal(count(t, 'strike'), count(s, 'strike') - 2); assert.equal(t.player.maxHp, 54); break;
-        case 'stoke': assert.equal(count(t, 'inflame'), 1); assert.equal(t.player.hp, 45); break;
+        case 'sparkfall': assert.equal(count(t, 'spark'), 2); assert.equal(t.player.hp, 54); break;
+        case 'purge': assert.equal(count(t, 'hammerfall'), count(s, 'hammerfall') - 2); assert.equal(t.player.maxHp, 54); break;
+        case 'stoke': assert.equal(count(t, 'stoke'), 1); assert.equal(t.player.hp, 45); break;
         default: assert.fail(`unknown boon ${a.boon}`);
       }
     }
@@ -91,7 +91,7 @@ test('Iron Skin switches off the relic heal', () => {
         assert.equal(out.state.player.hp, s.player.hp, 'HP after the win equals HP before the winning blow');
         // Control: the identical winning step with the relic on does heal.
         const control = step({ ...s, relicOff: false }, a.id);
-        assert.equal(control.events.some((e) => e.t === 'heal' && e.source === 'burning_blood'), true, 'control: the relic heals when on');
+        assert.equal(control.events.some((e) => e.t === 'heal' && e.source === 'kindled_heart'), true, 'control: the relic heals when on');
         assert.ok(control.state.player.hp > s.player.hp, 'control: HP rises when the relic is on');
         return;
       }
@@ -115,4 +115,4 @@ test('log header carries the flag and replay matches hash-for-hash (golden)', ()
 
 // Recomputed for the "golpes discretos NxM" slice (pool 70 -> 73 cards; strikes
 // resolve through attackHit).
-const GOLDEN = 'sha256:9c5f1695c988a3434f148ed10eadcd97453533a423325ce9395a79987233a96c';
+const GOLDEN = 'sha256:80ca10ad014f4a165f7e6a7a5bf968c266e2f5638cfed66a00f06435dc94d959';

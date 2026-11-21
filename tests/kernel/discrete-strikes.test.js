@@ -20,7 +20,7 @@
 //   floor 1); enemy tick at the close of the enemy turn beside the decay (it CAN kill).
 //   Zero interaction with the multi-golpe loop; zero draws.
 //
-//   ALCANCE v1 — the exotic handlers (hemokinesis/reaper/rampage) and potion_damage
+//   ALCANCE v1 — the exotic handlers (blood_hammer/ash_harvest/climbing_heat) and potion_damage
 //   stay OUTSIDE the fold: a strike there rolls no parry and ticks no bleed.
 //
 //   EVENTS — the golpe order with reactions: [parry roll] -> [damage] -> [the
@@ -44,8 +44,8 @@ const draws = (before, res) => res.state.rngDraws - before.rngDraws;
 /* ----------------------------------------------------------------- parry: the roll */
 
 test('parry 100 refuses the whole golpe: dealt 0, blocked = raw, HP untouched', async () => {
-  // Cinder Maw chomp (A11) into a hero holding Parry 100 — a guaranteed proc.
-  const s = freezeDeep(await combatState('defend', { enemyOver: { moveIndex: 0 }, statuses: { parry: 100 } }));
+  // Cinder Maw maw_chomp (A11) into a hero holding Parry 100 — a guaranteed proc.
+  const s = freezeDeep(await combatState('quench', { enemyOver: { moveIndex: 0 }, statuses: { parry: 100 } }));
   const res = endTurn(s);
   const hit = res.events.find((e) => e.t === 'enemy_attack');
   assert.deepEqual(hit, {
@@ -56,22 +56,22 @@ test('parry 100 refuses the whole golpe: dealt 0, blocked = raw, HP untouched', 
 });
 
 test('the parry roll costs exactly 1 draw per defended golpe, zero without parry (measured)', async () => {
-  const withParry = freezeDeep(await combatState('defend', { enemyOver: { moveIndex: 0 }, statuses: { parry: 100 } }));
-  const without = freezeDeep(await combatState('defend', { enemyOver: { moveIndex: 0 } }));
+  const withParry = freezeDeep(await combatState('quench', { enemyOver: { moveIndex: 0 }, statuses: { parry: 100 } }));
+  const without = freezeDeep(await combatState('quench', { enemyOver: { moveIndex: 0 } }));
   const a = endTurn(withParry);
   const b = endTurn(without);
   const diff = draws(withParry, a) - draws(without, b);
   assert.equal(diff, 1, `one defended golpe = one draw (parry ${draws(withParry, a)} vs control ${draws(without, b)})`);
 });
 
-test('a defended MULTI-GOLPE move rolls once per golpe: whirlwind A5x3 = exactly 3 draws', async () => {
-  // The Slag Warden's script opens charging_up -> fierce_bash -> whirlwind; stand the
-  // fight at the whirlwind step directly.
-  const withParry = freezeDeep(await combatState('defend', {
-    enemyId: 'the_guardian', enemyOver: { moveIndex: 3, intentStep: 3 }, statuses: { parry: 100 },
+test('a defended MULTI-GOLPE move rolls once per golpe: shield_spin A5x3 = exactly 3 draws', async () => {
+  // The Slag Warden's script opens plating_up -> piston_bash -> shield_spin; stand the
+  // fight at the shield_spin step directly.
+  const withParry = freezeDeep(await combatState('quench', {
+    enemyId: 'slag_warden', enemyOver: { moveIndex: 3, intentStep: 3 }, statuses: { parry: 100 },
   }));
-  const without = freezeDeep(await combatState('defend', {
-    enemyId: 'the_guardian', enemyOver: { moveIndex: 3, intentStep: 3 },
+  const without = freezeDeep(await combatState('quench', {
+    enemyId: 'slag_warden', enemyOver: { moveIndex: 3, intentStep: 3 },
   }));
   const a = endTurn(withParry);
   const b = endTurn(without);
@@ -87,7 +87,7 @@ test('the proc rule IS the roll: proc === intAt(seed, liveDraws, 100) < charges'
   // a low-parry hero procs exactly when the roll is under the charges.
   const checked = { proc: 0, noProc: 0 };
   for (let seed = 1; seed <= 40 && (checked.proc === 0 || checked.noProc === 0); seed += 1) {
-    const s = await combatState('defend', { enemyOver: { moveIndex: 0 }, statuses: { parry: 20 }, seed });
+    const s = await combatState('quench', { enemyOver: { moveIndex: 0 }, statuses: { parry: 20 }, seed });
     const roll = intAt(seed, s.rngDraws, 100);
     const res = endTurn(freezeDeep(s));
     const procced = res.events.find((e) => e.t === 'enemy_attack').parried === true;
@@ -98,8 +98,8 @@ test('the proc rule IS the roll: proc === intAt(seed, liveDraws, 100) < charges'
 });
 
 test('an enemy with parry rolls against the hero\u2019s golpes too — symmetric (1 draw per golpe)', async () => {
-  const armored = freezeDeep(await combatState('strike', { enemyOver: { statuses: { parry: 100 } } }));
-  const bare = freezeDeep(await combatState('strike', { enemyOver: {} }));
+  const armored = freezeDeep(await combatState('hammerfall', { enemyOver: { statuses: { parry: 100 } } }));
+  const bare = freezeDeep(await combatState('hammerfall', { enemyOver: {} }));
   const a = K.step(armored, 'p1');
   const b = K.step(bare, 'p1');
   const hit = a.events.find((e) => e.t === 'damage');
@@ -114,7 +114,7 @@ test('a proc spends nothing and a non-proc still soaks through the pool — parr
   // The end-of-step state cannot carry this pin (beginTurn resets the hero's Block
   // before the step returns), so the pool fact is read two ways: off the strike event
   // and off a direct attackHit call, which is the exact fold the runner runs.
-  const procced = freezeDeep(await combatState('defend', {
+  const procced = freezeDeep(await combatState('quench', {
     enemyOver: { moveIndex: 0 }, statuses: { parry: 100 }, block: 10,
   }));
   const a = endTurn(procced);
@@ -129,7 +129,7 @@ test('a proc spends nothing and a non-proc still soaks through the pool — parr
   assert.equal(unit.state.player.block, 10, 'a parried golpe never touches the pool itself');
   assert.equal(unit.state.player.hp, 60);
   // A parry the roll refuses (0 charges here) resolves like any strike: the pool works.
-  const refused = freezeDeep(await combatState('defend', {
+  const refused = freezeDeep(await combatState('quench', {
     enemyOver: { moveIndex: 0 }, statuses: { parry: 0 }, block: 10,
   }));
   const b = endTurn(refused);
@@ -171,7 +171,7 @@ test('the tick order per golpe: [damage] -> [bleed_tick], interleaved over a mul
 test('a parried golpe still executed — the attacker\u2019s bleed ticks anyway', async () => {
   // The hero bleeds 2 and strikes an enemy holding Parry 100: the strike is refused,
   // the tick is not (rule 4: parry covers attack golpes, never ticks).
-  const s = freezeDeep(await combatState('strike', { statuses: { bleed: 2 }, enemyOver: { statuses: { parry: 100 } } }));
+  const s = freezeDeep(await combatState('hammerfall', { statuses: { bleed: 2 }, enemyOver: { statuses: { parry: 100 } } }));
   const res = K.step(s, 'p1');
   const hit = res.events.find((e) => e.t === 'damage');
   assert.equal(hit.parried, true);
@@ -184,7 +184,7 @@ test('a parried golpe still executed — the attacker\u2019s bleed ticks anyway'
 });
 
 test('the hero\u2019s bleed floors at 1 HP — no DoT kills the hero in v1', async () => {
-  const s = freezeDeep(await combatState('strike', { hp: 3, statuses: { bleed: 5 } }));
+  const s = freezeDeep(await combatState('hammerfall', { hp: 3, statuses: { bleed: 5 } }));
   const res = K.step(s, 'p1');
   const tick = res.events.find((e) => e.t === 'bleed_tick');
   assert.equal(tick.amount, 5);
@@ -197,7 +197,7 @@ test('an attacker felled by its own bleed cancels the golpes it has left', async
   // Slag Crawler pincers (A4x2) bleeding 5 on 2 HP: golpe 1 lands, the tick kills the
   // striker, golpe 2 never fires. The kill settles the fight, so the corpse is read
   // off the events (resolveVictory empties the field).
-  const s = freezeDeep(await combatState('defend', {
+  const s = freezeDeep(await combatState('quench', {
     enemyId: 'slag_crawler', enemyOver: { moveIndex: 1, hp: 2, maxHp: 2, statuses: { bleed: 5 } },
   }));
   const res = endTurn(s);
@@ -211,7 +211,7 @@ test('an attacker felled by its own bleed cancels the golpes it has left', async
 
 test('the enemy\u2019s bleed ticks per golpe too, and the event is index-stamped', async () => {
   // Slag Crawler pincers (2 golpes) bleeding 2 on full HP: two ticks, 2 then 1.
-  const s = freezeDeep(await combatState('defend', {
+  const s = freezeDeep(await combatState('quench', {
     enemyId: 'slag_crawler', enemyOver: { moveIndex: 1, statuses: { bleed: 2 } },
   }));
   const res = endTurn(s);
@@ -225,11 +225,11 @@ test('the enemy\u2019s bleed ticks per golpe too, and the event is index-stamped
 /* ---------------------------------------------------------------- poison: turn ends */
 
 test('the hero\u2019s poison ticks at HIS turn end, one stack per tick, floored at 1', async () => {
-  const s = freezeDeep(await combatState('defend', {
-    enemyId: 'the_guardian', enemyOver: { moveIndex: 0, intentStep: 0 }, statuses: { poison: 3 }, hp: 50,
+  const s = freezeDeep(await combatState('quench', {
+    enemyId: 'slag_warden', enemyOver: { moveIndex: 0, intentStep: 0 }, statuses: { poison: 3 }, hp: 50,
   }));
   const res = endTurn(s);
-  // The Guardian's script opens charging_up (B20) — no damage muddies the tick.
+  // Slag Warden's script opens plating_up (B20) — no damage muddies the tick.
   assert.deepEqual(
     res.events.find((e) => e.t === 'poison_tick'),
     { t: 'poison_tick', who: 'player', amount: 3, hp: 47, remaining: 2 },
@@ -241,8 +241,8 @@ test('the hero\u2019s poison ticks at HIS turn end, one stack per tick, floored 
 test('the hero\u2019s poison tick sits INSIDE endOfTurnStatuses, before the decay sweep', async () => {
   // Metallicize first (block), then poison, then decay (vulnerable) — the contract's
   // hero-close order, read straight off the event list of one endTurn.
-  const s = freezeDeep(await combatState('defend', {
-    enemyId: 'the_guardian', enemyOver: { moveIndex: 0, intentStep: 0 },
+  const s = freezeDeep(await combatState('quench', {
+    enemyId: 'slag_warden', enemyOver: { moveIndex: 0, intentStep: 0 },
     statuses: { poison: 2, metallicize: 4, vulnerable: 1 }, hp: 50,
   }));
   const res = endTurn(s);
@@ -266,10 +266,10 @@ test('the enemies\u2019 poison ticks at THEIR turn close, beside the decay — a
 });
 
 test('poison has zero interaction with the multi-golpe loop — one tick per turn end, not per golpe', async () => {
-  // A poisoned HERO facing the whirlwind (3 golpes): his poison ticks ONCE per turn end
+  // A poisoned HERO facing the shield_spin (3 golpes): his poison ticks ONCE per turn end
   // (his own), no matter how many golpes flew.
-  const s = freezeDeep(await combatState('defend', {
-    enemyId: 'the_guardian', enemyOver: { moveIndex: 3, intentStep: 3 }, statuses: { poison: 2 }, hp: 60,
+  const s = freezeDeep(await combatState('quench', {
+    enemyId: 'slag_warden', enemyOver: { moveIndex: 3, intentStep: 3 }, statuses: { poison: 2 }, hp: 60,
   }));
   const res = endTurn(s);
   assert.equal(res.events.filter((e) => e.t === 'enemy_attack').length, 3);
@@ -302,10 +302,10 @@ test('both sides tick in one endTurn: the hero first, the enemies after their tu
 
 /* ------------------------------------------------- alcance v1: what stays OUTSIDE */
 
-test('ALCANCE v1: the exotic handlers stay outside the fold — hemokinesis rolls no parry and ticks no bleed', async () => {
-  // The enemy holds Parry 100 and the hero holds Bleed 2: a hemokinesis strike must
+test('ALCANCE v1: the exotic handlers stay outside the fold — blood_hammer rolls no parry and ticks no bleed', async () => {
+  // The enemy holds Parry 100 and the hero holds Bleed 2: a blood_hammer strike must
   // land plainly — no roll (zero draws), no hex refusal, no tick.
-  const s = freezeDeep(await combatState('hemokinesis', {
+  const s = freezeDeep(await combatState('blood_hammer', {
     hp: 40, statuses: { bleed: 2 }, enemyOver: { statuses: { parry: 100 } },
   }));
   const res = K.step(s, 'p1');
@@ -339,7 +339,7 @@ test('the tick events carry `index` ONLY for who="enemy" (the contract\u2019s sh
     assert.equal(typeof e.hp, 'number');
     assert.equal(typeof e.remaining, 'number');
   }
-  const enemySide = freezeDeep(await combatState('defend', {
+  const enemySide = freezeDeep(await combatState('quench', {
     enemyId: 'slag_crawler', enemyOver: { moveIndex: 1, statuses: { bleed: 1 } },
   }));
   const b = endTurn(enemySide);

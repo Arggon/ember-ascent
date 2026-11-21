@@ -4,7 +4,7 @@
 // so any accidental write inside rules throws instead of silently diverging (R1/R3).
 //
 // Numbers below are OBSERVED outputs of the shipped build with a pinned fixture
-// (seed 5, stepIndex 10, rngDraws 90, 60/60 HP, 5 energy, Jaw Worm 40/44, five-card
+// (seed 5, stepIndex 10, rngDraws 90, 60/60 HP, 5 energy, Cinder Maw 40/44, five-card
 // dummy draw pile) — not hand-derived. A change in any of them is a real behaviour change.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +25,7 @@ const C = await content();
 /** How many cards the shipped bundle actually declares. */
 const SHIPPED_CARDS = cardsBundle.cards.length;
 
-/** Play the single card in hand against a pinned Jaw Worm and return the state. */
+/** Play the single card in hand against a pinned Cinder Maw and return the state. */
 async function playCard(cardId, over = {}) {
   const state = freezeDeep(await combatState(cardId, over));
   const res = step(state, 'p1');
@@ -51,79 +51,79 @@ function expectCard(res, cardId, e) {
 
 // --- named exemplars required by the brief: plain damage / block / draw / multi-hit / exhaust ---
 
-test('strike — plain damage card', async () => {
-  const res = await playCard('strike');
-  expectCard(res, 'strike', { energy: 4, enemyHp: [34], discard: 1, events: ['damage'] });
+test('hammerfall — plain damage card', async () => {
+  const res = await playCard('hammerfall');
+  expectCard(res, 'hammerfall', { energy: 4, enemyHp: [34], discard: 1, events: ['damage'] });
 });
 
-test('defend — block card', async () => {
-  const res = await playCard('defend');
-  expectCard(res, 'defend', { energy: 4, block: 5, enemyHp: [40], discard: 1, events: ['block'] });
+test('quench — block card', async () => {
+  const res = await playCard('quench');
+  expectCard(res, 'quench', { energy: 4, block: 5, enemyHp: [40], discard: 1, events: ['block'] });
 });
 
-test('pommel — damage + draw card', async () => {
-  const res = await playCard('pommel');
-  expectCard(res, 'pommel', { energy: 4, enemyHp: [31], hand: 1, events: ['damage', 'draw'] });
+test('haft_jab — damage + draw card', async () => {
+  const res = await playCard('haft_jab');
+  expectCard(res, 'haft_jab', { energy: 4, enemyHp: [31], hand: 1, events: ['damage', 'draw'] });
 });
 
-test('twin_strike — multi-hit card (two separate hits)', async () => {
-  const res = await playCard('twin_strike');
-  expectCard(res, 'twin_strike', { energy: 4, enemyHp: [30], events: ['damage', 'damage'] });
+test('twin_hammers — multi-hit card (two separate hits)', async () => {
+  const res = await playCard('twin_hammers');
+  expectCard(res, 'twin_hammers', { energy: 4, enemyHp: [30], events: ['damage', 'damage'] });
 });
 
-test('pummel — multi-hit card that then exhausts', async () => {
-  const res = await playCard('pummel');
-  expectCard(res, 'pummel', { energy: 4, enemyHp: [32], exhaust: 1, discard: 0 });
-  assert.equal(res.state.combat.exhaust[0].cardId, 'pummel', 'exhausted card is the played one');
+test('hail_of_blows — multi-hit card that then exhausts', async () => {
+  const res = await playCard('hail_of_blows');
+  expectCard(res, 'hail_of_blows', { energy: 4, enemyHp: [32], exhaust: 1, discard: 0 });
+  assert.equal(res.state.combat.exhaust[0].cardId, 'hail_of_blows', 'exhausted card is the played one');
 });
 
-test('impervious — block card that exhausts, filed exactly once', async () => {
-  const res = await playCard('impervious');
-  expectCard(res, 'impervious', { energy: 3, block: 30, exhaust: 1, discard: 0 });
-  assert.equal(res.state.combat.exhaust[0].cardId, 'impervious');
+test('unbroken — block card that exhausts, filed exactly once', async () => {
+  const res = await playCard('unbroken');
+  expectCard(res, 'unbroken', { energy: 3, block: 30, exhaust: 1, discard: 0 });
+  assert.equal(res.state.combat.exhaust[0].cardId, 'unbroken');
 });
 
 // --- each of the 11 exotic handlers ---
 
 const EXOTICS = [
-  ['bloodletting', { statuses: {} }, { energy: 7, hp: 57, events: ['self_damage', 'energy'] }],
-  ['hemokinesis', { statuses: {} }, { energy: 4, hp: 58, enemyHp: [25], events: ['self_damage', 'damage'] }],
-  ['reaper', { hp: 54 }, { energy: 3, hp: 58, enemyHp: [36], events: ['damage', 'heal'] }],
-  ['limit_break', { statuses: { strength: 3 } }, { energy: 4, statuses: { strength: 6 }, events: ['status'] }],
-  ['offering', { statuses: {} }, { energy: 7, hp: 54, hand: 3, events: ['self_damage', 'energy', 'draw'] }],
-  ['combust', { statuses: {} }, { powers: { combust: 1 }, events: ['power'] }],
-  ['dark_embrace', { statuses: {} }, { powers: { dark_embrace: 1 }, events: ['power'] }],
-  ['feel_no_pain', { statuses: {} }, { powers: { feel_no_pain: 1 }, events: ['power'] }],
-  ['rupture', { statuses: {} }, { powers: { rupture: 1 }, events: ['power'] }],
-  ['entrench', { block: 6 }, { energy: 3, block: 12, events: ['block'] }],
-  ['rampage', { statuses: {} }, { energy: 4, enemyHp: [32], events: ['damage', 'grow'] }],
+  ['vein_tap', { statuses: {} }, { energy: 7, hp: 57, events: ['self_damage', 'energy'] }],
+  ['blood_hammer', { statuses: {} }, { energy: 4, hp: 58, enemyHp: [25], events: ['self_damage', 'damage'] }],
+  ['ash_harvest', { hp: 54 }, { energy: 3, hp: 58, enemyHp: [36], events: ['damage', 'heal'] }],
+  ['overtemper', { statuses: { strength: 3 } }, { energy: 4, statuses: { strength: 6 }, events: ['status'] }],
+  ['blood_tithe', { statuses: {} }, { energy: 7, hp: 54, hand: 3, events: ['self_damage', 'energy', 'draw'] }],
+  ['banked_coal', { statuses: {} }, { powers: { banked_coal: 1 }, events: ['power'] }],
+  ['ash_embrace', { statuses: {} }, { powers: { ash_embrace: 1 }, events: ['power'] }],
+  ['cinder_skin', { statuses: {} }, { powers: { cinder_skin: 1 }, events: ['power'] }],
+  ['split_seam', { statuses: {} }, { powers: { split_seam: 1 }, events: ['power'] }],
+  ['brace', { block: 6 }, { energy: 3, block: 12, events: ['block'] }],
+  ['climbing_heat', { statuses: {} }, { energy: 4, enemyHp: [32], events: ['damage', 'grow'] }],
 ];
 
 for (const [id, over, expected] of EXOTICS) {
   test(`exotic handler: ${id}`, async () => {
     const deck =
-      id === 'rampage'
-        ? [...newRun({ seed: 5 }).deck, { uid: 'HAND', cardId: 'rampage', perPlay: 0 }]
+      id === 'climbing_heat'
+        ? [...newRun({ seed: 5 }).deck, { uid: 'HAND', cardId: 'climbing_heat', perPlay: 0 }]
         : undefined;
     const res = await playCard(id, { ...over, deck });
     expectCard(res, id, expected);
-    if (id === 'rampage') {
+    if (id === 'climbing_heat') {
       // The growth is the card's entire identity: it must land on the RUN's deck
       // instance, not merely appear in this step's events.
-      const inDeck = res.state.deck.filter((c) => c.cardId === 'rampage');
-      assert.deepEqual(inDeck.map((c) => c.perPlay), [5], 'rampage keeps +5 after it is played');
+      const inDeck = res.state.deck.filter((c) => c.cardId === 'climbing_heat');
+      assert.deepEqual(inDeck.map((c) => c.perPlay), [5], 'climbing_heat keeps +5 after it is played');
     }
-    if (['combust', 'dark_embrace', 'feel_no_pain', 'rupture'].includes(id)) {
+    if (['banked_coal', 'ash_embrace', 'cinder_skin', 'split_seam'].includes(id)) {
       assert.equal(res.state.powers[id], 1, `${id} power gained`);
     }
   });
 }
 
-test('entrench is a no-op with no block, and limit_break with no Strength', async () => {
-  const noBlock = await playCard('entrench', { block: 0 });
-  expectCard(noBlock, 'entrench', { block: 0, events: ['noop'] });
-  const noStrength = await playCard('limit_break', { statuses: {} });
-  expectCard(noStrength, 'limit_break', { statuses: {}, events: ['noop'] });
+test('brace is a no-op with no block, and overtemper with no Strength', async () => {
+  const noBlock = await playCard('brace', { block: 0 });
+  expectCard(noBlock, 'brace', { block: 0, events: ['noop'] });
+  const noStrength = await playCard('overtemper', { statuses: {} });
+  expectCard(noStrength, 'overtemper', { statuses: {}, events: ['noop'] });
 });
 
 // --- every shipped card id is playable, deterministic, and mutation-safe ---
@@ -136,7 +136,7 @@ test(`all ${SHIPPED_CARDS} shipped card ids play deterministically from deep-fro
   assert.ok(SHIPPED_CARDS > 0, 'the bundle must declare cards, or this whole loop proves nothing');
   for (const id of ids) {
     const deck =
-      id === 'rampage' ? [...newRun({ seed: 5 }).deck, { uid: 'HAND', cardId: 'rampage', perPlay: 0 }] : undefined;
+      id === 'climbing_heat' ? [...newRun({ seed: 5 }).deck, { uid: 'HAND', cardId: 'climbing_heat', perPlay: 0 }] : undefined;
     const a = await playCard(id, { deck });
     const b = await playCard(id, { deck });
     assert.equal(hash(a.state), hash(b.state), `${id}: same fixture => same state hash`);
@@ -145,7 +145,7 @@ test(`all ${SHIPPED_CARDS} shipped card ids play deterministically from deep-fro
 
 test('frozen input throws on mutation instead of diverging silently', async () => {
   const c = await content();
-  const state = freezeDeep(await combatState('strike', { draw: dummyPile(c) }));
+  const state = freezeDeep(await combatState('hammerfall', { draw: dummyPile(c) }));
   assert.throws(() => {
     state.player.hp = 1;
   }, 'writes to frozen state must throw in strict mode');

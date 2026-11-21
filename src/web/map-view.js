@@ -47,7 +47,7 @@ export function mapView(travel = null) {
     map.append(rowEl);
   });
   // The world behind the path (decorative, constant markup): lava at the foot where the
-  // climb starts, two ridge lines, and the Guardian's spire at the summit.
+  // climb starts, two ridge lines, and the Slag Warden's spire at the summit.
   const world = el('div', { cls: 'map-world', attrs: { 'aria-hidden': 'true' } });
   world.innerHTML = MAP_WORLD;
   map.prepend(world);

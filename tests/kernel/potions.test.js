@@ -76,7 +76,7 @@ function beltCombat(belt, over = {}) {
       nodeType: over.nodeType ?? 'combat_weak',
       turn: 1,
       enemies: (over.hps ?? [40]).map((hp, i) => ({
-        id: 'jaw_worm', index: i, name: `Worm ${i}`, hp, maxHp: 44,
+        id: 'cinder_maw', index: i, name: `Worm ${i}`, hp, maxHp: 44,
         block: over.enemyBlock ?? 0, statuses: { ...(over.enemyStatuses ?? {}) },
         moveIndex: 0, moveHistory: [], intentStep: 0, dead: false,
       })),
@@ -364,7 +364,7 @@ test('belt actions exist in combat ONLY; forcing the ids elsewhere is the R6 rej
     assert.equal(actions(s).some((a) => a.kind === 'quaff' || a.kind === 'discard_potion'), false, `${phase}: no belt actions`);
   }
   // The reward phase carries an open offer, as a real one always does.
-  const rewardPhase = { ...belted, phase: 'reward', reward: { cards: ['strike'], taken: null, gold: 12 } };
+  const rewardPhase = { ...belted, phase: 'reward', reward: { cards: ['hammerfall'], taken: null, gold: 12 } };
   assert.equal(actions(rewardPhase).some((a) => a.kind === 'quaff' || a.kind === 'discard_potion'), false, 'reward: no belt actions');
   const mapPhase = { ...belted, phase: 'map' };
   const outside = step(mapPhase, 'q1');
@@ -426,8 +426,8 @@ test('validateSave: the field is optional, structured, and never id-checked', ()
   const legacy = JSON.parse(JSON.stringify({ save: true }));
   void legacy;
   const baseSave = {
-    formatVersion: 1, engineVersion: 'x', contentVersion: 'dlb-0.3.0-act1', seed: 1,
-    character: 'ironclad', difficulty: 0, stepIndex: 0, rngDraws: 0,
+    formatVersion: 1, engineVersion: 'x', contentVersion: 'dlb-0.5.0-dests', seed: 1,
+    character: 'ashwright', difficulty: 0, stepIndex: 0, rngDraws: 0,
     state: newRun({ seed: 1 }),
   };
   const noField = JSON.parse(JSON.stringify(baseSave));

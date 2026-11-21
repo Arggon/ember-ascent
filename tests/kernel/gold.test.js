@@ -246,7 +246,7 @@ test('gold is granted through the public step on the kill, and the grant is in t
   // aimed at the first living enemy, which is what a real player's clicks do.
   const aim = (st) => (st.combat.enemies.filter((e) => !e.dead).length > 1 ? '_1' : '');
   const base = newRun({ seed: 2 });
-  const boosted = { ...base, deck: Array.from({ length: 10 }, (_, i) => ({ uid: `g${i}`, cardId: 'bludgeon' })) };
+  const boosted = { ...base, deck: Array.from({ length: 10 }, (_, i) => ({ uid: `g${i}`, cardId: 'maul' })) };
   let s = step(boosted, 'n1').state;
   const events = [];
   let out = step(s, `p1${aim(s)}`);

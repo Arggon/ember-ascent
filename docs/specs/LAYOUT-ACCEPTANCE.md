@@ -34,7 +34,7 @@ measured, the measurement disagreed, and the thread died mid-edit. As of today t
 is `@media (max-width: 620px), (max-height: 480px)` and the five media blocks a cut-off run left
 unclosed have since been closed — so the file is syntactically sound and the phone case is real.
 
-**Root cause of the thrash (this is the load-bearing finding).** The instrument was lying. Both
+**Root cause of the coil_thrash (this is the load-bearing finding).** The instrument was lying. Both
 harnesses navigate to `http://localhost:5173/src/web/?seed=11`; `scripts/serve.mjs` 301-redirects that
 to `/src/web/?seed=11/`, appending the slash to the **query**, so `src/web/app.js` does
 `Number("11/") → NaN`, fails `Number.isInteger`, and falls back to
@@ -269,7 +269,7 @@ Each with the default I would ship without an answer.
     shop) keep 30/21/18px inset gems. The type word starts at gem + 11..15px per tier
     (measured), which retires the "TACK" word-under-gem bug on phones.
   - **The hand fits at every width ≥ 621px** (compress-to-fit was already true in combat;
-    now pinned): 5-card hands compress (`flex 1 1 0`); 6-card hands take the deliberate
+    now pinned): 5-card hands compress (`bellows 1 1 0`); 6-card hands take the deliberate
     ≤620-style scroller in the 761–1000px band (compression realized 56–86px cards there,
     where the fixed face broke down: the 5-line rules clamp outgrew its box and the
     −3px overlap covered rules-line ends; measured, 768×1024+hand7), and go flush on the
@@ -332,9 +332,9 @@ Each with the default I would ship without an answer.
   at every step (the `.kindling:has(.hero-select)` illustration clamp goes with them). The
   onboarding tour drops its heroes step with the same stroke — five steps, the first
   anchored on the boon list. Bellows Keeper and The Cinder Mines STAY in the game: they
-  are seeded exactly as before by `?hero=bellows` / `?biome=mines` (and the CLI flags),
+  are seeded exactly as before by `?hero=bellows_keeper` / `?biome=mines` (and the CLI flags),
   the kernel's BIOMES table and hero roster are untouched, and the seeding is pinned by
   tests/kernel/fixed-start.test.js. Verified live by the SDLC run's six Playwright checks
   (fresh boot with no pickers, tour "Step 1 of 5" over the boon list, boon → map flow,
-  `?hero=bellows` boots the Keeper at 54 HP, `?biome=mines` names THE CINDER MINES on the
+  `?hero=bellows_keeper` boots the Keeper at 54 HP, `?biome=mines` names THE CINDER MINES on the
   Act I card, veteran boots clean) and by the full browser suite after the change.

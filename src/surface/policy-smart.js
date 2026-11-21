@@ -7,9 +7,9 @@
 //
 //   1. Block was credited as min(block, incoming - player.block), and the reward
 //      branch asked for a valuation with incoming = 0. Every defensive card in the
-//      game therefore scored exactly 0 when offered: `impervious` (30 Block, 2
+//      game therefore scored exactly 0 when offered: `unbroken` (30 Block, 2
 //      Energy, the best defensive card in the slice) was offered 742 times and
-//      picked 0 times. `bludgeon`, the biggest raw damage number, was picked 100%.
+//      picked 0 times. `maul`, the biggest raw damage number, was picked 100%.
 //   2. Nothing consulted the deck. `rewardWorth()` scored a card against a
 //      hard-coded fake board, so a deck with one attack and no defence and a deck
 //      with the reverse made the same choice.
@@ -44,7 +44,7 @@ const W = {
    * it deals a fixed number of damage per turn, so the only way to take less damage
    * is to END THE FIGHT SOONER. Block reduces damage per turn; it never wins. The
    * first `smart` priced a printed Block point at 1.0 x blockNeed, which made
-   * `impervious` (2 Energy, 30 Block) out-score `bludgeon` (3 Energy, 32 damage) and
+   * `unbroken` (2 Energy, 30 Block) out-score `maul` (3 Energy, 32 damage) and
    * built decks of 44 Block / 77 attack that reached the boss and then could not
    * kill it (19.2% boss kill rate vs greedy's 34.6%). Damage is priced by what it
    * contributes to the kill (`throughput` below); Block is priced lower so that a
@@ -55,7 +55,7 @@ const W = {
    * Extra reward credit for RAW damage, on top of `damageNeed`, because the marginal
    * point of damage is worth more than an average point: it is the last points that
    * end the fight, and every boss turn not taken is 19-32 damage not suffered.
-   * Expressed as a multiplier on concentrated damage only, so a 32-damage `bludgeon`
+   * Expressed as a multiplier on concentrated damage only, so a 32-damage `maul`
    * is valued ABOVE four 8-damage hits (which a Block-heavy boss fight may never
    * live long enough to land). ARBITRARY value; the ordering it produces is pinned
    * by tests/policy.test.js rather than trusted to the number.
@@ -322,8 +322,8 @@ export function smartRewardScore(def, state) {
   // means in policy terms.
   //
   // UTILITY is where a card does not hit or block but SHORTENS THE FIGHT. The 2000-run
-  // data is blunt about what mattered: greedy's boss decks carried more `uppercut`,
-  // `shockwave`, `twin_strike` and `flex` than smart's, i.e. damage AMPLIFICATION and
+  // data is blunt about what mattered: greedy's boss decks carried more `rising_blow`,
+  // `heat_wash`, `twin_hammers` and `bellows` than smart's, i.e. damage AMPLIFICATION and
   // cheap efficient attacks, and they killed the boss with decks that were also less
   // Block-heavy. So Strength and Vulnerable are priced on the DAMAGE side (they are
   // multipliers on every future attack) and persistent powers are valued over a

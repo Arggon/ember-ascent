@@ -31,8 +31,8 @@ export function fireHook(state, hook, ctx) {
 }
 
 const IMPL = {
-  /** Combust: at end of turn, deal `stacks` damage to all enemies and lose `stacks` HP. */
-  combust: {
+  /** Banked Coal: at end of turn, deal `stacks` damage to all enemies and lose `stacks` HP. */
+  banked_coal: {
     end_of_turn(state, stacks) {
       const events = [];
       const enemies = state.combat.enemies.map((e, i) => {
@@ -42,12 +42,12 @@ const IMPL = {
         return out.enemy;
       });
       const player = loseHp(state.player, stacks);
-      events.push({ t: 'self_damage', amount: stacks, source: 'combust' });
+      events.push({ t: 'self_damage', amount: stacks, source: 'banked_coal' });
       return { state: { ...state, player, combat: { ...state.combat, enemies } }, events };
     },
   },
-  /** Dark Embrace: draw `stacks` whenever a card is exhausted. */
-  dark_embrace: {
+  /** Ash Embrace: draw `stacks` whenever a card is exhausted. */
+  ash_embrace: {
     on_exhaust(state, stacks, ctx) {
       // ctx.rng-bound shuffle, like the `draw` verb (rules/draw.js explains the
       // callback): the old inline loop's stream semantics, preserved exactly.
@@ -57,25 +57,25 @@ const IMPL = {
         // `reshuffles: 0` is LITERAL, on purpose: the historical event reported 0 even
         // when a reshuffle happened. A behavior-preserving refactor keeps the quirk;
         // the real count is available as out.reshuffles if a fix is ever ruled on.
-        events: [{ t: 'draw', count: out.drawn.length, uids: out.drawn.map((c) => c.uid), reshuffles: 0, source: 'dark_embrace' }],
+        events: [{ t: 'draw', count: out.drawn.length, uids: out.drawn.map((c) => c.uid), reshuffles: 0, source: 'ash_embrace' }],
       };
     },
   },
-  /** Feel No Pain: gain `stacks` block whenever a card is exhausted. */
-  feel_no_pain: {
+  /** Cinder Skin: gain `stacks` block whenever a card is exhausted. */
+  cinder_skin: {
     on_exhaust(state, stacks) {
       return {
         state: { ...state, player: { ...state.player, block: state.player.block + stacks } },
-        events: [{ t: 'block', who: 'player', amount: stacks, source: 'feel_no_pain' }],
+        events: [{ t: 'block', who: 'player', amount: stacks, source: 'cinder_skin' }],
       };
     },
   },
-  /** Rupture: gain `stacks` Strength whenever you lose HP from a card. */
-  rupture: {
+  /** Split Seam: gain `stacks` Strength whenever you lose HP from a card. */
+  split_seam: {
     on_self_damage(state, stacks) {
       return {
         state: { ...state, player: addStatus(state.player, 'strength', stacks) },
-        events: [{ t: 'status', who: 'player', status: 'strength', stacks, source: 'rupture' }],
+        events: [{ t: 'status', who: 'player', status: 'strength', stacks, source: 'split_seam' }],
       };
     },
   },

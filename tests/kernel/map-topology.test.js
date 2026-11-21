@@ -29,7 +29,7 @@
 //     band can end at a WAYSIDE, and the test names the exact structural
 //     singletons (act 1: r1n1→r2n1; act 2: r2n1→r3n1 and r4n2→r5n2) — no others,
 //     and no singleton SHOP anywhere;
-//   * a LEGACY save carries its own full-linked map and keeps offering the whole
+//   * a LEGACY save carries its own full-linked map and keeps blood_tithe the whole
 //     next row — the stored edges are read, no new field, nothing relinked.
 // 60 seeds × 2 acts, asserted with the seed named in every message.
 import test from 'node:test';
@@ -233,7 +233,7 @@ test('the kernel offers exactly the current node band, and the forced-wayside si
   }
 });
 
-test('a legacy save carries its own full-linked map and keeps offering the whole next row', () => {
+test('a legacy save carries its own full-linked map and keeps blood_tithe the whole next row', () => {
   // Rebuild the pre-Part-A map exactly as an old save stores it (a fresh map object —
   // the kernel freezes its states) and read the offers from it: availableNodes walks
   // the STORED edges, so nothing relinks and no new field is needed.

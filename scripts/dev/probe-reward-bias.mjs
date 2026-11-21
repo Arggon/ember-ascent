@@ -11,7 +11,7 @@ console.log(`starter deck: ${comp.cards} cards, blockPoints ${comp.block} (${(co
 console.log(`needs: blockNeed ${needs.blockNeed.toFixed(3)}  damageNeed ${needs.damageNeed.toFixed(3)}  <-- block multiplier is permanently larger`);
 console.log('');
 console.log('card             cost  type    block  dmg   score    key    perEnergy');
-for (const id of ['strike', 'defend', 'bash', 'impervious', 'ghostly_armor', 'shrug_it_off', 'bludgeon', 'uppercut', 'twin_strike', 'cleave', 'pommel_strike', 'inflame', 'flex', 'shockwave']) {
+for (const id of ['hammerfall', 'quench', 'anvil_blow', 'unbroken', 'cinder_shroud', 'cast_aside', 'maul', 'rising_blow', 'twin_hammers', 'arc_cut', 'haft_jab', 'stoke', 'bellows', 'heat_wash']) {
   const def = c.cards.get(id);
   if (!def) continue;
   const s = smartRewardScore(def, state);

@@ -57,7 +57,7 @@ export function makeEnemy(def, over = {}) {
 export function dummyPile(c, n = 5) {
   return Array.from({ length: n }, (_, i) => ({
     uid: `d${i + 1}`,
-    cardId: i % 2 === 0 ? 'strike' : 'defend',
+    cardId: i % 2 === 0 ? 'hammerfall' : 'quench',
     perPlay: 0,
   }));
 }
@@ -77,7 +77,7 @@ export async function combatState(cardId, over = {}) {
   const def = c.cards.get(cardId);
   const base = newRun({ seed: over.seed ?? 5 });
   const enemies = (
-    over.enemies ?? [makeEnemy(ENEMIES[over.enemyId ?? 'jaw_worm'], over.enemyOver ?? {})]
+    over.enemies ?? [makeEnemy(ENEMIES[over.enemyId ?? 'cinder_maw'], over.enemyOver ?? {})]
   ).map((e, i) => ({ ...e, index: i }));
   return {
     ...base,
@@ -115,7 +115,7 @@ export async function mapState(over = {}) {
 
 /** A log header for replaying a scripted action list from seed 0. */
 export function header(over = {}) {
-  return { format: 'dlb-log', v: 1, seed: 0, contentVersion: 'dlb-0.3.0-act1', character: 'ironclad', difficulty: 0, ...over };
+  return { format: 'dlb-log', v: 1, seed: 0, contentVersion: 'dlb-0.5.0-dests', character: 'ashwright', difficulty: 0, ...over };
 }
 
 /** Replay a scripted action list and return the step hashes. */

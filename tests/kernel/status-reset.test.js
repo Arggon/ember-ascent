@@ -8,7 +8,7 @@
 // Cause: `startCombat()` reset the player's block and energy but CARRIED `statuses` forward,
 // while every enemy's statuses were (correctly) reset per spawn. The game's own glossary
 // says Strength "Lasts the whole fight", so the accumulation contradicted the documented
-// rule and turned one early Inflame into unbounded damage for the rest of the run.
+// rule and turned one early Stoke into unbounded damage for the rest of the run.
 //
 // The fix resets `player.statuses` when a combat STARTS. `beginTurn` must NOT do this —
 // a buff has to survive the turns within one fight.
@@ -99,18 +99,18 @@ test('no player status survives into the map phase', () => {
 test('Strength gained DURING a fight still applies for the rest of that fight', () => {
   // The complement of the fix: resetting at combat start must not break the buff itself.
   // Find a fight, apply Strength directly through a real card if one is in hand, and assert
-  // it is still present on the following player turn. One Inflame is pushed into each
+  // it is still present on the following player turn. One Stoke is pushed into each
   // probed deck (the save/load lever's shape: travel shuffles and deals it like any real
   // card) so the probe does not depend on a seed's draw stream dealing a Strength card by
   // luck — the S3 gold grants shifted every stream, which retired the old pure-probe finds.
   let found = null;
   for (const seed of [1, 2, 3, 5, 8, 13]) {
     let state = newRun({ seed });
-    state = { ...state, deck: [...state.deck, { uid: 'sr-inflame', cardId: 'inflame' }] };
+    state = { ...state, deck: [...state.deck, { uid: 'sr-stoke', cardId: 'stoke' }] };
     for (let i = 0; i < 400; i += 1) {
       const snap = snapshot(state);
       if (snap.phase === 'combat') {
-        const play = actions(state).find((a) => a.kind === 'play' && /flex|inflame/.test(a.cardId || ''));
+        const play = actions(state).find((a) => a.kind === 'play' && /bellows|stoke/.test(a.cardId || ''));
         if (play) {
           const after = step(state, play.id).state;
           const gained = snapshot(after).player.statuses.find((s) => s.key === 'strength')?.stacks ?? 0;

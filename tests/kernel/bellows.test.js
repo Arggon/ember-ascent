@@ -1,4 +1,4 @@
-// B4 second hero: the Bellows Keeper, chosen at run start with `character: 'bellows'`.
+// B4 second hero: the Bellows Keeper, chosen at run start with `character: 'bellows_keeper'`.
 //
 // Pins: Ashwright runs untouched; the Keeper starts with his own HP, deck and relic; the
 // Cyan Lantern adds 1 Energy on each fight's first turn and never heals; his starters stay
@@ -27,58 +27,58 @@ test('an Ashwright run starts with exactly the Kindled Heart (S7 relic array)', 
   // S7: the B4-era singular `state.relic` field is gone from fresh states; every run
   // carries the held relics as an ARRAY, relics[0] the character's starter.
   assert.equal('relic' in a, false);
-  assert.deepEqual(a.relics, ['burning_blood']);
-  assert.equal(hash(a), hash(newRun({ seed: 4, character: 'ironclad' })));
+  assert.deepEqual(a.relics, ['kindled_heart']);
+  assert.equal(hash(a), hash(newRun({ seed: 4, character: 'ashwright' })));
 });
 
 test('the Bellows Keeper starts with 54 HP, his deck and the Cyan Lantern', () => {
-  const r = newRun({ seed: 4, character: 'bellows' });
+  const r = newRun({ seed: 4, character: 'bellows_keeper' });
   assert.equal(r.player.maxHp, 54);
   assert.deepEqual(r.relics, ['cyan_lantern']);
   const ids = r.deck.map((c) => c.cardId);
   assert.equal(ids.length, 10);
-  assert.ok(ids.includes('gust') && ids.includes('fan_flames'));
-  assert.equal(ids.includes('bash'), false);
+  assert.ok(ids.includes('bellows_gust') && ids.includes('fan_the_flames'));
+  assert.equal(ids.includes('anvil_blow'), false);
 });
 
 test('Cyan Lantern: +1 Energy on turn 1, base Energy on turn 2, no post-fight heal', () => {
-  let s = step(newRun({ seed: 4, character: 'bellows' }), 'n1').state;
+  let s = step(newRun({ seed: 4, character: 'bellows_keeper' }), 'n1').state;
   assert.equal(s.player.energy, s.energyPerTurn + 1);
   s = step(s, 'e1').state;
   assert.equal(s.phase, 'combat');
   assert.equal(s.combat.turn, 2);
   assert.equal(s.player.energy, s.energyPerTurn);
-  const won = drive({ seed: 4, character: 'bellows' }, 200);
-  const heals = won.events.filter((e) => e.t === 'heal' && e.source === 'burning_blood');
+  const won = drive({ seed: 4, character: 'bellows_keeper' }, 200);
+  const heals = won.events.filter((e) => e.t === 'heal' && e.source === 'kindled_heart');
   assert.equal(heals.length, 0);
 });
 
 test('Fan the Flames and Bellows Gust resolve, and stay out of the draft pool', () => {
-  const r = newRun({ seed: 4, character: 'bellows' });
-  assert.equal(r.draftPool.includes('gust') || r.draftPool.includes('fan_flames'), false);
+  const r = newRun({ seed: 4, character: 'bellows_keeper' });
+  assert.equal(r.draftPool.includes('bellows_gust') || r.draftPool.includes('fan_the_flames'), false);
   const fresh = contentForProfile(null);
-  assert.ok(fresh.cards.has('gust') && fresh.cards.has('fan_flames'), 'the fresh content still resolves his deck');
+  assert.ok(fresh.cards.has('bellows_gust') && fresh.cards.has('fan_the_flames'), 'the fresh content still resolves his deck');
   // play a Fan the Flames from an opening hand (search a few seeds)
   for (let seed = 1; seed < 30; seed += 1) {
-    const s = step(newRun({ seed, character: 'bellows' }), 'n1').state;
-    const slot = s.combat.hand.findIndex((c) => c.cardId === 'fan_flames');
+    const s = step(newRun({ seed, character: 'bellows_keeper' }), 'n1').state;
+    const slot = s.combat.hand.findIndex((c) => c.cardId === 'fan_the_flames');
     if (slot < 0) continue;
     const after = step(s, `p${slot + 1}`).state;
     assert.equal(after.player.energy, s.player.energy + 1);
-    assert.ok(after.combat.exhaust.some((c) => c.cardId === 'fan_flames'));
+    assert.ok(after.combat.exhaust.some((c) => c.cardId === 'fan_the_flames'));
     return;
   }
   assert.fail('no opening hand with Fan the Flames in 30 seeds');
 });
 
 test('log header carries the hero and replay matches the golden hash', () => {
-  const s = drive({ seed: 1, character: 'bellows', kindling: true, tempers: true, quests: true }, 120);
+  const s = drive({ seed: 1, character: 'bellows_keeper', kindling: true, tempers: true, quests: true }, 120);
   const parsed = parseLog(renderLog(s));
-  assert.equal(parsed.header.character, 'bellows');
+  assert.equal(parsed.header.character, 'bellows_keeper');
   assert.equal(assertReplay(parsed).ok, true);
   assert.equal(runHash(s), GOLDEN);
 });
 
 // Recomputed for the "golpes discretos NxM" slice (pool 70 -> 73 cards; strikes
 // resolve through attackHit).
-const GOLDEN = 'sha256:df3e77d9b8fd66323abdccb3f723f39fa1926e49d8f0539fd260b689a0329de2';
+const GOLDEN = 'sha256:3fb564537630668f8272259219600f2b57da1766aa37902bc28d2be4c11a1e88';

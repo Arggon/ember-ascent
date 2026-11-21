@@ -51,20 +51,20 @@ const PILE_SPIKE = `PILES
  disc: Quench, Bellows
  exhaust: -`;
 
-const CONFIG_SPIKE = `$ node bin/dlb new --seed 7 --character ironclad --difficulty 1
+const CONFIG_SPIKE = `$ node bin/dlb new --seed 7 --character ashwright --difficulty 1
 $ node bin/dlb actions
 $ node bin/dlb play 3
 $ node bin/dlb state`;
 
 const ACTION_LINES = [
   '1 strike A6',
-  '3 bash A8+V2 EN2',
-  '5 inflame PWR+2 EN1',
+  '3 anvil_blow A8+V2 EN2',
+  '5 stoke PWR+2 EN1',
   'e1 end turn',
   'c continue',
   's1 card-pick',
   'n2 path',
-  '9 defend B5',
+  '9 quench B5',
 ];
 
 /** [label, payload, ceiling] — the per-payload budget table this spike reports on. */

@@ -73,4 +73,4 @@ test('log header carries the flag and replay matches the golden hash', () => {
 // Recomputed for the "golpes discretos NxM" slice: the pool grew 70 -> 73 cards
 // (Slag Barb / Kiln Fume / Anvil Guard), so the reward streams shifted, and strikes
 // now resolve through attackHit.
-const GOLDEN = 'sha256:b4cbb5f9f5edc277d1d8860562c142a6fa146195584faa1f538d633721d6ba08';
+const GOLDEN = 'sha256:9a336284929f2d96d621799508af37503e5b532784ca1a87f76b3ad83954d9f1';

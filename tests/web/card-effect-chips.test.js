@@ -3,11 +3,11 @@
 // NEVER plays the card.
 //
 // WHAT THIS PINS, against the REAL surface code driven by the fake-DOM harness:
-//   * Bellows (flex) paints ONE strength chip reading "+2" and, because the kernel says
+//   * Bellows (bellows) paints ONE strength chip reading "+2" and, because the kernel says
 //     the chips say the whole card (`chipsComplete`), its long sentence leaves the face —
 //     but stays in the tile's title and aria-label;
-//   * Kiln Cry (warcry) paints Draw +1 and Discard 1;
-//   * a `custom` card (Bloodletting) paints NO chip and KEEPS its visible sentence;
+//   * Kiln Cry (kiln_cry) paints Draw +1 and Discard 1;
+//   * a `custom` card (Vein Tap) paints NO chip and KEEPS its visible sentence;
 //   * clicking the strength chip opens the kernel Strength sentence on the fx layer and
 //     stops the click from reaching the play button (the hand keeps all its cards);
 //   * Escape closes the popover, and an outside pointer-down closes it too;
@@ -127,7 +127,7 @@ const HELP_SEEN_KEY = 'dlb.helpSeen.v1';
 
 /**
  * Boot the surface on the reference fight with the hand crafted to hold the three cards
- * the spec names: Bellows (flex), Kiln Cry (warcry) and a custom-only card (Bloodletting).
+ * the spec names: Bellows (bellows), Kiln Cry (kiln_cry) and a custom-only card (Vein Tap).
  * The controller is the real one; the chip lists and sentences on the tiles are still the
  * kernel's, through the controller's own snapshot().
  */
@@ -137,9 +137,9 @@ function startCombat() {
   state.combat = {
     ...state.combat,
     hand: [
-      { uid: 't1', cardId: 'flex', cost: 0 },
-      { uid: 't2', cardId: 'warcry', cost: 0 },
-      { uid: 't3', cardId: 'bloodletting', cost: 0 },
+      { uid: 't1', cardId: 'bellows', cost: 0 },
+      { uid: 't2', cardId: 'kiln_cry', cost: 0 },
+      { uid: 't3', cardId: 'vein_tap', cost: 0 },
     ],
   };
   const ctl = ctlMod.createController({ session: { state, submitted: [], events: [] } });
@@ -192,7 +192,7 @@ test('Kiln Cry paints Draw +1 and Discard 1; the custom card keeps its sentence 
   assert.deepEqual(wc.map((c) => c.querySelector('.cfx-num').txt), ['+1', '1'],
     'the draw reads as a gain (+1), the discard as a plain cost');
   const blTile = tileByName('Vein Tap');
-  assert.ok(blTile, 'the custom-only card (Bloodletting, face name Vein Tap) is painted');
+  assert.ok(blTile, 'the custom-only card (Vein Tap, face name Vein Tap) is painted');
   assert.equal(chipsOf(blTile).length, 0, 'a custom-only card claims no generic icon');
   const desc = localFind(blTile, '.cdesc');
   assert.ok(desc, 'the custom card KEEPS its visible sentence');
@@ -287,7 +287,7 @@ test('on a read-only tile the chip is a real control: role=button, tabbable, Ent
   const api = startCombat();
   const explain = 'Strength — your attacks deal 2 more damage. Lasts the whole fight. Added to every attack you play.';
   const tile = api.cardTile({
-    cardId: 'flex', name: 'Bellows', cost: 0, type: 'skill', typeLabel: 'Skill',
+    cardId: 'bellows', name: 'Bellows', cost: 0, type: 'skill', typeLabel: 'Skill',
     description: 'Gain 2 Strength — your attacks deal 2 more damage.', summary: 'PWR+2',
     chips: [{ verb: 'status', status: 'strength', amount: 2, num: '+2', label: 'Strength', explain }],
     chipsComplete: true,

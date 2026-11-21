@@ -250,7 +250,7 @@ test('the removal service: pay 75, pick one uid-precise instance, land back on t
 
 test('the deck-of-one invariant: no service is sold, and the pick handler refuses anyway', () => {
   // The action space is honest first: a deck of exactly 1 never gets an `x`.
-  const lone = shopVisit(3, { state: { deck: [{ uid: 'last', cardId: 'strike' }] }, player: { gold: 300 } });
+  const lone = shopVisit(3, { state: { deck: [{ uid: 'last', cardId: 'hammerfall' }] }, player: { gold: 300 } });
   assert.ok(!actions(lone).some((a) => a.kind === 'shop_removal'), 'a one-card deck cannot buy removal');
   // And the handler — the one place the deck shrinks — holds the line regardless of
   // how a pick is reached (the step is legal in removing mode; the removal is not).

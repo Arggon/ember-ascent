@@ -94,17 +94,17 @@ export const STATUS_ABBREV = {
  * Exported for the same reason as STATUS_ABBREV: describe.js derives its glossary from
  * this table, so a new exotic card is never left unexplained in the compact form. */
 export const CUSTOM_SUMMARY = {
-  bloodletting: 'HP3 E2',
-  hemokinesis: 'A15 HP2',
-  reaper: 'A4xall HP+',
-  limit_break: 'PWRx2',
-  offering: 'HP6 E2 D3',
-  combust: 'PWR+',
-  dark_embrace: 'PWR+',
-  feel_no_pain: 'PWR+',
-  rupture: 'PWR+',
-  entrench: 'BLKx2',
-  rampage: 'A8+5',
+  vein_tap: 'HP3 E2',
+  blood_hammer: 'A15 HP2',
+  ash_harvest: 'A4xall HP+',
+  overtemper: 'PWRx2',
+  blood_tithe: 'HP6 E2 D3',
+  banked_coal: 'PWR+',
+  ash_embrace: 'PWR+',
+  cinder_skin: 'PWR+',
+  split_seam: 'PWR+',
+  brace: 'BLKx2',
+  climbing_heat: 'A8+5',
 };
 
 /**
@@ -545,17 +545,17 @@ function mapBody(state, opts) {
  * Produced in the kernel for the same reason observe() is: a surface must never be
  * able to show (or accept) an action the other surface cannot.
  *
- * CARD LINES ARE `<p-slot> <cardId>`, e.g. `p1 bash`. Two deliberate omissions:
+ * CARD LINES ARE `<p-slot> <cardId>`, e.g. `p1 anvil_blow`. Two deliberate omissions:
  *
  *   - No cost. The PM ruling froze the 8-token ceiling ahead of the illustrative
- *     `3 bash A8+V2 EN2` line; cost stays in the R4 hand dump and still gates
+ *     `3 anvil_blow A8+V2 EN2` line; cost stays in the R4 hand dump and still gates
  *     legality, so nothing is hidden, it is just not paid for twice.
  *   - No effect summary. Measured: `<slot> <name> <summary>` overran the ceiling on
- *     12 of 40 cards (worst 15 tokens, `p3 pummel A2 A2 A2 A2 EXH`). Effects are
+ *     12 of 40 cards (worst 15 tokens, `p3 hail_of_blows A2 A2 A2 A2 EXH`). Effects are
  *     already in the hand dump the agent reads to decide; repeating them per action
  *     would be the single largest avoidable cost in the interface.
  *
- * Measured worst across all 42 content ids: 7 tokens (`p1 sword_boomerang`). Unlike
+ * Measured worst across all 42 content ids: 7 tokens (`p1 returning_brand`). Unlike
  * a name+summary scheme, this form is bounded BY CONSTRUCTION as content grows —
  * the only input is the slot and the card's stable id — and tests/budget.test.js
  * fails CI if any shipped id ever breaks the ceiling.
@@ -855,7 +855,7 @@ function snapshotHand(state, legal, lang = 'en') {
       chipsByTarget,
       playable,
       // The engine's own answer to "may this card be aimed?" — so a renderer never has to
-      // infer it from the card type (Defend is type 'skill', Bash is 'attack', but the
+      // infer it from the card type (Quench is type 'skill', Anvil Blow is 'attack', but the
       // rule belongs here, in the kernel).
       target: def.target ?? 'self',
       // Non-empty only when the player actually has a choice to make: more than one living

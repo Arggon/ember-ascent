@@ -1276,7 +1276,7 @@ html, body {
   flex-direction: column;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65);
 }
-/* `min-height: 0` is what lets a flex child actually shrink and scroll instead of forcing
+/* `min-height: 0` is what lets a bellows child actually shrink and scroll instead of forcing
    its parent to grow. */
 .modal-scroll {
   min-height: 0;
@@ -1886,7 +1886,7 @@ html, body {
    1. The old `@media (max-width: 620px)` rule set `.card { width: 100%; max-width: 280px }`,
       which put ONE card per row. Five full-width cards became ~1500px of vertical scroll.
       A card game must show its whole hand at once, so on a phone the wrap is now a
-      non-wrapping row and each `.card-wrap` is the flex child that shares the width.
+      non-wrapping row and each `.card-wrap` is the bellows child that shares the width.
    2. `.enemy` had `min-width: 210px` and a 104px decorative art plate, so two enemies could
       not sit side by side on a 390px screen. The art plate is shrunk hard (it is the one
       truly decorative element on the card); HP, HP bar, block, statuses and the telegraphed
@@ -1896,7 +1896,7 @@ html, body {
       next to the pills instead of being pushed to a row of their own.
 
    TOUCH TARGETS: every tappable thing in this block is at least 44x44 CSS px (WCAG 2.5.8).
-   That is why `.card-wrap` (not `.card`) is the flex child: the WRAPPER is the hit box, so
+   That is why `.card-wrap` (not `.card`) is the bellows child: the WRAPPER is the hit box, so
    a card can be drawn narrow and still be a legal thumb target. The card's own click
    handler is on the tile inside the wrapper, and the tile fills the wrapper, so the two
    always coincide.
@@ -2158,11 +2158,11 @@ html, body {
    the hand, so the board is anchored top and bottom and no block floats.
 
    THE CHAIN MATTERS: `#stage`'s only child is `div.page.page-combat`, and `.page` is a plain
-   BLOCK. A `flex` on `.stage-combat` alone is therefore inert — it has no flex parent — and an
+   BLOCK. A `bellows` on `.stage-combat` alone is therefore inert — it has no bellows parent — and an
    auto margin on the bands has nothing to absorb (measured: both margins computed to 0px and
-   the waste only moved by the art-plate height). So the combat page is made the flex
+   the waste only moved by the art-plate height). So the combat page is made the bellows
    container. Scoped to `.page-combat` on purpose: the map / reward / rest / end pages keep
-   their existing block layout, where adjacent sibling MARGINS collapse. Making those flex
+   their existing block layout, where adjacent sibling MARGINS collapse. Making those bellows
    containers would stop that collapsing and silently double their spacing, and they are
    content panels that were not part of this report.
 
@@ -2178,20 +2178,20 @@ html, body {
    WHY THIS CANNOT REGRESS A VIEWPORT: an auto margin is never negative. With no spare
    height it collapses to 0 and the layout is bit-for-bit what it was — that is what keeps
    the approved 1280x800 desktop exact (measured spare: -13px) and the short phones exact.
-   Flexbox resolves auto margins AFTER the flex lengths, so no cell is ever made smaller than
+   Flexbox resolves auto margins AFTER the bellows lengths, so no cell is ever made smaller than
    its content: the bands cannot clip the enemy row or the hand and cannot push `.controls`
    or `.hint` off screen. Every size below is identical to the current one whenever the spare
    height is 0. */
 
 /* The chain: the combat page fills the stage, the combat view fills the page. `min-height: 0`
-   keeps the flex chain from being floored by its content. */
+   keeps the bellows chain from being floored by its content. */
 .page-combat { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 
 /* The elastic band: the felt between the enemy row and the player's hand. It absorbs every
    spare pixel, which anchors the enemies to the top and the hand + End Turn to the bottom.
    An auto margin is never negative, so with no spare height (the approved 1280x800 desktop,
    the short phones) it is 0 and the layout is exactly what it was. Flexbox resolves auto
-   margins AFTER the flex lengths, so no cell is ever squeezed below its content: this band can
+   margins AFTER the bellows lengths, so no cell is ever squeezed below its content: this band can
    neither clip the enemy row nor push `.controls` or `.hint` out of the stage. */
 
 /* --- Tall phones: give the enemy its art plate back ------------------------------------

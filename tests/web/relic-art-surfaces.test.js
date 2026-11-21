@@ -170,7 +170,7 @@ test('every known relic id paints its own distinct offer mark, with its tier on 
 test('an unknown relic id degrades to the generic plate (offer) and the generic heart (chip), never an empty box', () => {
   const view = bootView({
     phase: 'reward',
-    reward: { boss: true, cards: [], gold: 0, relicOffers: ['not_a_relic', 'burning_blood'] },
+    reward: { boss: true, cards: [], gold: 0, relicOffers: ['not_a_relic', 'kindled_heart'] },
   }).rewardView();
   const offers = view._all().filter((n) => n.classList.contains('relic-offer'));
   assert.equal(offers.length, 2, 'both offers still render (the torn one is visible, not dropped)');
@@ -189,7 +189,7 @@ test('the elite spoils chip is keyed by relicId: each relic chips its own mark, 
   for (const id of ['ash_crown', 'deep_well', 'forge_iron']) {
     const view = bootView({
       phase: 'reward',
-      reward: { boss: false, cards: ['flex'], gold: 5, relic: id },
+      reward: { boss: false, cards: ['bellows'], gold: 5, relic: id },
     }).rewardView();
     const chip = view._all().find((n) => n.classList.contains('reward-relic'));
     assert.ok(chip, `${id}: the spoils chip renders`);
@@ -202,7 +202,7 @@ test('the elite spoils chip is keyed by relicId: each relic chips its own mark, 
   }
   const torn = bootView({
     phase: 'reward',
-    reward: { boss: false, cards: ['flex'], gold: 5, relic: 'zzz_torn' },
+    reward: { boss: false, cards: ['bellows'], gold: 5, relic: 'zzz_torn' },
   }).rewardView();
   const chip = torn._all().find((n) => n.classList.contains('reward-relic'));
   const glyph = glyphOf(chip, 'coin-glyph');

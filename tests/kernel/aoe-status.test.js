@@ -1,4 +1,4 @@
-// Rules fix: Forgeclap (thunderclap) and Heat Wash (shockwave) are "all" cards that cannot
+// Rules fix: Forgeclap (forgeclap) and Heat Wash (heat_wash) are "all" cards that cannot
 // be aimed, but their statuses used `to: "enemy"`, so vocabulary.status gave them to
 // enemies[0] — even a dead one. They now hit ALL living enemies, and a status never lands on
 // a dead enemy.
@@ -14,7 +14,7 @@ const state = (enemies) => ({ player: { hp: 50, statuses: {} }, combat: { enemie
 const enemy = (dead = false) => ({ hp: dead ? 0 : 20, dead, statuses: {} });
 
 test('Forgeclap and Heat Wash apply every status to ALL enemies', () => {
-  for (const id of ['thunderclap', 'shockwave']) {
+  for (const id of ['forgeclap', 'heat_wash']) {
     const c = card(id);
     assert.equal(c.target, 'all');
     for (const e of c.effects.filter((x) => x.verb === 'status')) assert.equal(e.to, 'all_enemies', `${id} ${e.status}`);

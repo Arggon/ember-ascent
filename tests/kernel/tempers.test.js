@@ -54,10 +54,10 @@ test('temper effect lists', () => {
 
 test('a Red-hot Hammerfall deals 9 and costs 2 HP in a real fight', () => {
   const base = newRun({ seed: 2, tempers: true });
-  const strikes = base.deck.filter((c) => c.cardId === 'strike').map((c) => c.uid);
+  const strikes = base.deck.filter((c) => c.cardId === 'hammerfall').map((c) => c.uid);
   const tempered = { ...base, tempers: Object.fromEntries(strikes.map((u) => [u, 'redhot'])) };
   let s = step(tempered, 'n1').state;
-  const slot = s.combat.hand.findIndex((c) => c.cardId === 'strike');
+  const slot = s.combat.hand.findIndex((c) => c.cardId === 'hammerfall');
   assert.ok(slot >= 0, 'a Hammerfall is in the opening hand');
   const hp0 = s.player.hp;
   const enemyHp0 = s.combat.enemies[0].hp;
@@ -86,21 +86,21 @@ test('log header carries the flag and replay matches the golden hash', () => {
 
 // Recomputed for the "golpes discretos NxM" slice (pool 70 -> 73 cards; strikes
 // resolve through attackHit).
-const GOLDEN = 'sha256:a57352bc630a4336ce651d5472549278e9067491178f5e36e2f1676c581ceead';
+const GOLDEN = 'sha256:e5e810043fc3a33a77c9bce62e9ee6ab635e6e8dfd597ae82d03fe3eccb99dfb';
 
 // ---------------------------------------------------------------------------
 // Visible tempers: every rendering of a tempered card shows what it really plays.
 // ---------------------------------------------------------------------------
 
 /** Seed-6 opening hand with one Red-hot Hammerfall and one Balanced Quench
- *  (S6 moved the map draw: seed 2's opening hand no longer holds the defend). */
+ *  (S6 moved the map draw: seed 2's opening hand no longer holds the quench). */
 function temperedOpening() {
   const base = newRun({ seed: 6, tempers: true });
-  const strikes = base.deck.filter((c) => c.cardId === 'strike');
-  const defend = base.deck.find((c) => c.cardId === 'defend');
+  const strikes = base.deck.filter((c) => c.cardId === 'hammerfall');
+  const quench = base.deck.find((c) => c.cardId === 'quench');
   const tempers = {};
   for (const c of strikes) tempers[c.uid] = 'redhot';
-  tempers[defend.uid] = 'balanced';
+  tempers[quench.uid] = 'balanced';
   const s = step({ ...base, tempers }, 'n1').state;
   assert.equal(s.phase, 'combat');
   return s;
@@ -112,7 +112,7 @@ test('CLI HAND dump shows the tempered numbers and a temper tag', () => {
   const lines = s.combat.hand.map((c, i) => hand.find((l) => l.startsWith(` ${i + 1} `)));
   s.combat.hand.forEach((c, i) => {
     const t = s.tempers[c.uid];
-    if (c.cardId === 'strike') assert.match(lines[i], /Hammerfall +A9 \[RH\]$/, `a Red-hot Hammerfall reads A9 [RH], got "${lines[i]}"`);
+    if (c.cardId === 'hammerfall') assert.match(lines[i], /Hammerfall +A9 \[RH\]$/, `a Red-hot Hammerfall reads A9 [RH], got "${lines[i]}"`);
     else if (t === 'balanced') assert.match(lines[i], /B5 D1 EXH \[BAL\]$/, `a Balanced Quench reads B5 D1 EXH [BAL], got "${lines[i]}"`);
     else assert.doesNotMatch(lines[i], /\[/, 'an untempered card carries no tag');
   });
@@ -129,7 +129,7 @@ test('a default run renders the hand exactly as before (no tags, base numbers)',
 test('GUI snapshot: a Red-hot Hammerfall says Deal 9 and names its temper and HP cost', () => {
   const s = temperedOpening();
   const hand = K.snapshot(s).hand;
-  const hot = hand.find((c) => c.cardId === 'strike');
+  const hot = hand.find((c) => c.cardId === 'hammerfall');
   assert.equal(hot.temper, 'redhot');
   assert.equal(hot.temperName, 'Red-hot');
   assert.equal(hot.summary, 'A9');
@@ -140,13 +140,13 @@ test('GUI snapshot: a Red-hot Hammerfall says Deal 9 and names its temper and HP
   assert.ok(bal, 'the Balanced Quench is in hand');
   assert.equal(bal.temperName, 'Balanced');
   assert.match(bal.description, /Gain 5 Block\. Draw 1 card\. Exhaust/);
-  const plain = hand.find((c) => c.cardId === 'defend' && c.temper === null);
+  const plain = hand.find((c) => c.cardId === 'quench' && c.temper === null);
   if (plain) assert.equal(plain.description, 'Gain 5 Block.');
 });
 
 test('what the card says is what the card does: shown damage equals dealt damage', () => {
   const s = temperedOpening();
-  const slot = s.combat.hand.findIndex((c) => c.cardId === 'strike');
+  const slot = s.combat.hand.findIndex((c) => c.cardId === 'hammerfall');
   const shown = Number(/Deal (\d+) damage/.exec(K.snapshot(s).hand[slot].description)[1]);
   const before = s.combat.enemies[0].hp + s.combat.enemies[0].block;
   // Aimed when the opening fight holds two living enemies (see the S4 note above) —

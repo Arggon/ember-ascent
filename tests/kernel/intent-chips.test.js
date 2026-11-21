@@ -11,7 +11,7 @@
 //   * the numbers are the engine's own (intentDamage), so a chip and the intent
 //     sentence can never disagree.
 //
-// Pins: thrash → attack 7 + block 5; a debuff move → a status chip; a buff move → a
+// Pins: coil_thrash → attack 7 + block 5; a debuff move → a status chip; a buff move → a
 // self Strength chip and its block; the ES rows word the same chips in Spanish.
 
 import test from 'node:test';
@@ -25,8 +25,8 @@ const { ENEMIES } = await loadEncounters();
 const enemy0 = (state, opts) => K.snapshot(state, opts).enemies[0];
 
 test('the enemy row carries the structured intent facts beside its sentence', async () => {
-  // jaw_worm's thrash (moveIndex 1): attack 7 AND block 5 — the both-facts shape.
-  const s = await combatState('strike', { enemyId: 'jaw_worm', enemyOver: { moveIndex: 1 } });
+  // cinder_maw's coil_thrash (moveIndex 1): attack 7 AND block 5 — the both-facts shape.
+  const s = await combatState('hammerfall', { enemyId: 'cinder_maw', enemyOver: { moveIndex: 1 } });
   const e = enemy0(s);
   assert.equal(e.intent.kind, 'attack');
   assert.equal(e.intent.damage, 7, 'the damage fact is the engine intentDamage');
@@ -35,8 +35,8 @@ test('the enemy row carries the structured intent facts beside its sentence', as
   assert.match(e.intent.text, /Will attack for 7 and block 5/, 'the sentence rides beside the facts');
 });
 
-test('intentChips: thrash reads as attack 7 + block 5', async () => {
-  const s = await combatState('strike', { enemyId: 'jaw_worm', enemyOver: { moveIndex: 1 } });
+test('intentChips: coil_thrash reads as attack 7 + block 5', async () => {
+  const s = await combatState('hammerfall', { enemyId: 'cinder_maw', enemyOver: { moveIndex: 1 } });
   const chips = K.intentChips(enemy0(s));
   assert.deepEqual(chips.map((c) => [c.verb, c.num]), [['attack', '7'], ['block', '5']],
     'one chip per fact, in move order');
@@ -53,13 +53,13 @@ test('intentChips: thrash reads as attack 7 + block 5', async () => {
 });
 
 test('intentChips: a debuff move yields a status chip; a buff yields self Strength and block', async () => {
-  const debuff = await combatState('strike', { enemyId: 'acid_slime', enemyOver: { moveIndex: 1 } });
+  const debuff = await combatState('hammerfall', { enemyId: 'slag_ooze', enemyOver: { moveIndex: 1 } });
   const dchips = K.intentChips(enemy0(debuff));
   assert.deepEqual(dchips.map((c) => [c.verb, c.status, c.num]), [['status', 'weak', '+1']],
     'the applied status is a chip, stacks and all');
   assert.match(dchips[0].explain, /Will apply 1 Weak to you/, 'the explain is the intent sentence');
 
-  const buff = await combatState('strike', { enemyId: 'jaw_worm', enemyOver: { moveIndex: 2 } });
+  const buff = await combatState('hammerfall', { enemyId: 'cinder_maw', enemyOver: { moveIndex: 2 } });
   const bchips = K.intentChips(enemy0(buff));
   assert.deepEqual(bchips.map((c) => [c.verb, c.status ?? null, c.num]),
     [['status', 'strength', '+3'], ['block', null, '6']],
@@ -67,10 +67,10 @@ test('intentChips: a debuff move yields a status chip; a buff yields self Streng
   assert.equal(bchips[0].status, 'strength');
 });
 
-test('the rider moves chip their hexes: soulfire is attack 7×2 + Bleed +2, spur_set is Parry +20', async () => {
-  // The Ash Matriarch's soulfire ("A7x2 BLEED2"): the attack chip stays per-hit × hits,
+test('the rider moves chip their hexes: ember_soulfire is attack 7×2 + Bleed +2, spur_set is Parry +20', async () => {
+  // The Ash Matriarch's ember_soulfire ("A7x2 BLEED2"): the attack chip stays per-hit × hits,
   // and the bleed rider is a status chip ON YOU, after the attack in resolution order.
-  const matriarch = await combatState('strike', { enemyId: 'ash_wraith_elite', enemyOver: { moveIndex: 1 } });
+  const matriarch = await combatState('hammerfall', { enemyId: 'ash_wraith_elite', enemyOver: { moveIndex: 1 } });
   const mrow = enemy0(matriarch);
   assert.equal(mrow.intent.label, 'A7x2 BLEED2', 'the label is honest about the rider');
   assert.equal(mrow.intent.damage, 14, 'intentDamage keeps announcing the TOTAL (7×2)');
@@ -81,7 +81,7 @@ test('the rider moves chip their hexes: soulfire is attack 7×2 + Bleed +2, spur
 
   // The Slag Crawler's spur_set ("PARRY20"): a self-buff chips its Parry like its
   // Strength does, `to: 'self'` stamped.
-  const crawler = await combatState('strike', { enemyId: 'slag_crawler', enemyOver: { moveIndex: 3 } });
+  const crawler = await combatState('hammerfall', { enemyId: 'slag_crawler', enemyOver: { moveIndex: 3 } });
   const crow = enemy0(crawler);
   assert.equal(crow.intent.label, 'PARRY20');
   assert.deepEqual(crow.intent.statuses, [{ status: 'parry', stacks: 20, to: 'self' }]);
@@ -92,13 +92,13 @@ test('the rider moves chip their hexes: soulfire is attack 7×2 + Bleed +2, spur
 });
 
 test('the rider sentences word themselves in Spanish too', async () => {
-  const matriarch = await combatState('strike', { enemyId: 'ash_wraith_elite', enemyOver: { moveIndex: 1 } });
+  const matriarch = await combatState('hammerfall', { enemyId: 'ash_wraith_elite', enemyOver: { moveIndex: 1 } });
   const mrow = enemy0(matriarch, { lang: 'es' });
   const mchips = K.intentChips(mrow, 'es');
   assert.match(mchips[0].explain, /Atacará 2 veces con 7 de daño, y te dejará 2 de Sangrado/);
   assert.equal(mchips[1].label, 'Sangrado');
 
-  const crawler = await combatState('strike', { enemyId: 'slag_crawler', enemyOver: { moveIndex: 3 } });
+  const crawler = await combatState('hammerfall', { enemyId: 'slag_crawler', enemyOver: { moveIndex: 3 } });
   const crow = enemy0(crawler, { lang: 'es' });
   const cchips = K.intentChips(crow, 'es');
   assert.match(cchips[0].explain, /Se potenciará: ganará 20 de Parada/);
@@ -106,7 +106,7 @@ test('the rider sentences word themselves in Spanish too', async () => {
 });
 
 test('the intent facts and chips word themselves in Spanish too', async () => {
-  const s = await combatState('strike', { enemyId: 'jaw_worm', enemyOver: { moveIndex: 1 } });
+  const s = await combatState('hammerfall', { enemyId: 'cinder_maw', enemyOver: { moveIndex: 1 } });
   const e = enemy0(s, { lang: 'es' });
   assert.equal(e.intent.block, 5, 'the facts are language-free');
   const chips = K.intentChips(e, 'es');

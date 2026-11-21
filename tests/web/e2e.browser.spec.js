@@ -165,7 +165,7 @@ async function injectMaulDeck(page) {
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-maul-${i}`, cardId: 'bludgeon' });
+    for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-maul-${i}`, cardId: 'maul' });
     return ctl.load(save);
   });
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
@@ -373,7 +373,7 @@ test('deck: tempered copies injected through the save lever wear their own stamp
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    save.state.deck.push({ uid: 'e2e-hot-0', cardId: 'strike' }, { uid: 'e2e-hot-1', cardId: 'strike' });
+    save.state.deck.push({ uid: 'e2e-hot-0', cardId: 'hammerfall' }, { uid: 'e2e-hot-1', cardId: 'hammerfall' });
     save.state.tempers['e2e-hot-0'] = 'redhot';
     save.state.tempers['e2e-hot-1'] = 'redhot';
     return ctl.load(save);
@@ -404,8 +404,8 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
   const page = await freshPage(t);
   await bootToMap(page);
 
-  // The save/load lever (see header): one Slag Surge (cardId ironwave) into the deck, so
-  // the sheet can be pinned against an owned copy. The ironclad starters are not pool
+  // The save/load lever (see header): one Brow Strike (cardId brow_strike) into the deck, so
+  // the sheet can be pinned against an owned copy. The ashwright starters are not pool
   // cards, so this is the ONLY owned copy the codex can chip. The lever's own second half
   // (per the roadmap recipe) is a real action: a bare ctl.load() swaps the session but
   // does not repaint — `act()` does — so the test travels to the first fight (the deck's
@@ -414,7 +414,7 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    save.state.deck.push({ uid: 'e2e-codex-1', cardId: 'ironwave' });
+    save.state.deck.push({ uid: 'e2e-codex-1', cardId: 'brow_strike' });
     return ctl.load(save);
   });
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
@@ -423,40 +423,44 @@ test('codex: the Cards sheet groups the draft pool by rarity and marks owned cop
   // S10 NOTE: this test boots a FRESH ledger, and the boot now builds the run through
   // the same newGame() a restart uses — so the sheet is the run's REAL narrowed pool
   // (the S2 truth fix, finally visible from the first paint too). S8 grew the shipped
-  // table 44 → 70, and the fresh composition moved with it: 20 offerable cards
-  // (16 common, 4 uncommon, NO rare — rule 4 holds rares back as the prize; the four
-  // uncommons ride the one-card-per-verb and named-in-help rules, not the fill).
+  // table 44 → 70, and the fresh composition moved with it: 21 offerable cards
+  // (17 common, 4 uncommon, NO rare — rule 4 holds rares back as the prize; the four
+  // uncommons ride the one-card-per-verb and named-in-help rules, not the fill). The
+  // 0.5.0 id rename re-sorted the one-per-verb tie-breaks (ids sort), so the fresh
+  // pool moved one card: docs/specs/NAMES.md documents the rename.
   const poolLen = await page.evaluate(() => window.__dlb.controller().snapshot().draftPool.length);
-  assert.equal(poolLen, 20, 'the fresh run offers 20 cards');
+  assert.equal(poolLen, 21, 'the fresh run offers 21 cards');
   const btn = page.locator('#hud button[aria-label^="Card codex:"]');
   assert.equal(await btn.count(), 1, 'the HUD Cards control must be present (exactly one)');
-  assert.equal(await btn.getAttribute('aria-label'), 'Card codex: 20 cards', 'the control must announce the pool size');
+  assert.equal(await btn.getAttribute('aria-label'), 'Card codex: 21 cards', 'the control must announce the pool size');
   await openCodex(page);
 
   const sheet = page.locator('.modal.codex-modal');
-  assert.equal(await sheet.getAttribute('aria-label'), 'Card codex: 20 cards', 'the sheet must be a labelled dialog');
-  assert.equal(await sheet.locator('h2').textContent(), 'Cards (20)', 'the sheet title carries the pool size');
+  assert.equal(await sheet.getAttribute('aria-label'), 'Card codex: 21 cards', 'the sheet must be a labelled dialog');
+  assert.equal(await sheet.locator('h2').textContent(), 'Cards (21)', 'the sheet title carries the pool size');
   const heads = await sheet.locator('.codex-group-head').allTextContents();
-  assert.deepEqual(heads, ['Common (16)', 'Uncommon (4)'], 'the fresh groups with their counts — and no rare group, honestly absent');
+  assert.deepEqual(heads, ['Common (17)', 'Uncommon (4)'], 'the fresh groups with their counts — and no rare group, honestly absent');
   const tiles = sheet.locator('.codex-grid .card');
-  assert.equal(await tiles.count(), 20, 'every pool card is one full card tile');
+  assert.equal(await tiles.count(), 21, 'every pool card is one full card tile');
 
-  // Spot-check one known tile: Slag Surge (cardId ironwave) — the game's card face, with
+  // Spot-check one known tile: Brow Strike (cardId brow_strike) — the game's card face, with
   // its cost gem, its woodcut illustration and its describe-layer sentence verbatim (the
   // chips-first face owns the visible rules row — one chip per kernel effect — and the
   // sentence itself stays verbatim on the tile's native title, cardTile) — while the
   // full-table card Maul stays ABSENT from a fresh sheet (the codex shows what the run
-  // can be offered, never the whole shipped table).
-  const surge = tiles.filter({ hasText: 'Slag Surge' });
-  assert.equal(await surge.count(), 1, 'Slag Surge renders exactly one tile');
-  assert.equal(await surge.locator('.cname').textContent(), 'Slag Surge');
+  // can be offered, never the whole shipped table). Slag Surge left the fresh pool with
+  // the 0.5.0 rename (the id sort moved the one-per-verb tie-breaks), so the spot-check
+  // moved to a card the fresh pool still offers.
+  const surge = tiles.filter({ hasText: 'Brow Strike' });
+  assert.equal(await surge.count(), 1, 'Brow Strike renders exactly one tile');
+  assert.equal(await surge.locator('.cname').textContent(), 'Brow Strike');
   assert.equal(await surge.locator('.gem-core').textContent(), '1');
-  assert.equal(await surge.locator('.cfx .cfx-chip').count(), 2,
-    'the chips row carries one chip per kernel effect (Gain 5 Block, Deal 5 damage)');
+  assert.equal(await surge.locator('.cfx .cfx-chip').count(), 1,
+    'the chips row carries one chip per kernel effect (Deal 9 damage)');
   // The codex tile's title is the sentence PLUS the rarity word (codexTile keeps rarity
   // spoken deep in a long group), so the verbatim sentence is pinned as the title's head
   // and the rarity as its tail.
-  assert.equal(await surge.getAttribute('title'), 'Gain 5 Block. Deal 5 damage to the enemy. (Common)');
+  assert.equal(await surge.getAttribute('title'), 'Deal 9 damage to the enemy. (Common)');
   assert.equal(await surge.locator('.c-illus svg').count(), 1, 'the tile renders the card art');
   assert.equal(await surge.getAttribute('role'), 'group', 'a codex tile is a labelled fact, not a button');
   assert.match(await surge.getAttribute('aria-label'), /Costs 1 Energy/);
@@ -497,7 +501,7 @@ test('UX-8: the codex gallery renders card tiles with art, and the deck sheet on
   const page = await freshPage(t);
   await bootToMap(page);
 
-  // The codex gallery. The fresh pool is 20 cards; 13 of them have a drawn woodcut
+  // The codex gallery. The fresh pool is 21 cards; 14 of them have a drawn woodcut
   // today (the "golpes discretos" slice grew the pool by the three new status cards —
   // kiln_fume and cinder_flick joined without a drawing — displacing one drawn card,
   // and the Bellows-family cards ship through the designed no-art fallback: the head
@@ -505,8 +509,8 @@ test('UX-8: the codex gallery renders card tiles with art, and the deck sheet on
   await openCodex(page);
   const sheet = page.locator('.modal.codex-modal');
   const tiles = sheet.locator('.codex-grid .card');
-  assert.equal(await tiles.count(), 20, 'the gallery shows one tile per offerable card');
-  assert.equal(await sheet.locator('.codex-grid .card .c-illus svg').count(), 13,
+  assert.equal(await tiles.count(), 21, 'the gallery shows one tile per offerable card');
+  assert.equal(await sheet.locator('.codex-grid .card .c-illus svg').count(), 14,
     'the drawn cards render their woodcut inside the tile head');
 
   // Phone fit: the sheet never outgrows a 390x844 viewport, and the gallery scrolls
@@ -516,7 +520,7 @@ test('UX-8: the codex gallery renders card tiles with art, and the deck sheet on
   const sheetBox = await sheet.boundingBox();
   assert.ok(sheetBox && sheetBox.height <= 844, `the codex sheet must fit a phone viewport, got ${sheetBox && sheetBox.height}`);
   const scrolls = await sheet.locator('.modal-scroll').evaluate((n) => ({ sh: n.scrollHeight, ch: n.clientHeight }));
-  assert.ok(scrolls.sh > scrolls.ch, `a 20-tile gallery must scroll (scrollHeight ${scrolls.sh} > clientHeight ${scrolls.ch})`);
+  assert.ok(scrolls.sh > scrolls.ch, `a 21-tile gallery must scroll (scrollHeight ${scrolls.sh} > clientHeight ${scrolls.ch})`);
   await page.locator('.modal.codex-modal').getByRole('button', { name: /Close/ }).click();
   await page.waitForSelector('.modal.codex-modal', { state: 'detached', timeout: 3000 });
 
@@ -526,9 +530,9 @@ test('UX-8: the codex gallery renders card tiles with art, and the deck sheet on
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
     save.state.deck = [
-      { uid: 'u-0', cardId: 'strike' }, { uid: 'u-1', cardId: 'strike' },
-      { uid: 'u-2', cardId: 'defend' }, { uid: 'u-3', cardId: 'defend' }, { uid: 'u-4', cardId: 'defend' },
-      { uid: 'u-5', cardId: 'bash' }, { uid: 'u-6', cardId: 'ironwave' },
+      { uid: 'u-0', cardId: 'hammerfall' }, { uid: 'u-1', cardId: 'hammerfall' },
+      { uid: 'u-2', cardId: 'quench' }, { uid: 'u-3', cardId: 'quench' }, { uid: 'u-4', cardId: 'quench' },
+      { uid: 'u-5', cardId: 'anvil_blow' }, { uid: 'u-6', cardId: 'slag_surge' },
     ];
     return ctl.load(save);
   });
@@ -552,7 +556,7 @@ test('combat: a basic attack deals its printed damage without targeting', { time
   await travelToFight(page);
 
   const before = await readState(page);
-  assert.equal(before.enemies.length, 1, 'seed 7 floor 1 is the single Jaw Worm');
+  assert.equal(before.enemies.length, 1, 'seed 7 floor 1 is the single Cinder Maw');
   const energyBefore = before.player.energy;
 
   // `strike` is named Hammerfall on the card face: "Deal 6 damage to the enemy."
@@ -630,7 +634,7 @@ test('UX-3: every cost gem is a whole circle inside its card, and the type word 
     lab.append(labHand);
     document.body.append(lab);
     const wraps = [...hand.querySelectorAll(':scope > .card-wrap')];
-    // Clone EVERY wrap before measuring any: flex shares the lab row across the whole hand,
+    // Clone EVERY wrap before measuring any: bellows shares the lab row across the whole hand,
     // so a lone clone grows to its max-width cap instead of the realized width.
     const clones = wraps.map((w) => {
       const c = w.cloneNode(true);
@@ -1223,7 +1227,7 @@ test('the opening draw is a visible deal: staggered, travelling, layout-stable (
 test('kill: the stroke plays against the hold stage, then the reward arrives', { timeout: 240000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   // Seed 1 deals the exact shape this claim needs (the S4 map draw shift moved seed 7's
-  // opening fight): a single 43-HP Jaw Worm — Maul (32) leaves 11 on turn 1, the second
+  // opening fight): a single 43-HP Cinder Maw — Maul (32) leaves 11 on turn 1, the second
   // stroke kills on turn 2.
   const page = await freshPage(t, 1);
   await bootToMap(page);
@@ -1231,13 +1235,13 @@ test('kill: the stroke plays against the hold stage, then the reward arrives', {
   await travelToFight(page);
 
   // In-page collector for the kill beat: the hold is transient (~1.5s for a signature
-  // stroke) and the shockwave fires mid-hold, so sample from inside the page.
+  // stroke) and the heat_wash fires mid-hold, so sample from inside the page.
   await page.evaluate(() => {
-    window.__fx = { shake: 0, shockwave: 0, hold: 0, heroInHold: 0 };
+    window.__fx = { shake: 0, heat_wash: 0, hold: 0, heroInHold: 0 };
     window.__fxTimer = setInterval(() => {
       const stage = document.getElementById('stage');
       if (stage && stage.classList.contains('stage-shake')) window.__fx.shake += 1;
-      if (document.querySelector('.fx-shockwave')) window.__fx.shockwave += 1;
+      if (document.querySelector('.fx-shockwave')) window.__fx.heat_wash += 1;
       if (stage && stage.querySelector('.ended-hold')) {
         window.__fx.hold += 1;
         if (stage.querySelector('.stage-combat .fight .hero')) window.__fx.heroInHold += 1;
@@ -1245,19 +1249,19 @@ test('kill: the stroke plays against the hold stage, then the reward arrives', {
     }, 40);
   });
 
-  // Turn 1: Maul (32) leaves the 43-HP Jaw Worm at 11. playCard/endTurn wait on the
+  // Turn 1: Maul (32) leaves the 43-HP Cinder Maw at 11. playCard/endTurn wait on the
   // UX-5 gate (the play span, the enemy turn, the deal), so no blind sleeps remain.
   let s = await readState(page);
-  if (!s.hand.some((c) => c.cardId === 'bludgeon')) {
+  if (!s.hand.some((c) => c.cardId === 'maul')) {
     await endTurn(page);
     s = await readState(page);
-    assert.ok(s.hand.some((c) => c.cardId === 'bludgeon'), 'no Maul dealt in two hands');
+    assert.ok(s.hand.some((c) => c.cardId === 'maul'), 'no Maul dealt in two hands');
   }
   await playCard(page, 'Maul');
 
   await endTurn(page);
 
-  // Turn 2: Maul kills. The stroke must PLAY — hold stage with the hero + the shockwave
+  // Turn 2: Maul kills. The stroke must PLAY — hold stage with the hero + the heat_wash
   // beat — and only then hand over to the reward screen.
   await playCard(page, 'Maul');
   let reward = null;
@@ -1276,7 +1280,7 @@ test('kill: the stroke plays against the hold stage, then the reward arrives', {
   assert.ok(fx.hold > 0, 'the kill must hold the fight stage before the panel (the beat)');
   assert.ok(fx.heroInHold > 0, 'the held stage must include the hero figure');
   assert.ok(fx.shake > 0, "Maul's stage shake must fire during the kill");
-  assert.ok(fx.shockwave > 0, "Maul's ember shockwave must fire during the kill");
+  assert.ok(fx.heat_wash > 0, "Maul's ember heat_wash must fire during the kill");
 
   // S3 GOLD: the victory paid. The reward head carries the "+N gold" chip (the kernel's
   // own goldGained), the HUD purse is the start purse plus exactly that N — one computed
@@ -1341,12 +1345,12 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
 
   // In-page FX collector: transient classes sampled every 40ms (see header).
   await page.evaluate(() => {
-    window.__fx = { shake: 0, shockwave: 0, floats: 0, hitstop: 0, embers: 0 };
+    window.__fx = { shake: 0, heat_wash: 0, floats: 0, hitstop: 0, embers: 0 };
     window.__fxTimer = setInterval(() => {
       const stage = document.getElementById('stage');
       if (stage && stage.classList.contains('stage-shake')) window.__fx.shake += 1;
       if (stage && stage.classList.contains('hitstop')) window.__fx.hitstop += 1;
-      if (document.querySelector('.fx-shockwave')) window.__fx.shockwave += 1;
+      if (document.querySelector('.fx-shockwave')) window.__fx.heat_wash += 1;
       if (document.querySelector('.efloat:not(.is-queued)')) window.__fx.floats += 1;
       const embers = document.querySelectorAll('#fx-layer .fx-ember').length;
       if (embers > window.__fx.embers) window.__fx.embers = embers;
@@ -1366,11 +1370,11 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
   // The ember scatter (WAAPI particles): the burst spawns at the freeze anchor
   // (animMs(240) ≈ 480ms after the play) and each particle removes itself on its own
   // finish (a paced life of animMs(700) ≈ 1400ms). The collector's MAX is sampled
-  // through the whole flight; the drain is read directly once it must be over.
+  // through the whole flight; the soul_drain is read directly once it must be over.
   await sleep(900);
   assert.ok((await page.evaluate(() => window.__fx.embers)) > 0,
     `the impact must scatter live embers (max sample ${(await page.evaluate(() => window.__fx.embers))})`);
-  // UX-4 pace: pose animMs(1150) = 2300ms; impact beat at 66% ≈ 1518ms; the shockwave
+  // UX-4 pace: pose animMs(1150) = 2300ms; impact beat at 66% ≈ 1518ms; the heat_wash
   // lives a paced 1120ms beyond that. The UX-5 play span (pose 2300 + the signature
   // tail ≈ 2910ms) covers every beat, and the gate releases past it.
   await waitIdle(page);
@@ -1392,7 +1396,7 @@ test('signature: Maul fires shake + shockwave through the real targeting path', 
 
   // The signature effects fired and coexist with the hit-stop queue (bfa7bf7).
   assert.ok(fx.shake > 0, 'stage-shake must be seen (450ms window)');
-  assert.ok(fx.shockwave > 0, 'the ember shockwave must be seen (560ms window)');
+  assert.ok(fx.heat_wash > 0, 'the ember heat_wash must be seen (560ms window)');
   assert.ok(fx.hitstop > 0, 'the hit-stop feel queue must still run');
   assert.ok(fx.floats > 0, 'damage floats must rise');
 
@@ -1478,24 +1482,24 @@ async function probeHammerArc(t, seed) {
     await page.waitForLoadState('domcontentloaded');
     // The kindling offer is seed-dependent; base 3 Energy covers the salvo's cost 1,
     // so whichever gift is offered will do.
-    const bellows = page.getByRole('button', { name: /^Bellows Breath:/ });
-    if ((await bellows.count()) === 1) await bellows.click();
+    const bellows_keeper = page.getByRole('button', { name: /^Bellows Breath:/ });
+    if ((await bellows_keeper.count()) === 1) await bellows_keeper.click();
     else await page.getByRole('button', { name: /^(Iron Skin|Sparkfall):/ }).first().click();
     await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
     await page.evaluate(() => {
       const ctl = window.__dlb.controller();
       const save = JSON.parse(ctl.save());
-      for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-twin-${i}`, cardId: 'twin_strike' });
+      for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-twin-${i}`, cardId: 'twin_hammers' });
       const res = ctl.load(save);
       if (!res.ok) throw new Error(`save/load failed: ${(res.problems || []).join('; ')}`);
     });
     await travelToFight(page);
 
     let s = await readState(page);
-    if (!s.hand.some((c) => c.cardId === 'twin_strike')) {
+    if (!s.hand.some((c) => c.cardId === 'twin_hammers')) {
       await endTurn(page);
       s = await readState(page);
-      if (s.phase !== 'combat' || !s.hand.some((c) => c.cardId === 'twin_strike')) return null;
+      if (s.phase !== 'combat' || !s.hand.some((c) => c.cardId === 'twin_hammers')) return null;
     }
     await waitIdle(page); // the hand's deal gates the input; wait it out before the aim
 
@@ -1573,14 +1577,14 @@ async function probeKillSlot(t, seed) {
     await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
     await page.goto(`${base}/src/web/index.html?seed=${seed}`);
     await page.waitForLoadState('domcontentloaded');
-    const bellows = page.getByRole('button', { name: /^Bellows Breath:/ });
-    if ((await bellows.count()) === 1) await bellows.click();
+    const bellows_keeper = page.getByRole('button', { name: /^Bellows Breath:/ });
+    if ((await bellows_keeper.count()) === 1) await bellows_keeper.click();
     else await page.getByRole('button', { name: /^(Iron Skin|Sparkfall):/ }).first().click();
     await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
     await page.evaluate(() => {
       const ctl = window.__dlb.controller();
       const save = JSON.parse(ctl.save());
-      for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-kill-twin-${i}`, cardId: 'twin_strike' });
+      for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-kill-twin-${i}`, cardId: 'twin_hammers' });
       const res = ctl.load(save);
       if (!res.ok) throw new Error(`save/load failed: ${(res.problems || []).join('; ')}`);
     });
@@ -1589,10 +1593,10 @@ async function probeKillSlot(t, seed) {
 
     let s = await readState(page);
     if (s.enemies.length !== 2) return null;
-    if (!s.hand.some((c) => c.cardId === 'twin_strike')) {
+    if (!s.hand.some((c) => c.cardId === 'twin_hammers')) {
       await endTurn(page);
       s = await readState(page);
-      if (s.phase !== 'combat' || !s.hand.some((c) => c.cardId === 'twin_strike')) return null;
+      if (s.phase !== 'combat' || !s.hand.some((c) => c.cardId === 'twin_hammers')) return null;
     }
     const victim = s.enemies.reduce((a, b) => (b.hp < a.hp ? b : a));
     if (victim.hp > 10) return null; // the salvo must KILL, or there is no reflow to pin
@@ -1631,10 +1635,10 @@ test('smoke: las nuevas firmas emiten su fx propio', { timeout: 300000 }, async 
   for (const seed of [7, 8, 9, 10, 11, 12]) {
     const fx = await probeSignatureFx(t, seed);
     if (!fx) continue;
-    assert.ok(fx.slagwave > 0, 'Slag Surge (ironwave) must roll its slag wave into the aimed lane');
-    assert.ok(fx.heatwash > 0, 'Heat Wash (shockwave) must drag its thermal wave across the whole row');
-    assert.ok(fx.stokedraft > 0, 'Stoke (inflame) must draft its embers over the hero');
-    assert.ok(fx.platestack > 0, 'Unbroken (impervious) must stack its plates as the skill exhausts');
+    assert.ok(fx.slagwave > 0, 'Slag Surge (slag_surge) must roll its slag wave into the aimed lane');
+    assert.ok(fx.heatwash > 0, 'Heat Wash (heat_wash) must drag its thermal wave across the whole row');
+    assert.ok(fx.stokedraft > 0, 'Stoke (stoke) must draft its embers over the hero');
+    assert.ok(fx.platestack > 0, 'Unbroken (unbroken) must stack its plates as the skill exhausts');
     return;
   }
   assert.fail('no seed let all four signature cards reach the stage');
@@ -1655,14 +1659,14 @@ async function probeSignatureFx(t, seed) {
     await page.addInitScript(() => { try { localStorage.setItem('dlb.helpSeen.v1', '1'); } catch {} });
     await page.goto(`${base}/src/web/index.html?seed=${seed}`);
     await page.waitForLoadState('domcontentloaded');
-    const bellows = page.getByRole('button', { name: /^Bellows Breath:/ });
-    if ((await bellows.count()) === 1) await bellows.click();
+    const bellows_keeper = page.getByRole('button', { name: /^Bellows Breath:/ });
+    if ((await bellows_keeper.count()) === 1) await bellows_keeper.click();
     else await page.getByRole('button', { name: /^(Iron Skin|Sparkfall):/ }).first().click();
     await page.waitForSelector('button[aria-label^="Travel to"]', { timeout: 5000 });
     await page.evaluate(() => {
       const ctl = window.__dlb.controller();
       const save = JSON.parse(ctl.save());
-      for (const id of ['ironwave', 'shockwave', 'inflame', 'impervious']) {
+      for (const id of ['slag_surge', 'heat_wash', 'stoke', 'unbroken']) {
         for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-fx-${id}-${i}`, cardId: id });
       }
       const res = ctl.load(save);
@@ -1684,10 +1688,10 @@ async function probeSignatureFx(t, seed) {
     // Face name → collector key: the fx classes are unique per card (Heat Wash's wave
     // is fx-heatwash — Maul's ring is fx-shockwave, no clash).
     const FACES = [
-      ['slagwave', 'Slag Surge'],   // ironwave
-      ['heatwash', 'Heat Wash'],    // shockwave
-      ['stokedraft', 'Stoke'],      // inflame
-      ['platestack', 'Unbroken'],   // impervious
+      ['slagwave', 'Slag Surge'],   // slag_surge
+      ['heatwash', 'Heat Wash'],    // heat_wash
+      ['stokedraft', 'Stoke'],      // stoke
+      ['platestack', 'Unbroken'],   // unbroken
     ];
     const pending = new Set(FACES.map(([key]) => key));
     // The band routes the walk across REAL fights, and a signature play can KILL the
@@ -1756,7 +1760,7 @@ test('a full run ends on the restart menu, not a blank stage', { timeout: 300000
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    for (let i = 0; i < 10; i += 1) save.state.deck.push({ uid: `e2e-run-${i}`, cardId: 'bludgeon' });
+    for (let i = 0; i < 10; i += 1) save.state.deck.push({ uid: `e2e-run-${i}`, cardId: 'maul' });
     return ctl.load(save);
   });
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
@@ -1835,7 +1839,7 @@ test('shop: the vendor sells a card, removes one, and closes for good', { timeou
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    for (let i = 0; i < 10; i += 1) save.state.deck.push({ uid: `e2e-shop-${i}`, cardId: 'bludgeon' });
+    for (let i = 0; i < 10; i += 1) save.state.deck.push({ uid: `e2e-shop-${i}`, cardId: 'maul' });
     return ctl.load(save);
   });
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
@@ -2000,7 +2004,7 @@ test('potions: the belt fills from a victory, quaffs in combat, and discards', {
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    for (let i = 0; i < 10; i += 1) save.state.deck.push({ uid: `e2e-belt-${i}`, cardId: 'bludgeon' });
+    for (let i = 0; i < 10; i += 1) save.state.deck.push({ uid: `e2e-belt-${i}`, cardId: 'maul' });
     return ctl.load(save);
   });
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
@@ -2191,7 +2195,7 @@ test('event: the wayside tells its story, a choice pays and takes, and the beat 
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-event-${i}`, cardId: 'bludgeon' });
+    for (let i = 0; i < 8; i += 1) save.state.deck.push({ uid: `e2e-event-${i}`, cardId: 'maul' });
     return ctl.load(save);
   });
   assert.equal(res.ok, true, `save/load failed: ${JSON.stringify(res.problems)}`);
@@ -2403,7 +2407,7 @@ test('relics: no HUD chip, the held count climbs on an elite drop, and the warde
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    for (let i = 0; i < 12; i += 1) save.state.deck.push({ uid: `e2e-relic-${i}`, cardId: 'bludgeon' });
+    for (let i = 0; i < 12; i += 1) save.state.deck.push({ uid: `e2e-relic-${i}`, cardId: 'maul' });
     // The naive auto-player bleeds out at the row-6 elite (deterministically, hp 71 ->
     // 9 by floor 5): a padded HP pool removes the attrition coin-flip without touching
     // what this test claims — the drop chain, the chip, the offers, the ended win.
@@ -2630,13 +2634,13 @@ test('a fresh profile: the vault offers down-tier commons and the first win unlo
   // The run's pool, straight from the kernel's own snapshot: the five commons, no rares.
   const FRESH_NAMES = ['Kindled Heart', 'Cyan Lantern', 'Forge Iron', 'Whetted Edge', 'Hearth Ash'];
   const bootPool = await page.evaluate(() => window.__dlb.snapshot().relicPool);
-  assert.deepEqual(bootPool, ['burning_blood', 'cyan_lantern', 'forge_iron', 'whetted_edge', 'hearth_ash'],
+  assert.deepEqual(bootPool, ['kindled_heart', 'cyan_lantern', 'forge_iron', 'whetted_edge', 'hearth_ash'],
     `a fresh ledger boots the five-common pool: ${JSON.stringify(bootPool)}`);
 
   const res = await page.evaluate(() => {
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
-    for (let i = 0; i < 12; i += 1) save.state.deck.push({ uid: `e2e-fresh-${i}`, cardId: 'bludgeon' });
+    for (let i = 0; i < 12; i += 1) save.state.deck.push({ uid: `e2e-fresh-${i}`, cardId: 'maul' });
     save.state.player.maxHp = 999;
     save.state.player.hp = 999;
     return ctl.load(save);
@@ -2693,7 +2697,7 @@ test('a fresh profile: the vault offers down-tier commons and the first win unlo
           // The vault can be genuinely EXHAUSTED through play on a fresh profile: the
           // elite-heavy walk may hold every common the pool carries by the act-2 warden
           // (starter + four elite drops). The honest zero is the S10 truth, still
-          // headlined, still offering the walk-away.
+          // headlined, still blood_tithe the walk-away.
           const head = await page.locator('.reward-head span').first().textContent();
           assert.match(head, /the warden offers nothing/, `an exhausted vault says so: ${head}`);
           assert.equal(await page.locator('.relic-offer').count(), 0, 'an exhausted vault renders no offer button');
@@ -2783,7 +2787,7 @@ test('a torn relic pool seals the warden\u2019s vault honestly (UX-2 fallback)',
     const ctl = window.__dlb.controller();
     const save = JSON.parse(ctl.save());
     save.state.relicPool = ['ghost_one', 'ghost_two'];
-    for (let i = 0; i < 12; i += 1) save.state.deck.push({ uid: `e2e-torn-${i}`, cardId: 'bludgeon' });
+    for (let i = 0; i < 12; i += 1) save.state.deck.push({ uid: `e2e-torn-${i}`, cardId: 'maul' });
     save.state.player.maxHp = 999;
     save.state.player.hp = 999;
     return ctl.load(save);
@@ -2938,12 +2942,12 @@ test('language: the toggle flips the combat UI and the card sentences to Spanish
   assert.equal(await page.evaluate(() => localStorage.getItem('dlb.lang')), 'en');
 });
 
-test('fixed start: the seeded other hero (?hero=bellows) names himself in the HUD, in English and in Spanish after the toggle', { timeout: 60000 }, async (t) => {
+test('fixed start: the seeded other hero (?hero=bellows_keeper) names himself in the HUD, in English and in Spanish after the toggle', { timeout: 60000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   // A page of its OWN, seeded to the other hero: the walk above runs the fixed default,
   // and a language toggle here would persist (dlb.lang is written) and poison every
   // later English assertion — which is exactly why this is an independent test.
-  const page = await freshPage(t, 7, false, null, 'bellows');
+  const page = await freshPage(t, 7, false, null, 'bellows_keeper');
   await page.waitForSelector('#hud', { timeout: 5000 });
   // The HUD chip paints snap.characterName (kernel-side), the same proper noun the
   // retired picker's name row used to show. The BLURBS' live EN/ES read died with the
@@ -3771,7 +3775,7 @@ test('defeat: the speed dock skip cuts the hold short like every other hold', { 
 
 test('defeat rework leaves the victory kill-hold intact', { timeout: 240000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
-  // Seed 1: a single 43-HP Jaw Worm — two Mauls kill it on turn 2 (the same shape the
+  // Seed 1: a single 43-HP Cinder Maw — two Mauls kill it on turn 2 (the same shape the
   // older kill walk pins, replayed here as the defeat work's own regression guard).
   const page = await freshPage(t, 1);
   await bootToMap(page);
@@ -3780,10 +3784,10 @@ test('defeat rework leaves the victory kill-hold intact', { timeout: 240000 }, a
   await armDefeatCollector(page);
 
   let s = await readState(page);
-  if (!s.hand.some((c) => c.cardId === 'bludgeon')) {
+  if (!s.hand.some((c) => c.cardId === 'maul')) {
     await endTurn(page);
     s = await readState(page);
-    assert.ok(s.hand.some((c) => c.cardId === 'bludgeon'), 'no Maul dealt in two hands');
+    assert.ok(s.hand.some((c) => c.cardId === 'maul'), 'no Maul dealt in two hands');
   }
   await playCard(page, 'Maul');
   await endTurn(page);
@@ -3897,15 +3901,15 @@ test('barra por golpe: a multi-hit card steps the enemy bar per golpe, never one
 
 test('barra por golpe: a heal raises the hero bar animated when it lands', { timeout: 120000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
-  // Seed 1's default fight is the jaw worm; its first move is chomp (A11), so one end
+  // Seed 1's default fight is the jaw worm; its first move is maw_chomp (A11), so one end
   // turn damages the hero with a fresh snapshot -- the heal then has room to land.
   const page = await freshPage(t, 1);
   await bootToMap(page);
   await injectDeck(page, 'tallow_rub');
   await travelToFight(page);
-  await endTurn(page); // chomp lands (A11)
+  await endTurn(page); // maw_chomp lands (A11)
   const hurt = await page.evaluate(() => window.__dlb.snapshot().player);
-  assert.ok(hurt.hp < hurt.maxHp, `the hero took the chomp to heal from: ${hurt.hp}/${hurt.maxHp}`);
+  assert.ok(hurt.hp < hurt.maxHp, `the hero took the maw_chomp to heal from: ${hurt.hp}/${hurt.maxHp}`);
 
   await armBarCollector(page, '.fight .hero .hpbar > i');
   await page.locator('button[data-slot][aria-label^="Tallow Rub"][aria-disabled="false"]').first().click();
@@ -4170,9 +4174,9 @@ test('barra por golpe: a 2-body mid-timeline kill keeps the ghost on stage until
   assert.ok(got.collapseTicks > 0, `the delayed collapse actually played on the (re-drawn) ghost (${got.collapseTicks} active ticks)`);
 });
 
-test('barra por golpe: a Combust turn steps the hero cost BEFORE the first slam (no false heal between golpes)', { timeout: 120000 }, async (t) => {
+test('barra por golpe: a Banked Coal turn steps the hero cost BEFORE the first slam (no false heal between golpes)', { timeout: 120000 }, async (t) => {
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
-  // The regression: Combust's end-of-turn sweep and HP cost resolve in the stream BEFORE
+  // The regression: Banked Coal's end-of-turn sweep and HP cost resolve in the stream BEFORE
   // the enemy attacks of the same turn (rules/act.js: fireHook(end_of_turn) then
   // enemyTurn). Their bar steps are absolute pre-attack HP, so firing them on the uniform
   // feel-queue beat (~1 beat after the first impact) lifted the bar back up mid-turn with
@@ -4181,13 +4185,13 @@ test('barra por golpe: a Combust turn steps the hero cost BEFORE the first slam 
   // falling. Seed 22 deals two attacking foes on turn 1.
   const page = await freshPage(t, 22);
   await bootToMap(page);
-  await injectDeck(page, 'combust');
+  await injectDeck(page, 'banked_coal');
   await travelToFight(page);
   const attackers = (await readIntents(page)).filter((i) => i.kind === 'attack');
   assert.ok(attackers.length >= 1, `the seeded turn attacks: ${JSON.stringify(await readIntents(page))}`);
-  await playCard(page, 'Banked Coal'); // the combust power (kernel cardId 'combust')
-  const held = await page.evaluate(() => window.__dlb.controller().state.powers?.combust ?? 0);
-  assert.ok(held >= 1, `Combust is held: ${JSON.stringify(await page.evaluate(() => window.__dlb.controller().state.powers))}`);
+  await playCard(page, 'Banked Coal'); // the banked_coal power (kernel cardId 'banked_coal')
+  const held = await page.evaluate(() => window.__dlb.controller().state.powers?.banked_coal ?? 0);
+  assert.ok(held >= 1, `Banked Coal is held: ${JSON.stringify(await page.evaluate(() => window.__dlb.controller().state.powers))}`);
   // The sweep's cost IS the power's stacks (kernel: loseHp(state.player, stacks)).
   const cost = held;
 
@@ -4265,7 +4269,7 @@ test('impact recipe: the frozen frame is white + squashed on the fig, and the ca
   if (!chromium || !base) return t.skip('playwright/chromium unavailable');
   const page = await freshPage(t, 1, false, 'mines');
   await bootToMap(page);
-  await injectDeck(page, 'strike');
+  await injectDeck(page, 'hammerfall');
   await travelToFight(page);
   // travelToFight does NOT wait the gate (its header says so): without this, the
   // collector would arm inside the fight-entry action's own freeze and misread it as
@@ -4606,7 +4610,7 @@ test('the sfx layer: lazy context, one sound per golpe, a persistent mute', { ti
   // the same counts (the collapse beat, AC6's moment), and lastParams carries whatever
   // synthesis fired last — the pitch band itself is pinned by the unit suite over 20
   // real syntheses, not by one racy browser read.
-  await injectDeck(page, 'bludgeon');
+  await injectDeck(page, 'maul');
   await travelToFight(page);
 
   await waitIdle(page);

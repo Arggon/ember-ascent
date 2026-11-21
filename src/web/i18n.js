@@ -360,10 +360,10 @@ const STRINGS = {
   // non-empty en/es blurb.
   // I18N-2: the names. Ashwright is a proper noun (renders identically);
   // the Bellows Keeper's title localizes, article-less per the genderless-hero ruling.
-  'hero.ironclad.name': { en: 'Ashwright', es: 'Ashwright' },
-  'hero.bellows.name': { en: 'Bellows Keeper', es: 'Custodio del Fuelle' },
-  'hero.ironclad.blurb': { en: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.', es: '60 HP. Martillo y yunque. Corazón Encendido: recupera 6 tras cada combate.' },
-  'hero.bellows.blurb': { en: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.', es: '54 HP. Soplo del Fuelle golpea a todos los enemigos; Abanica las Llamas aviva la Energía. Farol Cian: +1 de Energía en el primer turno de cada combate.' },
+  'hero.ashwright.name': { en: 'Ashwright', es: 'Ashwright' },
+  'hero.bellows_keeper.name': { en: 'Bellows Keeper', es: 'Custodio del Fuelle' },
+  'hero.ashwright.blurb': { en: '60 HP. Hammer and anvil. Kindled Heart: heal 6 after each fight.', es: '60 HP. Martillo y yunque. Corazón Encendido: recupera 6 tras cada combate.' },
+  'hero.bellows_keeper.blurb': { en: '54 HP. Bellows Gust hits every enemy; Fan the Flames stokes Energy. Cyan Lantern: +1 Energy on the first turn of each fight.', es: '54 HP. Soplo del Fuelle golpea a todos los enemigos; Abanica las Llamas aviva la Energía. Farol Cian: +1 de Energía en el primer turno de cada combate.' },
   'page.kindling': { en: '0 — The Kindling', es: '0 — El Rescoldo' },
 
   /* ---- end screen ----------------------------------------------------------------------- */

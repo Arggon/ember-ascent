@@ -155,7 +155,7 @@ function countersOf(profile) {
 export const RELIC_UNLOCK_TABLE = Object.freeze([
   Object.freeze({
     at: 0,
-    ids: Object.freeze(['burning_blood', 'cyan_lantern', 'forge_iron', 'whetted_edge', 'hearth_ash']),
+    ids: Object.freeze(['kindled_heart', 'cyan_lantern', 'forge_iron', 'whetted_edge', 'hearth_ash']),
   }),
   Object.freeze({ at: 1, ids: Object.freeze(['ember_heart']) }),
   Object.freeze({ at: 3, ids: Object.freeze(['gold_vein', 'flask_grip']) }),

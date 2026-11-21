@@ -192,7 +192,7 @@ const flickStrikes = (hp) => [
 ];
 const flickList = (hp) => [{ kind: 'card-fly', side: 'side-0', strikes: flickStrikes(hp) }];
 const deathBurst = (holdMs) => ({
-  kind: 'death', enemy: 0, slot: 0, id: 'jaw_worm', name: 'Jaw Worm',
+  kind: 'death', enemy: 0, slot: 0, id: 'cinder_maw', name: 'Cinder Maw',
   side: 'side-0', boss: false, maxHp: 32, holdMs,
 });
 

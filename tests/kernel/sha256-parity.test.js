@@ -23,7 +23,7 @@ test('sha256Hex equals node:crypto on known vectors and every length 0..200', ()
     '',
     'abc',
     'The quick brown fox jumps over the lazy dog',
-    'dlb-0.3.0-act1',
+    'dlb-0.5.0-dests',
     '{"a":1,"b":[1,2,3]}',
     'héllo — unicode ünïcödé ✓ 漢字',
   ];

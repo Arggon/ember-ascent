@@ -52,7 +52,7 @@ export function readRecords(from) {
  * Per-card counts over the record set: how often each card was offered, picked, and
  * carried in decks, with the ratios that a balance report is read for.
  *
- * A RATIO NEEDS A DENOMINATOR. A starter card (`strike`, `defend`, `bash`) is never
+ * A RATIO NEEDS A DENOMINATOR. A starter card (`hammerfall`, `quench`, `anvil_blow`) is never
  * OFFERED as a reward — it is in the deck from turn one — so `picked / offered` was
  * 0/0, printed as "0.000", which reads as "picked 0% of the time" when the truth is
  * "not applicable". Same for a presence rate before the first win. Both are null and

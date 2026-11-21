@@ -2,7 +2,7 @@
 // shapes for targeted plays against the FROZEN 8-token action-line ceiling (R9a).
 //
 // Why this exists: the frozen interface change wants `p2 1` for the multi-enemy case, but
-// action lines also carry the card id (`p2 sword_boomerang`) and that pair already measures
+// action lines also carry the card id (`p2 returning_brand`) and that pair already measures
 // 7 tokens worst-case. Appending anything to it risks the frozen ceiling, so every candidate
 // shape is measured over the FULL shipped content set before one is chosen.
 //
