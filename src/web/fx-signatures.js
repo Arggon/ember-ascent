@@ -230,7 +230,6 @@ export function fxFlarefan(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.42)) || 1);
 }
 
-        // ==== LOTE 2 — ataques comunes I: each common attack draws its own mark. ====
         // Arc Cut: ONE horizontal luminous arc crosses the WHOLE enemy row, side to
         // side — sized to the row's measured span (like the bellows_gust cone), never to a
         // single lane, because the card hits all enemies.
@@ -332,7 +331,6 @@ export function fxJabpull(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.52)) || 1);
 }
 
-        // ==== LOTE 3 — ataques comunes II: each common attack draws its own mark. ====
         // Forgeclap: TWO hammer heads rise and MEET overhead — the clash point is ABOVE
         // the hero (measured hero box), and the shock ring plus the vulnerable cracks
         // span the WHOLE row (measured row span, like the bellows_gust cone: every enemy is hit).
@@ -447,7 +445,6 @@ export function fxBloodcondense(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.06)) || 1);
 }
 
-        // ==== LOTE 4 — skills comunes: each common skill draws its own mark. ====
         // Cast Aside: the cast_aside tosses a spare plate OVER the shoulder — it rises behind
         // the hero's back and drops away (measured hero box) — and the DRAWN card slides
         // from the chest into the hand (the hand measured, like the jab's pulled card).
@@ -570,7 +567,6 @@ export function fxVentjets(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.5)) || 1);
 }
 
-        // ==== LOTE 5 — ataques uncommon: each uncommon card draws its own mark. ====
         // Heat Trance: the arms cross and THREE GHOST CARDS fan open by the chest —
         // they glow in sequence, then flow one after another into the hand (the hand
         // measured, like the jab's pulled card). A fan of cards, not a dart and not a
@@ -688,7 +684,6 @@ export function fxAshscythe(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.45)) || 1);
 }
 
-        // ==== LOTE 6 — skills uncommon: each uncommon skill makes its own mark. ====
         // Heat Wash: the low arm sweep drags a THERMAL WAVE across the WHOLE row
         // (sized to the row's measured span, like the ash scythe) — a low crest rolls
         // left-to-right and the haze behind it wilts as it passes.
@@ -777,7 +772,6 @@ export function fxAshswirl(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.26)) || 1);
 }
 
-        // ==== LOTE 7 — poderes uncommon: each uncommon power makes its own mark. ====
         // Stoke: a COLUMN of embers drafts UP over the hero's furnace — the breast is
         // the furnace and this is it being fed. A soft glow breathes at the chest and
         // the embers rise through it: round motes in a tight vertical draft, never
@@ -894,7 +888,6 @@ export function fxCindercrust(fire, lane, b, sigMs, gen) {
   }, animMs(Math.round(sigMs * 0.2)) || 1);
 }
 
-        // ==== LOTE 8 — cartas raras: each rare card makes its own mark. ====
         // Unbroken: FOUR steel plates stack onto the hero ONE BY ONE — each drops
         // from above onto the pile (its own staggered beat), then a white seal closes
         // the set. Hero-measured (self-target), like the quench veil; a BUILD, never

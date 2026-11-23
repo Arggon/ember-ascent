@@ -7,25 +7,6 @@
 // When it needs to know something (is this card playable? what does this enemy intend?
 // which node can I reach?), it reads a field the kernel already answered.
 //
-// The surface is split into focused modules beside this one:
-//   runtime.js       element roots, motion/timer plumbing, shared presentation state
-//   dom.js           the el() builder, toast/announce, keyword text, small helpers
-//   glyphs.js        every inline-SVG mark and the name->mark tables
-//   hero-moves.js    the per-card movement/throw/signature tables (a mirror of cards.json)
-//   targeting.js     the aiming flow (pendingSlot/aimed live here)
-//   actions.js       act() — the ONE dispatch path — plus newGame and the hero/path switch
-//   run-history.js   localStorage ledger, scoring screens, unlock narration
-//   hud.js           the status bar and the help/glossary sheet (the sheet's footer
-//                    carries the tour's Replay entry)
-//   floats.js        floating numbers, hit classes, dying-enemy ghosts
-//   fx.js            the FX queue and its dispatcher (the persistent #fx-layer)
-//   fx-signatures.js one function per per-card signature effect
-//   combat-view.js   the fight screen (hero, enemies, hand, controls)
-//   map-view.js      the ascent map
-//   reward-view.js / kindling-view.js / rest-view.js / end-view.js  the other screens
-//   tour.js          the first-run product tour (the persistent #tour-layer, the
-//                    onboarding flags, the keyboard guard's predicate)
-//   render.js        the one paint path (the page() frame lives in page-frame.js)
 //
 // All art is CSS or inline SVG built with DOM calls: no image files beyond the local
 // sprites, no external assets, no fonts fetched over the network. Silhouettes and glyphs
@@ -52,7 +33,6 @@ import { tourOpen, tourStep, freshOnboarding, tourNext, tourBack, dismissTour } 
 import { render } from './render.js';
 void render;
 
-/* ------------------------------------------------------------- keyboard bonus */
 
 document.addEventListener('keydown', (ev) => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;

@@ -46,7 +46,6 @@ import { el } from './dom.js';
 import { ctl, runEvents } from './runtime.js';
 import { currentLang, t } from './i18n.js';
 
-/* -------------------------------------------------------------------- RUN HISTORY */
 //
 // WHAT THIS OWNS: the shape of browser storage, the layout of the history screens, and
 // every word on them. WHAT IT DOES NOT OWN: any game fact. The score comes from

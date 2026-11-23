@@ -111,7 +111,6 @@ export function sfx(name, opts = {}) {
   return true;
 }
 
-/* ------------------------------------------------------------------ synthesis ---- */
 
 function noiseFor() {
   if (noiseBuf) return noiseBuf;
@@ -271,7 +270,6 @@ const SYNTHS = {
   'enemy-death': playDeath,
 };
 
-/* ------------------------------------------------------- the gesture listeners ---- */
 
 function onFirstGesture() {
   primeAudio();

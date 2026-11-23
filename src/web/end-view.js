@@ -12,7 +12,6 @@ import { newGame } from './actions.js';
 import { page } from './page-frame.js';
 import { t } from './i18n.js';
 
-/* --------------------------------------------------------------------- ENDED */
 
 export function endView() {
   const e = snap.ended;

@@ -23,7 +23,6 @@ import { blockGain, playerStrike, vulnerableAmplify } from './rules/vocabulary.j
 import { defaultContent } from './content.js';
 import { effectSummary, CUSTOM_SUMMARY, STATUS_ABBREV } from './observe.js';
 
-/* ------------------------------------------------------------------ small helpers */
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const sentence = (s) => (/[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
@@ -44,10 +43,8 @@ const sentence = (s) => (/[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
  * es tables below are complete, so the fallback only ever fires for an unknown key.
  */
 
-/** The languages the describe layer speaks, in the order a surface may offer them. */
 export const LANGUAGES = Object.freeze(['en', 'es']);
 
-/** The one language resolver: exactly 'es' picks Spanish, everything else English. */
 export const langOf = (lang) => (lang === 'es' ? 'es' : 'en');
 
 /** Spanish plural, mirroring the English `plural` above. */
@@ -82,7 +79,6 @@ function glossRow(abbrev, label, meaning, group = 'A') {
   return Object.fromEntries(GLOSS_KEYS.map((k, i) => [k, [abbrev, label, meaning, group][i]]));
 }
 
-/** The glossary sections, in the order a new player should meet them (English). */
 export const GLOSSARY_SECTIONS = [
   { key: 'A', title: 'Every card', blurb: 'The shapes you will see on almost every card.' },
   { key: 'B', title: 'Statuses and powers', blurb: 'Names for lingering effects. Each shows a number for how many stacks you have.' },
@@ -101,9 +97,7 @@ export function glossarySections(lang = 'en') {
   return langOf(lang) === 'es' ? GLOSSARY_SECTIONS_ES : GLOSSARY_SECTIONS;
 }
 
-/* ------------------------------------------------------------------------ glossary */
 
-/** The card types a tile can show (English). */
 export const CARD_TYPE_LABEL = {
   attack: 'Attack',
   skill: 'Skill',
@@ -121,7 +115,6 @@ export const CARD_TYPE_LABEL_ES = {
   curse: 'Maldición',
 };
 
-/** The type word for one language; unknown types fall through unchanged. */
 export function typeLabel(type, lang = 'en') {
   const table = langOf(lang) === 'es' ? CARD_TYPE_LABEL_ES : CARD_TYPE_LABEL;
   return table[type] ?? CARD_TYPE_LABEL[type] ?? String(type);
@@ -305,14 +298,12 @@ export function describePower(key, stacks, lang = 'en') {
   return `${m.label} ${n} — ${m.per}. ${es ? POWER_NOTE_ES : POWER_NOTE}`;
 }
 
-/** Short human label for one status counter, e.g. "Strength 2". */
 export const statusName = (key, lang = 'en') => {
   const es = langOf(lang) === 'es';
   return (es ? STATUS_MEANING_ES[key]?.label : null) ?? STATUS_MEANING[key]?.label
     ?? String(key).replace(/_/g, ' ');
 };
 
-/* ------------------------------------------------------- effect chips (the icons) */
 //
 // The card face's SECOND reading: an icon and a number instead of a sentence. A player
 // who has met the marks reads "arrow-up +2" faster than "Gain 2 Strength — your attacks
@@ -524,7 +515,6 @@ export function chipsCover(def) {
     || (Object.prototype.hasOwnProperty.call(CHIP_NUMBER, e.verb)));
 }
 
-/** One-line description of a card type, for tiles and the help panel. */
 export function describeCardType(type, lang = 'en') {
   if (langOf(lang) === 'es') {
     switch (type) {
@@ -550,7 +540,6 @@ export function describeCardType(type, lang = 'en') {
   }
 }
 
-/* --------------------------------------------------------------- custom handlers */
 
 /**
  * One sentence per `custom` handler, written from the handler source.
@@ -737,7 +726,6 @@ export function describeEffect(effect, def = {}, lang = 'en', fold = null) {
   return fn(effect, def, fold);
 }
 
-/* ------------------------------------------------------------------ card describe */
 
 /**
  * Consecutive identical `damage` effects folded into one sentence.
@@ -861,7 +849,6 @@ export function describePlayability(card, energy, lang = 'en') {
   return 'Not playable right now.';
 }
 
-/* ----------------------------------------------------------------- enemy intent */
 
 /**
  * Resolve the move an enemy is showing. The R4 dump stores `moveIndex`; the structured
@@ -953,7 +940,6 @@ export function describeIntent(enemy, lang = 'en') {
   }
 }
 
-/* ---------------------------------------------------------------------- glossary */
 
 /**
  * The tokens `effectSummary()` can actually emit, derived from the generators rather
@@ -1149,7 +1135,6 @@ export function glossary(lang = 'en') {
   return out;
 }
 
-/* -------------------------------------------------------------------- how to play */
 
 /**
  * The first-run help lines, in kernel hands so the browser help panel and any other

@@ -7,7 +7,6 @@ import { temperPickTile } from './event-view.js';
 import { page } from './page-frame.js';
 import { t } from './i18n.js';
 
-/* --------------------------------------------------------------------- REST */
 
 export function restView() {
   const wrap = el('div', { cls: 'rest' + (arriving.rest ? ' rest-arriving' : '') });

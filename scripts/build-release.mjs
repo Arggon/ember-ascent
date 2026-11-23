@@ -39,9 +39,6 @@
 // is byte-reproducible and needs no `zip` binary and no dependency, so the exact
 // upload file can be regenerated and its hash checked on any machine with Node.
 //
-// Usage:
-//   node scripts/build-release.mjs                  # -> ./release + ./release.zip
-//   OUT=/tmp/foo node scripts/build-release.mjs     # -> /tmp/foo + /tmp/foo.zip
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
@@ -52,7 +49,6 @@ const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const OUT = resolve(process.env.OUT ?? join(REPO, 'release'));
 const ZIP = OUT.endsWith('.zip') ? OUT : `${OUT}.zip`;
 
-// ---------------------------------------------------------------------------
 // What ships (#47). Nothing here is a hand-kept file list:
 //   1. the WHOLE web app folder (src/web/, incl. src/web/assets/ sprites and backdrops),
 //      flattened to the artifact root, because itch.io serves index.html from the root;
@@ -130,7 +126,6 @@ Layout:
   HOW-TO-RUN-LOCALLY.txt this file
 `;
 
-// ---------------------------------------------------------------------------
 // Minimal deterministic ZIP writer (store + deflate, CRC32, fixed timestamps).
 // ---------------------------------------------------------------------------
 const CRC_TABLE = (() => {
@@ -215,7 +210,6 @@ function makeZip(files) {
   return Buffer.concat([...locals, cdBuf, eocd]);
 }
 
-// ---------------------------------------------------------------------------
 // Nothing that is not a runtime asset may reach the upload: archives, logs and
 // dotfiles are skipped, so a leftover file in the output directory can never be
 // packaged into the zip the owner uploads.
