@@ -41,6 +41,7 @@ rules enforced
   SAVE1 parseSave(raw) is the only save entry for callers outside the kernel
   SAVE2 only surface/session.js may call parseSave; every other surface goes through loadObject
   SAVE3 loadObject must branch on parseSave(raw).ok
+  RELIC1 rules must derive relic effects from the held relic table, not hardcoded names
 
 exit codes
   0  clean
@@ -192,6 +193,18 @@ if (!/\bparseSave\s*\(/.test(sessionText) || !/\bparsed\s*\.\s*ok\b/.test(sessio
     rule: 'SAVE3', file: SESSION_FILE,
     detail: 'loadObject must branch on parseSave(raw).ok; fix: const parsed = parseSave(raw); if (!parsed.ok) return { ok: false, problems: parsed.problems }',
   });
+}
+
+const RELIC_NAME_KEY = /(?:\bstate|\bst)\s*\.\s*relics?\s*(?:[!=]==?|===|!==)\s*['"`]/;
+for (const file of files) {
+  const rel = relative(root, file);
+  if (!rel.startsWith('src/kernel/rules/')) continue;
+  if (RELIC_NAME_KEY.test(stripComments(readFileSync(file, 'utf8')))) {
+    violations.push({
+      rule: 'RELIC1', file: rel,
+      detail: 'relic effects must come from the held relic table (relicList/hasRelic), not a hardcoded relic name; fix: replace the name comparison with a table lookup',
+    });
+  }
 }
 
 // The public surface is a frozen list: kernel/index.js and nothing else (R1).
