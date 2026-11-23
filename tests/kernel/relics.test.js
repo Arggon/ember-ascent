@@ -24,9 +24,7 @@
 //     same log machinery every other run does (the S4/S5 precedent).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadKernel, REPO } from '../helpers/harness.mjs';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { loadKernel } from '../helpers/harness.mjs';
 import { contentForProfile } from '../../src/kernel/index.js';
 import {
   RELICS, RELIC_HOOKS, RELIC_TIERS, ELITE_COMMON_BAND, relicList, relicDef, relicSum,
@@ -107,11 +105,6 @@ test('every starting relic is in the relic table', async () => {
   for (const [id, ch] of contentForProfile(null).characters) {
     assert.ok(RELICS[ch.startingRelic], `${id}: relic ${ch.startingRelic} has no table entry`);
   }
-});
-
-test('relic effects are not keyed on relic names in the act rules', () => {
-  const src = readFileSync(resolve(REPO, 'src/kernel/rules/act.js'), 'utf8');
-  assert.doesNotMatch(src, /state\.relic\s*[!=]==?\s*'/);
 });
 
 test('the Iron Skin offer names the hero\'s own relic', () => {

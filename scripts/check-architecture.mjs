@@ -38,6 +38,7 @@ rules enforced
   R1c  state mutation (Object.assign on state, direct .prop = on a state arg) only inside kernel
   R3   kernel must not import node:perf_hooks, read Date, or call Math.random
   R3   kernel must import NO node:* builtin at all (so it runs in a browser unmodified)
+  RELIC1 rules must derive relic effects from the held relic table, not hardcoded names
 
 exit codes
   0  clean
@@ -157,6 +158,19 @@ for (const file of files) {
       if (/\bstate\s*\.\s*[A-Za-z_$][\w$]*\s*(?:=[^=]|\+\+|--)/.test(code)) {
         violations.push({ rule: 'R1c', file: rel, line: i + 1, detail: 'assigns to a state property outside the kernel' });
       }
+    });
+  }
+}
+
+const codeOnly = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+const RELIC_NAME_KEY = /(?:\bstate|\bst)\s*\.\s*relics?\s*(?:[!=]==?|===|!==)\s*['"`]/;
+for (const file of files) {
+  const rel = relative(root, file);
+  if (!rel.startsWith('src/kernel/rules/')) continue;
+  if (RELIC_NAME_KEY.test(codeOnly(readFileSync(file, 'utf8')))) {
+    violations.push({
+      rule: 'RELIC1', file: rel,
+      detail: 'relic effects must come from the held relic table (relicList/hasRelic), not a hardcoded relic name; fix: replace the name comparison with a table lookup',
     });
   }
 }
