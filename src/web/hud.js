@@ -21,7 +21,6 @@ import { currentLang, t } from './i18n.js';
 import { switchLang } from './actions.js';
 import { startTour, HELP_SEEN_KEY } from './tour.js';
 
-/* ------------------------------------------------------------------------- HUD */
 
 export function renderHud() {
   hudEl.replaceChildren();
@@ -131,7 +130,6 @@ export function renderHud() {
   }));
 }
 
-/* --------------------------------------------------------------------- BELT (S5) */
 
 /**
  * The potion belt: exactly `snap.beltSlots` slots beside the gold readout — rendered in
@@ -287,7 +285,6 @@ function ordinal(n) {
   return t('ord', { n });
 }
 
-/* ----------------------------------------------------------------- HELP / GLOSSARY */
 
 export let helpOpen = false;
 // The key string itself lives in tour.js beside TOUR_SEEN_KEY — the coexistence rule
@@ -395,7 +392,6 @@ export function helpPanel() {
   return back;
 }
 
-/* --------------------------------------------------------------- DECK VIEWER (S1) */
 
 export let deckOpen = false;
 
@@ -490,7 +486,6 @@ function deckTile(c) {
   return tile;
 }
 
-/* ---------------------------------------------------------------- CARD CODEX (S2) */
 
 /**
  * The kernel's full-set LOOKUP TABLE, one row per card the shipped content could ever

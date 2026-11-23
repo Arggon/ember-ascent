@@ -811,7 +811,6 @@ export function enemyCard(e, position) {
   return card;
 }
 
-/* ----------------------------------------------- effect chips (the card icon row) */
 //
 // The kernel publishes one chip per effect (`card.chips`, kernel-worded: `{verb,
 // status?, amount, num, label, explain}`); this layer only paints glyph + number and
@@ -1187,7 +1186,6 @@ export function cardTile(card, opts = {}) {
   return wrap;
 }
 
-/* ------------------------------------------------- UX-8: the gallery fact layer */
 //
 // The codex gallery, the deck sheet and the shop's removal pick render cardTile, whose
 // hand/reward callers receive their describe-layer sentences pre-computed in the snapshot.

@@ -1,6 +1,5 @@
 // Drawing cards — the ONE implementation of "move cards from the draw pile to a hand".
 //
-// WHY THIS MODULE EXISTS
 // The loop below (reshuffle the discard when the draw pile empties, decorate the
 // instance, cap the hand at 10 and overflow to the discard) used to exist in FOUR
 // places: the turn draw (act.js), the `draw` verb (vocabulary.js), Blood Tithe

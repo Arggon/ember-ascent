@@ -15,7 +15,6 @@ import { page } from './page-frame.js';
 import { storeGet, storePut } from './run-history.js';
 import { t } from './i18n.js';
 
-/* ---------------------------------------------------------------------- MAP */
 
 /**
  * The map. `travel` is the burst for a step just taken (or null), so the node the player

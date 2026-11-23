@@ -13,7 +13,6 @@ import { page } from './page-frame.js';
 import { glyphBox, BOON_GLYPH } from './glyphs.js';
 import { t } from './i18n.js';
 
-/* ------------------------------------------------------------------ KINDLING */
 
 /** #40: a boon's price must be as plain as its gift. The kernel sentence is
  *  "upside. cost." (BOONS in rules/kindling.js); the cost gets its own line,

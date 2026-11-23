@@ -53,13 +53,11 @@ function readAnimSpeed() {
   return 1;
 }
 export let animSpeed = readAnimSpeed();
-/** Speed is the one piece of motion state the player changes at runtime (the speed dock). */
 export function setAnimSpeed(n) {
   animSpeed = n;
   applyPace();
 }
 export let animGen = 0;
-/** Advance the action generation; returns the NEW value, as `++animGen` would. */
 export function bumpAnimGen() { animGen += 1; return animGen; }
 /**
  * The hero's card movement, held for its own duration. `bursts` lives for exactly one

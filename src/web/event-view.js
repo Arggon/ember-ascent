@@ -135,7 +135,6 @@ export function eventView() {
   return page('event', t('page.event'), 'rune', 'panel', [wrap]);
 }
 
-/* --------------------------------------- the tempered face tiles (S6 + the forge) */
 
 /** The content's definition table, loaded once — the same snapshot-free source the
  *  describe layer (combat-view's gallery path) reads. Only a tile's NAME and cost are

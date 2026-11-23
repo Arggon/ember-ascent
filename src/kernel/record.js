@@ -9,9 +9,7 @@
 // fails the build if that ever stops being true. Everything here is a pure function of
 // its arguments — no clock, no `Math.random`, no I/O.
 //
-// ---------------------------------------------------------------------------
 // RECORD SCHEMA (one JSON object per line in runs.jsonl, append-only)
-// ---------------------------------------------------------------------------
 //   v             number   schema version of THIS record      [optional on read]
 //   id            string   the run's state hash (DR-3: id === the state hash)  [required]
 //   hash          string   compatibility alias of `id` for pre-DR-3 readers   [optional]

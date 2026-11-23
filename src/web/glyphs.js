@@ -1,5 +1,3 @@
-// src/web/glyphs.js — every inline-SVG mark, and the tables that map kernel names to them.
-//
 // Every mark is inline SVG built from the static table below and injected into a span.
 // Two deliberate properties worth stating:
 //   * the markup is 100% constant — no kernel value and no user input is ever
@@ -16,17 +14,6 @@
 
 import { el } from './dom.js';
 
-/* ------------------------------------------------------------------------ glyphs */
-//
-// Every mark is inline SVG built from the static table below and injected into a span.
-// Two deliberate properties worth stating:
-//   * the markup is 100% constant — no kernel value and no user input is ever
-//     interpolated into it, which is what makes innerHTML safe here;
-//   * the <svg> element carries no `xmlns` attribute, because the HTML parser places
-//     it in the SVG namespace on its own. That keeps this file free of any URL-shaped
-//     string at all, so an "no external asset" grep over src/web/ can be trusted.
-// Anything unknown falls back to a rune, so a new enemy or node type in the kernel
-// renders as a generic shape rather than an empty box.
 
 const MARKS = {
   // --- card types: crossed blades / shield / star / hourglass / skull ---
