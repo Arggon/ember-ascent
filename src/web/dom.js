@@ -7,7 +7,6 @@
 
 import { snap, toastEl, liveEl } from './runtime.js';
 
-/* ---------------------------------------------------------------- tiny DOM helper */
 
 export function el(tag, opts = {}, ...kids) {
   const node = document.createElement(tag);

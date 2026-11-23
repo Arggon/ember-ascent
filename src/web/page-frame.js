@@ -1,9 +1,3 @@
-// src/web/page-frame.js — the shared "engraved page" wrapper around every phase.
-//
-// A leaf on purpose: every view module wraps its screen in `page()`, and views sit below
-// render.js in the import graph, so the helper lives here rather than there and the paint
-// path stays a sink nothing imports back into.
-
 import { el } from './dom.js';
 import { glyphBox } from './glyphs.js';
 

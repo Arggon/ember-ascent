@@ -329,7 +329,51 @@ export function validateSave(raw) {
   }
   const actions = /** @type {Record<string, unknown>} */ (raw).actions;
   if (actions !== undefined && !Array.isArray(actions)) problems.push('save: "actions" must be an array');
+  if (st && typeof st === 'object' && !Array.isArray(st)) {
+    try {
+      canonical(st);
+    } catch (err) {
+      problems.push(`save.state: not wholly serializable — ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
   return problems;
+}
+
+const PARSED_SAVE = Symbol('ember-ascent.parsed-save');
+
+/**
+ * @typedef {{ ok: true, save: Readonly<{ state: any, actions: readonly any[] }> }
+ *   | { ok: false, problems: string[] }} ParseSaveResult
+ */
+
+/**
+ * The single entry for untrusted save objects. Returns a frozen branded value on
+ * success, so no surface can feed a raw parsed object to the session by mistake.
+ * @param {unknown} raw
+ * @returns {ParseSaveResult}
+ */
+export function parseSave(raw) {
+  const problems = validateSave(raw);
+  if (Array.isArray(raw?.actions)) {
+    for (const [i, a] of raw.actions.entries()) {
+      const shaped = a !== null && typeof a === 'object' && ('act' in a || 'reject' in a);
+      if (!shaped) problems.push(`save.actions[${i}]: entry must be {"act":...} or {"reject":...}`);
+    }
+  }
+  if (problems.length > 0) return { ok: false, problems };
+  return {
+    ok: true,
+    save: Object.freeze({
+      [PARSED_SAVE]: true,
+      state: raw.state,
+      actions: Object.freeze(raw.actions.slice()),
+    }),
+  };
+}
+
+/** @param {unknown} value @returns {boolean} */
+export function isParsedSave(value) {
+  return Boolean(value && typeof value === 'object' && value[PARSED_SAVE] === true);
 }
 
 /**

@@ -315,7 +315,6 @@ const heroParam = new URLSearchParams(location.search).get('hero');
 const heroRequested = HERO_ALIASES[heroParam] ?? heroParam;
 export let heroChoice = HEROES.some((h) => h.id === heroRequested) ? heroRequested : 'ashwright';
 
-/* --------------------------------------------------------- the one dispatch path */
 
 /**
  * Every interaction funnels here: dispatch one kernel action id, then repaint.

@@ -56,19 +56,24 @@ test('a Red-hot Hammerfall deals 9 and costs 2 HP in a real fight', () => {
   const base = newRun({ seed: 2, tempers: true });
   const strikes = base.deck.filter((c) => c.cardId === 'hammerfall').map((c) => c.uid);
   const tempered = { ...base, tempers: Object.fromEntries(strikes.map((u) => [u, 'redhot'])) };
-  let s = step(tempered, 'n1').state;
-  const slot = s.combat.hand.findIndex((c) => c.cardId === 'hammerfall');
-  assert.ok(slot >= 0, 'a Hammerfall is in the opening hand');
-  const hp0 = s.player.hp;
-  const enemyHp0 = s.combat.enemies[0].hp;
-  // S4 note: the map draw shifted (row 5 now holds the shop), so seed 2's opening fight
-  // became Twin Mites — two LIVING enemies, where the unaimed id does not exist (R6).
-  // The claim is unchanged: one aimed, tempered Hammerfall deals 9 and costs 2 HP.
-  const aim = s.combat.enemies.filter((e) => !e.dead).length > 1 ? '_1' : '';
-  s = step(s, `p${slot + 1}${aim}`).state;
-  assert.equal(s.player.hp, hp0 - 2);
-  const dealt = enemyHp0 - s.combat.enemies[0].hp;
-  assert.ok(dealt >= 9 || s.combat.enemies[0].dead, `dealt ${dealt}`);
+  const playFirstHammerfall = (run) => {
+    const s = step(run, 'n1').state;
+    const slot = s.combat.hand.findIndex((c) => c.cardId === 'hammerfall');
+    assert.ok(slot >= 0, 'a Hammerfall is in the opening hand');
+    const aim = s.combat.enemies.filter((e) => !e.dead).length > 1 ? '_1' : '';
+    const out = step(s, `p${slot + 1}${aim}`);
+    return {
+      hpCost: s.player.hp - out.state.player.hp,
+      dealt: s.combat.enemies[0].hp - out.state.combat.enemies[0].hp,
+    };
+  };
+  const hot = playFirstHammerfall(tempered);
+  const plain = playFirstHammerfall(base);
+  assert.equal(hot.dealt, 9, 'a Red-hot Hammerfall deals its printed 9');
+  assert.equal(plain.dealt, 6, 'the same card untempered deals 6');
+  assert.equal(hot.dealt - plain.dealt, 3, 'Red-hot adds exactly three damage');
+  assert.equal(hot.hpCost, 2, 'the tempered copy costs 2 HP');
+  assert.equal(plain.hpCost, 0, 'the untempered copy costs no HP');
 });
 
 test('log header carries the flag and replay matches the golden hash', () => {

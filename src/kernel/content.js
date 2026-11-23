@@ -107,10 +107,8 @@ export function loadContent(input = cardsBundle) {
   };
 }
 
-/** The shipped content object (the same data cards.json holds). */
 export const SHIPPED_CONTENT = cardsBundle;
 
-/** Default content, loaded once and shared (read-only, so sharing is safe). */
 let DEFAULT_CONTENT = null;
 /** @returns {ReturnType<typeof loadContent>} */
 export function defaultContent() {
@@ -118,7 +116,6 @@ export function defaultContent() {
   return DEFAULT_CONTENT;
 }
 
-/** Card ids that may appear as combat rewards (starters excluded). */
 export function draftPoolFrom(content) {
   return content.cardList.filter((c) => c.rarity !== 'starter').map((c) => c.id).sort();
 }

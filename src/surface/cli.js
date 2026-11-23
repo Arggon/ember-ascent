@@ -253,12 +253,10 @@ function emit(text, flags, err) {
   return text.endsWith('\n') ? text : `${text}\n`;
 }
 
-// ---------------------------------------------------------------------------
 // The command table. One named handler per subcommand — adding a command means
 // adding a handler here and a flag spec in SPECS, and nothing else. Handlers see
 // exactly what dispatch() saw (flags, positional, out, err) and return an exit code;
 // they are the only place the CLI formats output.
-// ---------------------------------------------------------------------------
 
 /** @type {Record<string, (ctx: {flags: any, positional: string[], out: Function, err: Function}) => Promise<number>>} */
 const COMMANDS = {

@@ -146,7 +146,6 @@ export const HERO_MOVES = {
   // Cinder Skin (cinder_skin): the hero STIFFENS in place — a rigid hardening while
   // the crust sets, the stillest movement in the deck (fx-cindercrust below).
   cinder_skin: 'cinderskin',
-  // ==== LOTE 8 — cartas raras: each rare card moves its own way. ====
   // Unbroken (unbroken): the body SQUARES UP and LOCKS as the plates stack onto it —
   // four small compressive beats, then a rigid clench (fx-platestack below).
   unbroken: 'lockdown',
@@ -292,7 +291,6 @@ export const HERO_SIGNATURES = {
   ash_embrace: { ashtendrils: true },
   // Cinder Skin: a crust of cinder hardens progressively OVER the hero's skin.
   cinder_skin: { cindercrust: true },
-  // ==== LOTE 8 — cartas raras: each rare card makes its own mark. ====
   // Unbroken: FOUR steel plates stack onto the hero ONE BY ONE (top-down drops) and a
   // white seal closes the set — a build, never the single plate's clank.
   unbroken: { platestack: true },

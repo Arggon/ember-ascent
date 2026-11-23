@@ -30,7 +30,6 @@ const cssSrc = readFileSync(join(ROOT, 'src/web/style.css'), 'utf8');
 const problems = [];
 const notes = [];
 
-/* ---------------------------------------------------------------- 1. class coverage */
 
 /**
  * The text of a `cls:` value, from just after the colon to the end of that argument.
@@ -216,7 +215,6 @@ if (poseKfMissing.length > 0) {
   problems.push(`animation name(s) referenced by pose rules but undefined: ${poseKfMissing.join(', ')}`);
 }
 
-/* ------------------------------------------------------- 2. braces and duplicate tops */
 
 const strippedCss = cssSrc.replace(/\/\*[\s\S]*?\*\//g, ' ');
 const opens = (strippedCss.match(/\{/g) || []).length;
@@ -287,7 +285,6 @@ const dupes = [...seen.entries()].filter(([, n]) => n > 1).map(([s, n]) => `${s}
 if (dupes.length > 0) problems.push(`duplicate top-level selector(s): ${dupes.join(', ')}`);
 notes.push(`top-level selectors: ${sels.length}, distinct ${seen.size}`);
 
-/* --------------------------------------------------------------- 3. external assets */
 
 const external = [];
 const externalTargets = [
@@ -310,7 +307,6 @@ for (const [file, src] of externalTargets) {
 }
 if (external.length > 0) problems.push(`external-asset reference(s) found: ${external.join('; ')}`);
 
-/* ------------------------------------------------------------------------ reporting */
 
 if (json) {
   process.stdout.write(`${JSON.stringify({ ok: problems.length === 0, notes, problems, missing, dupes }, null, 2)}\n`);

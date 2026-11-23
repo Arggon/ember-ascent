@@ -17,7 +17,8 @@
   "scripts": {
     "test": "node --test 'tests/**/*.test.js'",
     "test:browser": "node --test 'tests/web/*.spec.js'",
-    "gate": "node scripts/check-architecture.mjs",
+    "gate": "node scripts/check-architecture.mjs && node scripts/verify-fx-generation.mjs",
+    "verify:formal": "node scripts/verify-fx-generation.mjs",
     "tokens": "node scripts/measure-tokens.mjs",
     "sim": "node bin/dlb sim --runs 200 --seed-start 1 --policy greedy --threads 4",
     "serve": "node scripts/serve.mjs"

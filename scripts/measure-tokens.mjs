@@ -32,7 +32,6 @@ export function countWorst(text) {
   return { o200k_base: o, cl100k_base: c, worst: Math.max(o, c) };
 }
 
-// ---------------------------------------------------------------------------
 // CLI spike — only when run directly, never on import.
 // ---------------------------------------------------------------------------
 

@@ -1,6 +1,5 @@
 // Card runtime instances — the ONE place a deck instance becomes a hand card.
 //
-// WHY THIS MODULE EXISTS
 // Deck instances are stored compactly (`{uid, cardId, perPlay}`) so a save never duplicates
 // content definitions. A card in the HAND additionally needs `cost`, because legality
 // checks and rendering both read it and neither should re-read content mid-turn.

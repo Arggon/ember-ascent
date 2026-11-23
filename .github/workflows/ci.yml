@@ -1,13 +1,10 @@
 name: CI
 
-# Runs on every pull request (any base branch, so stacked PRs get checks too) and on
-# pushes to main. Nothing else triggers it, to keep within the free Actions minutes.
 on:
   pull_request:
   push:
     branches: [main]
 
-# A newer push to the same PR/branch cancels the run still in progress.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

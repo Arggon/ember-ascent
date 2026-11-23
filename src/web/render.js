@@ -73,7 +73,6 @@ import { sceneBeat } from './fx.js';
 import { page } from './page-frame.js';
 import { setRepaint } from './runtime.js';
 
-/* ----------------------------------------------------------------------- STAGE */
 
 /**
  * How long the end-of-run panel is held back on the motion path, so the killing blow is a
