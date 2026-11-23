@@ -194,7 +194,7 @@ test('validateSave: relics is an optional array of strings; duplicates are refus
   const save = (relics) => ({
     formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 4, character: 'ashwright',
     difficulty: 0, stepIndex: 0, rngDraws: 0,
-    state: { ...base, relics, phase: 'map', act: 1, floor: -1, contentVersion: 'x' },
+    state: { ...base, ...(relics === undefined ? {} : { relics }), phase: 'map', act: 1, floor: -1, contentVersion: 'x' },
   });
   assert.deepEqual(validateSave(save(undefined)), [], 'absent (legacy) is fine');
   assert.deepEqual(validateSave(save(['kindled_heart'])), []);

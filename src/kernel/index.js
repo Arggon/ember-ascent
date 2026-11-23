@@ -73,7 +73,7 @@ export {
   helpTopics,
 };
 export { actions } from './actions.js';
-export { FORMAT_VERSION, ENGINE_VERSION, validateSave, toSave, serializeSave } from './state.js';
+export { FORMAT_VERSION, ENGINE_VERSION, validateSave, parseSave, isParsedSave, toSave, serializeSave } from './state.js';
 // The DE-STS rename shim: legacy ids -> Ember ids at load time (the NAMES.md
 // compatibility break). Surfaces reach it through this ONE entry point (R1).
 export { LEGACY_ID_MAP, migrateLegacySave, HERO_ALIASES } from './legacy-ids.js';

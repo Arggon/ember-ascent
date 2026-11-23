@@ -317,7 +317,7 @@ test('validateSave: relicPool is an optional array of strings; duplicates are re
   const save = (relicPool) => ({
     formatVersion: 1, engineVersion: 'x', contentVersion: 'x', seed: 4, character: 'ashwright',
     difficulty: 0, stepIndex: 0, rngDraws: 0,
-    state: { ...base, relicPool, phase: 'map', act: 1, floor: -1, contentVersion: 'x' },
+    state: { ...base, ...(relicPool === undefined ? {} : { relicPool }), phase: 'map', act: 1, floor: -1, contentVersion: 'x' },
   });
   assert.deepEqual(validateSave(save(undefined)), [], 'absent (legacy) is fine');
   assert.deepEqual(validateSave(save(['kindled_heart', 'deep_well'])), [], 'a real pool is fine');
