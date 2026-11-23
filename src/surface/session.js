@@ -25,7 +25,7 @@ import {
   helpTopics,
   hash,
   toSave,
-  validateSave,
+  parseSave,
   serializeSave,
   canonical,
   ENGINE_VERSION,
@@ -196,19 +196,10 @@ export function saveText(session) {
  * @returns {{ok: true, session: any} | {ok: false, problems: string[]}}
  */
 export function loadObject(raw) {
-  const problems = validateSave(raw);
-  if (Array.isArray(raw?.actions)) {
-    for (const [i, a] of raw.actions.entries()) {
-      const shaped = a !== null && typeof a === 'object' && ('act' in a || 'reject' in a);
-      if (!shaped) problems.push(`save.actions[${i}]: entry must be {"act":...} or {"reject":...}`);
-    }
-  }
-  if (problems.length > 0) return { ok: false, problems };
-  // A save file carries the actions but never the event stream (the save format is
-  // frozen), so a restored session starts with an empty one. That is honest: a run
-  // restored mid-play cannot report kills it did not observe after the restore.
-  const migrated = migrateLegacySave(raw);
-  return { ok: true, session: { state: migrated.state, submitted: raw.actions.slice(), events: [] } };
+  const parsed = parseSave(raw);
+  if (!parsed.ok) return { ok: false, problems: parsed.problems };
+  const migrated = migrateLegacySave(parsed.save);
+  return { ok: true, session: { state: migrated.state, submitted: parsed.save.actions.slice(), events: [] } };
 }
 
 /** Log header line object for a session's originating run. */

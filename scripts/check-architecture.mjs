@@ -38,6 +38,9 @@ rules enforced
   R1c  state mutation (Object.assign on state, direct .prop = on a state arg) only inside kernel
   R3   kernel must not import node:perf_hooks, read Date, or call Math.random
   R3   kernel must import NO node:* builtin at all (so it runs in a browser unmodified)
+  SAVE1 parseSave(raw) is the only save entry for callers outside the kernel
+  SAVE2 only surface/session.js may call parseSave; every other surface goes through loadObject
+  SAVE3 loadObject must branch on parseSave(raw).ok
 
 exit codes
   0  clean
@@ -58,6 +61,10 @@ function walk(dir) {
     else if (full.endsWith('.js')) out.push(full);
   }
   return out;
+}
+
+function stripComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 }
 
 /** Static import/export-from specifiers in a file, via regex over the source. */
@@ -159,6 +166,32 @@ for (const file of files) {
       }
     });
   }
+}
+
+const STATE_FILE = 'src/kernel/state.js';
+const SESSION_FILE = 'src/surface/session.js';
+for (const file of files) {
+  const rel = relative(root, file);
+  const text = stripComments(readFileSync(file, 'utf8'));
+  if (rel !== STATE_FILE && /\bvalidateSave\s*\(/.test(text)) {
+    violations.push({
+      rule: 'SAVE1', file: rel,
+      detail: 'use parseSave(raw) from src/kernel/state.js; it returns a branded validated save or a problem list',
+    });
+  }
+  if (rel !== SESSION_FILE && rel !== STATE_FILE && /\bparseSave\s*\(/.test(text)) {
+    violations.push({
+      rule: 'SAVE2', file: rel,
+      detail: 'load saves through loadObject() in src/surface/session.js, the single boundary',
+    });
+  }
+}
+const sessionText = stripComments(readFileSync(join(root, SESSION_FILE), 'utf8'));
+if (!/\bparseSave\s*\(/.test(sessionText) || !/\bparsed\s*\.\s*ok\b/.test(sessionText)) {
+  violations.push({
+    rule: 'SAVE3', file: SESSION_FILE,
+    detail: 'loadObject must branch on parseSave(raw).ok; fix: const parsed = parseSave(raw); if (!parsed.ok) return { ok: false, problems: parsed.problems }',
+  });
 }
 
 // The public surface is a frozen list: kernel/index.js and nothing else (R1).
